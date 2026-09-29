@@ -320,6 +320,8 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// Sombras só do cenário (estático): o mapa de sombra é desenhado uma vez por mapa, não a cada frame.
+renderer.shadowMap.autoUpdate = false;
 renderer.autoClear = false;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(CFG.fov, innerWidth / innerHeight, .05, 600);
@@ -418,6 +420,19 @@ function buildMap(id) {
   SPAWNS.a = M.spawns.map(([x, z]) => [x, 0, z]);
   SPAWNS.b = M.spawns.map(([x, z]) => [-x, 0, -z]);
   buildNav(M);
+  renderer.shadowMap.needsUpdate = true;
+  // Compila os shaders agora. Senão cada material novo que entra na tela ao girar
+  // compila na hora e trava a câmera por alguns frames.
+  const warm = new THREE.Group();
+  warm.add(playerModel('#888888'), gunModel('ak47'), nameSprite('x', '#fff'));
+  warm.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, transparent: true, depthWrite: false })));
+  warm.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(), new V3(0, 1, 0)]), new THREE.LineBasicMaterial({ transparent: true })));
+  warm.add(new THREE.Mesh(new THREE.SphereGeometry(.1), new THREE.MeshBasicMaterial({ transparent: true })));
+  scene.add(warm);
+  renderer.compile(scene, camera);
+  renderer.compile(vmScene, vmCam);
+  scene.remove(warm);
+  warm.traverse(o => { o.geometry?.dispose(); if (o.material?.map !== SOFT) o.material?.map?.dispose(); });
 }
 
 // ---------- navegação dos bots (grade automática) ----------
@@ -685,7 +700,6 @@ function playerModel(color) {
   bx(arms, .12, .12, .42, .22, 0, -.18, bodyM); bx(arms, .12, .12, .42, -.1, -.02, -.26, bodyM);
   bx(arms, .1, .1, .1, .15, -.02, -.4, skin); bx(arms, .1, .1, .1, -.02, 0, -.48, skin);
   const gh = new THREE.Group(); gh.position.set(.1, -.02, -.42); arms.add(gh);
-  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   g.userData = { inner, legL, legR, arms, gh, head, bodyM };
   return g;
 }
@@ -1453,7 +1467,7 @@ function updateRoomInfo() {
   $('#cpLink') && ($('#cpLink').onclick = () => cp(url));
 }
 const fmtT = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
-let hudCache = {};
+let hudCache = {}, fps = 0, fpsN = 0, fpsT = 0;
 function setHTML(id, html) { if (hudCache[id] !== html) { hudCache[id] = html; document.getElementById(id).innerHTML = html; } }
 function updateHud(dt) {
   const w = W[G.cur], st = C.st || {};
@@ -1511,7 +1525,9 @@ function updateHud(dt) {
     setHTML('board', `<h2>Placar${C.round && st.mode === 'rounds' ? ' · Rodada ' + C.round : ''}</h2><table><tr><th>Jogador</th>${st.mode === 'rounds' ? '<th>Rodadas</th>' : ''}<th>Abates</th><th>Mortes</th>${st.mode === 'rounds' ? '<th>$</th>' : ''}</tr>` +
       rows.map(p => `<tr class="${p.id === C.myId ? 'me' : ''} ${p.al ? '' : 'dead'}"><td><span style="color:${esc(p.c)}">■</span> ${esc(p.n)}${p.b ? ' <small>(bot)</small>' : ''}</td>${st.mode === 'rounds' ? `<td>${p.rw}</td>` : ''}<td>${p.k}</td><td>${p.d}</td>${st.mode === 'rounds' ? `<td>${p.id === C.myId || p.b ? '$' + p.m : '-'}</td>` : ''}</tr>`).join('') + '</table>');
   }
-  $('#net').textContent = NET.isHost ? `host · ${S.players.size} jogador(es)` : '';
+  fpsN++; fpsT += dt; if (fpsT >= .5) { fps = Math.round(fpsN / fpsT); fpsN = 0; fpsT = 0; }
+  const net = `${fps} FPS` + (NET.isHost ? ` · host · ${S.players.size} jogador(es)` : '');
+  if ($('#net').textContent !== net) $('#net').textContent = net;
 }
 function renderBuy() {
   const el = $('#buy');
@@ -1574,8 +1590,14 @@ canvas.addEventListener('mousedown', e => {
 });
 addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; });
 addEventListener('contextmenu', e => { if (inGame) e.preventDefault(); });
+let mouseAvg = 0;
 addEventListener('mousemove', e => {
   if (!locked()) return;
+  // O Chrome no Windows às vezes manda um movementX enorme e falso durante um giro rápido,
+  // e a câmera dá um tranco. Descarta o pico isolado; giro rápido de verdade sobe a média antes.
+  const mag = Math.abs(e.movementX) + Math.abs(e.movementY);
+  if (mag > 200 && mag > mouseAvg * 6 + 60) { mouseAvg = mouseAvg * .8 + 12; return; }
+  mouseAvg = mouseAvg * .8 + mag * .2;
   const w = W[G.cur], fovK = (w?.scope && G.scope > 0) ? w.scope[G.scope - 1] / CFG.fov : 1;
   const k = .0022 * CFG.sens * fovK;
   if (me.alive) { me.yaw -= e.movementX * k; me.pitch = clamp(me.pitch - e.movementY * k, -1.55, 1.55); }
@@ -1586,7 +1608,13 @@ function openChat() { C.chatOpen = true; const i = $('#chatin'); i.classList.rem
 function closeChat() { C.chatOpen = false; const i = $('#chatin'); i.blur(); i.classList.add('hidden'); if (!locked()) $('#click').classList.remove('hidden'); }
 function requestLock() {
   audioInit();
-  try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => toast('Clique de novo para travar o mouse', 2)); } catch (e) { }
+  const retry = () => toast('Clique de novo para travar o mouse', 2);
+  const plain = () => { try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(retry); } catch (e) { } };
+  // unadjustedMovement = movimento cru do mouse (sem aceleração do Windows e sem os saltos do Chrome)
+  try {
+    const r = canvas.requestPointerLock({ unadjustedMovement: true });
+    if (r && r.catch) r.catch(err => err?.name === 'NotSupportedError' ? plain() : retry());
+  } catch (e) { plain(); }
 }
 document.addEventListener('pointerlockchange', () => {
   if (!inGame) return;
@@ -1634,6 +1662,7 @@ function settingsForm(el) {
 function applySettings() {
   if (MASTER) MASTER.gain.value = CFG.vol;
   sun.castShadow = CFG.shadows;
+  renderer.shadowMap.needsUpdate = true;
 }
 const lastSt = load('lastSt', { map: 'arena', mode: 'rounds', rounds: 8, frags: 20, bots: 0, diff: 1 });
 const getHostForm = matchForm($('#hostForm'), lastSt);
