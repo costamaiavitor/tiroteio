@@ -1,6 +1,6 @@
 # Tiroteio
 
-FPS multiplayer estilo Counter-Strike que roda direto no navegador. Feito para x1 com amigos, cada um no seu computador.
+FPS multiplayer que roda direto no navegador: x1 estilo Counter-Strike e um modo Zumbis cooperativo estilo Call of Duty. Cada um joga no seu computador.
 
 ## Como jogar
 
@@ -12,13 +12,28 @@ Funciona na mesma rede Wi-Fi ou em casas diferentes pela internet. A conexão é
 
 O host roda a partida no navegador dele. Se o host fechar a aba, a partida acaba.
 
-## Conteúdo
+## Modos
 
-- **Modos:** Rodadas (estilo CS: uma vida por rodada, dinheiro, compra no começo da rodada) e Mata-mata (renasce, tudo grátis).
-- **Mapas:** Arena, Deserto, Armazém, Favela, Posto de Neve.
-- **Armas:** Faca, Glock-18, USP-S, P250, Desert Eagle, MP5-SD, P90, Nova, AK-47, M4A4, SSG 08, AWP, granada HE, fumaça, colete e capacete.
-- **Bots** (0 a 7, três dificuldades) para treinar sozinho ou completar a sala.
-- Headshot, recuo, dispersão por movimento, dano por distância, colete, som posicional (dá pra ouvir passos).
+- **Rodadas:** estilo CS. Uma vida por rodada, dinheiro, compra no começo da rodada.
+- **Mata-mata:** renasce, tudo grátis.
+- **Zumbis:** cooperativo (até 4), inspirado no CoD Zombies. Veja abaixo.
+
+## Modo Zumbis
+
+Mapa **Sanatório**, com seis cômodos. Vocês começam na Recepção com uma M1911 e 500 pontos.
+
+- **Rodadas infinitas.** A vida dos zumbis segue a fórmula do CoD (150 na rodada 1, +100 por rodada até a 9, depois ×1,1). A quantidade cresce a cada rodada. Os zumbis começam andando e passam a correr e disparar nas rodadas altas.
+- **Pontos:** 10 por acerto; ao matar, 60 (corpo), 100 (headshot) ou 130 (faca). Consertar janela dá 10 por tábua.
+- **Janelas:** os zumbis vêm de fora, arrancam as tábuas e pulam para dentro. Segure F perto da janela para pregar as tábuas de volta. No Pátio eles também saem do chão.
+- **Portas e entulho** (750 a 1250) liberam novos cômodos, com mais armas e mais janelas.
+- **Armas de parede** (contorno de giz): M14, Olympia, MP40, MP5K, AK-74u, Stakeout, granadas e Faca Bowie. Se você já tem a arma, compra munição pela metade do preço.
+- **Caixa Misteriosa (950):** arma aleatória: Ray Gun, Arma Trovão, Galil, Commando, FAL, RPK, HK21, SPAS-12, Python, CZ75, Dragunov, China Lake ou Macacos com Pratos. Às vezes sai o ursinho: você recebe os pontos de volta e a caixa muda de lugar.
+- **Energia:** fica no Laboratório. Ligue para ativar as bebidas e o Pack-a-Punch.
+- **Bebidas** (máximo de 4): Juggernog (aguenta 5 golpes), Speed Cola (recarrega rápido), Double Tap (atira mais rápido), Quick Revive (reanima rápido; sozinho, te levanta até 3 vezes) e Stamin-Up (corre mais).
+- **Pack-a-Punch (5000):** fica no Teatro. Dobra o dano, aumenta o pente e dá nome e camuflagem novos à arma (a M1911 vira a explosiva Mustang & Sally).
+- **Power-ups:** caem dos zumbis e duram 26s no chão. São eles: Munição Máxima, Insta-Kill, Pontos em Dobro, Nuke (+400) e Carpinteiro (+200).
+- **Cães do inferno:** uma rodada especial de tempos em tempos. O último cão sempre solta Munição Máxima.
+- **Cair e reanimar:** com a vida zerada, você cai com uma pistola e tem 45s para alguém segurar F em você. Quem sangra volta na rodada seguinte, com a M1911 e os mesmos pontos. Se todos caírem, fim de jogo.
 
 ## Controles
 
@@ -34,15 +49,17 @@ O host roda a partida no navegador dele. Se o host fechar a aba, a partida acaba
 | 1 2 3 4 | Primária, pistola, faca, granadas |
 | Q / roda do mouse | Arma anterior / trocar arma |
 | B | Menu de compra (números escolhem) |
+| F | Zumbis: comprar, abrir porta, usar a caixa; segure para consertar janela e reanimar |
+| V | Zumbis: facada rápida |
 | Tab | Placar |
 | Y ou Enter | Chat |
-| Esc | Pausa, configurações e troca de mapa (host) |
+| Esc | Pausa, configurações e troca de modo/mapa (host) |
 
 ## Problemas comuns
 
 - **"Sala não encontrada":** confira o código. O código muda toda vez que o host cria uma sala nova.
 - **Fica em "Conectando..." e dá tempo esgotado:** algumas redes (faculdade, empresa, 4G com CGNAT) bloqueiam conexão P2P. Tente outra rede ou roteie pelo celular.
-- **Travando:** desligue as sombras nas configurações.
+- **Travando:** desligue as sombras nas configurações. O FPS aparece no rodapé.
 
 ## Tecnologia
 
