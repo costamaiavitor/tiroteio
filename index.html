@@ -47,9 +47,8 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #hud{position:fixed;inset:0;pointer-events:none;z-index:10;text-shadow:0 1px 3px #000,0 0 2px #000}
 #xhair{position:absolute;left:50%;top:50%}
 #xhair i{position:absolute;background:#6cff6c;box-shadow:0 0 1px #000}
-#xhair .t,#xhair .b{width:2px;height:8px;left:-1px}
-#xhair .l,#xhair .r{height:2px;width:8px;top:-1px}
-#xhair .d{width:2px;height:2px;left:-1px;top:-1px}
+#xhair .v{width:2px;height:18px;left:-1px;top:-9px}
+#xhair .h{width:18px;height:2px;left:-9px;top:-1px}
 #hitmark{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px;opacity:0}
 #hitmark:before,#hitmark:after{content:"";position:absolute;left:12px;top:0;width:2px;height:26px;background:#fff;transform:rotate(45deg);-webkit-mask:linear-gradient(#000 35%,transparent 35% 65%,#000 65%);mask:linear-gradient(#000 35%,transparent 35% 65%,#000 65%)}
 #hitmark:after{transform:rotate(-45deg)}
@@ -111,7 +110,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 
 <div id="hud" class="hidden">
   <div id="scope" class="hidden"></div>
-  <div id="xhair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="d"></i></div>
+  <div id="xhair"><i class="v"></i><i class="h"></i></div>
   <div id="hitmark"></div>
   <div id="dmgflash"></div>
   <div id="dmgdir"></div>
@@ -766,7 +765,6 @@ function calcSpread(w) {
   s += (w.move || 0) * mf;
   if (!me.onGround) s += w.air ?? .15;
   if (me.crouch && me.onGround) s *= .75;
-  s += (w.recoil || 0) * .22 * Math.min(G.shots, 10) * (w.auto ? 1 : .4);
   return s;
 }
 function perturb(dir, spread) {
@@ -810,8 +808,6 @@ function shoot() {
   if (dmgBy.size) { showHitmarker(hs); play(hs ? 'hs' : 'hit'); }
   sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: ends });
   play(w.snd); muzzleFlash(mz); vmFlashUntil = now + .05; G.kick = 1;
-  G.punchP += w.recoil * (1 + Math.min(G.shots, 10) * .12);
-  if (G.shots > 3) G.punchY += (Math.random() - .5) * w.recoil * 1.6;
   if (w.scope && G.scope) { G.rezoom = G.scope; G.scope = 0; }
   if (a.mag === 0 && a.res > 0) setTimeout(startReload, 250);
 }
@@ -1406,7 +1402,6 @@ function onMsg(m) {
         me.hp = m.hp; me.armor = m.ar; play('hurt');
         const f = $('#dmgflash'); f.style.transition = 'none'; f.style.opacity = Math.min(1, .35 + m.d / 60); requestAnimationFrame(() => { f.style.transition = 'opacity .8s'; f.style.opacity = 0; });
         if (m.ap) { const yawTo = Math.atan2(-(m.ap[0] - me.pos.x), -(m.ap[1] - me.pos.z)), rel = angDiff(me.yaw, yawTo); const a = document.createElement('div'); a.className = 'arc'; a.style.transform = `rotate(${-rel}rad)`; $('#dmgdir').appendChild(a); setTimeout(() => a.style.opacity = 0, 50); setTimeout(() => a.remove(), 1100); }
-        G.punchP += .02;
       }
       break;
     }
@@ -1465,13 +1460,7 @@ function updateHud(dt) {
   // mira
   const scoped = me.alive && w?.scope && G.scope > 0;
   $('#scope').classList.toggle('hidden', !scoped);
-  const showX = me.alive && !scoped && !(w?.scope);
-  const xh = $('#xhair'); xh.style.display = showX ? '' : 'none';
-  if (showX && w?.spread != null) {
-    const gap = 3 + calcSpread(w) * 700 + G.punchP * 60;
-    xh.children[0].style.top = (-gap - 8) + 'px'; xh.children[1].style.top = gap + 'px'; xh.children[2].style.left = (-gap - 8) + 'px'; xh.children[3].style.left = gap + 'px';
-  } else if (showX) { for (let i = 0; i < 4; i++) xh.children[i].style.display = w?.slot === 'knife' || w?.slot === 'nade' ? 'none' : ''; }
-  if (showX && w?.spread != null) for (let i = 0; i < 4; i++) xh.children[i].style.display = '';
+  $('#xhair').style.display = me.alive && !scoped ? '' : 'none';
   // topo
   const ps = [...C.players.values()];
   let score = '';
