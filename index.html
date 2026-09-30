@@ -2506,15 +2506,15 @@ const ARMS = { holder: null, root: null, mixer: null, clips: {}, cur: null, knif
 const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] };
 function loadArms() {
   new GLTFLoader().load('assets/arms.glb', g => {
-    const root = g.scene, A = armMats(); root.updateMatrixWorld(true);
+    const root = g.scene; root.updateMatrixWorld(true);
     const cam = root.getObjectByName('Cam'), holder = new THREE.Group();
-    const rep = (m, n) => { const c = m.clone(); for (const k of ['map', 'bumpMap']) if (c[k]) { c[k] = c[k].clone(); c[k].repeat.set(n, n); c[k].needsUpdate = true; } return c; };
-    const sleeve = rep(A.sleeve, 2.5), glove = rep(A.hand, 4); // a UV do corpo inteiro é grande: repete a trama para o tecido ficar na escala certa
     holder.matrixAutoUpdate = false; holder.matrix.copy(cam.matrixWorld).invert(); holder.add(root); // a câmera do Blender vira a câmera do jogo
     root.traverse(o => {
       if (!o.isMesh) return;
       o.frustumCulled = false; o.geometry.userData.keep = true; o.castShadow = false;
-      o.material = o.material.name === 'sleeve' ? sleeve : glove;
+      // texturas assadas no Blender (camuflado, couro da luva, punho elástico); o material do glTF vinha espelhado demais
+      const M = o.material, R = { glove: [.62, .3, 1], sleeve: [.95, .3, 1.45], cuff: [.8, .35, 1] }[M.name] || [.8, .4, 1];
+      o.material = new THREE.MeshStandardMaterial({ name: M.name, map: M.map, normalMap: M.normalMap, normalScale: new THREE.Vector2(1, -1), roughness: R[0], metalness: 0, envMapIntensity: R[1], color: new THREE.Color(R[2], R[2], R[2]) });
     });
     const all = new THREE.AnimationClip('all', -1, g.animations.flatMap(a => a.tracks));
     ARMS.mixer = new THREE.AnimationMixer(root);

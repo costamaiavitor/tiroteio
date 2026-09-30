@@ -9,5 +9,5 @@ os.makedirs(os.path.dirname(out), exist_ok=True)
 bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', use_selection=True, export_cameras=True, export_animations=True,
     export_animation_mode='SCENE', export_force_sampling=True, export_bake_animation=True, export_frame_range=True,
     export_anim_single_armature=True, export_optimize_animation_size=True, export_def_bones=False, export_yup=True,
-    export_apply=False, export_morph=False, export_texcoords=True, export_normals=True, export_materials='EXPORT', export_image_format='NONE')
+    export_apply=False, export_morph=False, export_texcoords=True, export_normals=True, export_materials='EXPORT', export_image_format='JPEG', export_jpeg_quality=88)
 print(out, os.path.getsize(out))

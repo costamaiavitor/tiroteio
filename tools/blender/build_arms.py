@@ -32,35 +32,41 @@ for s in 'lr':
     ARM[f'upperarm_{s}'] = 'upper'
 gi = {g.index: g.name for g in bm_obj.vertex_groups}
 me = bm_obj.data
-keep, glove = set(), set()
+# região de cada vértice pela posição ao longo do antebraço (t = 0 cotovelo, 1 pulso): anel reto, sem serrilhado
+def tpar(co, s):
+    b = rig.data.bones[f'lowerarm_{s}']; h, t = b.head_local, b.tail_local
+    return (co - h).dot(t - h) / (t - h).length_squared
+keep, side, T = set(), {}, {}
 for v in me.vertices:
     best, bw = None, 0
     for g in v.groups:
         n = gi[g.group]
         if n in ARM or n.startswith(('clavicle', 'spine', 'neck', 'head', 'pelvis', 'thigh', 'calf', 'foot', 'ball')):
             if g.weight > bw: best, bw = n, g.weight
-    if best in ARM:
-        kind, side = ARM[best], best[-1]
-        if kind == 'upper':
-            b = rig.data.bones[best]; h, t = b.head_local, b.tail_local
-            k = (v.co - h).dot(t - h) / (t - h).length_squared
-            if k < .45: continue
-        keep.add(v.index)
-        if kind == 'hand': glove.add(v.index)
-        if kind == 'lower':
-            b = rig.data.bones[best]; h, t = b.head_local, b.tail_local
-            if (v.co - h).dot(t - h) / (t - h).length_squared > .9: glove.add(v.index)
+    if best not in ARM: continue
+    s = best[-1]
+    if ARM[best] == 'upper':
+        b = rig.data.bones[best]; h, t = b.head_local, b.tail_local
+        if (v.co - h).dot(t - h) / (t - h).length_squared < .45: continue
+    keep.add(v.index); side[v.index] = s
+    T[v.index] = 2.0 if ARM[best] == 'hand' else tpar(v.co, s)
+GL, CU = .93, .8   # luva a partir de 93% do antebraço; punho elástico entre 80% e 93%
+def region(t): return 0 if t > GL else 2 if t > CU else 1   # 0 luva, 1 manga, 2 punho
 def mat(name, col, rough):
     m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
     m.use_nodes = True; p = m.node_tree.nodes.get('Principled BSDF')
     p.inputs['Base Color'].default_value = (*col, 1); p.inputs['Roughness'].default_value = rough; m.diffuse_color = (*col, 1)
     return m
-me.materials.clear(); me.materials.append(mat('glove', (.035, .033, .032), .55)); me.materials.append(mat('sleeve', (.22, .2, .15), .85))
+me.materials.clear()
+for n, c, r in (('glove', (.035, .033, .032), .55), ('sleeve', (.3, .28, .2), .9), ('cuff', (.06, .06, .065), .8)): me.materials.append(mat(n, c, r))
 bm = bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table(); bm.normal_update()
-for f in bm.faces: f.material_index = 0 if all(v.index in glove for v in f.verts) else 1
-# manga mais grossa que o braço (tecido por cima), luva justa
+for f in bm.faces:
+    if all(v.index in keep for v in f.verts):
+        f.material_index = region(sum(T[v.index] for v in f.verts) / len(f.verts))
+# espessuras: manga larga por cima, punho um pouco mais justo, luva colada
+PUSH = {0: .0035, 1: .013, 2: .009}
 for v in bm.verts:
-    if v.index in keep: v.co += v.normal * (.0035 if v.index in glove else .012)
+    if v.index in keep: v.co += v.normal * PUSH[region(T[v.index])]
 bmesh.ops.delete(bm, geom=[bm.verts[i] for i in range(len(bm.verts)) if i not in keep], context='VERTS')
 bm.to_mesh(me); bm.free()
 for p in me.polygons: p.use_smooth = True
