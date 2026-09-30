@@ -35,6 +35,16 @@ Mapa **Sanatório**, com seis cômodos. Vocês começam na Recepção com uma M1
 - **Cães do inferno:** uma rodada especial de tempos em tempos. O último cão sempre solta Munição Máxima.
 - **Cair e reanimar:** com a vida zerada, você cai com uma pistola e tem 45s para alguém segurar F em você. Quem sangra volta na rodada seguinte, com a M1911 e os mesmos pontos. Se todos caírem, fim de jogo.
 
+## Gráficos
+
+Em Esc → Configurações → **Gráficos**:
+
+- **Baixo:** resolução reduzida e sem sombras, para notebook fraco.
+- **Médio:** céu com degradê e nuvens (ou estrelas), texturas com relevo, faíscas, cápsulas e sangue no chão.
+- **Alto:** tudo do Médio, mais brilho (bloom) nas luzes, olhos dos zumbis e clarões, sombras de jogadores e zumbis, e resolução cheia.
+
+Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Médio para integrada.
+
 ## Controles
 
 | Tecla | Ação |
@@ -51,6 +61,7 @@ Mapa **Sanatório**, com seis cômodos. Vocês começam na Recepção com uma M1
 | B | Menu de compra (números escolhem) |
 | F | Zumbis: comprar, abrir porta, usar a caixa; segure para consertar janela e reanimar |
 | V | Zumbis: facada rápida |
+| Shift + W | Zumbis: correr (fôlego limitado, Stamin-Up dobra; atirar interrompe a corrida) |
 | Tab | Placar |
 | Y ou Enter | Chat |
 | Esc | Pausa, configurações e troca de modo/mapa (host) |
@@ -59,7 +70,7 @@ Mapa **Sanatório**, com seis cômodos. Vocês começam na Recepção com uma M1
 
 - **"Sala não encontrada":** confira o código. O código muda toda vez que o host cria uma sala nova.
 - **Fica em "Conectando..." e dá tempo esgotado:** algumas redes (faculdade, empresa, 4G com CGNAT) bloqueiam conexão P2P. Tente outra rede ou roteie pelo celular.
-- **Travando:** desligue as sombras nas configurações. O FPS aparece no rodapé.
+- **Travando:** em Esc → Configurações, baixe **Gráficos** para Médio ou Baixo, ou desligue as sombras. O FPS aparece no rodapé.
 
 ## Tecnologia
 
