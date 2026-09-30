@@ -2299,7 +2299,7 @@ function updateMe(dt) {
 let posT = 0;
 function sendPos(dt) {
   posT -= dt; if (posT > 0 || !me.alive) return; posT = 1 / 30;
-  sendToHost({ t: 'pos', p: [r3(me.pos.x), r3(me.pos.y), r3(me.pos.z)], y: r3(me.yaw), pi: r3(me.pitch), c: me.crouch ? 1 : 0, w: G.cur });
+  sendToHostFast({ t: 'pos', p: [r3(me.pos.x), r3(me.pos.y), r3(me.pos.z)], y: r3(me.yaw), pi: r3(me.pitch), c: me.crouch ? 1 : 0, w: G.cur, ts: r3(now) });
 }
 function localSpawn(m) {
   me.pos.set(m.p[0], m.p[1], m.p[2]); me.vel.set(0, 0, 0); me.yaw = m.y; me.pitch = 0;
@@ -2334,15 +2334,17 @@ function refreshRemoteInfo(rp) {
   if (info.n !== rp.name) { rp.name = info.n; if (rp.tag) rp.model.remove(rp.tag); rp.tag = nameSprite(info.n, info.c); rp.model.add(rp.tag); }
 }
 function updateRemotes(dt) {
-  const rt = now - .1;
   for (const rp of R.values()) {
-    const ud = rp.model.userData, buf = rp.buf;
+    const ud = rp.model.userData, buf = rp.buf, rt = now - (rp.delay || .1);
     if (buf.length) {
       let a = null, b = null;
       for (let i = buf.length - 1; i >= 0; i--) if (buf[i].t <= rt) { a = buf[i]; b = buf[i + 1] || null; break; }
       if (!a) a = buf[0];
       if (b) { const k = clamp((rt - a.t) / Math.max(1e-3, b.t - a.t), 0, 1); rp.pos.set(lerp(a.p[0], b.p[0], k), lerp(a.p[1], b.p[1], k), lerp(a.p[2], b.p[2], k)); rp.yaw = a.y + angDiff(a.y, b.y) * k; rp.pitch = lerp(a.pi, b.pi, k); rp.crouch = b.c; }
-      else { rp.pos.set(a.p[0], a.p[1], a.p[2]); rp.yaw = a.y; rp.pitch = a.pi; rp.crouch = a.c; }
+      else { // sem dado novo ainda: segue a última velocidade por até 150 ms em vez de parar e dar um pulo
+        const pv = buf.length > 1 && a === buf[buf.length - 1] ? buf[buf.length - 2] : null, e = pv ? clamp(rt - a.t, 0, .15) / Math.max(.02, a.t - pv.t) : 0;
+        rp.pos.set(a.p[0] + (pv ? (a.p[0] - pv.p[0]) * e : 0), a.p[1], a.p[2] + (pv ? (a.p[2] - pv.p[2]) * e : 0)); rp.yaw = a.y; rp.pitch = a.pi; rp.crouch = a.c;
+      }
       while (buf.length > 2 && buf[1].t < rt) buf.shift();
     }
     const sp = Math.hypot(rp.pos.x - rp.last.x, rp.pos.z - rp.last.z) / Math.max(dt, 1e-3), vy = Math.abs(rp.pos.y - rp.last.y) / Math.max(dt, 1e-3);
@@ -2450,6 +2452,45 @@ const ICE = { iceServers: [
     .map(urls => ({ urls, username: '7e5e8e438db7850a900283eb', credential: 'lsm3R6Mx0fBbhLeX' })),
 ] };
 const NET = { peer: null, isHost: false, code: null, conns: new Map(), hostConn: null, online: false };
+// Canal rápido: posições e zumbis vão num canal WebRTC sem retransmissão e sem ordem. No canal confiável,
+// um pacote perdido segura todos os seguintes até ser reenviado — é isso que dava os "travões".
+// Só é usado depois que chega algo do outro lado por ele (versão antiga do jogo continua no canal normal).
+const FAST_ID = 101;
+function attachFast(conn, onData) {
+  if (conn.fast) return;
+  try {
+    const dc = conn.peerConnection.createDataChannel('rapido', { negotiated: true, id: FAST_ID, ordered: false, maxRetransmits: 0 });
+    conn.fast = dc;
+    dc.onmessage = e => { conn.fastOk = true; let m; try { m = JSON.parse(e.data); } catch (err) { return; } if (m.t !== 'ping') onData(m); };
+    dc.onopen = () => { let n = 0; const iv = setInterval(() => { if (dc.readyState !== 'open' || n++ > 20) return clearInterval(iv); try { dc.send('{"t":"ping"}'); } catch (e) { } if (conn.fastOk && n > 3) clearInterval(iv); }, 500); };
+  } catch (e) { console.warn('canal rápido indisponível', e); }
+}
+function sendFastTo(conn, m) {
+  const f = conn.fast;
+  if (conn.fastOk && f?.readyState === 'open') { if (f.bufferedAmount < 32000) try { f.send(JSON.stringify(m)); } catch (e) { } return; } // congestionado: descarta, vem outro já já
+  if (conn.open) try { conn.send(m); } catch (e) { }
+}
+function broadcastFast(m, except) {
+  for (const [pid, conn] of NET.conns) if (pid !== except && conn.open) sendFastTo(conn, m);
+  if (except !== C.myId) onMsg(m);
+}
+function sendToHostFast(m) {
+  if (NET.isHost) srvHandle(C.myId, m);
+  else if (NET.hostConn?.open) sendFastTo(NET.hostConn, m);
+}
+// Relógio: mensagens rápidas levam a hora de quem mandou (ts). Por remetente, guardo o menor atraso visto
+// (offset) e uso ts + offset como hora de chegada "sem tremida"; a tremida medida define quanto atraso
+// de interpolação usar (80 a 300 ms). Assim uma rede irregular não vira movimento aos trancos.
+const NCLK = new Map();
+function netTime(src, ts) {
+  if (!(ts > 0)) return now;
+  const o = now - ts; let c = NCLK.get(src);
+  if (!c || Math.abs(o - c.off) > 5) { c = { off: o, jit: .03 }; NCLK.set(src, c); }
+  if (o < c.off) c.off = o; else c.off += (o - c.off) * .003;
+  c.jit += (Math.min(o - c.off, .5) - c.jit) * (o - c.off > c.jit ? .2 : .02); // sobe rápido, desce devagar
+  return ts + c.off;
+}
+const netDelay = src => { const c = NCLK.get(src); return c ? clamp(.06 + c.jit * 2, .08, .3) : .1; };
 const genCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
 function sendToHost(m) {
   if (NET.isHost) srvHandle(C.myId, m);
@@ -2483,6 +2524,7 @@ function startHost(st) {
     });
     peer.on('disconnected', () => { setTimeout(() => { if (!peer.destroyed) try { peer.reconnect(); } catch (e) { } }, 1500); });
     peer.on('connection', conn => {
+      conn.on('open', () => attachFast(conn, d => srvOnData(conn, d)));
       conn.on('data', d => srvOnData(conn, d));
       conn.on('close', () => srvDrop(conn));
       conn.on('error', () => srvDrop(conn));
@@ -2505,9 +2547,9 @@ function joinRoom(code) {
     : 'Tempo esgotado: conectou, mas o host não respondeu. Veja se a sala ainda está aberta.'), 30000);
   peer.on('open', () => {
     stage = 'linking';
-    const conn = peer.connect(PEER_PREFIX + code, { reliable: true });
+    const conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
     NET.hostConn = conn;
-    conn.on('open', () => { stage = 'waiting'; conn.send({ t: 'join', name: CFG.name, sk: cleanSk(PROF.data?.equipped) }); });
+    conn.on('open', () => { stage = 'waiting'; attachFast(conn, m => { NET.lastHost = performance.now(); onMsg(m); }); conn.send({ t: 'join', name: CFG.name, sk: cleanSk(PROF.data?.equipped) }); });
     conn.on('data', m => { NET.lastHost = performance.now(); if (m.t === 'welcome') { welcomed = true; clearTimeout(timer); NET.code = code; NET.online = true; status.textContent = ''; } onMsg(m); });
     conn.on('close', () => { if (welcomed) lostConnection(); else fail('Conexão recusada'); });
     conn.on('error', () => { if (welcomed) lostConnection(); });
@@ -2571,8 +2613,9 @@ function srvHandle(pid, m) {
   switch (m.t) {
     case 'pos':
       if (!p.alive || !Array.isArray(m.p)) return;
+      if (m.ts && m.ts < (p.posTs || 0)) return; p.posTs = m.ts || 0; // canal sem ordem: ignora posição velha
       p.pos = m.p; p.yaw = m.y; p.pitch = m.pi; p.crouch = m.c; p.w = m.w;
-      broadcast({ t: 'pos', id: pid, p: m.p, y: m.y, pi: m.pi, c: m.c, w: m.w, d: p.downed ? 1 : 0 }, pid); break;
+      broadcastFast({ t: 'pos', id: pid, p: m.p, y: m.y, pi: m.pi, c: m.c, w: m.w, d: p.downed ? 1 : 0, ts: m.ts }, pid); break;
     case 'shot': broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e: (m.e || []).slice(0, 12) }, pid); break;
     case 'zhit': if (S.st.mode === 'zombies' && Z.on && p.alive) zHit(p, +m.v, +m.dmg || 0, m.z, W[m.w] ? m.w : 'm1911', !!m.sp); break;
     case 'use': if (S.st.mode === 'zombies' && Z.on) srvZUse(p, m); break;
@@ -2710,7 +2753,7 @@ function srvState() {
       rv: p.downed && p.revBy ? r2(p.revProg / (S.players.get(p.revBy)?.perks.includes('qr') ? 2 : 4)) : 0, mh: p.maxHp, bw: p.bowie ? 1 : 0 });
     pl.push(o);
   }
-  const msg = { t: 'state', ph: S.phase, tl: Math.max(0, S.phaseEnd - now), r: S.round, pl, win: S.winner, pre: S.pre ? Math.max(0, S.pre - now) : 0, st: S.st };
+  const msg = { t: 'state', ph: S.phase, tl: Math.max(0, S.phaseEnd - now), r: S.round, pl, win: S.winner, pre: S.pre ? Math.max(0, S.pre - now) : 0, st: (S.stN = (S.stN || 0) + 1) % 8 === 1 ? S.st : undefined };
   if (zmode && Z.on) msg.z = zWorldState();
   broadcast(msg);
 }
@@ -2810,7 +2853,7 @@ function botThink(p, dt) {
   if (pos.y < -25) { srvKill(p, null, 'world', false); return; }
   p.pos = [pos.x, pos.y, pos.z]; p.yaw = b.yaw; p.pitch = b.pitch; p.w = wid;
   b.sendT -= dt;
-  if (b.sendT <= 0) { b.sendT = 1 / 20; broadcast({ t: 'pos', id: p.id, p: [r3(pos.x), r3(pos.y), r3(pos.z)], y: r3(b.yaw), pi: r3(b.pitch), c: 0, w: wid }); }
+  if (b.sendT <= 0) { b.sendT = 1 / 20; broadcastFast({ t: 'pos', id: p.id, p: [r3(pos.x), r3(pos.y), r3(pos.z)], y: r3(b.yaw), pi: r3(b.pitch), c: 0, w: wid, ts: r3(now) }); }
 }
 function botShoot(p, tgt, D, wid, eye, dist) {
   const w = W[wid], b = p.bot;
@@ -2859,7 +2902,7 @@ function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.fl
 
 // ---------- estado do cliente ----------
 const ZC = { on: false, round: 0, phase: '', power: false, doors: new Set(), box: { loc: 0, st: 'idle', user: null, w: null, t0: 0 }, pap: { st: 'idle', user: null, w: null, t0: 0 },
-  boards: [], drops: new Map(), zs: new Map(), insta: 0, dbl: 0, dog: false, fogDog: false, perks: [], bowie: false, qrBuys: 0, act: null, holdT: 0, revLocal: 0,
+  boards: [], drops: new Map(), zs: new Map(), gone: new Set(), snapTs: 0, insta: 0, dbl: 0, dog: false, fogDog: false, perks: [], bowie: false, qrBuys: 0, act: null, holdT: 0, revLocal: 0,
   world: null, downPrev: null, bleedEnd: 0, selfRev: false, groanN: 0, groanT: 0, over: false, builtAt: 0 };
 const zGroup = new THREE.Group(); scene.add(zGroup);
 
@@ -2944,7 +2987,7 @@ function zBuildWorld(M) {
   if (FF.nx !== D.ff.nx || FF.nz !== D.ff.nz || !FF.walk) { Object.assign(FF, D.ff); FF.walk = new Uint8Array(FF.nx * FF.nz); FF.dist = new Float32Array(FF.nx * FF.nz); }
   else Object.assign(FF, D.ff);
   Object.assign(ZC, { on: true, round: 0, phase: '', power: false, doors: new Set(), box: { loc: 0, st: 'idle', user: null, w: null, t0: now }, pap: { st: 'idle', user: null, w: null, t0: now },
-    boards: D.windows.map(() => 6), insta: 0, dbl: 0, dog: false, fogDog: false, perks: [], bowie: false, qrBuys: 0, act: null, over: false, builtAt: now, selfRev: false });
+    boards: D.windows.map(() => 6), insta: 0, dbl: 0, dog: false, fogDog: false, perks: [], bowie: false, qrBuys: 0, act: null, over: false, builtAt: now, selfRev: false, gone: new Set(), snapTs: 0 });
   const Wd = ZC.world = { doors: new Map(), planks: [], perks: new Map(), lights: [], box: null, pap: null, power: null, boxCol: null };
   const woodM = mc(0x6e4b2a), stoneM = mc(0x6a655c);
   const face = (o, n) => { o.rotation.y = Math.atan2(n[0], n[1]); };
@@ -3146,12 +3189,13 @@ function zNewClientZombie(id, f) {
 }
 function zRemoveClient(zc) { zGroup.remove(zc.model); zc.model.traverse(o => o.geometry?.dispose()); ZC.zs.delete(zc.id); }
 function zOnSnap(m) {
-  const a = m.z;
+  if (m.ts) { if (m.ts <= (ZC.snapTs || 0)) return; ZC.snapTs = m.ts; } // canal sem ordem: foto velha é descartada
+  const a = m.z, t = netTime('z', m.ts);
   for (let i = 0; i + 5 < a.length; i += 6) {
     const id = a[i]; let zc = ZC.zs.get(id), fresh = false;
-    if (!zc) { zc = zNewClientZombie(id, a[i + 5]); fresh = true; }
+    if (!zc) { if (ZC.gone.has(id)) continue; zc = zNewClientZombie(id, a[i + 5]); fresh = true; } // não ressuscita zumbi que já morreu
     if (zc.dead) continue;
-    zc.buf.push({ t: now, p: [a[i + 1], a[i + 2], a[i + 3]], y: a[i + 4] }); if (zc.buf.length > 30) zc.buf.shift();
+    zc.buf.push({ t, p: [a[i + 1], a[i + 2], a[i + 3]], y: a[i + 4] }); if (zc.buf.length > 30) zc.buf.shift();
     zc.f = a[i + 5]; zc.lastSeen = now;
     if (fresh) { zc.pos.set(a[i + 1], a[i + 2], a[i + 3]); zc.last.copy(zc.pos); zc.yaw = a[i + 4]; zc.model.position.copy(zc.pos); if (zc.dog) zLightning(zc.pos); }
   }
@@ -3173,7 +3217,7 @@ function zBoxes(zc) {
 }
 function zCands() { const out = []; for (const zc of ZC.zs.values()) if (!zc.dead) out.push({ id: zc.sid, pos: zc.pos, boxes: zBoxes(zc) }); return out; }
 function updateZombies(dt) {
-  const rt = now - .1;
+  const rt = now - netDelay('z');
   for (const zc of [...ZC.zs.values()]) {
     const ud = zc.model.userData, M_ = zc.model;
     if (zc.dead) {
@@ -3183,14 +3227,14 @@ function updateZombies(dt) {
       if (k > 2.2) zRemoveClient(zc);
       continue;
     }
-    if (now - zc.lastSeen > .7) { zRemoveClient(zc); continue; }
+    if (now - zc.lastSeen > 2.5) { zRemoveClient(zc); continue; } // folga para picos de rede (antes sumiam e voltavam)
     const buf = zc.buf;
     if (buf.length) {
       let A = null, Bq = null;
       for (let i = buf.length - 1; i >= 0; i--) if (buf[i].t <= rt) { A = buf[i]; Bq = buf[i + 1] || null; break; }
       if (!A) A = buf[0];
       if (Bq) { const k = clamp((rt - A.t) / Math.max(1e-3, Bq.t - A.t), 0, 1); zc.pos.set(lerp(A.p[0], Bq.p[0], k), lerp(A.p[1], Bq.p[1], k), lerp(A.p[2], Bq.p[2], k)); zc.yaw = A.y + angDiff(A.y, Bq.y) * k; }
-      else { zc.pos.set(A.p[0], A.p[1], A.p[2]); zc.yaw = A.y; }
+      else { const pv = buf.length > 1 && A === buf[buf.length - 1] ? buf[buf.length - 2] : null, e = pv ? clamp(rt - A.t, 0, .12) / Math.max(.02, A.t - pv.t) : 0; zc.pos.set(A.p[0] + (pv ? (A.p[0] - pv.p[0]) * e : 0), A.p[1], A.p[2] + (pv ? (A.p[2] - pv.p[2]) * e : 0)); zc.yaw = A.y; }
       while (buf.length > 2 && buf[1].t < rt) buf.shift();
     }
     const sp = Math.hypot(zc.pos.x - zc.last.x, zc.pos.z - zc.last.z) / Math.max(dt, 1e-3); zc.last.copy(zc.pos); zc.spd = lerp(zc.spd, Math.min(sp, 9), .2);
@@ -3526,7 +3570,7 @@ function zTick(dt) {
   if (now >= Z.ffT) { Z.ffT = now + .3; zFlow(Z.lure ? [Z.lure] : [...S.players.values()].filter(p => p.alive && !p.downed).map(p => [p.pos[0], p.pos[2]])); }
   zTickZombies(dt);
   zTickObjects();
-  Z.zsT -= dt; if (Z.zsT <= 0) { Z.zsT = 1 / 15; zSnap(); }
+  Z.zsT -= dt; if (Z.zsT <= 0) { Z.zsT = 1 / 20; zSnap(); }
 }
 function zTickPlayers(dt) {
   for (const p of S.players.values()) {
@@ -3833,7 +3877,7 @@ function zSnap() {
     const P = z.body.pos, f = z.sc | (z.atkWind ? 4 : 0) | (z.crawler ? 8 : 0) | (z.dog ? 16 : 0) | (z.st === 'out' || z.st === 'tear' || z.st === 'climb' ? 32 : 0) | (z.st === 'rise' ? 64 : 0);
     a.push(z.id, r2(P.x), r2(P.y), r2(P.z), r2(z.yaw), f);
   }
-  broadcast({ t: 'zs', z: a, b: Z.boards.slice(), ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0 });
+  broadcastFast({ t: 'zs', ts: r3(now), z: a, b: Z.boards.slice(), ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0 });
 }
 function zWorldState() {
   return { r: Z.round, ph: Z.phase, pw: Z.power ? 1 : 0, d: [...Z.doors], box: [Z.box.loc, Z.box.st, Z.box.user, Z.box.st === 'offer' ? Z.box.w : null], pap: [Z.pap.st, Z.pap.user, Z.pap.st === 'ready' ? Z.pap.w : null],
@@ -3879,8 +3923,10 @@ function onMsg(m) {
     }
     case 'pos': {
       if (m.id === C.myId) break;
-      const rp = getRemote(m.id);
-      rp.buf.push({ t: now, p: m.p, y: m.y, pi: m.pi, c: m.c }); if (rp.buf.length > 40) rp.buf.shift();
+      const rp = getRemote(m.id), t = netTime(m.id, m.ts), lb = rp.buf[rp.buf.length - 1];
+      if (lb && t <= lb.t) break; // chegou fora de ordem
+      rp.buf.push({ t, p: m.p, y: m.y, pi: m.pi, c: m.c }); if (rp.buf.length > 40) rp.buf.shift();
+      rp.delay = netDelay(m.id);
       if (m.d !== undefined) rp.downed = !!m.d;
       setRemoteGun(rp, m.w);
       break;
@@ -3897,6 +3943,7 @@ function onMsg(m) {
       break;
     case 'zs': if (ZC.on) zOnSnap(m); break;
     case 'zdie': {
+      ZC.gone.add(m.id);
       const zc = ZC.zs.get(m.id); if (!zc || zc.dead) break;
       zc.dead = true; zc.deadT = now;
       if (m.by === C.myId) grantXP(m.hs ? 5 : 3);
@@ -3905,7 +3952,7 @@ function onMsg(m) {
       if (m.fl) { const src = m.by === C.myId ? me.pos : (R.get(m.by)?.pos || zc.pos); const d = zc.pos.clone().sub(src); d.y = 0; if (d.lengthSq() < 1e-6) d.set(0, 0, 1); d.normalize(); zc.fling = d.multiplyScalar(14); zc.fling.y = 7; }
       break;
     }
-    case 'zgone': { const zc = ZC.zs.get(m.id); if (zc) zRemoveClient(zc); break; }
+    case 'zgone': { ZC.gone.add(m.id); const zc = ZC.zs.get(m.id); if (zc) zRemoveClient(zc); break; }
     case 'zround': ZC.round = m.r; ZC.dog = !!m.dog; ZC.phase = 'round'; zRoundFx(m.r, m.dog); break;
     case 'zrend': if (me.alive && !me.downed) grantXP(25); ZC.phase = 'break'; play('zend'); centerMsg('Rodada ' + m.r + ' concluída', 'Próxima rodada em 10 segundos', 4); zFogDog(false); break;
     case 'zdoor': if (zDoorOpen(m.id)) { const d = ZD.doors.find(x => x.id === m.id); play('door', d ? new V3(d.x, 1.5, d.z) : null); } break;
