@@ -2502,7 +2502,7 @@ function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo,
 // ---------- braços de primeira pessoa feitos no Blender (humano do MPFB, licença CC0) com as animações das facas ----------
 // assets/arms.glb traz os dois braços com esqueleto, a câmera usada para posar e dois soquetes na mão direita
 // (Spin_karambit / Spin_knife) onde a faca do jogo é pendurada. Uma linha do tempo só, cortada em clipes (30 fps).
-const GRIP = { tilt: -.3, r: [0, 0, 0], l: [0, -.012, 0], lroll: .7, shr: [.3, -.25, -.02], shl: [-.4, -.2, .12], elr: [.2, -.3, 0], ell: [-.3, -.2, 0], lift: [.02, .045, -.02] }; // alvos das mãos; ombro (sh) e cotovelo (el) em relação à mão, espaço da câmera; lift sobe a arma para as mãos aparecerem
+const GRIP = { tilt: -.3, r: [0, 0, 0], l: [0, .025, 0], lroll: 1.0, shr: [.38, -.22, .14], shl: [-.42, -.3, .02], elr: [.15, -.3, .05], ell: [-.25, -.35, -.05], lift: [.01, .075, -.08] }; // alvos das mãos; ombro (sh) e cotovelo (el) em relação à mão, espaço da câmera; lift sobe a arma para as mãos aparecerem
 const ARMS = { holder: null, root: null, mixer: null, clips: {}, cur: null, knife: null };
 // cada faca tem a sua pose de mão: karambit a partir do quadro 0, faca a partir do 1000
 const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] }, ARMS_OFF = { karambit: 0, knife: 1000 };
