@@ -5,7 +5,7 @@ FPS multiplayer que roda direto no navegador: x1 estilo Counter-Strike e um modo
 ## Como jogar
 
 1. Abra o jogo (pelo link do GitHub Pages ou abrindo o `index.html` no Chrome/Edge).
-2. Um jogador clica em **Criar sala** e recebe um código de 5 letras.
+2. Na aba **Jogar**, o host escolhe o modo, o mapa e as opções nos cartões e clica em **Criar sala**. Ele recebe um código de 5 letras.
 3. O amigo digita o código em **Entrar em sala** (ou abre o link `...?sala=CODIGO`).
 
 Funciona na mesma rede Wi-Fi ou em casas diferentes pela internet. A conexão é P2P (WebRTC via PeerJS): não precisa abrir porta no roteador nem ter servidor próprio. As duas máquinas precisam de internet para o pareamento inicial.
@@ -20,24 +20,43 @@ O host roda a partida no navegador dele. Se o host fechar a aba, a partida acaba
 
 ## Modo Zumbis
 
-Mapa **Sanatório**, com seis cômodos. Vocês começam na Recepção com uma M1911 e 500 pontos.
+Dois mapas:
+
+- **Vila** (aberto): um octógono de uns 90 m cercado por muro de pedra e floresta. Vocês começam na Praça, em volta do chafariz. Portões de ferro levam à Igreja (norte), à Fazenda (leste, onde fica a energia), ao Cemitério (oeste, com o Pack-a-Punch no mausoléu) e ao Lago (sul, com o moinho). As grades de ferro deixam a bala passar, mas não deixam ninguém atravessar; as sebes e o muro seguram tudo. Os zumbis pulam o muro pelas janelas de tábua ou saem do chão no meio das áreas abertas.
+- **Sanatório** (fechado): seis cômodos com portas e janelas. Vocês começam na Recepção.
+
+Todo mundo começa com uma M1911.
+
+### Dificuldades
+
+| | Fácil | Normal | Difícil | Pesadelo |
+|---|---|---|---|---|
+| Vida dos zumbis | 70% | 100% (CoD) | 135% | 180% |
+| Golpes para cair (sem Juggernog) | 3 | 2 | 2 | 1 |
+| Quantidade por rodada | 75% | 100% | 125% | 150% |
+| Começam a correr | mais tarde | normal | mais cedo | desde a rodada 1 |
+| Pontos iniciais | 1500 | 500 | 500 | 250 |
+| Tempo caído até sangrar | 60 s | 45 s | 35 s | 25 s |
+| Power-ups | mais | normal | menos | bem menos |
+
+A dificuldade aparece no canto de cima, junto com o nome do mapa.
 
 - **Rodadas infinitas.** A vida dos zumbis segue a fórmula do CoD (150 na rodada 1, +100 por rodada até a 9, depois ×1,1). A quantidade cresce a cada rodada. Os zumbis começam andando e passam a correr e disparar nas rodadas altas.
 - **Pontos:** 10 por acerto; ao matar, 60 (corpo), 100 (headshot) ou 130 (faca). Consertar janela dá 10 por tábua.
-- **Janelas:** os zumbis vêm de fora, arrancam as tábuas e pulam para dentro. Segure F perto da janela para pregar as tábuas de volta. No Pátio eles também saem do chão.
-- **Portas e entulho** (750 a 1250) liberam novos cômodos, com mais armas e mais janelas.
-- **Armas de parede** (contorno de giz): M14, Olympia, MP40, MP5K, AK-74u, Stakeout, granadas e Faca Bowie. Se você já tem a arma, compra munição pela metade do preço.
+- **Janelas:** os zumbis vêm de fora, arrancam as tábuas e pulam para dentro. Segure F perto da janela para pregar as tábuas de volta. Na Vila (e no Pátio do Sanatório) eles também saem do chão.
+- **Portões, portas e entulho** (750 a 1250) liberam novas áreas, com mais armas e mais janelas.
+- **Armas de parede** (contorno de giz, na parede ou em placas de madeira): M14, Olympia, MP40, MP5K, AK-74u, Stakeout, granadas e Faca Bowie. Se você já tem a arma, compra munição pela metade do preço.
 - **Caixa Misteriosa (950):** arma aleatória: Ray Gun, Arma Trovão, Galil, Commando, FAL, RPK, HK21, SPAS-12, Python, CZ75, Dragunov, China Lake ou Macacos com Pratos. Às vezes sai o ursinho: você recebe os pontos de volta e a caixa muda de lugar.
-- **Energia:** fica no Laboratório. Ligue para ativar as bebidas e o Pack-a-Punch.
+- **Energia:** fica no celeiro (Vila) ou no Laboratório (Sanatório). Ligue para ativar as bebidas e o Pack-a-Punch.
 - **Bebidas** (máximo de 4): Juggernog (aguenta 5 golpes), Speed Cola (recarrega rápido), Double Tap (atira mais rápido), Quick Revive (reanima rápido; sozinho, te levanta até 3 vezes) e Stamin-Up (corre mais).
-- **Pack-a-Punch (5000):** fica no Teatro. Dobra o dano, aumenta o pente e dá nome e camuflagem novos à arma (a M1911 vira a explosiva Mustang & Sally).
+- **Pack-a-Punch (5000):** fica no mausoléu (Vila) ou no Teatro (Sanatório). Dobra o dano, aumenta o pente e dá nome e camuflagem novos à arma (a M1911 vira a explosiva Mustang & Sally).
 - **Power-ups:** caem dos zumbis e duram 26s no chão. São eles: Munição Máxima, Insta-Kill, Pontos em Dobro, Nuke (+400) e Carpinteiro (+200).
 - **Cães do inferno:** uma rodada especial de tempos em tempos. O último cão sempre solta Munição Máxima.
-- **Cair e reanimar:** com a vida zerada, você cai com uma pistola e tem 45s para alguém segurar F em você. Quem sangra volta na rodada seguinte, com a M1911 e os mesmos pontos. Se todos caírem, fim de jogo.
+- **Cair e reanimar:** com a vida zerada, você cai com uma pistola e tem 45 s (no Normal) para alguém segurar F em você. Quem sangra volta na rodada seguinte, com a M1911 e os mesmos pontos. Se todos caírem, fim de jogo.
 
 ## Gráficos
 
-Em Esc → Configurações → **Gráficos**:
+No menu, aba **Configurações**, ou em Esc → Configurações → **Gráficos**:
 
 - **Baixo:** resolução reduzida e sem sombras, para notebook fraco.
 - **Médio:** céu com degradê e nuvens (ou estrelas), texturas com relevo, faíscas, cápsulas e sangue no chão.
