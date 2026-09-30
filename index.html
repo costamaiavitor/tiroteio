@@ -77,6 +77,26 @@ button.card.on{border-color:var(--acc);background:rgba(255,176,32,.1);box-shadow
 .skc:hover{background:rgba(255,255,255,.08)}
 .skc.on{box-shadow:0 0 0 2px var(--acc)}
 .skc .sw.def{background:repeating-linear-gradient(135deg,#2a2d33 0 8px,#33373f 8px 16px)}
+.vcoll{margin-top:12px;background:radial-gradient(ellipse at 50% 0%,rgba(255,176,32,.06),transparent 60%),rgba(10,12,16,.6)}
+.vhead{display:flex;align-items:center;gap:12px;margin-bottom:10px}.vhead h3{margin:0;font-size:22px;letter-spacing:2px;text-transform:uppercase}
+.vgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:start}
+@media(max-width:760px){.vgrid{grid-template-columns:repeat(2,1fr)}}
+.vcol{display:flex;flex-direction:column;gap:6px}
+.vcat{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#8b94a0;margin:6px 0 0;border-bottom:1px solid var(--line);padding-bottom:3px}
+.vtile{position:relative;height:74px;border-radius:4px;cursor:pointer;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08);border-bottom:3px solid var(--rc);overflow:hidden;transition:transform .12s,border-color .12s,background .12s}
+.vtile:hover{transform:translateY(-2px);border-color:rgba(255,176,32,.7);background:linear-gradient(180deg,rgba(255,176,32,.12),rgba(255,255,255,.02))}
+.vtile img:not([src]){visibility:hidden}
+.vtile img{position:absolute;left:6%;top:4px;width:88%;height:52px;object-fit:contain;filter:drop-shadow(0 3px 4px rgba(0,0,0,.6))}
+.vtile b{position:absolute;left:8px;bottom:4px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:#e8e8e8}
+.vtile i{position:absolute;right:8px;bottom:4px;font-style:normal;font-size:12px;color:var(--rc)}
+.vtile span{position:absolute;right:6px;top:4px;font-size:11px;font-weight:700;background:rgba(0,0,0,.55);color:#ddd;padding:0 5px;border-radius:3px}
+.vdet{display:grid;grid-template-columns:250px 1fr;gap:14px}
+@media(max-width:760px){.vdet{grid-template-columns:1fr}}
+.vskins{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;max-height:380px;overflow:auto;padding-right:4px}
+.vstage{position:relative;border-radius:6px;background:radial-gradient(ellipse at center,#2a2f3a,#0b0d11 72%);min-height:300px}
+.vstage #skPrev{width:100%;height:300px;display:block;background:none;cursor:grab}
+.vdrag{position:absolute;right:10px;top:8px;font-size:12px}
+.vsel{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px 12px}.vsel .sknm{margin:0}.vsel button{width:auto;min-width:150px}
 .skinv{display:grid;grid-template-columns:170px 1fr;gap:10px}
 @media(max-width:560px){.skinv{grid-template-columns:1fr}}
 .skweap{max-height:360px;overflow:auto;display:flex;flex-direction:column;gap:3px;padding-right:4px}
@@ -292,9 +312,18 @@ summary{cursor:pointer;color:#fff;font-weight:700}
         </div>
       </div>
       <div id="skRoll" class="box hidden" style="margin-top:12px"><div class="rstrip"><div class="rtrack"></div><div class="rmark"></div></div><div id="skRollRes"></div></div>
-      <div class="skbody">
-        <div class="box"><canvas id="skPrev"></canvas><div id="skSel"></div></div>
-        <div class="box"><h3 style="margin:0 0 8px">Inventário</h3><div class="skinv"><div id="skWeap" class="skweap"></div><div><div id="skWTitle" class="skwt"></div><div id="skGrid" class="skgrid"></div></div></div></div>
+      <div id="skColl" class="box vcoll">
+        <div id="skGridView">
+          <div class="vhead"><h3>Coleção</h3><span class="hint">Clique numa arma para ver e equipar as skins</span></div>
+          <div id="vGrid" class="vgrid"></div>
+        </div>
+        <div id="skDetail" class="hidden">
+          <div class="vhead"><button id="skBack">← Coleção</button><h3 id="skDTitle"></h3><span id="skDCount" class="hint"></span></div>
+          <div class="vdet">
+            <div><div class="lbl" style="margin-top:0">Suas skins</div><div id="skGrid" class="vskins"></div></div>
+            <div class="vstage"><canvas id="skPrev"></canvas><div class="hint vdrag">arraste para girar</div><div id="skSel" class="vsel"></div></div>
+          </div>
+        </div>
       </div>
       <div class="hint" style="margin-top:8px">Raridades: <span style="color:#b0c3d9">Comum 60%</span> · <span style="color:#4b69ff">Incomum 25%</span> · <span style="color:#8847ff">Rara 10%</span> · <span style="color:#d32ce6">Épica 4%</span> · <span style="color:#ffae39">Lendária 1%</span>. Facas só saem em Épica ou Lendária. Clique duas vezes numa skin para equipar.</div>
     </div>
@@ -4634,7 +4663,7 @@ function skinsChanged() {
   }
 }
 // ---------- tela de skins (menu) ----------
-const SKUI = { sel: null, weap: null, rolling: false, hide: null };
+const SKUI = { sel: null, weap: null, rolling: false, hide: null, view: 'grid' };
 const SWATCH = {};
 const swatch = f => SWATCH[f] || (SWATCH[f] = skinSwatch(f));
 function skCard(it, extra = '') {
@@ -4667,36 +4696,77 @@ function skinsUI() {
   $('#skCases').textContent = d.cases;
   $('#btnCase').disabled = !d.cases || SKUI.rolling;
   $('#btnCase').textContent = SKUI.rolling ? 'Abrindo...' : d.cases ? 'Abrir caixa' : 'Sem caixas';
-  // inventário: lista com todas as armas; ao clicar numa, aparecem as skins que você tem para ela
+  // coleção estilo Valorant: todas as armas à mostra, em colunas por categoria; clicar abre a tela da arma
   const items = d.items.filter(it => it !== SKUI.hide);
-  const ws = skWeaponOrder();
-  if (!SKUI.weap || !ws.includes(SKUI.weap)) SKUI.weap = ws[0];
-  setHTMLm('skWeap', ws.map(w => {
-    const n = items.filter(it => it.startsWith(w + ':')).length, eq = d.equipped[w];
-    return `<div class="skw${SKUI.weap === w ? ' on' : ''}${n ? '' : ' none'}" data-w="${w}"><span class="sw"${eq ? ` style="background-image:url(${swatch(eq)})"` : ''}></span><b>${esc(itemInfo(w + ':x').wn)}</b><small>${n ? n + (n > 1 ? ' skins' : ' skin') : '—'}</small></div>`;
-  }).join(''));
+  const grid = SKUI.view !== 'detail';
+  $('#skGridView').classList.toggle('hidden', !grid); $('#skDetail').classList.toggle('hidden', grid);
+  if (grid) {
+    setHTMLm('vGrid', vCategories().map(col => `<div class="vcol">${col.map(([cat, ws]) => `<div class="vcat">${cat}</div>` + ws.map(w => {
+      const n = items.filter(it => it.startsWith(w + ':')).length, f = d.equipped[w] || '', rar = f ? SKIN_BY[f].r : -1, url = thumbURL(w, f);
+      return `<div class="vtile" data-w="${w}" style="--rc:${rar >= 0 ? RARITY[rar].css : 'transparent'}">${url ? `<img src="${url}" alt="">` : `<img data-th="${w}:${f}" alt="">`}<b>${esc(itemInfo(w + ':x').wn)}</b>${f ? `<i>${esc(SKIN_BY[f].name)}</i>` : ''}${n ? `<span>${n}</span>` : ''}</div>`;
+    }).join('')).join('')}</div>`).join(''));
+    pvShow(null);
+    return;
+  }
   const w = SKUI.weap, mine = items.filter(it => it.startsWith(w + ':')).sort((a, b) => itemInfo(b).rar - itemInfo(a).rar);
   const eqDef = !d.equipped[w];
-  setHTMLm('skWTitle', `<b>${esc(itemInfo(w + ':x').wn)}</b> <span class="hint">${mine.length ? `${mine.length} de ${SKINS.length} skins` : 'nenhuma skin ainda — abra caixas!'}</span>`);
+  setHTMLm('skDTitle', esc(itemInfo(w + ':x').wn));
+  setHTMLm('skDCount', mine.length ? `${mine.length} de ${SKINS.length} skins` : 'nenhuma skin ainda — abra caixas!');
   setHTMLm('skGrid', `<div class="skc${SKUI.sel === 'def:' + w ? ' on' : ''}" data-def="${w}" style="--rc:#5a6070"><div class="sw def"></div><b>Padrão</b><small style="color:#9aa">sem skin</small>${eqDef ? '<i>EQUIPADA</i>' : ''}</div>` + mine.map(it => skCard(it)).join(''));
-  // item selecionado (skin ou "Padrão")
   if (SKUI.sel && SKUI.sel !== 'def:' + w && !mine.includes(SKUI.sel)) SKUI.sel = null;
   if (!SKUI.sel) SKUI.sel = d.equipped[w] && mine.includes(w + ':' + d.equipped[w]) ? w + ':' + d.equipped[w] : 'def:' + w;
   if (SKUI.sel.startsWith('def:')) {
-    setHTMLm('skSel', `<div class="sknm" style="--rc:#5a6070"><b>${esc(itemInfo(w + ':x').wn)} | Padrão</b><span style="color:#9aa">sem skin</span></div>${eqDef ? '<div class="hint">Em uso.</div>' : '<button id="skEq" class="big">Usar padrão</button>'}`);
+    setHTMLm('skSel', `<div class="sknm" style="--rc:#5a6070"><b>Padrão</b><span style="color:#9aa">sem skin</span></div>${eqDef ? '<button disabled>Equipada</button>' : '<button id="skEq" class="big">Equipar</button>'}`);
     if (!eqDef) $('#skEq').onclick = () => { delete d.equipped[w]; profSave(); skinsUI(); skinsChanged(); };
     pvShow(w, null);
   } else {
-    const { f, s: sk, wn, rar } = itemInfo(SKUI.sel), eq = d.equipped[w] === f;
-    setHTMLm('skSel', `<div class="sknm" style="--rc:${RARITY[rar].css}"><b>${esc(wn)} | ${esc(sk.name)}</b><span>${RARITY[rar].name}</span></div><button id="skEq" class="${eq ? '' : 'big'}">${eq ? 'Remover skin' : 'Equipar'}</button>`);
+    const { f, s: sk, rar } = itemInfo(SKUI.sel), eq = d.equipped[w] === f;
+    setHTMLm('skSel', `<div class="sknm" style="--rc:${RARITY[rar].css}"><b>${esc(sk.name)}</b><span>${RARITY[rar].name}</span></div><button id="skEq" class="${eq ? '' : 'big'}">${eq ? 'Remover skin' : 'Equipar'}</button>`);
     $('#skEq').onclick = () => equipItem(SKUI.sel, !eq);
     pvShow(w, f);
   }
 }
-// ordem da lista: faca, pistolas, depois as principais (primeiro as do x1, depois as do modo zumbis)
-function skWeaponOrder() {
-  const ws = SKIN_WEAPONS(), rank = k => k === 'knife' ? 0 : (W[k].slot === 'secondary' ? 1 : 2) * 2 + (W[k].zw ? 1 : 0);
-  return ws.sort((a, b) => rank(a) - rank(b));
+// colunas como no Arsenal do Valorant: pistolas | SMGs + escopetas | rifles | precisão + pesadas + corpo a corpo
+function vCategories() {
+  const all = SKIN_WEAPONS(), used = new Set();
+  const cols = [
+    [['Pistolas', ['glock', 'usp', 'p250', 'deagle', 'm1911', 'cz75', 'python']]],
+    [['SMGs', ['mp5', 'p90', 'mp40', 'mp5k', 'ak74u']], ['Escopetas', ['nova', 'olympia', 'stakeout', 'spas']]],
+    [['Rifles', ['ak47', 'm4', 'm14', 'galil', 'commando', 'fal']]],
+    [['Precisão', ['scout', 'awp', 'dragunov']], ['Pesadas', ['rpk', 'hk21', 'chinalake']], ['Corpo a corpo', ['knife']]],
+  ].map(col => col.map(([c, ws]) => [c, ws.filter(w => all.includes(w) && !used.has(w) && used.add(w))]).filter(([, ws]) => ws.length));
+  const rest = all.filter(w => !used.has(w)); if (rest.length) cols[3].push(['Outras', rest]);
+  return cols;
+}
+// miniaturas das armas (de perfil, com a skin), desenhadas uma por quadro num renderizador separado
+const THC = {}, thQ = [];
+let TH = null;
+function thumbURL(w, f) {
+  const k = w + ':' + (f || ''); if (THC[k]) return THC[k];
+  if (!thQ.includes(k)) thQ.push(k);
+  if (thQ.length === 1) setTimeout(thPump, 0);
+  return null;
+}
+function thPump() {
+  const k = thQ[0]; if (!k) return;
+  if (!TH) {
+    const c = document.createElement('canvas'); c.width = 360; c.height = 150;
+    const r = new THREE.WebGLRenderer({ canvas: c, antialias: true, alpha: true, preserveDrawingBuffer: true }); r.toneMapping = THREE.ACESFilmicToneMapping;
+    const sc = new THREE.Scene(), pm = new THREE.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(r), .04).texture; pm.dispose();
+    sc.add(new THREE.HemisphereLight(0xffffff, 0x606060, 1.8)); const dl = new THREE.DirectionalLight(0xffffff, 2.6); dl.position.set(3, 3, 1); sc.add(dl);
+    const fl = new THREE.DirectionalLight(0xdfe8ff, 1.6); fl.position.set(4, -1, -2); sc.add(fl); // luz de preenchimento: arma escura não some no cartão
+    TH = { r, sc, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, .01, 20), c };
+  }
+  const [w, f] = k.split(':'), g = gunModel(w, true, f || null);
+  const box = new THREE.Box3().setFromObject(g), ctr = box.getCenter(new V3()), sz = box.getSize(new V3());
+  g.position.sub(ctr); TH.sc.add(g);
+  const asp = 360 / 150, hw = Math.max(sz.z / 2, sz.y / 2 * asp) * 1.08, hh = hw / asp;
+  Object.assign(TH.cam, { left: -hw, right: hw, top: hh, bottom: -hh }); TH.cam.position.set(5, 0, 0); TH.cam.lookAt(0, 0, 0); TH.cam.updateProjectionMatrix(); // de lado: cano para a direita
+  TH.r.render(TH.sc, TH.cam);
+  const url = THC[k] = TH.c.toDataURL('image/png');
+  TH.sc.remove(g); g.traverse(o => o.geometry?.dispose());
+  document.querySelectorAll(`img[data-th="${k}"]`).forEach(i => { i.src = url; i.removeAttribute('data-th'); });
+  thQ.shift(); if (thQ.length) setTimeout(thPump, 10);
 }
 function setHTMLm(id, html) { const el = document.getElementById(id); if (el && el.innerHTML !== html) el.innerHTML = html; }
 // roleta estilo CS: a faixa corre e para no item sorteado
@@ -4722,7 +4792,7 @@ function openCaseUI() {
     track.children[WIN]?.classList.add('win');
     setHTMLm('skRollRes', `<div class="sknm big" style="--rc:${RARITY[rar].css}"><b>${esc(wn)} | ${esc(s.name)}</b><span>${RARITY[rar].name}</span></div>${dup ? '<div class="hint">Repetida: virou +60 XP</div>' : ''}`);
     play(rar >= 3 ? 'pap' : 'kaching');
-    SKUI.rolling = false; SKUI.hide = null; SKUI.sel = it; SKUI.weap = it.split(':')[0];
+    SKUI.rolling = false; SKUI.hide = null; SKUI.sel = it; SKUI.weap = it.split(':')[0]; SKUI.view = 'detail';
     if (dup) grantXP(60); else skinsUI();
   }, 5400);
 }
@@ -4736,13 +4806,16 @@ function pvShow(w, f) {
     sc.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.1)); const dl = new THREE.DirectionalLight(0xfff2e0, 2.4); dl.position.set(1, 2, 2); sc.add(dl);
     const rim = new THREE.DirectionalLight(0xbcd4ff, 1.4); rim.position.set(-2, .5, -2); sc.add(rim);
     const cam = new THREE.PerspectiveCamera(28, 2, .01, 20), pivot = new THREE.Group(); sc.add(pivot);
-    PV = { r, sc, cam, pivot, key: null, t0: performance.now() };
+    PV = { r, sc, cam, pivot, key: null, t0: performance.now(), rot: 0, drag: null };
+    cv.onpointerdown = e => { PV.drag = e.clientX; cv.setPointerCapture(e.pointerId); };
+    cv.onpointermove = e => { if (PV.drag != null) { PV.rot += (e.clientX - PV.drag) * .012; PV.drag = e.clientX; } };
+    cv.onpointerup = cv.onpointercancel = () => { PV.drag = null; };
     const loop = () => {
       requestAnimationFrame(loop);
-      const vis = !$('#menu').classList.contains('hidden') && !$('#skinsPane').classList.contains('hidden');
+      const vis = !$('#menu').classList.contains('hidden') && !$('#skinsPane').classList.contains('hidden') && !$('#skDetail').classList.contains('hidden');
       if (!vis || !PV.pivot.children.length) return;
       const w = cv.clientWidth, h = cv.clientHeight; if (w && (cv.width !== Math.round(w * PV.r.getPixelRatio()))) { PV.r.setSize(w, h, false); PV.cam.aspect = w / h; PV.cam.updateProjectionMatrix(); }
-      PV.pivot.rotation.y = Math.PI / 2 + Math.sin((performance.now() - PV.t0) / 1400) * .55;
+      if (PV.drag == null) PV.rot += .004; PV.pivot.rotation.y = Math.PI / 2 + PV.rot;
       PV.r.render(PV.sc, PV.cam);
     };
     loop();
@@ -4752,12 +4825,13 @@ function pvShow(w, f) {
   if (!w) { PV.r.clear(); return; }
   const g = gunModel(w, true, f), box = new THREE.Box3().setFromObject(g), c = box.getCenter(new V3()), sz = box.getSize(new V3());
   g.position.sub(c); PV.pivot.add(g);
-  const L = Math.max(sz.x, sz.y, sz.z); PV.cam.position.set(0, L * .1, L * 1.45); PV.cam.lookAt(0, 0, 0);
+  const L = Math.max(sz.x, sz.y, sz.z); PV.cam.position.set(0, L * .08, L * 1.9); PV.cam.lookAt(0, 0, 0); PV.rot = 0;
 }
 function skinsInit() {
   profLoadLocal();
   $('#btnCase').onclick = openCaseUI;
-  $('#skWeap').onclick = e => { const c = e.target.closest('[data-w]'); if (!c) return; SKUI.weap = c.dataset.w; SKUI.sel = null; skinsUI(); };
+  $('#vGrid').onclick = e => { const c = e.target.closest('[data-w]'); if (!c) return; SKUI.weap = c.dataset.w; SKUI.sel = null; SKUI.view = 'detail'; skinsUI(); };
+  $('#skBack').onclick = () => { SKUI.view = 'grid'; skinsUI(); };
   $('#skGrid').onclick = e => { const c = e.target.closest('[data-it],[data-def]'); if (!c) return; SKUI.sel = c.dataset.it || 'def:' + c.dataset.def; skinsUI(); };
   $('#skGrid').ondblclick = e => { const c = e.target.closest('[data-it]'); if (!c) return; const it = c.dataset.it, { w, f } = itemInfo(it); equipItem(it, PROF.data.equipped[w] !== f); };
   skinsUI();
@@ -4878,7 +4952,7 @@ applyQuality();
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos)
 window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
-  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
+  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>
 </body>

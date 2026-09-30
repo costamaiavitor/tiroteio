@@ -68,7 +68,7 @@ Aba **Skins** no menu.
   - Fim de jogo nos zumbis: 30 + 8 por rodada
 - **Abrir caixa:** roleta no estilo CS. Raridades: Comum 60%, Incomum 25%, Rara 10%, Épica 4%, Lendária 1%. Faca só sai em Épica ou Lendária. Skin repetida vira 60 XP.
 - **Acabamentos:** Floresta, Deserto, Urbano, Grafite, Areia, Oceano, Cereja, Carbono, Ártico, Tigre, Colmeia, Crepúsculo, Damasco, Neon, Lava, Asiimov, Esmeralda, Ouro, Dragão e Galáxia (Neon, Lava, Dragão e Galáxia brilham). Servem para todas as armas, menos Ray Gun e Arma Trovão. Com Pack-a-Punch vale a camuflagem do Pack-a-Punch.
-- **Inventário:** a lista mostra todas as armas; clique numa para ver as skins que você tem dela (e a opção Padrão). Clique na skin e em **Equipar** (ou clique duas vezes). Os outros jogadores veem a sua skin.
+- **Coleção (estilo Valorant):** todas as armas aparecem ao mesmo tempo, em colunas por categoria (pistolas; SMGs e escopetas; rifles; precisão, pesadas e faca), cada uma desenhada com a skin que está equipada. Clique numa arma para abrir a tela dela: à esquerda as skins que você tem (e a Padrão), no centro a arma em 3D (arraste para girar), e o botão **Equipar**. Os outros jogadores veem a sua skin.
 - **Conta:** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
 
 ### Configurar as contas (Firebase, uma vez só)
