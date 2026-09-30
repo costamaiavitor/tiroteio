@@ -55,6 +55,45 @@ A dificuldade aparece no canto de cima, junto com o nome do mapa.
 - **Vida:** a barra no centro de baixo da tela mostra a vida (com Juggernog vai até 250). Toda rodada nova começa com a vida cheia.
 - **Cair e reanimar:** com a vida zerada, você cai com uma pistola e tem 45 s (no Normal) para alguém segurar F em você. Quem sangra volta na rodada seguinte, com a M1911 e os mesmos pontos. Se todos caírem, fim de jogo.
 
+## Skins
+
+Aba **Skins** no menu.
+
+- **Caixas:** você ganha XP jogando e, a cada 300 XP, recebe uma caixa. Conta nova começa com 2.
+  - Abate: 10 XP (headshot 15; contra bot vale metade)
+  - Zumbi morto: 3 (headshot 5)
+  - Rodada de zumbi sobrevivida: 25
+  - Reanimar alguém: 20
+  - Fim de partida: 40 (vitória: 150)
+  - Fim de jogo nos zumbis: 30 + 8 por rodada
+- **Abrir caixa:** roleta no estilo CS. Raridades: Comum 60%, Incomum 25%, Rara 10%, Épica 4%, Lendária 1%. Faca só sai em Épica ou Lendária. Skin repetida vira 60 XP.
+- **Acabamentos:** Floresta, Deserto, Urbano, Grafite, Areia, Oceano, Cereja, Carbono, Ártico, Tigre, Colmeia, Crepúsculo, Damasco, Neon, Lava, Asiimov, Esmeralda, Ouro, Dragão e Galáxia (Neon, Lava, Dragão e Galáxia brilham). Servem para todas as armas, menos Ray Gun e Arma Trovão. Com Pack-a-Punch vale a camuflagem do Pack-a-Punch.
+- **Equipar:** clique na skin e em **Equipar** (ou clique duas vezes). Os outros jogadores veem a sua skin.
+- **Conta:** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
+
+### Configurar as contas (Firebase, uma vez só)
+
+1. Em https://console.firebase.google.com, crie um projeto (o Google Analytics pode ficar desligado).
+2. **Authentication → Vamos começar → Método de login:** ative **Google** e **E-mail/senha**.
+3. **Authentication → Configurações → Domínios autorizados:** adicione `costamaiavitor.github.io` (o `localhost` já vem).
+4. **Firestore Database → Criar banco de dados** (modo de produção, qualquer região). Na aba **Regras**, cole e publique:
+
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /players/{uid} {
+         allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+     }
+   }
+   ```
+
+5. **Configurações do projeto (engrenagem) → Seus apps → Web (`</>`):** registre o app e copie o objeto `firebaseConfig`.
+6. No `index.html`, troque `const FIREBASE_CONFIG = null;` por `const FIREBASE_CONFIG = { ...o que você copiou... };`.
+
+A `apiKey` do Firebase não é segredo (ela identifica o projeto); quem protege os dados são as regras acima. Cada jogador só lê e grava o próprio inventário. Como o jogo roda no navegador, alguém que mexa no código consegue se dar skins. Para jogar entre amigos isso não importa.
+
 ## Gráficos
 
 No menu, aba **Configurações**, ou em Esc → Configurações → **Gráficos**:

@@ -62,6 +62,32 @@ button.card.on{border-color:var(--acc);background:rgba(255,176,32,.1);box-shadow
 .optrow{display:flex;gap:6px 22px;flex-wrap:wrap}
 .zdesc{color:#bbb;font-size:15px;margin-top:8px;min-height:38px;line-height:1.25}
 .zdesc b{color:var(--acc)}
+/* skins */
+.skhead{display:grid;grid-template-columns:1fr 1.2fr;gap:12px}
+.skbody{display:grid;grid-template-columns:1fr 1.5fr;gap:12px;margin-top:12px;align-items:start}
+@media(max-width:780px){.skhead,.skbody{grid-template-columns:1fr}}
+#skPrev{width:100%;height:190px;display:block;border-radius:6px;background:radial-gradient(ellipse at center,#2a2f3a,#0c0e12 75%)}
+.casen{display:flex;align-items:center;gap:10px;font-size:38px;font-weight:700;line-height:1}
+.cicon{width:34px;height:26px;border-radius:4px;background:linear-gradient(180deg,#ffcf6a,#c88a1c);box-shadow:inset 0 -6px 0 rgba(0,0,0,.25),inset 0 0 0 2px rgba(0,0,0,.3);position:relative}
+.cicon:after{content:"";position:absolute;left:14px;top:0;bottom:0;width:6px;background:rgba(0,0,0,.25)}
+.xpbar{height:10px;background:rgba(255,255,255,.1);border-radius:5px;overflow:hidden}
+.xpbar i{display:block;height:100%;background:linear-gradient(90deg,#ffb020,#ffd36a);width:0;transition:width .4s}
+.skgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-top:10px;max-height:330px;overflow:auto;padding-right:4px}
+.skc{position:relative;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));border:1px solid var(--line);border-bottom:3px solid var(--rc);border-radius:6px;padding:6px;cursor:pointer;min-width:0}
+.skc:hover{background:rgba(255,255,255,.08)}
+.skc.on{box-shadow:0 0 0 2px var(--acc)}
+.skc .sw{height:44px;border-radius:4px;background-size:120px;margin-bottom:5px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.4)}
+.skc b{display:block;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skc small{display:block;font-size:13px;color:var(--rc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skc i{position:absolute;top:4px;right:4px;font-style:normal;font-size:10px;font-weight:700;background:var(--acc);color:#1a1200;padding:1px 4px;border-radius:3px}
+.sknm{border-left:4px solid var(--rc);padding:2px 10px;margin:10px 0}
+.sknm b{display:block;font-size:19px;color:#fff}.sknm span{color:var(--rc);font-weight:700}
+.sknm.big b{font-size:26px}
+.rstrip{position:relative;overflow:hidden;height:118px;border-radius:6px;background:#0c0e12}
+.rtrack{display:flex;gap:6px;padding:8px 0;will-change:transform}
+.rtrack .skc{flex:0 0 110px;cursor:default}
+.rtrack .skc.win{box-shadow:0 0 18px var(--rc),0 0 0 2px var(--rc)}
+.rmark{position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--acc);box-shadow:0 0 8px var(--acc)}
 #zinfo{position:absolute;top:32px;left:12px;font-size:15px;color:#aaa}
 #zinfo b{color:#ff8a6a}
 .box{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:8px;padding:14px}
@@ -227,7 +253,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
       <div><h1>TIROTEIO</h1><div class="sub">FPS no navegador. x1 com os amigos ou sobrevivam juntos no modo Zumbis.</div></div>
       <label class="mname">Seu nome <input id="inName" maxlength="16" autocomplete="off"></label>
     </div>
-    <div class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></div>
+    <div class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="skins">Skins</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></div>
     <div data-pane="play" class="cols2">
       <div class="box">
         <h3>Criar sala</h3>
@@ -242,6 +268,23 @@ summary{cursor:pointer;color:#fff;font-weight:700}
         <div id="joinStatus" class="status"></div>
         <div class="hint">Quem cria a sala recebe um código de 5 letras. O amigo digita aqui (ou abre o link que o host copiar no Esc). Funciona na mesma rede ou pela internet.</div>
       </div>
+    </div>
+    <div data-pane="skins" id="skinsPane" class="hidden">
+      <div class="skhead">
+        <div class="box" id="skAcct"></div>
+        <div class="box skcase">
+          <div class="row" style="justify-content:space-between;align-items:flex-end"><div><div class="lbl" style="margin-top:0">Caixas</div><div class="casen"><span class="cicon"></span><b id="skCases">0</b></div></div><button id="btnCase" class="big" style="width:auto;padding:10px 22px">Abrir caixa</button></div>
+          <div class="lbl">Próxima caixa <span id="skXpTxt" style="float:right;color:#ddd;letter-spacing:0"></span></div>
+          <div class="xpbar"><i id="skXp"></i></div>
+          <div class="hint" style="margin-top:8px">XP: abate 10 (headshot 15, bot vale metade) · zumbi 3 · rodada de zumbi sobrevivida 25 · reanimar 20 · partida 40 · vitória 150.</div>
+        </div>
+      </div>
+      <div id="skRoll" class="box hidden" style="margin-top:12px"><div class="rstrip"><div class="rtrack"></div><div class="rmark"></div></div><div id="skRollRes"></div></div>
+      <div class="skbody">
+        <div class="box"><canvas id="skPrev"></canvas><div id="skSel"></div></div>
+        <div class="box"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Inventário</h3><select id="skFilter" style="width:auto"></select></div><div id="skGrid" class="skgrid"></div></div>
+      </div>
+      <div class="hint" style="margin-top:8px">Raridades: <span style="color:#b0c3d9">Comum 60%</span> · <span style="color:#4b69ff">Incomum 25%</span> · <span style="color:#8847ff">Rara 10%</span> · <span style="color:#d32ce6">Épica 4%</span> · <span style="color:#ffae39">Lendária 1%</span>. Facas só saem em Épica ou Lendária. Clique duas vezes numa skin para equipar.</div>
     </div>
     <div data-pane="cfg" class="hidden"><div class="box" style="max-width:520px"><div id="menuSettings"></div></div></div>
     <div data-pane="keys" class="hidden">
@@ -1443,30 +1486,113 @@ function gunTextures() {
   };
   return GTX;
 }
+// ---------- skins: acabamentos das armas (texturas geradas por código) ----------
+// Cada item do inventário é arma + acabamento ("ak47:tigre"). O acabamento pinta o corpo da arma
+// (metal, polímero, madeira); cano e ferrolho continuam de aço. Pack-a-Punch sempre ganha da skin.
+const RARITY = [
+  { name: 'Comum', css: '#b0c3d9', p: 60 }, { name: 'Incomum', css: '#4b69ff', p: 25 }, { name: 'Rara', css: '#8847ff', p: 10 },
+  { name: 'Épica', css: '#d32ce6', p: 4 }, { name: 'Lendária', css: '#ffae39', p: 1 },
+];
+const SKINS = [
+  { id: 'floresta', name: 'Floresta', r: 0, pat: 'camo', c: ['#4b5a34', '#2e3a22', '#6b6a45', '#1c2016'] },
+  { id: 'deserto', name: 'Deserto', r: 0, pat: 'camo', c: ['#b89c6a', '#8a7048', '#d4c09a', '#6a5436'] },
+  { id: 'urbano', name: 'Urbano', r: 0, pat: 'digital', c: ['#6d7075', '#44474c', '#9a9da2', '#2c2e31'] },
+  { id: 'grafite', name: 'Grafite', r: 0, pat: 'solid', c: ['#3a3d42'], m: .6, rg: .45 },
+  { id: 'areia', name: 'Areia', r: 0, pat: 'solid', c: ['#b59d74'], m: .2, rg: .7 },
+  { id: 'oceano', name: 'Oceano', r: 1, pat: 'digital', c: ['#1d4e7a', '#2d6fa8', '#0f2d4a', '#6aa6d6'] },
+  { id: 'cereja', name: 'Cereja', r: 1, pat: 'solid', c: ['#a3141f'], m: .75, rg: .28 },
+  { id: 'carbono', name: 'Carbono', r: 1, pat: 'carbon', c: ['#1b1c1f', '#34363b'], m: .4, rg: .35 },
+  { id: 'artico', name: 'Ártico', r: 1, pat: 'camo', c: ['#e4e8ec', '#a9b1ba', '#6d7580', '#ffffff'] },
+  { id: 'tigre', name: 'Tigre', r: 2, pat: 'tiger', c: ['#e07a1c', '#1a1208'] },
+  { id: 'colmeia', name: 'Colmeia', r: 2, pat: 'hex', c: ['#0f3b3a', '#35e0c8', '#156c64'], m: .6, rg: .35 },
+  { id: 'crepusculo', name: 'Crepúsculo', r: 2, pat: 'fade', c: ['#ff7a2e', '#d8327a', '#4a2a8a'], m: .7, rg: .25 },
+  { id: 'damasco', name: 'Damasco', r: 2, pat: 'damascus', c: ['#9a9da4', '#3c3f45'], m: .95, rg: .22 },
+  { id: 'neon', name: 'Neon', r: 3, pat: 'circuit', c: ['#0b0b12', '#39e6ff', '#ff4fd8'], glow: 1 },
+  { id: 'lava', name: 'Lava', r: 3, pat: 'lava', c: ['#1d0f0b', '#ff5a14'], glow: 1 },
+  { id: 'asiimov', name: 'Asiimov', r: 3, pat: 'asiimov', c: ['#eef0f2', '#ff7a1a', '#1a1a1c'], m: .2, rg: .5 },
+  { id: 'esmeralda', name: 'Esmeralda', r: 3, pat: 'fade', c: ['#063024', '#1fd18a', '#0b5a3a'], m: .9, rg: .18 },
+  { id: 'ouro', name: 'Ouro', r: 4, pat: 'gold', c: ['#d9a93e', '#8a6420'], m: 1, rg: .16 },
+  { id: 'dragao', name: 'Dragão', r: 4, pat: 'dragon', c: ['#7a0c0c', '#e8b440', '#ff3a10'], m: .6, rg: .3, glow: 1 },
+  { id: 'galaxia', name: 'Galáxia', r: 4, pat: 'galaxy', c: ['#12082e', '#4a2aa8', '#0a1a4a'], m: .5, rg: .25, glow: 1 },
+];
+const SKIN_BY = Object.fromEntries(SKINS.map(s => [s.id, s]));
+// armas que podem ter skin (as de raio ficam de fora: já têm visual próprio)
+const SKIN_WEAPONS = () => Object.keys(W).filter(k => k === 'knife' || (W[k].model && ['primary', 'secondary'].includes(W[k].slot) && !W[k].pap && !W[k].ls && !['raygun', 'thundergun'].includes(k)));
+const SKTEX = {};
+function skinTex(f) {
+  if (SKTEX[f.id]) return SKTEX[f.id];
+  const S = 256, C = f.c, R = (a, b) => a + Math.random() * (b - a);
+  const mk = draw => { const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); draw(g); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
+  const noise = (g, amt) => { const img = g.getImageData(0, 0, S, S), d = img.data; for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - .5) * amt; d[i] += n; d[i + 1] += n; d[i + 2] += n; } g.putImageData(img, 0, 0); };
+  const wear = g => { g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = .8; for (let i = 0; i < 14; i++) { const x = R(0, S), y = R(0, S); g.beginPath(); g.moveTo(x, y); g.lineTo(x + R(-20, 20), y + R(-4, 4)); g.stroke(); } };
+  // blobs que "dão a volta" na borda (textura repete sem emenda)
+  const blob = (g, x, y, rx, ry, col) => { g.fillStyle = col; for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) { g.beginPath(); g.ellipse(x + dx, y + dy, rx, ry, R(0, 3), 0, 7); g.fill(); } };
+  let glow = null;
+  const map = mk(g => {
+    g.fillStyle = C[0]; g.fillRect(0, 0, S, S);
+    switch (f.pat) {
+      case 'solid': noise(g, 10); g.globalAlpha = .06; for (let y = 0; y < S; y += 2) { g.fillStyle = Math.random() < .5 ? '#fff' : '#000'; g.fillRect(0, y, S, 1); } g.globalAlpha = 1; wear(g); break;
+      case 'camo': for (let k = 1; k < C.length; k++) for (let i = 0; i < 14; i++) { const x = R(0, S), y = R(0, S); for (let j = 0; j < 4; j++) blob(g, x + R(-18, 18), y + R(-12, 12), R(10, 26), R(6, 16), C[k]); } noise(g, 14); break;
+      case 'digital': { const q = 8; for (let k = 1; k < C.length; k++) for (let i = 0; i < 22; i++) { let x = Math.floor(R(0, S / q)) * q, y = Math.floor(R(0, S / q)) * q; for (let j = 0; j < 7; j++) { g.fillStyle = C[k]; g.fillRect((x + S) % S, (y + S) % S, q * 2, q); x += (Math.floor(R(-1, 2))) * q; y += (Math.floor(R(-1, 2))) * q; } } noise(g, 8); break; }
+      case 'tiger': g.fillStyle = C[1]; for (let i = 0; i < 16; i++) { const x0 = R(0, S), w = R(4, 12); g.beginPath(); g.moveTo(x0, -10); for (let y = 0; y <= S + 10; y += 16) g.lineTo(x0 + Math.sin(y / 30 + i) * 14 + R(-4, 4), y); for (let y = S + 10; y >= -10; y -= 16) g.lineTo(x0 + w * (.4 + Math.sin(y / 40) * .6) + Math.sin(y / 30 + i) * 14, y); g.fill(); } noise(g, 12); break;
+      case 'fade': { const gr = g.createLinearGradient(0, 0, S, S); C.forEach((c, i) => gr.addColorStop(i / (C.length - 1), c)); g.fillStyle = gr; g.fillRect(0, 0, S, S); noise(g, 6); wear(g); break; }
+      case 'hex': { const r = 14, h = r * Math.sqrt(3); g.lineWidth = 2; for (let row = -1; row < S / h + 1; row++) for (let col = -1; col < S / (r * 1.5) + 1; col++) { const cx = col * r * 1.5, cy = row * h + (col % 2 ? h / 2 : 0); g.beginPath(); for (let k = 0; k < 6; k++) g.lineTo(cx + Math.cos(k * Math.PI / 3) * (r - 1.5), cy + Math.sin(k * Math.PI / 3) * (r - 1.5)); g.closePath(); if (Math.random() < .18) { g.fillStyle = C[2]; g.fill(); } g.strokeStyle = C[1]; g.stroke(); } noise(g, 8); break; }
+      case 'carbon': for (let y = 0; y < S; y += 8) for (let x = 0; x < S; x += 8) { const on = ((x + y) / 8) % 2, gr = on ? g.createLinearGradient(x, y, x + 8, y) : g.createLinearGradient(x, y, x, y + 8); gr.addColorStop(0, C[0]); gr.addColorStop(.5, C[1]); gr.addColorStop(1, C[0]); g.fillStyle = gr; g.fillRect(x, y, 8, 8); } break;
+      case 'damascus': for (let i = 0; i < 60; i++) { const y0 = i * S / 60; g.strokeStyle = i % 2 ? C[1] : C[0]; g.lineWidth = 3.2; g.beginPath(); for (let x = 0; x <= S; x += 4) g.lineTo(x, y0 + Math.sin(x / 22 + i * .3) * 9 + Math.sin(x / 9) * 2); g.stroke(); } noise(g, 10); break;
+      case 'circuit': case 'lava': case 'galaxy': case 'dragon': break; // desenho abaixo (junto com o brilho)
+      case 'asiimov': g.fillStyle = C[2]; g.fillRect(0, S * .62, S, S * .38); g.fillStyle = C[1]; g.beginPath(); g.moveTo(0, S * .5); g.lineTo(S * .55, S * .5); g.lineTo(S * .7, S * .62); g.lineTo(0, S * .62); g.fill(); g.fillRect(S * .75, S * .2, S * .25, S * .08); g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(0, S * .49, S, 2); noise(g, 6); break;
+      case 'gold': { const gr = g.createLinearGradient(0, 0, 0, S); gr.addColorStop(0, C[0]); gr.addColorStop(.5, '#f6d67a'); gr.addColorStop(1, C[0]); g.fillStyle = gr; g.fillRect(0, 0, S, S); g.globalAlpha = .08; for (let y = 0; y < S; y += 2) { g.fillStyle = Math.random() < .5 ? '#fff' : C[1]; g.fillRect(0, y, S, 1); } g.globalAlpha = 1; break; }
+    }
+  });
+  // acabamentos que brilham: o desenho do brilho também vai no mapa de cor
+  if (f.glow) {
+    const lines = [];
+    const G = document.createElement('canvas'); G.width = G.height = S; const gg = G.getContext('2d'); gg.fillStyle = '#000'; gg.fillRect(0, 0, S, S);
+    const g = map.image.getContext('2d');
+    for (const ctx of [g, gg]) ctx.lineCap = 'round';
+    if (f.pat === 'circuit') for (let i = 0; i < 18; i++) { const col = i % 2 ? C[1] : C[2]; let x = R(0, S), y = R(0, S); const pts = [[x, y]]; for (let k = 0; k < 5; k++) { if (Math.random() < .5) x += R(-60, 60); else y += R(-60, 60); pts.push([x, y]); } lines.push([col, 2, pts]); }
+    if (f.pat === 'lava') for (let i = 0; i < 14; i++) { let x = R(0, S), y = R(0, S), a = R(0, 7); const pts = [[x, y]]; for (let k = 0; k < 10; k++) { a += R(-.8, .8); x += Math.cos(a) * R(6, 16); y += Math.sin(a) * R(6, 16); pts.push([x, y]); } lines.push([C[1], R(1.5, 3.5), pts]); }
+    if (f.pat === 'dragon') { g.fillStyle = C[0]; g.fillRect(0, 0, S, S); for (let y = 0; y < S + 16; y += 16) for (let x = 0; x < S + 16; x += 16) { const ox = (y / 16) % 2 ? 8 : 0; g.strokeStyle = C[1]; g.lineWidth = 1.5; g.beginPath(); g.arc(x + ox, y, 9, 0, Math.PI); g.stroke(); } for (let i = 0; i < 8; i++) { let x = R(0, S), y = R(0, S), a = R(0, 7); const pts = [[x, y]]; for (let k = 0; k < 8; k++) { a += R(-.6, .6); x += Math.cos(a) * 14; y += Math.sin(a) * 14; pts.push([x, y]); } lines.push([C[2], 2, pts]); } }
+    if (f.pat === 'galaxy') { const gr = g.createRadialGradient(S * .4, S * .5, 10, S * .5, S * .5, S * .7); gr.addColorStop(0, C[1]); gr.addColorStop(.5, C[2]); gr.addColorStop(1, C[0]); g.fillStyle = gr; g.fillRect(0, 0, S, S); for (let i = 0; i < 140; i++) { const x = R(0, S), y = R(0, S), r = Math.random() < .1 ? 1.6 : .8; for (const ctx of [g, gg]) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); } } }
+    for (const [col, w, pts] of lines) for (const ctx of [g, gg]) { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); }
+    glow = new THREE.CanvasTexture(G); glow.colorSpace = THREE.SRGBColorSpace; glow.wrapS = glow.wrapT = THREE.RepeatWrapping; map.needsUpdate = true;
+  }
+  return (SKTEX[f.id] = { map, glow });
+}
+function skinMats(f, mk, fp) {
+  const T = skinTex(f), em = T.glow ? { emissiveMap: T.glow, emissive: new THREE.Color(0xffffff).multiplyScalar(fp ? 1.4 : 1) } : {};
+  return {
+    a: mk({ map: T.map, color: 0xffffff, metalness: f.m ?? .45, roughness: f.rg ?? .45, ...em }),
+    b: mk({ map: T.map, color: 0xb0b0b0, metalness: Math.min(f.m ?? .45, .35), roughness: Math.max(f.rg ?? .45, .5), ...em }),
+  };
+}
+const skinSwatch = id => { const f = SKIN_BY[id]; return f ? skinTex(f).map.image.toDataURL('image/jpeg', .7) : ''; };
 // fp = primeira pessoa: PBR (metal reflete o ambiente). Senão, Lambert leve para o mundo (arma na mão dos outros, na caixa etc.)
 const GM = {};
 let VM_ENV = 1;
-function gunMats(pap, fp) {
-  const key = (pap ? 'p' : 'n') + (fp ? 'f' : 't'); if (GM[key]) return GM[key];
+function gunMats(pap, fp, skin) {
+  const f = !pap && skin ? SKIN_BY[skin] : null;
+  const key = (pap ? 'p' : 'n') + (fp ? 'f' : 't') + (f ? f.id : ''); if (GM[key]) return GM[key];
   const T = gunTextures();
   const mk = o => { if (fp) { const m = new THREE.MeshStandardMaterial({ ...o }); m.userData.env = (o.metalness ?? 0) > .5 ? 1 : .35; m.envMapIntensity = VM_ENV * m.userData.env; return m; } const { metalness, roughness, roughnessMap, ...rest } = o; return new THREE.MeshLambertMaterial(rest); };
   const camo = pap ? mk({ map: T.pap, emissiveMap: T.papGlow, emissive: new THREE.Color(0xffffff).multiplyScalar(fp ? 1.6 : 1), metalness: .55, roughness: .35 }) : null;
+  const sk = f ? skinMats(f, mk, fp) : null, A = sk?.a, Bm = sk?.b; // skin: 'a' no metal do corpo, 'b' (mais escuro) no polímero/madeira
   const M = {
-    metal: camo || mk({ map: T.metal, color: 0x3c3f44, metalness: .8, roughness: .5, roughnessMap: T.metal, bumpMap: T.metal, bumpScale: .4 }),
+    metal: camo || A || mk({ map: T.metal, color: 0x3c3f44, metalness: .8, roughness: .5, roughnessMap: T.metal, bumpMap: T.metal, bumpScale: .4 }),
     steel: camo || mk({ map: T.metal, color: 0x73777e, metalness: .9, roughness: .34, roughnessMap: T.metal }),
     chrome: camo || mk({ map: T.metal, color: 0xc9cdd3, metalness: 1, roughness: .16 }),
-    polymer: camo || mk({ map: T.poly, color: 0x2a2b2e, metalness: .05, roughness: .82, bumpMap: T.poly, bumpScale: .5 }),
-    wood: camo || mk({ map: T.wood, color: 0x6e3c1c, metalness: 0, roughness: .55, bumpMap: T.wood, bumpScale: .6 }),
-    woodDark: camo || mk({ map: T.wood, color: 0x4e2e18, metalness: 0, roughness: .5, bumpMap: T.wood, bumpScale: .5 }),
-    bakelite: camo || mk({ map: T.poly, color: 0x6e3216, metalness: .1, roughness: .55 }),
-    green: camo || mk({ map: T.poly, color: 0x56663f, metalness: .15, roughness: .72, bumpMap: T.poly, bumpScale: .4 }),
-    tan: camo || mk({ map: T.poly, color: 0x9a8662, metalness: .1, roughness: .75, bumpMap: T.poly, bumpScale: .4 }),
-    red: camo || mk({ map: T.metal, color: 0xb3262b, metalness: .6, roughness: .32 }),
-    bronze: camo || mk({ map: T.metal, color: 0x8c6a38, metalness: .9, roughness: .38, roughnessMap: T.metal }),
+    polymer: camo || Bm || mk({ map: T.poly, color: 0x2a2b2e, metalness: .05, roughness: .82, bumpMap: T.poly, bumpScale: .5 }),
+    wood: camo || Bm || mk({ map: T.wood, color: 0x6e3c1c, metalness: 0, roughness: .55, bumpMap: T.wood, bumpScale: .6 }),
+    woodDark: camo || Bm || mk({ map: T.wood, color: 0x4e2e18, metalness: 0, roughness: .5, bumpMap: T.wood, bumpScale: .5 }),
+    bakelite: camo || Bm || mk({ map: T.poly, color: 0x6e3216, metalness: .1, roughness: .55 }),
+    green: camo || Bm || mk({ map: T.poly, color: 0x56663f, metalness: .15, roughness: .72, bumpMap: T.poly, bumpScale: .4 }),
+    tan: camo || Bm || mk({ map: T.poly, color: 0x9a8662, metalness: .1, roughness: .75, bumpMap: T.poly, bumpScale: .4 }),
+    red: camo || A || mk({ map: T.metal, color: 0xb3262b, metalness: .6, roughness: .32 }),
+    bronze: camo || A || mk({ map: T.metal, color: 0x8c6a38, metalness: .9, roughness: .38, roughnessMap: T.metal }),
     copper: mk({ map: T.metal, color: 0xc97a44, metalness: 1, roughness: .3 }),
     dark: mk({ color: 0x141517, metalness: .5, roughness: .6 }),
     brass: mk({ color: 0xcaa24a, metalness: 1, roughness: .28 }),
-    blade: mk({ map: T.metal, color: 0xdadde2, metalness: 1, roughness: .14 }),
+    blade: A || mk({ map: T.metal, color: 0xdadde2, metalness: 1, roughness: .14 }),
     glass: mk({ color: 0x0c1824, metalness: .6, roughness: .04, emissive: 0x06141e }),
     glowG: new THREE.MeshBasicMaterial({ color: new THREE.Color(pap ? 0xff3355 : 0x44ff77).multiplyScalar(3) }),
     glowB: new THREE.MeshBasicMaterial({ color: new THREE.Color(0x66ccff).multiplyScalar(3) }),
@@ -1475,8 +1601,8 @@ function gunMats(pap, fp) {
   };
   return (GM[key] = M);
 }
-function gunModel(id, fp = false) {
-  const wd = W[id], pap = !!wd?.pap, M = gunMats(pap, fp), g = new THREE.Group(), ud = g.userData;
+function gunModel(id, fp = false, skin = null) {
+  const wd = W[id], pap = !!wd?.pap, M = gunMats(pap, fp, skin), g = new THREE.Group(), ud = g.userData;
   const hi = fp && CFG.gfx !== 'baixo';
   const RB = (w, h, d, r = .004) => { const m = Math.min(w, h, d); return hi && m > .012 ? new RoundedBoxGeometry(w, h, d, 2, Math.min(r, m / 2 - .001)) : new THREE.BoxGeometry(w, h, d); };
   const CY = (r, len, seg = 14, rFront = r) => { const q = new THREE.CylinderGeometry(rFront, r, len, hi ? seg : Math.max(6, seg >> 1)); q.rotateX(-Math.PI / 2); return q; }; // deitado ao longo de z
@@ -1830,7 +1956,7 @@ function armMats() {
 function vmSetWeapon(id) {
   if (vmGun) { vmRoot.remove(vmGun); vmGun.traverse(o => o.geometry?.dispose()); }
   vmGun = new THREE.Group();
-  const gun = gunModel(id, true), ud = gun.userData, A = armMats(); vmGun.add(gun);
+  const gun = gunModel(id, true, skinOf(id)), ud = gun.userData, A = armMats(); vmGun.add(gun);
   vmGun.userData = ud;
   const RBa = (w, h, d, r) => new RoundedBoxGeometry(w, h, d, 2, r);
   const put = (par, geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); par.add(m); return m; };
@@ -2198,12 +2324,13 @@ function getRemote(id) {
 function setRemoteGun(rp, w) {
   if (!w || rp.w === w) return; rp.w = w;
   const gh = rp.model.userData.gh; while (gh.children.length) { const c = gh.children[0]; gh.remove(c); c.traverse(o => o.geometry?.dispose()); }
-  const g = gunModel(w); g.scale.setScalar(1.1); gh.add(g);
+  const g = gunModel(w, false, rp.sk?.[w]); g.scale.setScalar(1.1); gh.add(g);
 }
 function removeRemote(id) { const rp = R.get(id); if (!rp) return; scene.remove(rp.model); disposeGroup(rp.model); R.delete(id); }
 function refreshRemoteInfo(rp) {
   const info = C.players.get(rp.id); if (!info) return;
   if (info.c !== rp.color) { rp.color = info.c; rp.model.userData.bodyM.color.set(info.c); }
+  const skk = JSON.stringify(info.sk || {}); if (skk !== rp.skKey) { rp.skKey = skk; rp.sk = info.sk || {}; const w = rp.w; rp.w = null; setRemoteGun(rp, w); } // skins dos outros
   if (info.n !== rp.name) { rp.name = info.n; if (rp.tag) rp.model.remove(rp.tag); rp.tag = nameSprite(info.n, info.c); rp.model.add(rp.tag); }
 }
 function updateRemotes(dt) {
@@ -2340,7 +2467,7 @@ function startHost(st) {
   NET.isHost = true; C.myId = 'h'; C.st = st;
   S.st = st; S.players.clear(); S.nextId = 1; S.colorI = 0;
   buildMap(st.map);
-  srvAddPlayer('h', CFG.name, false);
+  srvAddPlayer('h', CFG.name, false).skins = cleanSk(PROF.data?.equipped);
   enterGame();
   srvStartMatch();
   if (!peerAvailable()) { toast('Sem internet/PeerJS: jogando offline (só bots)', 5); return; }
@@ -2375,7 +2502,7 @@ function joinRoom(code) {
   peer.on('open', () => {
     const conn = peer.connect(PEER_PREFIX + code, { reliable: true });
     NET.hostConn = conn;
-    conn.on('open', () => { conn.send({ t: 'join', name: CFG.name }); });
+    conn.on('open', () => { conn.send({ t: 'join', name: CFG.name, sk: cleanSk(PROF.data?.equipped) }); });
     conn.on('data', m => { NET.lastHost = performance.now(); if (m.t === 'welcome') { welcomed = true; clearTimeout(timer); NET.code = code; NET.online = true; status.textContent = ''; } onMsg(m); });
     conn.on('close', () => { if (welcomed) lostConnection(); else fail('Conexão recusada'); });
     conn.on('error', () => { if (welcomed) lostConnection(); });
@@ -2418,7 +2545,7 @@ function srvOnData(conn, d) {
   if (d.t === 'join' && !conn.pid) {
     const id = 'p' + (S.nextId++); conn.pid = id; NET.conns.set(id, conn);
     const name = String(d.name || 'Jogador').replace(/[<>]/g, '').slice(0, 16) || 'Jogador';
-    const np = srvAddPlayer(id, name, false);
+    const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk);
     conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code });
     broadcast({ t: 'info', txt: name + ' entrou na sala' });
     if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') { zResetPlayer(np); srvSpawn(np, zSpawnPoint(S.players.size - 1), true, Math.PI); } // entra já jogando
@@ -2452,6 +2579,7 @@ function srvHandle(pid, m) {
       if (S.phase === 'freeze' || m.v === pid) return;
       srvDamage(m.v, pid, clamp(+m.dmg || 0, 0, 500), m.z, W[m.w] ? m.w : 'glock'); break;
     case 'buy': srvBuy(p, m.it); break;
+    case 'skins': p.skins = cleanSk(m.sk); break;
     case 'nade': if (!p.alive || !(p.inv[m.k] > 0)) return; p.inv[m.k]--; broadcast({ t: 'nade', id: pid, k: m.k, p: m.p, v: m.v }, pid); break;
     case 'chat': broadcast({ t: 'chat', id: pid, txt: String(m.txt || '').slice(0, 120) }); break;
     case 'suicide': if (p.alive) srvKill(p, null, 'world', false); break;
@@ -2528,7 +2656,7 @@ function srvEndRound(winner) {
   S.phase = 'end'; S.phaseEnd = now + 4;
   if (winner) { winner.rw++; winner.money = Math.min(16000, winner.money + 3250); winner.lossStreak = 0; }
   for (const p of S.players.values()) if (p !== winner) { p.money = Math.min(16000, p.money + 1400 + 500 * Math.min(p.lossStreak, 4)); p.lossStreak++; }
-  if (winner && winner.rw >= S.st.rounds) { S.phase = 'over'; S.phaseEnd = now + 10; S.winner = winner.id; broadcast({ t: 'msg', txt: winner.name + ' VENCEU A PARTIDA!', sub: 'Nova partida em 10s', dur: 9, snd: 'win' }); }
+  if (winner && winner.rw >= S.st.rounds) { S.phase = 'over'; S.phaseEnd = now + 10; S.winner = winner.id; broadcast({ t: 'mend', w: winner.id }); broadcast({ t: 'msg', txt: winner.name + ' VENCEU A PARTIDA!', sub: 'Nova partida em 10s', dur: 9, snd: 'win' }); }
   else broadcast({ t: 'msg', txt: winner ? winner.name + ' venceu a rodada' : 'Rodada empatada', sub: '', dur: 3 });
   srvState();
 }
@@ -2572,7 +2700,7 @@ function srvHE(pos, ownerId) {
 function srvState() {
   const zmode = S.st.mode === 'zombies', pl = [];
   for (const p of S.players.values()) {
-    const o = { id: p.id, n: p.name, c: p.color, b: p.isBot ? 1 : 0, hp: Math.round(p.hp), ar: p.armor, hm: p.helmet ? 1 : 0, al: p.alive ? 1 : 0, k: p.kills, d: p.deaths, m: p.money, rw: p.rw };
+    const o = { id: p.id, n: p.name, c: p.color, b: p.isBot ? 1 : 0, hp: Math.round(p.hp), ar: p.armor, hm: p.helmet ? 1 : 0, al: p.alive ? 1 : 0, k: p.kills, d: p.deaths, m: p.money, rw: p.rw, sk: p.skins || {} };
     if (zmode) Object.assign(o, { hs: p.hs, dw: p.downs, rvs: p.revives, pk: p.perks, dn: p.downed ? 1 : 0, bl: p.downed && !p.selfRev ? r2(Math.max(0, p.bleedAt - now)) : 0,
       rv: p.downed && p.revBy ? r2(p.revProg / (S.players.get(p.revBy)?.perks.includes('qr') ? 2 : 4)) : 0, mh: p.maxHp, bw: p.bowie ? 1 : 0 });
     pl.push(o);
@@ -2596,7 +2724,7 @@ function srvTick(dt) {
     if (S.phase === 'live') {
       for (const p of S.players.values()) if (!p.alive && now >= p.respawnAt) srvSpawnDM(p);
       let lead = null; for (const p of S.players.values()) if (!lead || p.kills > lead.kills) lead = p;
-      if (lead && (lead.kills >= st.frags || now >= S.phaseEnd)) { S.phase = 'over'; S.phaseEnd = now + 10; S.winner = lead.id; broadcast({ t: 'msg', txt: lead.name + ' VENCEU!', sub: `${lead.kills} abates — nova partida em 10s`, dur: 9, snd: 'win' }); srvState(); }
+      if (lead && (lead.kills >= st.frags || now >= S.phaseEnd)) { S.phase = 'over'; S.phaseEnd = now + 10; S.winner = lead.id; broadcast({ t: 'mend', w: lead.id }); broadcast({ t: 'msg', txt: lead.name + ' VENCEU!', sub: `${lead.kills} abates — nova partida em 10s`, dur: 9, snd: 'win' }); srvState(); }
     } else if (S.phase === 'over' && now >= S.phaseEnd) srvStartMatch();
   } else {
     switch (S.phase) {
@@ -3766,6 +3894,7 @@ function onMsg(m) {
     case 'zdie': {
       const zc = ZC.zs.get(m.id); if (!zc || zc.dead) break;
       zc.dead = true; zc.deadT = now;
+      if (m.by === C.myId) grantXP(m.hs ? 5 : 3);
       const hp = zc.pos.clone(); hp.y += zc.dog ? .7 : 1.5;
       if (m.hs && !zc.dog) { zc.model.userData.head.visible = false; puff(hp, 0x8a0000, .7, .5, 0); } else puff(hp, 0x8a0000, .45, .35, 0);
       if (m.fl) { const src = m.by === C.myId ? me.pos : (R.get(m.by)?.pos || zc.pos); const d = zc.pos.clone().sub(src); d.y = 0; if (d.lengthSq() < 1e-6) d.set(0, 0, 1); d.normalize(); zc.fling = d.multiplyScalar(14); zc.fling.y = 7; }
@@ -3773,7 +3902,7 @@ function onMsg(m) {
     }
     case 'zgone': { const zc = ZC.zs.get(m.id); if (zc) zRemoveClient(zc); break; }
     case 'zround': ZC.round = m.r; ZC.dog = !!m.dog; ZC.phase = 'round'; zRoundFx(m.r, m.dog); break;
-    case 'zrend': ZC.phase = 'break'; play('zend'); centerMsg('Rodada ' + m.r + ' concluída', 'Próxima rodada em 10 segundos', 4); zFogDog(false); break;
+    case 'zrend': if (me.alive && !me.downed) grantXP(25); ZC.phase = 'break'; play('zend'); centerMsg('Rodada ' + m.r + ' concluída', 'Próxima rodada em 10 segundos', 4); zFogDog(false); break;
     case 'zdoor': if (zDoorOpen(m.id)) { const d = ZD.doors.find(x => x.id === m.id); play('door', d ? new V3(d.x, 1.5, d.z) : null); } break;
     case 'zpower': zPowerOn(); play('power'); centerMsg('ENERGIA LIGADA', 'Bebidas e Pack-a-Punch funcionando', 3); break;
     case 'zperk':
@@ -3803,6 +3932,7 @@ function onMsg(m) {
       else { const rp = R.get(m.id); if (rp) rp.downed = true; toast(nameOf(m.id) + ' caiu! Segure F perto dele para reanimar', 3); }
       break;
     case 'zrevive':
+      if (m.by === C.myId && m.id !== C.myId) grantXP(20);
       if (m.id === C.myId) { zSetDowned(false); ZC.selfRev = false; play('revive'); toast(m.by ? 'Reanimado por ' + nameOf(m.by) : 'Você se levantou!', 2); }
       else { const rp = R.get(m.id); if (rp) rp.downed = false; }
       break;
@@ -3810,7 +3940,7 @@ function onMsg(m) {
       if (m.id === C.myId) { zSetDowned(false); me.alive = false; C.deadAt = now; C.spec = null; centerMsg('VOCÊ SANGROU', 'Você volta na próxima rodada', 3); }
       else { const rp = R.get(m.id); if (rp) { rp.downed = false; rp.alive = false; } }
       break;
-    case 'zover': ZC.over = true; play('over'); centerMsg('FIM DE JOGO', `${C.players.size > 1 ? 'Vocês sobreviveram' : 'Você sobreviveu'} ${m.r} rodada${m.r === 1 ? '' : 's'} · recomeça em 12s`, 11); break;
+    case 'zover': grantXP(30 + 8 * (m.r || 0)); ZC.over = true; play('over'); centerMsg('FIM DE JOGO', `${C.players.size > 1 ? 'Vocês sobreviveram' : 'Você sobreviveu'} ${m.r} rodada${m.r === 1 ? '' : 's'} · recomeça em 12s`, 11); break;
     case 'pts': me.money = m.m; zPopup(m.n); if (m.n < 0) play('kaching'); break;
     case 'ammo': if (W[m.w]) { G.ammo[m.w] = { mag: W[m.w].mag, res: W[m.w].res }; play('kaching'); } break;
     case 'zbowie': ZC.bowie = true; play('kaching'); centerMsg('FACA BOWIE', 'Facadas muito mais fortes', 2); break;
@@ -3824,11 +3954,12 @@ function onMsg(m) {
       }
       break;
     }
+    case 'mend': grantXP(m.w === C.myId ? 150 : 40); break;
     case 'kill': {
       feedAdd(m.k, m.v, m.w, m.hs);
       if (m.v === C.myId) { me.alive = false; C.deadAt = now; C.killer = m.k; G.scope = 0; G.reloadEnd = 0; C.spec = null; C.buyOpen = false; renderBuy(); }
       else { const rp = R.get(m.v); if (rp) { rp.alive = false; rp.dead = true; rp.deadT = now; } }
-      if (m.k === C.myId && m.v !== C.myId) play('kill');
+      if (m.k === C.myId && m.v !== C.myId) { play('kill'); grantXP((m.hs ? 15 : 10) * (C.players.get(m.v)?.b ? .5 : 1)); } // XP: abate (metade contra bot)
       const info = C.players.get(m.v); if (info) info.al = 0;
       break;
     }
@@ -4117,14 +4248,243 @@ function settingsForm(el) {
   const sh = el.querySelector('[data-k="shadows"]'); sh.checked = CFG.shadows;
   sh.onchange = () => { CFG.shadows = sh.checked; save('shadows', CFG.shadows); applySettings(); };
 }
+// ================================================================
+// Conta, progresso e skins
+// Com FIREBASE_CONFIG preenchido: login (Google ou e-mail/senha) e o inventário fica na nuvem,
+// no documento players/{uid} do Firestore. Sem ele: perfil local, salvo só neste navegador.
+// ================================================================
+const FIREBASE_CONFIG = null; // cole aqui o firebaseConfig do console do Firebase (Configurações do projeto → Seus apps → Web)
+const XP_CASE = 300; // XP para ganhar uma caixa
+const PROF = { uid: null, email: '', name: '', cloud: false, fb: false, data: null, saveT: 0, status: '' };
+const FB = {};
+const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0 });
+function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) if (W[w] && SKIN_BY[f]) o[w] = f; return o; }
+function cleanProf(d) {
+  const p = newProfile(0); if (!d || typeof d !== 'object') return p;
+  p.xp = Math.max(0, +d.xp || 0); p.cases = Math.max(0, Math.floor(+d.cases || 0)); p.opened = Math.max(0, +d.opened || 0);
+  p.items = Array.isArray(d.items) ? [...new Set(d.items.filter(it => typeof it === 'string' && W[it.split(':')[0]] && SKIN_BY[it.split(':')[1]]))] : [];
+  p.equipped = cleanSk(d.equipped); for (const [w, f] of Object.entries(p.equipped)) if (!p.items.includes(w + ':' + f)) delete p.equipped[w];
+  return p;
+}
+const profKey = () => 'prof.' + (PROF.uid || 'guest');
+function profLoadLocal() { const d = load(profKey(), null); PROF.data = d ? cleanProf(d) : newProfile(); }
+function profSave(now_) {
+  if (!PROF.data) return;
+  save(profKey(), PROF.data);
+  if (!PROF.cloud) return;
+  clearTimeout(PROF.saveT);
+  PROF.saveT = setTimeout(async () => {
+    try { await FB.F.setDoc(FB.F.doc(FB.db, 'players', PROF.uid), { ...PROF.data, name: PROF.name, upd: FB.F.serverTimestamp() }, { merge: true }); }
+    catch (e) { console.warn('salvar conta', e); PROF.status = 'Não consegui salvar na nuvem (' + (e.code || e.message) + '). Tento de novo na próxima mudança.'; skinsUI(); }
+  }, now_ ? 0 : 3000);
+}
+addEventListener('visibilitychange', () => { if (document.hidden && PROF.cloud) profSave(true); });
+async function fbInit() {
+  if (!FIREBASE_CONFIG) return;
+  try {
+    const base = 'https://www.gstatic.com/firebasejs/10.12.2/';
+    const [A0, A, F] = await Promise.all([import(base + 'firebase-app.js'), import(base + 'firebase-auth.js'), import(base + 'firebase-firestore.js')]);
+    const app = A0.initializeApp(FIREBASE_CONFIG);
+    Object.assign(FB, { A, F, auth: A.getAuth(app), db: F.getFirestore(app) });
+    PROF.fb = true; skinsUI();
+    A.onAuthStateChanged(FB.auth, profOnUser);
+  } catch (e) { console.warn('firebase', e); PROF.status = 'Não consegui carregar o sistema de contas. Usando perfil local.'; skinsUI(); }
+}
+async function profOnUser(u) {
+  if (!u) { PROF.uid = null; PROF.cloud = false; PROF.email = ''; profLoadLocal(); skinsUI(); skinsChanged(); return; }
+  PROF.uid = u.uid; PROF.email = u.email || ''; PROF.name = u.displayName || (u.email || 'Jogador').split('@')[0];
+  PROF.status = 'Carregando sua conta...'; skinsUI();
+  const ref = FB.F.doc(FB.db, 'players', u.uid);
+  try {
+    const snap = await FB.F.getDoc(ref);
+    if (snap.exists()) PROF.data = cleanProf(snap.data());
+    else { // conta nova: leva junto o que foi ganho como convidado neste navegador
+      const guest = load('prof.guest', null);
+      PROF.data = guest ? cleanProf(guest) : newProfile();
+      await FB.F.setDoc(ref, { ...PROF.data, name: PROF.name, created: FB.F.serverTimestamp() });
+      if (guest) save('prof.guest', newProfile(0));
+    }
+    PROF.cloud = true; PROF.status = ''; save(profKey(), PROF.data);
+  } catch (e) {
+    console.warn('ler conta', e); profLoadLocal();
+    PROF.status = 'Não consegui ler sua conta (' + (e.code || e.message) + '). Confira as regras do Firestore.';
+  }
+  skinsUI(); skinsChanged();
+}
+const AUTH_ERR = { 'auth/invalid-email': 'E-mail inválido', 'auth/missing-password': 'Digite a senha', 'auth/weak-password': 'Senha fraca (mínimo 6 caracteres)', 'auth/email-already-in-use': 'Esse e-mail já tem conta — clique em Entrar',
+  'auth/invalid-credential': 'E-mail ou senha errados', 'auth/wrong-password': 'E-mail ou senha errados', 'auth/user-not-found': 'Conta não encontrada', 'auth/popup-closed-by-user': 'Janela do Google fechada',
+  'auth/unauthorized-domain': 'Este site não está autorizado no Firebase (Authentication → Configurações → Domínios autorizados)', 'auth/too-many-requests': 'Muitas tentativas, espere um pouco', 'auth/operation-not-allowed': 'Esse tipo de login não está ativado no Firebase' };
+async function authDo(kind) {
+  if (!PROF.fb) return;
+  const em = $('#acEmail')?.value.trim(), pw = $('#acPass')?.value;
+  PROF.status = 'Conectando...'; skinsUI();
+  try {
+    if (kind === 'google') await FB.A.signInWithPopup(FB.auth, new FB.A.GoogleAuthProvider());
+    else if (kind === 'login') await FB.A.signInWithEmailAndPassword(FB.auth, em, pw);
+    else if (kind === 'signup') await FB.A.createUserWithEmailAndPassword(FB.auth, em, pw);
+    else if (kind === 'logout') { if (PROF.cloud) profSave(true); await FB.A.signOut(FB.auth); }
+    PROF.status = '';
+  } catch (e) { PROF.status = AUTH_ERR[e.code] || ('Erro: ' + (e.code || e.message)); }
+  skinsUI();
+}
+// ---------- recompensas: XP → caixas ----------
+function grantXP(n) {
+  const d = PROF.data; if (!d || !(n > 0)) return;
+  d.xp += n; let got = 0;
+  while (d.xp >= XP_CASE) { d.xp -= XP_CASE; d.cases++; got++; }
+  if (got && inGame) { toast(got > 1 ? `Você ganhou ${got} caixas de skin! Abra no menu → Skins` : 'Você ganhou uma caixa de skin! Abra no menu → Skins', 4); play('kaching'); }
+  profSave(); skinsUI();
+}
+// ---------- caixa ----------
+function rollItem() {
+  let r = Math.random() * 100, rar = 0;
+  for (let i = 0; i < RARITY.length; i++) { r -= RARITY[i].p; if (r <= 0) { rar = i; break; } }
+  const fs = SKINS.filter(s => s.r === rar), f = fs[Math.floor(Math.random() * fs.length)];
+  const ws = SKIN_WEAPONS().filter(w => w !== 'knife'); let w = ws[Math.floor(Math.random() * ws.length)];
+  if (rar >= 3 && Math.random() < .25) w = 'knife'; // faca só sai em Épica ou Lendária
+  return w + ':' + f.id;
+}
+const itemInfo = it => { const [w, f] = it.split(':'), s = SKIN_BY[f]; return { w, f, s, wn: w === 'knife' ? 'Faca' : (W[w]?.name || w), rar: s?.r ?? 0 }; };
+function skinOf(id) { if (!id || W[id]?.pap) return null; return PROF.data?.equipped?.[id] || null; }
+function equipItem(it, on) {
+  const d = PROF.data, { w, f } = itemInfo(it); if (!d || !d.items.includes(it)) return;
+  if (on) d.equipped[w] = f; else if (d.equipped[w] === f) delete d.equipped[w];
+  profSave(); skinsUI(); skinsChanged();
+}
+// avisa o jogo (arma na mão) e os outros jogadores quando a skin equipada muda
+function skinsChanged() {
+  const sk = cleanSk(PROF.data?.equipped);
+  if (inGame) {
+    if (NET.isHost) { const p = S.players.get('h'); if (p) p.skins = sk; } else sendToHost({ t: 'skins', sk });
+    if (G.cur) vmSetWeapon(G.cur);
+  }
+}
+// ---------- tela de skins (menu) ----------
+const SKUI = { sel: null, filter: '', rolling: false, hide: null };
+const SWATCH = {};
+const swatch = f => SWATCH[f] || (SWATCH[f] = skinSwatch(f));
+function skCard(it, extra = '') {
+  const { f, s, wn, rar } = itemInfo(it), eq = PROF.data?.equipped?.[it.split(':')[0]] === f;
+  return `<div class="skc${SKUI.sel === it ? ' on' : ''}" data-it="${it}" style="--rc:${RARITY[rar].css}"${extra}><div class="sw" style="background-image:url(${swatch(f)})"></div><b>${esc(wn)}</b><small>${esc(s.name)}</small>${eq ? '<i>EQUIPADA</i>' : ''}</div>`;
+}
+function skinsUI() {
+  const pane = $('#skinsPane'); if (!pane || !PROF.data) return;
+  const d = PROF.data;
+  // conta
+  let ac;
+  if (!PROF.fb) ac = `<b>Perfil local</b><div class="hint" style="margin-top:4px">${FIREBASE_CONFIG ? 'Carregando contas...' : 'As contas online ainda não foram configuradas: o progresso fica salvo só neste navegador.'}</div>`;
+  else if (!PROF.uid) ac = `<b>Entre para salvar suas skins na conta</b>
+    <div class="row" style="margin-top:8px"><button id="acGoogle">Entrar com Google</button></div>
+    <div class="row" style="margin-top:8px"><input id="acEmail" type="email" placeholder="e-mail" autocomplete="email" style="flex:1;min-width:140px"><input id="acPass" type="password" placeholder="senha" autocomplete="current-password" style="flex:1;min-width:110px"></div>
+    <div class="row" style="margin-top:6px"><button id="acLogin">Entrar</button><button id="acSignup">Criar conta</button></div>
+    <div class="hint" style="margin-top:6px">Sem entrar, o progresso fica neste navegador e vai pra conta no primeiro login.</div>`;
+  else ac = `<b>${esc(PROF.name)}</b><div class="hint" style="margin-top:2px">${esc(PROF.email)}${PROF.cloud ? ' · salvo na nuvem' : ''}</div><button id="acOut" style="margin-top:8px">Sair da conta</button>`;
+  if (PROF.status) ac += `<div class="status${/Erro|Não|errad|inválid|fraca/.test(PROF.status) ? ' err' : ''}">${esc(PROF.status)}</div>`;
+  const em0 = $('#acEmail')?.value, pw0 = $('#acPass')?.value; // redesenhar não apaga o que foi digitado
+  setHTMLm('skAcct', ac);
+  if ($('#acEmail') && em0) $('#acEmail').value = em0; if ($('#acPass') && pw0) $('#acPass').value = pw0;
+  $('#acGoogle') && ($('#acGoogle').onclick = () => authDo('google'));
+  $('#acLogin') && ($('#acLogin').onclick = () => authDo('login'));
+  $('#acSignup') && ($('#acSignup').onclick = () => authDo('signup'));
+  $('#acOut') && ($('#acOut').onclick = () => authDo('logout'));
+  // progresso e caixas
+  $('#skXp').style.width = (d.xp / XP_CASE * 100).toFixed(1) + '%';
+  $('#skXpTxt').textContent = `${Math.floor(d.xp)} / ${XP_CASE} XP`;
+  $('#skCases').textContent = d.cases;
+  $('#btnCase').disabled = !d.cases || SKUI.rolling;
+  $('#btnCase').textContent = SKUI.rolling ? 'Abrindo...' : d.cases ? 'Abrir caixa' : 'Sem caixas';
+  // inventário
+  const items = d.items.filter(it => it !== SKUI.hide).sort((a, b) => itemInfo(b).rar - itemInfo(a).rar || itemInfo(a).wn.localeCompare(itemInfo(b).wn));
+  const ws = [...new Set(items.map(it => it.split(':')[0]))];
+  const fsel = $('#skFilter'), fv = SKUI.filter;
+  const opts = `<option value="">Todas as armas (${items.length})</option>` + ws.map(w => `<option value="${w}"${fv === w ? ' selected' : ''}>${esc(itemInfo(w + ':x').wn)}</option>`).join('');
+  if (fsel.dataset.o !== opts) { fsel.innerHTML = opts; fsel.dataset.o = opts; fsel.value = ws.includes(fv) ? fv : ''; }
+  const shown = items.filter(it => !SKUI.filter || it.startsWith(SKUI.filter + ':'));
+  setHTMLm('skGrid', shown.length ? shown.map(it => skCard(it)).join('') : '<div class="hint">Nenhuma skin ainda. Abra uma caixa!</div>');
+  // item selecionado
+  if (SKUI.sel && !d.items.includes(SKUI.sel)) SKUI.sel = null;
+  if (SKUI.sel) {
+    const { w, f, s, wn, rar } = itemInfo(SKUI.sel), eq = d.equipped[w] === f;
+    setHTMLm('skSel', `<div class="sknm" style="--rc:${RARITY[rar].css}"><b>${esc(wn)} | ${esc(s.name)}</b><span>${RARITY[rar].name}</span></div><button id="skEq" class="${eq ? '' : 'big'}">${eq ? 'Remover skin' : 'Equipar'}</button>`);
+    $('#skEq').onclick = () => equipItem(SKUI.sel, !eq);
+    pvShow(w, f);
+  } else { setHTMLm('skSel', '<div class="hint">Clique numa skin para ver e equipar.</div>'); pvShow(null); }
+}
+function setHTMLm(id, html) { const el = document.getElementById(id); if (el && el.innerHTML !== html) el.innerHTML = html; }
+// roleta estilo CS: a faixa corre e para no item sorteado
+function openCaseUI() {
+  const d = PROF.data; if (!d || !d.cases || SKUI.rolling) return;
+  audioInit();
+  d.cases--; d.opened++;
+  const it = rollItem(), dup = d.items.includes(it);
+  if (!dup) d.items.push(it);
+  profSave(true);
+  SKUI.rolling = true; SKUI.hide = dup ? null : it; skinsUI(); // não mostra o prêmio no inventário antes da roleta parar
+  const N = 60, WIN = 52, strip = [];
+  for (let i = 0; i < N; i++) strip.push(i === WIN ? it : rollItem());
+  const box = $('#skRoll'), track = box.querySelector('.rtrack');
+  box.classList.remove('hidden'); setHTMLm('skRollRes', '');
+  track.style.transition = 'none'; track.style.transform = 'translateX(0)';
+  track.innerHTML = strip.map(x => skCard(x)).join('');
+  const cw = 116, vw = box.querySelector('.rstrip').clientWidth, x = -(WIN * cw + cw / 2 - vw / 2 + rand(-45, 45));
+  play('boxmusic');
+  requestAnimationFrame(() => requestAnimationFrame(() => { track.style.transition = 'transform 5.2s cubic-bezier(.06,.7,.14,1)'; track.style.transform = `translateX(${x}px)`; }));
+  setTimeout(() => {
+    const { s, wn, rar } = itemInfo(it);
+    track.children[WIN]?.classList.add('win');
+    setHTMLm('skRollRes', `<div class="sknm big" style="--rc:${RARITY[rar].css}"><b>${esc(wn)} | ${esc(s.name)}</b><span>${RARITY[rar].name}</span></div>${dup ? '<div class="hint">Repetida: virou +60 XP</div>' : ''}`);
+    play(rar >= 3 ? 'pap' : 'kaching');
+    SKUI.rolling = false; SKUI.hide = null; SKUI.sel = it;
+    if (dup) grantXP(60); else skinsUI();
+  }, 5400);
+}
+// prévia 3D da arma com a skin (renderizador pequeno, só enquanto a aba está aberta)
+let PV = null;
+function pvShow(w, f) {
+  const cv = $('#skPrev'); if (!cv) return;
+  if (!PV) {
+    const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); r.toneMapping = THREE.ACESFilmicToneMapping; r.setPixelRatio(Math.min(devicePixelRatio, 2));
+    const sc = new THREE.Scene(), pm = new THREE.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(r), .04).texture; pm.dispose();
+    sc.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.1)); const dl = new THREE.DirectionalLight(0xfff2e0, 2.4); dl.position.set(1, 2, 2); sc.add(dl);
+    const rim = new THREE.DirectionalLight(0xbcd4ff, 1.4); rim.position.set(-2, .5, -2); sc.add(rim);
+    const cam = new THREE.PerspectiveCamera(28, 2, .01, 20), pivot = new THREE.Group(); sc.add(pivot);
+    PV = { r, sc, cam, pivot, key: null, t0: performance.now() };
+    const loop = () => {
+      requestAnimationFrame(loop);
+      const vis = !$('#menu').classList.contains('hidden') && !$('#skinsPane').classList.contains('hidden');
+      if (!vis || !PV.pivot.children.length) return;
+      const w = cv.clientWidth, h = cv.clientHeight; if (w && (cv.width !== Math.round(w * PV.r.getPixelRatio()))) { PV.r.setSize(w, h, false); PV.cam.aspect = w / h; PV.cam.updateProjectionMatrix(); }
+      PV.pivot.rotation.y = Math.PI / 2 + Math.sin((performance.now() - PV.t0) / 1400) * .55;
+      PV.r.render(PV.sc, PV.cam);
+    };
+    loop();
+  }
+  const key = w ? w + ':' + f : null; if (PV.key === key) return; PV.key = key;
+  while (PV.pivot.children.length) { const c = PV.pivot.children[0]; PV.pivot.remove(c); c.traverse(o => o.geometry?.dispose()); }
+  if (!w) { PV.r.clear(); return; }
+  const g = gunModel(w, true, f), box = new THREE.Box3().setFromObject(g), c = box.getCenter(new V3()), sz = box.getSize(new V3());
+  g.position.sub(c); PV.pivot.add(g);
+  const L = Math.max(sz.x, sz.y, sz.z); PV.cam.position.set(0, L * .1, L * 1.45); PV.cam.lookAt(0, 0, 0);
+}
+function skinsInit() {
+  profLoadLocal();
+  $('#btnCase').onclick = openCaseUI;
+  $('#skFilter').onchange = e => { SKUI.filter = e.target.value; skinsUI(); };
+  $('#skGrid').onclick = e => { const c = e.target.closest('[data-it]'); if (!c) return; SKUI.sel = c.dataset.it; skinsUI(); };
+  $('#skGrid').ondblclick = e => { const c = e.target.closest('[data-it]'); if (!c) return; const it = c.dataset.it, { w, f } = itemInfo(it); equipItem(it, PROF.data.equipped[w] !== f); };
+  skinsUI();
+  fbInit();
+}
 function applySettings() {
   if (MASTER) MASTER.gain.value = CFG.vol;
   applyQuality();
 }
 const lastSt = load('lastSt', { map: 'arena', mode: 'rounds', rounds: 8, frags: 20, bots: 0, diff: 1, zmap: 'vila', zdiff: 1 });
+skinsInit();
 document.querySelectorAll('#menu .tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('#menu .tabs button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('#menu [data-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab));
+  if (b.dataset.tab === 'skins') skinsUI();
 });
 const getHostForm = matchForm($('#hostForm'), lastSt);
 settingsForm($('#menuSettings'));
