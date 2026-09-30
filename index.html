@@ -2503,7 +2503,8 @@ function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo,
 // assets/arms.glb traz os dois braços com esqueleto, a câmera usada para posar e dois soquetes na mão direita
 // (Spin_karambit / Spin_knife) onde a faca do jogo é pendurada. Uma linha do tempo só, cortada em clipes (30 fps).
 const ARMS = { holder: null, root: null, mixer: null, clips: {}, cur: null, knife: null };
-const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] };
+// cada faca tem a sua pose de mão: karambit a partir do quadro 0, faca a partir do 1000
+const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] }, ARMS_OFF = { karambit: 0, knife: 1000 };
 function loadArms() {
   new GLTFLoader().load('assets/arms.glb', g => {
     const root = g.scene; root.updateMatrixWorld(true);
@@ -2518,7 +2519,7 @@ function loadArms() {
     });
     const all = new THREE.AnimationClip('all', -1, g.animations.flatMap(a => a.tracks));
     ARMS.mixer = new THREE.AnimationMixer(root);
-    for (const [n, [a, b]] of Object.entries(ARMS_FR)) ARMS.clips[n] = THREE.AnimationUtils.subclip(all, n, a, b, 30);
+    for (const [k, o] of Object.entries(ARMS_OFF)) for (const [n, [a, b]] of Object.entries(ARMS_FR)) ARMS.clips[k + ':' + n] = THREE.AnimationUtils.subclip(all, k + ':' + n, a + o, b + o, 30);
     ARMS.mixer.addEventListener('finished', () => armsPlay('idle'));
     Object.assign(ARMS, { holder, root });
     if (vmGun && W[G.cur]?.slot === 'knife') vmSetWeapon(G.cur);
@@ -2527,7 +2528,7 @@ function loadArms() {
 function armsPlay(name) {
   if (!ARMS.mixer) return;
   ARMS.mixer.stopAllAction();
-  const a = ARMS.mixer.clipAction(ARMS.clips[name]);
+  const a = ARMS.mixer.clipAction(ARMS.clips[ARMS.kind + ':' + name]);
   a.reset(); a.setLoop(name === 'idle' ? THREE.LoopRepeat : THREE.LoopOnce); a.clampWhenFinished = true; a.play();
   ARMS.cur = name; ARMS.mixer.update(0);
 }
@@ -2543,7 +2544,7 @@ function vmSetWeapon(id) {
   if ((m === 'karambit' || m === 'knife') && ARMS.root) { // braços do Blender: a faca vai para o soquete da mão direita
     vmGun.add(ARMS.holder);
     const sock = ARMS.root.getObjectByName(m === 'karambit' ? 'Spin_karambit' : 'Spin_knife');
-    gun.position.set(0, -.006, m === 'karambit' ? -.08 : -.05); gun.quaternion.identity(); sock.add(gun); ARMS.knife = gun;
+    gun.position.set(0, -.006, m === 'karambit' ? -.08 : -.05); gun.quaternion.identity(); sock.add(gun); ARMS.knife = gun; ARMS.kind = m;
     ud.armsKnife = true; ud.vm = [-.165, .145, .43]; // o conjunto já está posado na frente da câmera
     vmRoot.add(vmGun); armsPlay('draw');
     return;
