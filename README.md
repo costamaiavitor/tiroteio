@@ -71,7 +71,7 @@ Aba **Skins** no menu.
 - **Coleção (estilo Valorant):** todas as armas aparecem ao mesmo tempo, em colunas por categoria (pistolas; SMGs e escopetas; rifles; precisão, pesadas e faca), cada uma desenhada com a skin que está equipada. Clique numa arma para abrir a tela dela: à esquerda as skins que você tem (e a Padrão), no centro a arma em 3D (arraste para girar), e o botão **Equipar**. Os outros jogadores veem a sua skin.
 - **Conta:** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
 
-- **Facas:** além da Faca, tem o **Karambit** (lâmina em garra, com anel). Na Coleção, abra a arma e clique em **Usar esta faca**; equipar uma skin de karambit também já troca a faca.
+- **Facas:** além da Faca, tem o **Karambit** (lâmina em garra, com anel). As duas usam a mesma mão 3D e animações no estilo do CS: saque (a karambit gira no dedo), cortes alternando o lado, estocada no botão direito e inspeção no F. Na Coleção, abra a arma e clique em **Usar esta faca**; equipar uma skin de karambit também já troca a faca.
 
 ### Configurar as contas (Firebase, uma vez só)
 
@@ -122,7 +122,7 @@ Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Mé
 | 1 2 3 4 | Primária, pistola, faca, granadas |
 | Q / roda do mouse | Arma anterior / trocar arma |
 | B | Loja estilo Valorant: clique na arma ou equipamento para comprar; B ou Esc fecha |
-| F | Zumbis: comprar, abrir porta, usar a caixa; segure para consertar janela e reanimar |
+| F | Com a faca: inspecionar (a karambit gira no dedo). Zumbis: comprar, abrir porta, usar a caixa; segure para consertar janela e reanimar |
 | V | Zumbis: facada rápida |
 | Shift + W | Zumbis: correr (fôlego limitado, Stamin-Up dobra; atirar interrompe a corrida) |
 | Tab | Placar |

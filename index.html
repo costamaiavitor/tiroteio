@@ -2385,6 +2385,11 @@ function handPose(H, curl, th) {
     set(ns[3], cur, acc);
   }
   const tn = ['thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip'], P = tn.map(k => R[k].p);
+  if (th.dirs) { // polegar por direções (mão da faca): cada falange aponta para onde mandar, mantendo o comprimento
+    let cur = P[0].clone(), q = new Q();
+    for (let i = 0; i < 3; i++) { const rd = P[i + 1].clone().sub(P[i]), L = rd.length(), nd = new V3(...th.dirs[i]).normalize(); q = new Q().setFromUnitVectors(rd.normalize(), nd); set(tn[i], cur, q); cur = cur.clone().addScaledVector(nd, L); }
+    set(tn[3], cur, q); return;
+  }
   const tax = new V3(th.ax[0] * sg, th.ax[1], th.ax[2]).normalize();
   let acc = new Q().setFromAxisAngle(tax, th.a * sg), cur = P[0].clone(); set(tn[0], cur, acc);
   for (let i = 1; i < 4; i++) { cur = cur.clone().add(P[i].clone().sub(P[i - 1]).applyQuaternion(acc)); if (i < 3) acc = acc.clone().multiply(new Q().setFromAxisAngle(ax, sg * (i === 1 ? th.f1 : th.f2))); set(tn[i], cur, acc); }
@@ -2397,24 +2402,53 @@ function gripCenter(H) {
   return new V3((a2 * (Bp.y - C.y) + b2 * (C.y - A.y) + c2 * (A.y - Bp.y)) / d, (a2 * (C.x - Bp.x) + b2 * (A.x - C.x) + c2 * (Bp.x - A.x)) / d, z);
 }
 const basis = (x, y) => { const X = new V3(...x).normalize(), Y = new V3(...y).normalize(), Z = new V3().crossVectors(X, Y).normalize(); Y.crossVectors(Z, X); return new THREE.Matrix4().makeBasis(X, Y, Z); };
-// d: direção da lâmina (sai do cabo pelo lado do mindinho); c: para onde a garra curva; xd: dorso da mão; fa: antebraço
-const KAR = { d: [-.3, -.02, -1], c: [.15, 1, 0], xd: [1, .25, 0], fa: [.3, -.6, .75] };
-function karambitPose(gun, ud, A) {
-  const vmg = gun.parent, bas = (a, b, c) => new THREE.Matrix4().makeBasis(new V3(...a).normalize(), new V3(...b).normalize(), new V3(...c).normalize());
-  if (HAND3D.R) { // mão anatômica: indicador no anel (perto da câmera), lâmina apontando para a frente e a garra curvando para cima
-    const d = new V3(...KAR.d).normalize(), c = new V3(...KAR.c), x = new V3(...KAR.xd);
-    c.addScaledVector(d, -c.dot(d)).normalize(); x.addScaledVector(d, -x.dot(d)).normalize();
-    const ym = c.clone().negate(), zm = d.clone().negate();
-    gun.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new V3().crossVectors(ym, zm), ym, zm)); // modelo: -z = lâmina, -y = curva
-    const hc = ud.rh.clone().applyQuaternion(gun.quaternion); // centro do cabo
-    const rg = new THREE.Group(); vmg.add(rg); rg.add(gun); ud.slashG = rg; // mão direita + faca: só ela anima no golpe
-    const H = HAND3D.R; H.mesh.material = A.hand;
-    handPose(H, [1.2, 1.5, 1.0], { ax: [.2, 1, .3], a: .35, f1: -.55, f2: -.7 });
-    H.root.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, new V3().crossVectors(d, x), d)); // z da mão (lado do mindinho) = lâmina
-    H.root.position.copy(hc).sub(gripCenter(H).applyQuaternion(H.root.quaternion)); rg.add(H.root);
-    const w = new V3(.036, .07, .012).applyQuaternion(H.root.quaternion).add(H.root.position);
-    forearm(rg, w.toArray(), KAR.fa, .55, A, false);
+// Pegada de faca com a mão 3D (igual nas duas facas, como no CS): punho fechado com o cabo quase em pé, dorso da mão
+// para a direita, polegar em cima e antebraço vindo de baixo à direita. Faca: lâmina sai por cima (lado do polegar) com o
+// fio para a frente. Karambit: indicador no anel em cima, lâmina sai por baixo (lado do mindinho) curvando para a frente.
+// z: eixo do cabo apontando para o mindinho; x: dorso; fa: antebraço; ring: quanto a mão sobe para o indicador entrar no anel
+const KG = { knife: { z: [.2, -.95, .2], x: [.6, .25, .75], fa: [.45, -.5, .75], vm: [.03, .045, -.13] }, kar: { z: [-.35, -.9, -.2], x: [.8, -.25, -.4], fa: [.3, -.75, .6], cv: [-.8, .6, -.4], vm: [.03, .04, -.1] }, ring: .012, curl: [1.2, 1.5, 1.0], th: { dirs: [[-.6, -.7, -.3], [-.55, -.6, .35], [-.2, -.5, .8]] } };
+function knifeGrip3D(gun, ud, A, kar) {
+  const P = kar ? KG.kar : KG.knife, vmg = gun.parent, z = new V3(...P.z).normalize(), x = new V3(...P.x);
+  x.addScaledVector(z, -x.dot(z)).normalize();
+  const H = HAND3D.R; H.mesh.material = A.hand;
+  handPose(H, KG.curl, KG.th);
+  const y = new V3().crossVectors(z, x); // do nó dos dedos para o pulso
+  H.root.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+  // arma: eixo do cabo (z do modelo aponta para o pomo/anel) no eixo da mão; fio/curva (-y do modelo) para o lado dos nós dos dedos
+  const zm = kar ? z.clone().negate() : z.clone(), ym = y.clone();
+  if (P.cv) { const c = new V3(...P.cv); c.addScaledVector(zm, -c.dot(zm)); ym.copy(c.normalize().negate()); } // karambit: garra curvando para o centro da tela
+  gun.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new V3().crossVectors(ym, zm), ym, zm));
+  const rg = new THREE.Group(); vmg.add(rg); ud.slashG = rg; // braço direito inteiro: gira no cotovelo nos golpes
+  const wg = new THREE.Group(); rg.add(wg); ud.wristG = wg; // mão + faca: dobra no pulso
+  const kp = new THREE.Group(); wg.add(kp); kp.add(gun); ud.spinG = kp; // pivô do giro (anel da karambit / cabo da faca)
+  const piv = (kar ? new V3(0, .006, .08) : ud.rh.clone()).applyQuaternion(gun.quaternion);
+  kp.position.copy(piv); gun.position.copy(piv).negate();
+  ud.spinAx = new V3(1, 0, 0).applyQuaternion(gun.quaternion); // giro no plano da lâmina
+  const hc = ud.rh.clone().applyQuaternion(gun.quaternion); // centro do cabo
+  H.root.position.copy(hc).sub(gripCenter(H).applyQuaternion(H.root.quaternion)); wg.add(H.root);
+  if (kar) H.root.position.addScaledVector(z, -KG.ring);
+  const w = new V3(.036, .07, .012).applyQuaternion(H.root.quaternion).add(H.root.position);
+  forearm(rg, w.toArray(), P.fa, .55, A, false);
+  ud.elbow = w.clone().addScaledVector(new V3(...P.fa).normalize(), .3); // golpes giram em volta do cotovelo, não do punho
+  ud.wristP = w.clone(); ud.spinKar = kar; ud.vm = P.vm;
+  leftOpenHand(vmg, A, P.vm);
+}
+function leftOpenHand(vmg, A, vm = [-.03, .045, -.06]) { // mão esquerda aberta e relaxada, embaixo à esquerda
+  if (HAND3D.L) { // palma para baixo, dedos para a frente e para dentro
+    const H = HAND3D.L; H.mesh.material = A.hand;
+    handPose(H, [.18, .26, .18], { ax: [.2, 1, .3], a: .12, f1: -.15, f2: -.2 });
+    H.root.quaternion.setFromRotationMatrix(basis([.1, -.9, -.3], [-.5, .15, .85])); // x (palma) → baixo; y (pulso) → câmera
+    H.root.position.set(-.24 - (vm[0] + .03) / 1.18, -.075 - (vm[1] - .045) / 1.18, .02 - (vm[2] + .06) / 1.18); vmg.add(H.root); // mesmo lugar na tela, seja qual for o ajuste da arma
+    const w = new V3(-.034, .07, .01).applyQuaternion(H.root.quaternion).add(H.root.position);
+    forearm(vmg, w.toArray(), [-.35, -.5, .8], .55, A, true);
   } else {
+    const lh = new THREE.Group(); lh.add(new THREE.Mesh(openHandGeo(), A.fist)); vmg.add(lh);
+    lh.position.set(-.27, -.04, .1); lh.rotation.set(.25, -.55, .35, 'YXZ');
+    forearm(lh, [0, .0, .062], [0, -.45, .9], .55, A, true);
+  }
+}
+function karambitPose(gun, ud, A) { // sem a mão 3D (modelo não carregou): punho em metaballs
+  const vmg = gun.parent, bas = (a, b, c) => new THREE.Matrix4().makeBasis(new V3(...a).normalize(), new V3(...b).normalize(), new V3(...c).normalize());
   // punho: malha espelhada (mão direita); eixo do cabo → esquerda, dorso → cima, metacarpos → câmera
   gun.quaternion.setFromRotationMatrix(bas([0, 0, -1], [0, -1, 0], [-1, 0, 0]));
   const hc = ud.rh.clone().applyQuaternion(gun.quaternion);
@@ -2426,20 +2460,7 @@ function karambitPose(gun, ud, A) {
   f.position.copy(hc); vmg.add(f);
   const wl = new V3(0, mid, 0).addScaledVector(r, R + .008).addScaledVector(t, .026).applyQuaternion(f.quaternion).add(hc); wl.y -= .012;
   forearm(vmg, wl.toArray(), [.18, -.82, .55], .55, A, false); // antebraço desce para baixo da tela (não tapa o punho)
-  }
-  // mão esquerda aberta e relaxada, embaixo à esquerda
-  if (HAND3D.L) { // mão esquerda anatômica, aberta e relaxada: palma para baixo, dedos para a frente e para dentro
-    const H = HAND3D.L; H.mesh.material = A.hand;
-    handPose(H, [.18, .26, .18], { ax: [.2, 1, .3], a: .12, f1: -.15, f2: -.2 });
-    H.root.quaternion.setFromRotationMatrix(basis([.1, -.9, -.3], [-.5, .15, .85])); // x (palma) → baixo; y (pulso) → câmera
-    H.root.position.set(-.24, -.075, .02); vmg.add(H.root);
-    const w = new V3(-.034, .07, .01).applyQuaternion(H.root.quaternion).add(H.root.position);
-    forearm(vmg, w.toArray(), [-.35, -.5, .8], .55, A, true);
-  } else {
-    const lh = new THREE.Group(); lh.add(new THREE.Mesh(openHandGeo(), A.fist)); vmg.add(lh);
-    lh.position.set(-.27, -.04, .1); lh.rotation.set(.25, -.55, .35, 'YXZ');
-    forearm(lh, [0, .0, .062], [0, -.45, .9], .55, A, true);
-  }
+  leftOpenHand(vmg, A);
 }
 // Mão esquerda aberta (palma para baixo, dedos levemente dobrados), também em metaballs. Dedos para -z, polegar para +x.
 let OPEN_GEO = null;
@@ -2490,7 +2511,8 @@ function vmSetWeapon(id) {
     const kn = m === 'knife', ax = (x, y, z, a) => new THREE.Quaternion().setFromAxisAngle(new V3(x, y, z), a);
     const qy = ax(0, 1, 0, kn ? -1.3 : -1.45), qz = ax(0, 0, 1, kn ? .3 : .12), qx = ax(1, 0, 0, kn ? Math.PI / 2 : -Math.PI / 2);
     const hq = qz.clone().multiply(qy); gun.quaternion.copy(hq).multiply(qx);
-    if (!kn) { karambitPose(gun, ud, A); rh = null; }
+    if (HAND3D.R) { knifeGrip3D(gun, ud, A, !kn); rh = null; }
+    else if (!kn) { karambitPose(gun, ud, A); rh = null; }
     else rh = knifeHand(A);
     if (rh) { rh.quaternion.copy(qz).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), -.45)); rh.position.copy(ud.rh).applyQuaternion(gun.quaternion); vmGun.add(rh); } // mão de 3/4, lâmina de perfil
   } else { rh = rightHand(A); rh.position.copy(ud.rh); gun.add(rh); }
@@ -2602,22 +2624,55 @@ function gunAnim(ud, w, o) {
   if (G.reload) shellAnim(ud, o);
   else if (G.reloadEnd) reloadAnim(ud, clamp((now - G.reloadStart) / (G.reloadEnd - G.reloadStart), 0, 1), o);
 }
-// Golpe de faca: preparação curta, corte rápido em arco e volta suave (o peso fica no meio, não no começo).
-// Golpes leves alternam o lado (direita→esquerda, depois esquerda→direita); o pesado é uma estocada para a frente.
-const SLASH = [ // [t, dx, dy, dz, rx, ry, rz]
-  [0, 0, 0, 0, 0, 0, 0], [.16, .045, .035, .025, .12, -.28, -.3], [.44, -.11, -.045, -.09, -.22, .6, .45], [.62, -.095, -.04, -.065, -.15, .5, .35], [1, 0, 0, 0, 0, 0, 0]];
-const STAB = [
-  [0, 0, 0, 0, 0, 0, 0], [.22, .02, .03, .07, .18, -.1, -.08], [.42, -.05, -.015, -.2, -.1, .12, .05], [.6, -.045, -.015, -.17, -.08, .1, .04], [1, 0, 0, 0, 0, 0, 0]];
+// ---------- animações da faca (no estilo do CS) ----------
+// Quadros-chave [t, dx, dy, dz, rx, ry, rz]. A rotação se divide entre o braço (parte do giro lateral, no cotovelo) e o pulso
+// (o resto, só a mão e a faca), como um braço de verdade; o deslocamento move o braço inteiro. A faca ainda pode girar
+// sozinha no anel/cabo (spinG). Golpes leves alternam: direita→esquerda, depois esquerda→direita.
+const KANIM = {
+  kar: { // karambit: a garra (que sai por baixo do punho) varre na horizontal
+    slash: { dur: .42, fr: [[0, 0, 0, 0, 0, 0, 0], [.15, .03, .03, .02, .35, -.35, -.3], [.4, -.12, -.01, -.05, .7, .6, .35], [.58, -.11, -.01, -.04, .6, .55, .3], [1, 0, 0, 0, 0, 0, 0]] },
+    slash2: { dur: .42, fr: [[0, 0, 0, 0, 0, 0, 0], [.15, -.1, 0, -.02, .45, .55, .45], [.4, .04, -.02, -.05, .65, -.4, -.35], [.58, .035, -.02, -.04, .55, -.35, -.3], [1, 0, 0, 0, 0, 0, 0]] },
+    stab: { dur: .8, fr: [[0, 0, 0, 0, 0, 0, 0], [.3, .02, .04, .07, .15, -.1, -.15], [.44, -.05, 0, -.18, .95, .15, .1], [.62, -.045, 0, -.16, .9, .12, .08], [1, 0, 0, 0, 0, 0, 0]] },
+  },
+  knife: { // faca: lâmina deita e corta na horizontal; a estocada empurra a ponta para a frente
+    slash: { dur: .42, fr: [[0, 0, 0, 0, 0, 0, 0], [.15, .03, .03, .02, -.1, -.35, -.45], [.4, -.12, -.02, -.05, -.45, .55, .9], [.58, -.11, -.02, -.04, -.4, .5, .8], [1, 0, 0, 0, 0, 0, 0]] },
+    slash2: { dur: .42, fr: [[0, 0, 0, 0, 0, 0, 0], [.15, -.1, 0, -.02, -.35, .5, .8], [.4, .04, -.02, -.05, -.4, -.4, -.6], [.58, .035, -.02, -.04, -.35, -.35, -.5], [1, 0, 0, 0, 0, 0, 0]] },
+    stab: { dur: .8, fr: [[0, 0, 0, 0, 0, 0, 0], [.3, .02, .04, .07, .25, -.1, -.1], [.44, -.04, -.02, -.18, -1.1, .1, .05], [.62, -.035, -.02, -.16, -1, .08, .04], [1, 0, 0, 0, 0, 0, 0]] },
+  },
+  // inspecionar (F): traz a faca para o meio, mostra um lado, vira o pulso e mostra o outro
+  inspect: { dur: 3.2, fr: [[0, 0, 0, 0, 0, 0, 0], [.14, -.07, .045, .03, .2, .55, .6], [.42, -.075, .05, .03, .25, .62, .66], [.55, -.06, .045, .03, -.15, -.5, -.35], [.84, -.06, .05, .03, -.1, -.56, -.4], [1, 0, 0, 0, 0, 0, 0]] },
+};
+const kanimOf = (S, kar) => S.type === 'inspect' ? KANIM.inspect : KANIM[kar ? 'kar' : 'knife'][S.type];
 const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // mais "estalado" que o smoothstep no corte
-function knifeSlash(o, ud) {
-  const S = G.slash, t = (now - S.t0) / S.dur, sg = ud.slashG;
-  if (sg) { sg.position.set(0, 0, 0); sg.rotation.set(0, 0, 0); }
-  if (t >= 1 || !['knife', 'karambit'].includes(W[G.cur]?.model)) { G.slash = null; return; }
-  const fr = S.heavy ? STAB : SLASH;
-  let i = 1; while (i < fr.length - 1 && t > fr[i][0]) i++;
-  const A = fr[i - 1], B = fr[i], k0 = (t - A[0]) / (B[0] - A[0]), k = i === fr.length - 1 ? smooth(k0) : easeIO(k0), v = j => lerp(A[j], B[j], k), sd = S.side;
-  if (sg) { sg.position.set(v(1) * sd, v(2), v(3)); sg.rotation.set(v(4), v(5) * sd, v(6) * sd, 'YXZ'); return; } // gira em volta do punho
-  o.x += v(1) * sd; o.y += v(2); o.z += v(3); o.rx += v(4); o.ry += v(5) * sd; o.rz += v(6) * sd;
+const easeOut = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+const _kq = new THREE.Quaternion(), _ke = new THREE.Euler(), _kv = new V3();
+function knifeAnim(o, ud) {
+  const sg = ud.slashG, wg = ud.wristG, kp = ud.spinG, kar = !!ud.spinKar;
+  if (sg) { sg.position.set(0, 0, 0); sg.quaternion.identity(); wg.position.set(0, 0, 0); wg.quaternion.identity(); }
+  let spin = 0;
+  if (now < G.switchEnd && kp) { // sacando: a karambit dá uma volta inteira no dedo; a faca sobe girando para a posição
+    const k = easeOut(1 - (G.switchEnd - now) / (G.switchDur || .5));
+    spin = kar ? -Math.PI * 2 * k : -(1 - k) * 1.6;
+  }
+  const S = G.kan;
+  if (S && (!['knife', 'karambit'].includes(W[G.cur]?.model) || now - S.t0 >= kanimOf(S, kar).dur)) G.kan = null;
+  if (G.kan) {
+    const K = kanimOf(S, kar), t = (now - S.t0) / K.dur, fr = K.fr;
+    let i = 1; while (i < fr.length - 1 && t > fr[i][0]) i++;
+    const A = fr[i - 1], B = fr[i], k0 = (t - A[0]) / (B[0] - A[0]), k = i === fr.length - 1 || S.type === 'inspect' ? smooth(k0) : easeIO(k0), v = j => lerp(A[j], B[j], k);
+    if (S.type === 'inspect' && kar) spin -= Math.PI * 2 * (easeIO(clamp((t - .42) / .13, 0, 1)) + easeIO(clamp((t - .84) / .12, 0, 1))); // gira no anel duas vezes
+    if (sg) { // braço gira no cotovelo, mão gira no pulso: pos = P - R·P + deslocamento
+      _ke.set(0, v(5) * .35, v(6) * .25, 'YXZ'); sg.quaternion.setFromEuler(_ke);
+      sg.position.copy(ud.elbow).sub(_kv.copy(ud.elbow).applyQuaternion(sg.quaternion)).add(_kv.set(v(1), v(2), v(3)));
+      _ke.set(v(4), v(5) * .65, v(6) * .75, 'YXZ'); wg.quaternion.setFromEuler(_ke);
+      wg.position.copy(ud.wristP).sub(_kv.copy(ud.wristP).applyQuaternion(wg.quaternion));
+    } else { o.x += v(1); o.y += v(2); o.z += v(3); o.rx += v(4) * .5; o.ry += v(5) * .5; o.rz += v(6) * .5; }
+  }
+  if (kp) kp.quaternion.setFromAxisAngle(ud.spinAx, spin);
+}
+function knifeInspect() {
+  if (!['knife', 'karambit'].includes(W[G.cur]?.model) || G.kan || now < G.switchEnd) return;
+  G.kan = { type: 'inspect', t0: now };
 }
 function updateViewmodel(dt) {
   const w = W[G.cur], ud = vmGun?.userData || {}, vo = ud.vm || [0, 0, 0];
@@ -2629,7 +2684,7 @@ function updateViewmodel(dt) {
   o.z += G.kick * .06; o.rx += G.kick * .1;
   if (now < G.switchEnd) { const k = smooth((G.switchEnd - now) / (G.switchDur || .35)); o.y -= k * .22; o.rx -= k * .9; o.rz += k * .35; } // sacando a arma
   if (G.swing > 0) { G.swing = Math.max(0, G.swing - dt * 4); const s = Math.sin(G.swing * Math.PI); o.ry += s * 1.1; o.x -= s * .12; o.z -= s * .1; }
-  if (G.slash) knifeSlash(o, ud);
+  if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model)) knifeAnim(o, ud);
   if (me.downed) { o.y -= .04; o.rz += .35; }
   // correndo: arma abaixada e de lado, balançando mais
   me.sprintK = lerp(me.sprintK, me.sprinting ? 1 : 0, Math.min(1, dt * 10));
@@ -2657,7 +2712,7 @@ function equip(id, force) {
   if (!hasW(id) || (id === G.cur && !force)) return;
   if (id !== G.cur) G.last = G.cur;
   G.ads = 0;
-  G.cur = id; G.reloadEnd = 0; G.reload = null; G.scope = 0; G.rezoom = 0; G.switchDur = id === 'awp' ? .6 : .35; G.switchEnd = now + G.switchDur; G.shots = 0;
+  G.cur = id; G.reloadEnd = 0; G.reload = null; G.scope = 0; G.rezoom = 0; G.switchDur = id === 'awp' ? .6 : id === 'knife' ? .55 : .35; G.kan = null; G.switchEnd = now + G.switchDur; G.shots = 0;
   vmSetWeapon(id); play('draw');
 }
 function applyInv(inv, refill, got) {
@@ -2742,7 +2797,7 @@ function shoot() {
   if (a.mag === 0 && a.res > 0) setTimeout(startReload, 250);
 }
 function knifeAttack(heavy) {
-  const w = W.knife; G.nextFire = now + (heavy ? w.altRate : w.rate); G.swing = 0; G.slash = { t0: now, heavy, dur: heavy ? .7 : .4, side: G.slash?.side === 1 && !heavy ? -1 : 1 };
+  const w = W.knife; G.nextFire = now + (heavy ? w.altRate : w.rate); G.swing = 0; G.kan = { type: heavy ? 'stab' : G.lastSlash?.type === 'slash' && now - G.lastSlash.t0 < 1 ? 'slash2' : 'slash', t0: now }; if (!heavy) G.lastSlash = G.kan; // golpes seguidos alternam o lado
   const o = camera.position.clone(), d = new V3(0, 0, -1).applyQuaternion(camera.quaternion);
   if (ZC.on) { // zumbis: 150 de dano (mata na rodada 1 com uma facada), Bowie 1000
     const res = trace(o, d, w.range, zCands());
@@ -4750,7 +4805,7 @@ addEventListener('keydown', e => {
   if (e.repeat) return;
   if (me.downed && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyQ', 'KeyV', 'KeyF'].includes(e.code)) return; // caído: só a pistola
   switch (e.code) {
-    case 'KeyF': if (ZC.on) zUse(); break;
+    case 'KeyF': if (ZC.on) zUse(); else knifeInspect(); break;
     case 'KeyV': if (ZC.on && me.alive && now >= G.nextFire && now >= G.switchEnd) knifeAttack(false); break;
     case 'Digit1': G.inv.primary && equip(G.inv.primary); break;
     case 'Digit2': G.inv.secondary && equip(G.inv.secondary); break;
@@ -5298,7 +5353,7 @@ loadHands();
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos)
 window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
-  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KAR, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
+  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>
 </body>
