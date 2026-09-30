@@ -105,6 +105,16 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #hp{position:absolute;left:18px;bottom:14px;display:flex;gap:22px;font-size:40px;font-weight:700;align-items:flex-end}
 #hp small{font-size:15px;color:#bbb;display:block;line-height:1}
 #hp .low{color:var(--red)}
+#hpbar{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);width:min(300px,60vw)}
+#hpbar .hbt{display:flex;justify-content:space-between;align-items:flex-end;font-size:14px;color:#ccc;margin-bottom:3px;font-weight:700;letter-spacing:1.5px}
+#hpbar .hbt b{color:#fff;font-size:18px;letter-spacing:0}
+#hpbar .hbar{position:relative;height:14px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.35);border-radius:3px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.6)}
+#hpbar .hbar i{position:absolute;left:0;top:0;bottom:0;width:0}
+#hpbar .hbar .trail{background:#fff;opacity:.5;transition:width .6s ease .3s}
+#hpbar .hbar .fill{transition:width .15s,background-color .3s}
+#hpbar .hbar:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),rgba(0,0,0,.35) calc(10% - 1px) 10%)}
+#hpbar.low .hbar{animation:hbl .9s infinite}
+@keyframes hbl{50%{border-color:#ff4b4b;box-shadow:0 0 10px rgba(255,60,60,.7)}}
 #money{position:absolute;left:18px;bottom:72px;font-size:26px;color:#7dff7d;font-weight:700}
 #ammo{position:absolute;right:20px;bottom:14px;text-align:right;font-size:44px;font-weight:700}
 #ammo small{font-size:20px;color:#bbb}
@@ -145,7 +155,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #zteam{position:absolute;left:26px;bottom:128px;font-size:19px;line-height:1.25}
 #zperks{position:absolute;left:24px;bottom:200px}
 .pk{display:inline-block;width:36px;height:36px;border-radius:50%;margin-right:6px;text-align:center;line-height:33px;font-weight:700;font-size:20px;color:#fff;border:2px solid rgba(255,255,255,.7);box-shadow:0 0 8px rgba(0,0,0,.6)}
-#zpw{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:14px;font-size:22px;font-weight:700}
+#zpw{position:absolute;bottom:92px;left:50%;transform:translateX(-50%);display:flex;gap:14px;font-size:22px;font-weight:700}
 #zpw div{background:rgba(0,0,0,.5);padding:4px 12px;border-radius:6px;color:#9dff9d}
 #zprompt{position:absolute;left:0;right:0;top:60%;text-align:center;font-size:23px;font-weight:700}
 #zprompt b{color:var(--acc)}
@@ -157,7 +167,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #zmarks span{position:absolute;transform:translate(-50%,-50%);color:#ff3b3b;font-size:30px;font-weight:700;text-align:center;line-height:1}
 #zmarks small{font-size:14px;color:#fff}
 #zflash{position:absolute;inset:0;background:#fff;opacity:0}
-#zstam{position:absolute;left:50%;bottom:62px;transform:translateX(-50%);width:160px;height:5px;background:rgba(255,255,255,.18);border-radius:3px;transition:opacity .4s}
+#zstam{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);width:160px;height:5px;background:rgba(255,255,255,.18);border-radius:3px;transition:opacity .4s}
 #zstam i{display:block;height:100%;width:100%;background:#e8e2c8;border-radius:3px}
 #zstam.low i{background:#ff7a50}
 #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.42) 100%)}
@@ -197,6 +207,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
   <div id="center"></div>
   <div id="money"></div>
   <div id="hp"></div>
+  <div id="hpbar" class="hidden"><div class="hbt"><span>VIDA</span><b></b></div><div class="hbar"><i class="trail"></i><i class="fill"></i></div></div>
   <div id="slots"></div>
   <div id="ammo"></div>
   <div id="reload" class="hidden"><i></i></div>
@@ -3362,6 +3373,7 @@ function zStartRound() {
   let i = 0;
   for (const p of S.players.values()) {
     if (!p.alive) { zResetPlayer(p); srvSpawn(p, zSpawnPoint(i++), true, Math.PI); } // quem sangrou volta com a M1911
+    else if (!p.downed) p.hp = p.maxHp; // rodada nova: vida cheia
     if (p.inv.he < 4) { p.inv.he = Math.min(4, p.inv.he + 2); zSendInv(p); } // +2 granadas por rodada (máx. 4)
   }
   broadcast({ t: 'zround', r: Z.round, dog: Z.dogRound ? 1 : 0 });
@@ -3861,6 +3873,19 @@ function updateRoomInfo() {
 }
 const fmtT = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 let hudCache = {}, fps = 0, fpsN = 0, fpsT = 0;
+// barra de vida (todos os modos); o rastro branco mostra o dano que acabou de levar
+let hpLast = '';
+function hpBar(mh) {
+  const el = $('#hpbar');
+  if (!mh) { if (hpLast !== 'off') { el.classList.add('hidden'); hpLast = 'off'; } return; }
+  const hp = Math.max(0, Math.round(me.hp)), f = me.downed ? 0 : clamp(hp / mh, 0, 1), key = hp + '/' + mh + (me.downed ? 'd' : '');
+  if (key === hpLast) return; hpLast = key;
+  el.classList.remove('hidden'); el.classList.toggle('low', f <= .3);
+  el.querySelector('b').textContent = me.downed ? 'CAÍDO' : `${hp} / ${mh}`;
+  const fill = el.querySelector('.fill'), w = (f * 100).toFixed(1) + '%';
+  fill.style.width = w; fill.style.backgroundColor = `hsl(${Math.round(f * 115)},75%,48%)`;
+  el.querySelector('.trail').style.width = w;
+}
 function setHTML(id, html) { if (hudCache[id] !== html) { hudCache[id] = html; document.getElementById(id).innerHTML = html; } }
 function updateHud(dt) {
   const w = W[G.cur], st = C.st || {}, ZM = st.mode === 'zombies';
@@ -3893,13 +3918,14 @@ function updateHud(dt) {
   } else hudCache.center = null;
   // vida e munição
   if (me.alive) {
-    setHTML('hp', ZM ? '' : `<div class="${me.hp <= 25 ? 'low' : ''}"><small>VIDA</small>${me.hp}</div><div><small>COLETE${me.helmet ? '+CAP' : ''}</small>${me.armor}</div>`);
+    setHTML('hp', ZM ? '' : `<div><small>COLETE${me.helmet ? '+CAP' : ''}</small>${me.armor}</div>`);
+    hpBar(ZM ? (C.players.get(C.myId)?.mh || 100) : 100);
     const a = G.ammo[G.cur];
     const wname = G.cur === 'knife' && ZC.bowie ? 'Faca Bowie' : (w?.name || '');
     setHTML('ammo', `<span class="wn">${esc(wname)}</span>` + (a ? `${a.mag}<small> / ${a.res}</small>` : (w?.slot === 'nade' ? `${G.inv[G.cur] || 0}` : '')));
     const sl = [['1', G.inv.primary], ['2', G.inv.secondary], ['3', 'knife'], ['4', G.inv.he ? 'he' : null], ['4', G.inv.smoke ? 'smoke' : null], ['4', G.inv.monkey ? 'monkey' : null]].filter(s => s[1]);
     setHTML('slots', sl.map(([k, id]) => `<div class="${id === G.cur ? 'on' : ''}">${k} ${esc(W[id].name)}${(id === 'he' || id === 'monkey') && ZM ? ' x' + G.inv[id] : ''}</div>`).join(''));
-  } else { setHTML('hp', ''); setHTML('ammo', ''); setHTML('slots', ''); }
+  } else { setHTML('hp', ''); setHTML('ammo', ''); setHTML('slots', ''); hpBar(0); }
   setHTML('money', st.mode === 'rounds' && C.phase !== 'warmup' ? '$' + me.money : '');
   // recarga
   const rl = $('#reload'); rl.classList.toggle('hidden', !G.reloadEnd || !me.alive);
