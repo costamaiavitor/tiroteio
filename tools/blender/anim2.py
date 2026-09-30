@@ -42,10 +42,30 @@ for KN, sp in SPIN.items():
     k = bpy.data.objects['K_' + KN]; k.parent = sp; k.matrix_parent_inverse.identity(); k.location = -piv; k.rotation_euler = (0, 0, 0)
 clear_anim()
 LPOSE = (Vector(LP['pos']), D(*LP['F']), D(*LP['N']), Vector(LP['pole']))
-def key(s, f, dp=(0, 0, 0), dr=(0, 0, 0), dpole=(0, 0, 0)):
+# As chaves viram quadros calculados um a um (bake_keys): posição com suavização e arco, rotação por slerp.
+# Deixar o Blender interpolar a rotação da mão componente a componente fazia a mão dar cambalhota no meio do golpe.
+KEYS = {'r': {}, 'l': {}}
+def key(s, f, dp=(0, 0, 0), dr=(0, 0, 0), dpole=(0, 0, 0), ease='smooth', arc=None):
     p, F, N, pole = BASE if s == 'r' else LPOSE
-    R = Rcam @ Euler(dr, 'YXZ').to_matrix() @ Rcam.transposed()
-    set_hand(s, C(*(p + Vector(dp))), F=R @ F, N=R @ N, pole=C(*(pole + Vector(dpole))), frame_=f)
+    q = (Rcam @ Euler(dr, 'YXZ').to_matrix() @ Rcam.transposed()).to_quaternion()
+    KEYS[s][f] = (p + Vector(dp), q, F, N, pole + Vector(dpole), ease, arc)
+EASE = {'smooth': lambda t: t * t * (3 - 2 * t), 'in': lambda t: t * t, 'out': lambda t: 1 - (1 - t) ** 2,
+        'fast': lambda t: 4 * t ** 3 if t < .5 else 1 - (-2 * t + 2) ** 3 / 2, 'lin': lambda t: t}
+def bake_keys():
+    for s in 'rl':
+        fs = sorted(KEYS[s]); qprev = None
+        def put(f, pos, q, F, N, pole):
+            set_hand(s, C(*pos), F=q @ F, N=q @ N, pole=C(*pole), frame_=f)
+        for a, b in zip(fs, fs[1:] + [None]):
+            A = KEYS[s][a]
+            if b is None or b - a > 30: put(a, A[0], A[1], A[2], A[3], A[4]); continue
+            B = KEYS[s][b]; qa, qb = A[1].copy(), B[1].copy()
+            if qa.dot(qb) < 0: qb.negate()
+            for f in range(a, b):
+                t = (f - a) / (b - a); e = EASE[B[5]](t)
+                pos = A[0].lerp(B[0], e)
+                if B[6]: pos = pos + Vector(B[6]) * math.sin(math.pi * e)
+                put(f, pos, qa.slerp(qb, e), A[2], A[3], A[4].lerp(B[4], e))
 def spin(f, a, axis=0):
     sp = SPIN[KIND]; e = [0, 0, 0]; e[axis] = a; sp.rotation_euler = e; sp.keyframe_insert('rotation_euler', frame=f)
 # ---------- movimentos: (quadro, deslocamento em m, giro em rad), eixos da câmera ----------
@@ -67,13 +87,14 @@ for kind, O in (('karambit', 0), ('knife', 1000)):
     else: spin(O + 100, -1.8); spin(O + 112, 0); spin(O + 118, 0)
     for mv, S0 in START.items():
         s0 = O + S0; key('r', s0); key('l', s0); spin(s0, 0)
-        for f, dp, dr in MOVES[kind][mv]: key('r', s0 + f, dp=dp, dr=dr)
+        for mk in MOVES[kind][mv]: key('r', s0 + mk[0], dp=mk[1], dr=mk[2], ease=(mk[3] if len(mk) > 3 else 'smooth'), arc=(mk[4] if len(mk) > 4 else None))
         key('l', s0 + (12 if mv == 'inspect' else 10), dp=(-.02, -.03 if mv == 'inspect' else -.02, 0))
         if mv == 'inspect': key('l', s0 + 84, dp=(-.02, -.03, 0))
         key('r', s0 + END[mv]); key('l', s0 + END[mv])
         if mv == 'inspect' and kind == 'karambit':
             spin(s0 + 40, 0); spin(s0 + 52, -2 * math.pi); spin(s0 + 72, -2 * math.pi); spin(s0 + 82, -4 * math.pi)
         spin(s0 + END[mv], -4 * math.pi if (mv == 'inspect' and kind == 'karambit') else 0)
+bake_keys()
 # dedos e polegares: curvatura fixa, mas com chaves (sem chave o exportador manda a mão aberta do esqueleto)
 FBONES = [f'{f}_0{i}_{sd}' for sd in 'rl' for f in FING + ['thumb'] for i in (1, 2, 3)]
 for fr in (0, 1596):

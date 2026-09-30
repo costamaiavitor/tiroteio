@@ -2530,10 +2530,12 @@ function loadArms() {
 }
 function armsPlay(name) {
   if (!ARMS.mixer) return;
-  ARMS.mixer.stopAllAction();
-  const a = ARMS.mixer.clipAction(ARMS.clips[name === 'gun' ? 'gun' : ARMS.kind + ':' + name]);
+  const a = ARMS.mixer.clipAction(ARMS.clips[name === 'gun' ? 'gun' : ARMS.kind + ':' + name]), prev = ARMS.act;
+  const blend = prev && prev !== a && name !== 'draw' && name !== 'gun' && ARMS.kind !== 'gun' ? (name === 'idle' ? .12 : .06) : 0; // golpe emendado no outro: mistura rápida em vez de pulo
+  for (const x of ARMS.mixer._actions) if (x !== a && x !== prev) x.stop();
   a.reset(); a.setLoop(name === 'idle' ? THREE.LoopRepeat : THREE.LoopOnce); a.clampWhenFinished = true; a.play();
-  ARMS.cur = name; ARMS.mixer.update(0);
+  if (blend) prev.crossFadeTo(a, blend, false); else if (prev && prev !== a) prev.stop();
+  ARMS.act = a; ARMS.cur = name; ARMS.mixer.update(0);
 }
 // ---------- IK dos braços nas armas de fogo ----------
 // A mão direita vai para o punho da arma (ud.rh) e a esquerda para o guarda-mão (ud.lh, que as recargas mexem).
