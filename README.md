@@ -73,6 +73,8 @@ Aba **Skins** no menu.
 
 ### Configurar as contas (Firebase, uma vez só)
 
+Já configurado no projeto `tiroteio-237ee`. Os passos abaixo servem só para refazer em outro projeto.
+
 1. Em https://console.firebase.google.com, crie um projeto (o Google Analytics pode ficar desligado).
 2. **Authentication → Vamos começar → Método de login:** ative **Google** e **E-mail/senha**.
 3. **Authentication → Configurações → Domínios autorizados:** adicione `costamaiavitor.github.io` (o `localhost` já vem).

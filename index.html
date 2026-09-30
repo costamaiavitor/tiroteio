@@ -4253,7 +4253,15 @@ function settingsForm(el) {
 // Com FIREBASE_CONFIG preenchido: login (Google ou e-mail/senha) e o inventário fica na nuvem,
 // no documento players/{uid} do Firestore. Sem ele: perfil local, salvo só neste navegador.
 // ================================================================
-const FIREBASE_CONFIG = null; // cole aqui o firebaseConfig do console do Firebase (Configurações do projeto → Seus apps → Web)
+// firebaseConfig do projeto tiroteio-237ee (a apiKey só identifica o projeto; quem protege os dados são as regras do Firestore)
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyDSRNcrKuh1MF63dM2NJUvLJSX6uQs2_9Q',
+  authDomain: 'tiroteio-237ee.firebaseapp.com',
+  projectId: 'tiroteio-237ee',
+  storageBucket: 'tiroteio-237ee.firebasestorage.app',
+  messagingSenderId: '226278812286',
+  appId: '1:226278812286:web:c967aee2e976fc5e61862f',
+};
 const XP_CASE = 300; // XP para ganhar uma caixa
 const PROF = { uid: null, email: '', name: '', cloud: false, fb: false, data: null, saveT: 0, status: '' };
 const FB = {};
