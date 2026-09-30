@@ -2502,7 +2502,7 @@ function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo,
 // ---------- braços de primeira pessoa feitos no Blender (humano do MPFB, licença CC0) com as animações das facas ----------
 // assets/arms.glb traz os dois braços com esqueleto, a câmera usada para posar e dois soquetes na mão direita
 // (Spin_karambit / Spin_knife) onde a faca do jogo é pendurada. Uma linha do tempo só, cortada em clipes (30 fps).
-const GRIP = { tilt: -.3, r: [0, 0, 0], l: [0, -.012, 0], lroll: 1.25 }; // ajuste fino dos alvos das mãos nas armas
+const GRIP = { tilt: -.3, r: [0, 0, 0], l: [0, -.012, 0], lroll: .7, shr: [.3, -.25, -.02], shl: [-.4, -.2, .12], elr: [.2, -.3, 0], ell: [-.3, -.2, 0], lift: [.02, .045, -.02] }; // alvos das mãos; ombro (sh) e cotovelo (el) em relação à mão, espaço da câmera; lift sobe a arma para as mãos aparecerem
 const ARMS = { holder: null, root: null, mixer: null, clips: {}, cur: null, knife: null };
 // cada faca tem a sua pose de mão: karambit a partir do quadro 0, faca a partir do 1000
 const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] }, ARMS_OFF = { karambit: 0, knife: 1000 };
@@ -2515,7 +2515,7 @@ function loadArms() {
       if (!o.isMesh) return;
       o.frustumCulled = false; o.geometry.userData.keep = true; o.castShadow = false;
       // texturas assadas no Blender (camuflado, couro da luva, punho elástico); o material do glTF vinha espelhado demais
-      const M = o.material, R = { glove: [.62, .3, 1], sleeve: [.95, .3, 1.45], cuff: [.8, .35, 1] }[M.name] || [.8, .4, 1];
+      const M = o.material, R = { glove: [.78, .12, .85], sleeve: [.95, .25, 1.45], cuff: [.85, .15, .9] }[M.name] || [.8, .4, 1];
       o.material = new THREE.MeshStandardMaterial({ name: M.name, map: M.map, normalMap: M.normalMap, normalScale: new THREE.Vector2(1, -1), roughness: R[0], metalness: 0, envMapIntensity: R[1], color: new THREE.Color(R[2], R[2], R[2]) });
     });
     const all = new THREE.AnimationClip('all', -1, g.animations.flatMap(a => a.tracks));
@@ -2588,13 +2588,12 @@ function armIK(s, target, pole) {
   // mão desejada no mundo: soquete na arma × mão em relação ao soquete
   const HW = _m2.copy(target).multiply(k.relInv), T = new V3().setFromMatrixPosition(HW);
   const qT = new THREE.Quaternion().setFromRotationMatrix(_m1.extractRotation(HW));
-  const S = k.up.getWorldPosition(new V3()), a = k.L1, b = k.L2, reach = (a + b) * .985;
+  const a = k.L1, b = k.L2;
+  // Como nos FPS, o ombro não fica preso ao corpo: ele é posto fora da tela, atrás e abaixo de cada mão, para o
+  // antebraço entrar na diagonal pelo canto (esquerdo por baixo do guarda-mão, direito pelo canto inferior direito).
+  const S = T.clone().add(_v1.fromArray(GRIP['sh' + s]));
+  k.up.parent.worldToLocal(_v2.copy(S)); k.up.position.copy(_v2); k.up.updateMatrixWorld(true);
   let D = T.clone().sub(S), d = D.length();
-  if (d > reach) { // longe demais: o ombro vai junto (fica fora da tela) em vez de a mão soltar a arma
-    const S2 = T.clone().addScaledVector(D.clone().normalize(), -reach);
-    k.up.parent.worldToLocal(_v1.copy(S2)); k.up.position.copy(_v1); k.up.updateMatrixWorld(true);
-    S.copy(S2); D = T.clone().sub(S); d = D.length();
-  }
   d = Math.max(Math.abs(a - b) + 1e-3, Math.min(d, a + b - 1e-4));
   const u = D.clone().normalize(), pv = pole.clone().sub(S); pv.addScaledVector(u, -pv.dot(u)).normalize();
   const cosA = (a * a + d * d - b * b) / (2 * a * d), sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
@@ -2611,7 +2610,10 @@ function armIK(s, target, pole) {
 function armsIK(ud) {
   const g = ud.armsGun; if (!g) return;
   vmRoot.updateMatrixWorld(true);
-  for (const [s, t] of [['r', g.rt], ['l', g.lt]]) armIK(s, t.matrixWorld, ARMS.gunC.localToWorld(_v4.set(s === 'r' ? .55 : -.55, -.75, .25))); // cotovelos para baixo e para fora
+  for (const [s, t] of [['r', g.rt], ['l', g.lt]]) {
+    const T = _v3.setFromMatrixPosition(t.matrixWorld);
+    armIK(s, t.matrixWorld, _v4.copy(T).add(_v1.fromArray(GRIP['sh' + s])).add(_v2.fromArray(GRIP['el' + s]))); // cotovelo para baixo e para fora
+  }
 }
 function vmSetWeapon(id) {
   if (vmGun) { vmRoot.remove(vmGun); vmGun.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); }
@@ -2648,7 +2650,7 @@ function vmSetWeapon(id) {
       lh.traverse(o => { if (o.isMesh) o.visible = false; });
       const rt = new THREE.Group(); rt.rotation.x = GRIP.tilt; rt.position.fromArray(GRIP.r); rh.add(rt); // punho inclinado
       const lt = new THREE.Group(); lt.position.fromArray(GRIP.l); lt.rotation.z = GRIP.lroll; lh.add(lt); // eixo do guarda-mão; mão por baixo
-      ud.armsGun = { rt, lt };
+      ud.armsGun = { rt, lt }; ud.vm = (ud.vm || [0, 0, 0]).map((v, i) => v + GRIP.lift[i]);
       vmRoot.add(ARMS.gunC); ARMS.gunC.position.set(-.165, .145, .43); ARMS.gunC.add(ARMS.holder);
       ARMS.kind = 'gun'; armsGunBase();
     }
