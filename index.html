@@ -183,7 +183,27 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #reload i{display:block;height:100%;background:var(--acc);width:0}
 #spec{position:absolute;bottom:90px;left:0;right:0;text-align:center;font-size:22px}
 #spec b{color:var(--acc)}
-#buy{position:absolute;left:18px;top:50%;transform:translateY(-50%);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px 18px;min-width:300px;font-size:19px}
+#buy{position:absolute;inset:0;pointer-events:auto;background:radial-gradient(ellipse at 50% 30%,rgba(20,24,32,.72),rgba(4,6,10,.92));display:flex;align-items:center;justify-content:center;z-index:12}
+.bmwrap{width:min(1100px,94vw);max-height:92vh;overflow:auto}
+.bmtop{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:10px}
+.bmt{font-size:30px;font-weight:700;letter-spacing:6px;color:#fff}.bmh{color:#8b94a0;font-size:15px}.bmh b{color:var(--acc)}
+.bmcred{text-align:right;font-size:34px;font-weight:700;color:#7dff9d;line-height:1}.bmcred span{display:block;font-size:12px;letter-spacing:2px;color:#8b94a0;margin-bottom:4px}
+.bmgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.bmcol{display:flex;flex-direction:column;gap:7px}
+.bmcat{font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:#8b94a0;margin:6px 0 2px}
+.bmc{position:relative;height:88px;border-radius:4px;cursor:pointer;background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.1);overflow:hidden;transition:transform .1s,background .1s,border-color .1s}
+.bmc:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.55);background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.04))}
+.bmc img{position:absolute;left:8%;top:14px;width:84%;height:54px;object-fit:contain;filter:drop-shadow(0 3px 4px rgba(0,0,0,.7))}
+.bmc img:not([src]){visibility:hidden}
+.bmc b{position:absolute;left:10px;bottom:6px;font-size:14px;letter-spacing:1px;text-transform:uppercase;color:#eee}
+.bmc .bmp{position:absolute;right:8px;top:5px;font-size:14px;font-weight:700;color:#f0e6c8}
+.bmc i{position:absolute;right:8px;bottom:6px;font-style:normal;font-size:11px;font-weight:700;letter-spacing:1px;color:#1a1200;background:var(--acc);padding:1px 6px;border-radius:2px}
+.bmc.own{border-color:var(--acc);background:linear-gradient(180deg,rgba(255,176,32,.18),rgba(255,176,32,.04))}
+.bmc.no{opacity:.35;cursor:not-allowed}.bmc.no:hover{transform:none}
+.bmgear{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.bmc.gear{height:74px}.bmico{position:absolute;left:14px;top:16px;width:40px;height:40px;color:#cfd6e0}.bmico svg{width:100%;height:100%}
+.bmc.gear b{left:66px;bottom:auto;top:30px}
+@media(max-width:760px){.bmgrid,.bmgear{grid-template-columns:repeat(2,1fr)}}
 #buy .it{display:flex;justify-content:space-between;gap:20px;padding:2px 0}
 #buy .no{color:#666}
 #buy .k{color:var(--acc);font-weight:700;margin-right:8px}
@@ -372,6 +392,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
@@ -456,6 +477,7 @@ for (const [id, w] of Object.entries(ZWEAP)) {
 }
 W.m1911_ls = { ...W.m1911, ls: 1 }; // pistola temporária de quem caiu sem pistola
 W.monkey = { name: 'Macaco com Pratos', slot: 'nade', model: 'monkey', speed: 1 };
+W.karambit = { ...W.knife, name: 'Karambit', model: 'karambit' }; // faca alternativa (só visual: escolhida na coleção)
 
 // ================================================================
 // Mapas (caixas AABB; x,z = centro, y = base)
@@ -823,7 +845,7 @@ function vilaGround() {
 }
 function buildVila() {
   const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), E3 = new THREE.Euler(), SC = new V3(), PO = new V3();
-  const lam = (k, c) => new THREE.MeshLambertMaterial({ map: tex(k), bumpMap: tex(k), bumpScale: BUMP[k] ?? 1, color: c });
+  const lam = (k, c) => worldMat(k, c, true);
   const add = (m, cast = true) => { m.castShadow = cast; m.receiveShadow = true; m.userData.own = true; world.add(m); return m; };
   const iron = new THREE.MeshLambertMaterial({ color: 0x23262b }), stoneM = lam('rock', 0x7d7a72), hedgeM = lam('leaf', 0x5a8240);
   const roofM = lam('brick', 0x6b3a2e), roofW = lam('wood', 0x4d3b2c), plaster = lam('plaster', 0xa39a86), barkM = lam('wood', 0x4a3a2a);
@@ -1122,7 +1144,22 @@ function buildSky(M) {
 const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
 const vmPass = new RenderPass(vmScene, vmCam); vmPass.clear = false; vmPass.clearDepth = true;
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), .5, .45, .85);
-composer.addPass(new RenderPass(scene, camera)); composer.addPass(vmPass); composer.addPass(bloomPass); composer.addPass(new OutputPass());
+// correção de cor final (Alto): contraste em S suave, saturação, tom quente nas altas, aberração nas bordas e grão de filme
+const gradePass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float time; varying vec2 vUv;
+    void main(){ vec2 d = vUv - .5; float r = dot(d, d);
+      vec3 c = vec3(texture2D(tDiffuse, vUv - d * r * .014).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv + d * r * .014).b);
+      float l = dot(c, vec3(.2126, .7152, .0722));
+      c = mix(vec3(l), c, 1.1);
+      c = mix(c, c * c * (3.0 - 2.0 * c), .28);
+      c *= mix(vec3(.97, .99, 1.04), vec3(1.03, 1.0, .96), smoothstep(.15, .8, l));
+      float n = fract(sin(dot(vUv * 913.7 + time, vec2(12.9898, 78.233))) * 43758.5453);
+      c += (n - .5) * .02;
+      gl_FragColor = vec4(c, 1.0); }`,
+});
+composer.addPass(new RenderPass(scene, camera)); composer.addPass(vmPass); composer.addPass(bloomPass); composer.addPass(new OutputPass()); composer.addPass(gradePass);
 function applyQuality() {
   const q = CFG.gfx;
   renderer.setPixelRatio(q === 'alto' ? Math.min(devicePixelRatio, 2) : q === 'medio' ? Math.min(devicePixelRatio, 1.25) : .8);
@@ -1223,6 +1260,24 @@ function boxGeo(w, h, d, scale) {
   for (let f = 0; f < 6; f++) for (let i = 0; i < 4; i++) { const k = f * 4 + i; uv.setXY(k, uv.getX(k) * dims[f][0] / scale, uv.getY(k) * dims[f][1] / scale); }
   return g;
 }
+// Material do cenário. Médio/Alto: PBR (aspereza por tipo de superfície) refletindo um ambiente suave.
+// "ao": escurece a base de tudo que encosta no chão (sombra de contato), o que tira a cara de caixa flutuando.
+const ROUGH = { metal: .42, container: .5, tile: .72, concrete: .86, brick: .84, rock: .9, wood: .74, crate: .7, plaster: .9, sand: .95, snow: .75, asphalt: .92, grass: .96, leaf: .9, dirt: .96 };
+let WORLD_ENV = null;
+function worldMat(k, c, ao) {
+  const lo = CFG.gfx === 'baixo';
+  const m = lo ? new THREE.MeshLambertMaterial({ map: tex(k), bumpMap: tex(k), bumpScale: BUMP[k] ?? 1, color: c })
+    : new THREE.MeshStandardMaterial({ map: tex(k), bumpMap: tex(k), bumpScale: (BUMP[k] ?? 1) * .8, color: c, roughness: ROUGH[k] ?? .85, metalness: k === 'metal' || k === 'container' ? .3 : 0 });
+  if (!lo) m.envMapIntensity = curMap?.stars ? .18 : .32;
+  if (ao) {
+    m.onBeforeCompile = sh => {
+      sh.vertexShader = 'varying float vWY;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vWY = (modelMatrix * vec4(transformed, 1.0)).y;');
+      sh.fragmentShader = 'varying float vWY;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor.rgb *= mix(.5, 1.0, smoothstep(0.0, 1.15, vWY));');
+    };
+    m.customProgramCacheKey = () => 'ao';
+  }
+  return m;
+}
 function softTex() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.5, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
@@ -1250,6 +1305,7 @@ function buildMap(id) {
   const vl = M.stars ? .5 : 1; vmHemi.intensity = 1.1 * vl; vmKey.intensity = 2.2 * vl; vmRim.intensity = 1.2 * vl; VM_ENV = M.stars ? .3 : 1;
   for (const set of [...Object.values(GM), ARM || {}]) for (const m of Object.values(set)) if (m?.isMeshStandardMaterial) m.envMapIntensity = VM_ENV * (m.userData.env ?? .35);
   scene.fog = new THREE.Fog(M.fogC ?? M.sky, M.fog[0], M.fog[1]);
+  if (CFG.gfx !== 'baixo') { if (!WORLD_ENV) { const pm = new THREE.PMREMGenerator(renderer); WORLD_ENV = pm.fromScene(new RoomEnvironment(renderer), .04).texture; pm.dispose(); } scene.environment = WORLD_ENV; } else scene.environment = null;
   const s = M.sun || [30, 50, 20]; sun.position.set(s[0], s[1], s[2]); sun.target.position.set(0, 0, 0);
   const ext = Math.max(M.w, M.d) / 2 + 8, sc = sun.shadow.camera;
   sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.near = 1; sc.far = Math.max(220, Math.hypot(s[0], s[1], s[2]) + ext * 1.6); sc.updateProjectionMatrix();
@@ -1264,7 +1320,7 @@ function buildMap(id) {
     // 'col' = colisor invisível sólido (o desenho é feito à parte, ex.: chafariz, moinho, tronco)
     if (b.mat === 'inv' || b.mat === 'col') { COL.push({ minX: b.x - b.w / 2, maxX: b.x + b.w / 2, minY: b.y, maxY: b.y + b.h, minZ: b.z - b.d / 2, maxZ: b.z + b.d / 2, ...(b.mat === 'inv' ? { ns: 1 } : {}) }); continue; }
     const th = M.theme[b.mat] || ['concrete', 0xaaaaaa], key = b.mat + '|' + (b.c ?? '');
-    const mat = mats[key] || (mats[key] = new THREE.MeshLambertMaterial({ map: tex(th[0]), bumpMap: tex(th[0]), bumpScale: BUMP[th[0]] ?? 1, color: b.c ?? th[1] }));
+    const mat = mats[key] || (mats[key] = worldMat(th[0], b.c ?? th[1], b.mat !== 'floor'));
     const m = new THREE.Mesh(boxGeo(b.w, b.h, b.d, TEXS[th[0]]), mat);
     m.position.set(b.x, b.y + b.h / 2, b.z); m.castShadow = b.mat !== 'floor'; m.receiveShadow = true;
     world.add(m);
@@ -1679,7 +1735,8 @@ const SKINS = [
 ];
 const SKIN_BY = Object.fromEntries(SKINS.map(s => [s.id, s]));
 // armas que podem ter skin (as de raio ficam de fora: já têm visual próprio)
-const SKIN_WEAPONS = () => Object.keys(W).filter(k => k === 'knife' || (W[k].model && ['primary', 'secondary'].includes(W[k].slot) && !W[k].pap && !W[k].ls && !['raygun', 'thundergun'].includes(k)));
+const knifeModelOf = (id, eq) => id === 'knife' && eq?._faca === 'karambit' ? 'karambit' : id; // qual faca a pessoa escolheu
+const SKIN_WEAPONS = () => Object.keys(W).filter(k => k === 'knife' || k === 'karambit' || (W[k].model && ['primary', 'secondary'].includes(W[k].slot) && !W[k].pap && !W[k].ls && !['raygun', 'thundergun'].includes(k)));
 const SKTEX = {};
 function skinTex(f) {
   if (SKTEX[f.id]) return SKTEX[f.id];
@@ -2029,7 +2086,16 @@ function gunModel(id, fp = false, skin = null) {
       add(g, EX([[-.004, .038], [.006, .038], [.006, -.012], [-.004, -.012]], .04, null, .002), M.steel, 0, -.004, -.012);
       add(g, EX([[.0, .03], [.0, -.004], [-.03, -.006], ['q', -.045, .004, -.06, -.006], [-.105, -.008], [-.112, .0], [-.112, .03], [-.06, .034], ['q', -.045, .026, -.03, .034]], .024, null, .004), M.polymer, 0, -.004, -.012);
       add(g, EX([[-.112, .002], [-.122, .004], [-.122, .026], [-.112, .03]], .026), M.steel, 0, -.004, -.012);
-      ud.rig = 'none'; ud.rh = new V3(0, .006, .05); ud.vm = [-.01, .005, .02]; mz = 0; my = 0;
+      ud.rig = 'none'; ud.rh = new V3(0, .006, .05); ud.vm = [-.01, -.02, -.02]; mz = 0; my = 0;
+      break;
+    }
+    case 'karambit': { // lâmina em garra curvada para baixo, cabo curto e anel atrás
+      add(g, EX([[0, .016], ['q', .05, .03, .085, .0], ['q', .105, -.022, .1, -.062], ['q', .07, -.024, .038, -.012], ['q', .018, -.007, 0, -.004]], .0042, null, .0012), M.blade, 0, 0, 0);
+      add(g, EX([[.01, .011], ['q', .05, .02, .078, -.004]], .0044), M.steel, 0, 0, 0); // fio
+      add(g, EX([[-.004, .024], [.006, .022], [.006, -.009], [-.004, -.011]], .024, null, .002), M.steel, 0, 0, 0);
+      add(g, EX([[-.004, -.008], [-.004, .022], [-.05, .024], ['q', -.064, .022, -.066, .006], [-.062, -.01], [-.03, -.012]], .021, null, .003), M.polymer, 0, 0, 0);
+      add(g, new THREE.TorusGeometry(.016, .0045, 8, 22), M.steel, 0, .006, .08, 0, Math.PI / 2); // anel do indicador
+      ud.rig = 'none'; ud.rh = new V3(0, .006, .03); ud.vm = [-.02, .005, -.04]; mz = 0; my = 0;
       break;
     }
     case 'nade': {
@@ -2186,13 +2252,14 @@ function rightHand(A) { // mão no punho da arma: dedos dando a volta pela frent
   forearm(h, [.03, -.045, .045], [.2, -.34, 1], .5, A, false);
   return h;
 }
-function knifeHand(A) { // punho fechado em volta do cabo deitado (eixo z): nós dos dedos em cima, dedos dando a volta, polegar por baixo
-  const h = new THREE.Group(), cy = .009, rx = .022, ry = .029, at = (t, dz) => [Math.cos(t) * rx, cy + Math.sin(t) * ry, dz];
-  const p = new THREE.Mesh(new RoundedBoxGeometry(.022, .06, .088, 3, .009), A.glove); p.position.set(.03, .002, .04); p.rotation.z = .25; h.add(p); // palma / dorso, do lado direito
-  const k = new THREE.Mesh(new RoundedBoxGeometry(.03, .014, .08, 2, .005), A.pad); k.position.set(.022, .036, .038); k.rotation.z = -.5; h.add(k); // protetor dos nós
-  [.004, .025, .046, .066].forEach((z, i) => { const r = i === 3 ? .0074 : .0084, deg = Math.PI / 180; finger(h, [at(50 * deg, z), at(110 * deg, z), at(170 * deg, z), at(228 * deg, z), at(262 * deg, z + .004)], r, A.glove); });
-  finger(h, [[.026, -.026, .062], [.004, -.038, .036], [-.018, -.03, .014], [-.027, -.012, .006]], .0098, A.glove); // polegar por baixo, travando o indicador
-  forearm(h, [.032, -.018, .092], [.25, -.45, 1], .52, A, false);
+function knifeHand(A, ring) { // punho fechado em volta do cabo (eixo z, centro do cabo = origem): nós em cima, dedos dando a volta, polegar travando o indicador
+  const h = new THREE.Group(), cy = .003, rx = .021, ry = .027, deg = Math.PI / 180, at = (t, dz) => [Math.cos(t) * rx, cy + Math.sin(t) * ry, dz];
+  const p = new THREE.Mesh(new RoundedBoxGeometry(.02, .056, .082, 3, .009), A.glove); p.position.set(.027, -.004, -.018); p.rotation.z = .3; h.add(p); // palma / dorso (lado direito)
+  const k = new THREE.Mesh(new RoundedBoxGeometry(.026, .012, .074, 2, .005), A.pad); k.position.set(.02, .026, -.02); k.rotation.z = -.55; h.add(k); // protetor dos nós
+  const zs = ring ? [-.024, -.006, .012, .03] : [-.05, -.03, -.01, .01];
+  zs.forEach((z, i) => finger(h, [at(40 * deg, z), at(100 * deg, z), at(160 * deg, z), at(220 * deg, z), at(258 * deg, z + .003)], i === 3 ? .0072 : .0082, A.glove));
+  finger(h, [[.024, -.024, .004], [.004, -.034, -.022], [-.016, -.026, zs[0] + .008], [-.024, -.01, zs[0] + .002]], .0092, A.glove); // polegar
+  forearm(h, [.03, -.02, .038], [.25, -.5, 1], .52, A, false);
   return h;
 }
 function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo, dedos subindo pelo lado direito
@@ -2207,16 +2274,18 @@ function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo,
 function vmSetWeapon(id) {
   if (vmGun) { vmRoot.remove(vmGun); vmGun.traverse(o => o.geometry?.dispose()); }
   vmGun = new THREE.Group();
-  const gun = gunModel(id, true, skinOf(id)), ud = gun.userData, A = armMats(); vmGun.add(gun);
+  const mid = knifeModelOf(id, PROF.data?.equipped), gun = gunModel(mid, true, skinOf(mid)), ud = gun.userData, A = armMats(); vmGun.add(gun);
+  gun.updateMatrixWorld(true); ud.sightY = new THREE.Box3().setFromObject(gun).max.y; // topo da arma = altura da mira
   vmGun.userData = ud;
-  const rh = W[id]?.model === 'knife' ? knifeHand(A) : rightHand(A); rh.position.copy(ud.rh); gun.add(rh);
-  const m = W[id]?.model;
-  if (!['knife', 'nade', 'smoke', 'monkey'].includes(m)) {
+  const m = W[mid]?.model;
+  const rh = m === 'knife' || m === 'karambit' ? knifeHand(A, m === 'karambit') : rightHand(A); rh.position.copy(ud.rh); gun.add(rh);
+  if (!['knife', 'karambit', 'nade', 'smoke', 'monkey'].includes(m)) {
     const lh = leftHand(A); lh.position.copy(ud.lh); gun.add(lh);
     const sh = new THREE.Mesh(new THREE.CylinderGeometry(.0105, .0105, .06, 10), m === 'launcher' ? A.brass : A.shell); sh.rotation.x = Math.PI / 2; sh.position.set(0, .01, -.01); sh.visible = false; lh.add(sh);
     ud.lhG = lh; ud.lhRest = lh.position.clone(); ud.handShell = sh;
   }
-  if (m === 'knife') gun.rotation.set(1.05, .18, -.22); // faca em pé, lâmina para cima e um pouco para a frente, como no CS
+  if (m === 'knife') gun.rotation.set(.72, .22, -.32); // faca inclinada para cima e para a frente, como no CS
+  if (m === 'karambit') gun.rotation.set(.3, .3, -.55); // karambit: garra para baixo e para a frente
   vmGun.scale.setScalar(1.18); vmGun.rotation.y = .05; // arma maior e levemente virada para dentro, como nos FPS grandes
   vmRoot.add(vmGun);
 }
@@ -2324,7 +2393,7 @@ function updateViewmodel(dt) {
   const w = W[G.cur], ud = vmGun?.userData || {}, vo = ud.vm || [0, 0, 0];
   const hs = Math.hypot(me.vel.x, me.vel.z);
   if (me.onGround) bobT += dt * hs * 1.5;
-  const bob = me.onGround ? Math.min(1, hs / RUN) : 0, breathe = Math.sin(now * 1.7) * .003 * (1 - bob);
+  const bob = (me.onGround ? Math.min(1, hs / RUN) : 0) * (1 - .8 * (G.ads || 0)), breathe = Math.sin(now * 1.7) * .003 * (1 - bob);
   const o = { x: .165 + vo[0] + Math.cos(bobT) * .012 * bob - mouseDX * .0004, y: -.145 + vo[1] + Math.abs(Math.sin(bobT)) * .014 * bob + breathe, z: -.43 + vo[2], rx: breathe * 2, ry: 0, rz: 0 };
   G.kick = Math.max(0, G.kick - dt * 10);
   o.z += G.kick * .06; o.rx += G.kick * .1;
@@ -2334,6 +2403,11 @@ function updateViewmodel(dt) {
   // correndo: arma abaixada e de lado, balançando mais
   me.sprintK = lerp(me.sprintK, me.sprinting ? 1 : 0, Math.min(1, dt * 10));
   if (me.sprintK > .01) { const k = me.sprintK; o.rx -= .55 * k; o.ry += .7 * k; o.x -= .06 * k; o.y -= .06 * k + Math.abs(Math.sin(bobT * 1.3)) * .03 * k; o.rz += Math.sin(bobT) * .08 * k; }
+  const ak = smooth(G.ads || 0);
+  if (ak > 0) { // mirando: arma no centro, com o topo (alça/mira holográfica) na linha do olho
+    const ay = -(ud.sightY ?? .05) * 1.18 + .004;
+    o.x = lerp(o.x, 0, ak); o.y = lerp(o.y, ay, ak); o.z = lerp(o.z, -.34 + vo[2] * .5, ak); o.ry = lerp(o.ry, -.05, ak); o.rx *= 1 - ak * .7;
+  }
   gunAnim(ud, w, o);
   mouseDX *= Math.exp(-dt * 12);
   const x = o.x, y = o.y, z = o.z, rx = o.rx, ry = o.ry, rz = o.rz;
@@ -2351,6 +2425,7 @@ const bestW = () => G.inv.primary || G.inv.secondary || 'knife';
 function equip(id, force) {
   if (!hasW(id) || (id === G.cur && !force)) return;
   if (id !== G.cur) G.last = G.cur;
+  G.ads = 0;
   G.cur = id; G.reloadEnd = 0; G.reload = null; G.scope = 0; G.rezoom = 0; G.switchDur = id === 'awp' ? .6 : .35; G.switchEnd = now + G.switchDur; G.shots = 0;
   vmSetWeapon(id); play('draw');
 }
@@ -2376,6 +2451,7 @@ function calcSpread(w) {
   s += (w.move || 0) * mf;
   if (!me.onGround) s += w.air ?? .15;
   if (me.crouch && me.onGround) s *= .75;
+  s *= 1 - .45 * (G.ads || 0); // mirando: mais precisão
   return s;
 }
 function perturb(dir, spread) {
@@ -2568,7 +2644,7 @@ function getRemote(id) {
 function setRemoteGun(rp, w) {
   if (!w || rp.w === w) return; rp.w = w;
   const gh = rp.model.userData.gh; while (gh.children.length) { const c = gh.children[0]; gh.remove(c); c.traverse(o => o.geometry?.dispose()); }
-  const g = gunModel(w, false, rp.sk?.[w]); g.scale.setScalar(1.1); gh.add(g);
+  const mid = knifeModelOf(w, rp.sk), g = gunModel(mid, false, rp.sk?.[mid]); g.scale.setScalar(1.1); gh.add(g);
 }
 function removeRemote(id) { const rp = R.get(id); if (!rp) return; scene.remove(rp.model); disposeGroup(rp.model); R.delete(id); }
 function refreshRemoteInfo(rp) {
@@ -4392,27 +4468,38 @@ function updateHud(dt) {
   const net = `${fps} FPS` + (NET.isHost ? ` · host · ${S.players.size} jogador(es)` : '');
   if ($('#net').textContent !== net) $('#net').textContent = net;
 }
+// ---------- loja estilo Valorant: tela por cima do jogo, colunas por categoria, clica e compra ----------
+const BUY_COLS = [[['Pistolas', ['glock', 'usp', 'p250', 'deagle']]], [['SMGs', ['mp5', 'p90']], ['Escopetas', ['nova']]], [['Rifles', ['ak47', 'm4']]], [['Snipers', ['scout', 'awp']]]];
+const BUY_GEAR = ['kevlar', 'helmet', 'he', 'smoke'];
+const GEAR_ICON = {
+  kevlar: '<svg viewBox="0 0 40 40"><path d="M20 4 L34 9 V20 C34 29 27 34 20 37 C13 34 6 29 6 20 V9 Z" fill="none" stroke="currentColor" stroke-width="3"/></svg>',
+  helmet: '<svg viewBox="0 0 40 40"><path d="M20 4 L34 9 V20 C34 29 27 34 20 37 C13 34 6 29 6 20 V9 Z" fill="currentColor" opacity=".85"/><path d="M12 16 H28" stroke="#111" stroke-width="3"/></svg>',
+  he: '<svg viewBox="0 0 40 40"><circle cx="20" cy="23" r="12" fill="currentColor"/><rect x="16" y="6" width="8" height="7" fill="currentColor"/><path d="M24 9 L32 5" stroke="currentColor" stroke-width="3"/></svg>',
+  smoke: '<svg viewBox="0 0 40 40"><rect x="12" y="10" width="16" height="26" rx="3" fill="currentColor"/><rect x="15" y="5" width="10" height="6" fill="currentColor"/></svg>',
+};
 function renderBuy() {
   const el = $('#buy');
   el.classList.toggle('hidden', !C.buyOpen);
-  if (!C.buyOpen) return;
-  const free = C.st?.mode === 'dm' || C.phase === 'warmup';
-  const money = me.money;
-  let h = `<h3>Comprar ${free ? '(grátis)' : `· $${money}`}</h3>`;
-  if (C.buyCat < 0) h += SHOP.map(([n], i) => `<div class="it"><span><span class="k">${i + 1}</span>${n}</span></div>`).join('') + `<div class="it"><span><span class="k">0</span>Fechar</span></div>`;
-  else {
-    h += `<div style="color:#999;margin-bottom:4px">${SHOP[C.buyCat][0]}</div>` + SHOP[C.buyCat][1].map((id, i) => { const pr = free ? 0 : W[id].price; return `<div class="it ${pr > money ? 'no' : ''}"><span><span class="k">${i + 1}</span>${W[id].name}</span><span>$${pr}</span></div>`; }).join('') + `<div class="it"><span><span class="k">0</span>Voltar</span></div>`;
-  }
-  el.innerHTML = h;
+  if (!C.buyOpen) { hudCache.buy = null; return; }
+  const free = C.st?.mode === 'dm' || C.phase === 'warmup', money = me.money;
+  const card = (id, gear) => {
+    const w = W[id], pr = free ? 0 : w.price, own = G.inv.primary === id || G.inv.secondary === id || (id === 'kevlar' && me.armor >= 100 && !me.helmet) || (id === 'helmet' && me.helmet && me.armor >= 100) || ((id === 'he' || id === 'smoke') && G.inv[id] > 0);
+    const skin = PROF.data?.equipped?.[id] || '', url = gear ? null : thumbURL(id, skin), cls = own ? ' own' : pr > money ? ' no' : '';
+    const pic = gear ? `<div class="bmico">${GEAR_ICON[id]}</div>` : url ? `<img src="${url}" alt="">` : `<img data-th="${id}:${skin}" alt="">`;
+    return `<div class="bmc${cls}${gear ? ' gear' : ''}" data-buy="${id}"><span class="bmp">${free ? 'GRÁTIS' : '$' + w.price}</span>${pic}<b>${esc(w.name)}</b>${own ? '<i>COMPRADO</i>' : ''}</div>`;
+  };
+  const cols = BUY_COLS.map(col => `<div class="bmcol">${col.map(([t, ids]) => `<div class="bmcat">${t}</div>${ids.filter(id => W[id]).map(id => card(id)).join('')}`).join('')}</div>`).join('');
+  setHTML('buy', `<div class="bmwrap"><div class="bmtop"><div><div class="bmt">LOJA</div><div class="bmh">Clique para comprar · <b>B</b> ou <b>Esc</b> fecha</div></div><div class="bmcred"><span>DINHEIRO</span>${free ? 'GRÁTIS' : '$' + money}</div></div>
+    <div class="bmgrid">${cols}</div><div class="bmcat">Equipamento</div><div class="bmgear">${BUY_GEAR.map(id => card(id, true)).join('')}</div></div>`);
 }
-function buyKey(code) {
-  const n = code.startsWith('Digit') ? +code.slice(5) : code.startsWith('Numpad') ? +code.slice(6) : NaN;
-  if (code === 'KeyB' || code === 'Escape') { C.buyOpen = false; renderBuy(); return; }
-  if (isNaN(n)) return;
-  if (C.buyCat < 0) { if (n === 0) { C.buyOpen = false; } else if (SHOP[n - 1]) C.buyCat = n - 1; }
-  else { if (n === 0) C.buyCat = -1; else { const id = SHOP[C.buyCat][1][n - 1]; if (id) sendToHost({ t: 'buy', it: id }); } }
-  renderBuy();
-}
+function openBuy() { if (!me.alive || ZC.on) return; C.buyOpen = true; hudCache.buy = null; renderBuy(); document.exitPointerLock?.(); }
+function closeBuy() { C.buyOpen = false; renderBuy(); requestLock(); }
+$('#buy').addEventListener('click', e => {
+  const c = e.target.closest('[data-buy]'); if (!c) return;
+  if (c.classList.contains('no')) { play('empty'); return; }
+  sendToHost({ t: 'buy', it: c.dataset.buy }); play('buy');
+});
+$('#buy').addEventListener('contextmenu', e => e.preventDefault());
 
 // ================================================================
 // Entrada
@@ -4425,11 +4512,11 @@ addEventListener('keydown', e => {
     return;
   }
   if (e.code === 'Tab') { e.preventDefault(); C.showBoard = true; return; }
+  if (C.buyOpen && (e.code === 'KeyB' || e.code === 'Escape')) { e.preventDefault(); closeBuy(); return; }
   if (!locked()) return;
   if (['Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code) || e.ctrlKey) e.preventDefault();
   keys[e.code] = true;
   if (e.repeat) return;
-  if (C.buyOpen && (e.code.startsWith('Digit') || e.code.startsWith('Numpad') || e.code === 'KeyB')) { buyKey(e.code); return; }
   if (me.downed && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyQ', 'KeyV', 'KeyF'].includes(e.code)) return; // caído: só a pistola
   switch (e.code) {
     case 'KeyF': if (ZC.on) zUse(); break;
@@ -4440,7 +4527,7 @@ addEventListener('keydown', e => {
     case 'Digit4': { const opts = ['he', 'smoke', 'monkey'].filter(hasW); if (opts.length) equip(opts[(opts.indexOf(G.cur) + 1) % opts.length]); break; }
     case 'KeyQ': hasW(G.last) && equip(G.last); break;
     case 'KeyR': startReload(); break;
-    case 'KeyB': if (me.alive && !ZC.on) { C.buyOpen = true; C.buyCat = -1; renderBuy(); } break;
+    case 'KeyB': openBuy(); break;
     case 'KeyY': case 'Enter': openChat(); e.preventDefault(); break;
     case 'Space': if (!me.alive) cycleSpec(); break;
   }
@@ -4452,9 +4539,9 @@ canvas.addEventListener('mousedown', e => {
   if (!locked()) { requestLock(); return; }
   audioInit();
   if (e.button === 0) { mouseDown = true; G.trigger = true; if (!me.alive) cycleSpec(); }
-  if (e.button === 2) altFire();
+  if (e.button === 2) { const w = W[G.cur]; if (w && !w.scope && (w.slot === 'primary' || w.slot === 'secondary')) G.adsHold = true; else altFire(); }
 });
-addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; });
+addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; if (e.button === 2) G.adsHold = false; });
 addEventListener('contextmenu', e => { if (inGame) e.preventDefault(); });
 let mouseAvg = 0;
 addEventListener('mousemove', e => {
@@ -4465,7 +4552,7 @@ addEventListener('mousemove', e => {
   if (mag > 200 && mag > mouseAvg * 6 + 60) { mouseAvg = mouseAvg * .8 + 12; return; }
   mouseAvg = mouseAvg * .8 + mag * .2;
   const w = W[G.cur], fovK = (w?.scope && G.scope > 0) ? w.scope[G.scope - 1] / CFG.fov : 1;
-  const k = .0022 * CFG.sens * fovK;
+  const k = .0022 * CFG.sens * fovK * (1 - .2 * (G.ads || 0));
   if (me.alive) { me.yaw -= e.movementX * k; me.pitch = clamp(me.pitch - e.movementY * k, -1.55, 1.55); }
   mouseDX += e.movementX;
 });
@@ -4485,7 +4572,8 @@ function requestLock() {
 document.addEventListener('pointerlockchange', () => {
   if (!inGame) return;
   if (locked()) { $('#pause').classList.add('hidden'); $('#click').classList.add('hidden'); }
-  else if (!C.chatOpen) { showPause(); for (const k in keys) keys[k] = false; mouseDown = false; C.buyOpen = false; renderBuy(); }
+  else if (C.buyOpen) { for (const k in keys) keys[k] = false; mouseDown = false; G.adsHold = false; } // loja aberta: o mouse fica solto para clicar
+  else if (!C.chatOpen) { showPause(); for (const k in keys) keys[k] = false; mouseDown = false; G.adsHold = false; }
 });
 function cycleSpec() {
   const alive = [...R.values()].filter(r => r.alive);
@@ -4580,12 +4668,12 @@ function grantAllSkins() {
 const PROF = { uid: null, email: '', name: '', cloud: false, fb: false, data: null, saveT: 0, status: '' };
 const FB = {};
 const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0 });
-function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) if (W[w] && SKIN_BY[f]) o[w] = f; return o; }
+function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) { if (w === '_faca') { if (f === 'karambit') o._faca = f; } else if (W[w] && SKIN_BY[f]) o[w] = f; } return o; }
 function cleanProf(d) {
   const p = newProfile(0); if (!d || typeof d !== 'object') return p;
   p.xp = Math.max(0, +d.xp || 0); p.cases = Math.max(0, Math.floor(+d.cases || 0)); p.opened = Math.max(0, +d.opened || 0);
   p.items = Array.isArray(d.items) ? [...new Set(d.items.filter(it => typeof it === 'string' && W[it.split(':')[0]] && SKIN_BY[it.split(':')[1]]))] : [];
-  p.equipped = cleanSk(d.equipped); for (const [w, f] of Object.entries(p.equipped)) if (!p.items.includes(w + ':' + f)) delete p.equipped[w];
+  p.equipped = cleanSk(d.equipped); for (const [w, f] of Object.entries(p.equipped)) if (w !== '_faca' && !p.items.includes(w + ':' + f)) delete p.equipped[w];
   return p;
 }
 const profKey = () => 'prof.' + (PROF.uid || 'guest');
@@ -4664,14 +4752,16 @@ function rollItem() {
   for (let i = 0; i < RARITY.length; i++) { r -= RARITY[i].p; if (r <= 0) { rar = i; break; } }
   const fs = SKINS.filter(s => s.r === rar), f = fs[Math.floor(Math.random() * fs.length)];
   const ws = SKIN_WEAPONS().filter(w => w !== 'knife'); let w = ws[Math.floor(Math.random() * ws.length)];
-  if (rar >= 3 && Math.random() < .25) w = 'knife'; // faca só sai em Épica ou Lendária
+  if (rar >= 3 && Math.random() < .25) w = Math.random() < .5 ? 'knife' : 'karambit'; // faca só sai em Épica ou Lendária
   return w + ':' + f.id;
 }
 const itemInfo = it => { const [w, f] = it.split(':'), s = SKIN_BY[f]; return { w, f, s, wn: w === 'knife' ? 'Faca' : (W[w]?.name || w), rar: s?.r ?? 0 }; };
+const isKnife = w => w === 'knife' || w === 'karambit';
+const knifeInUse = () => PROF.data?.equipped?._faca === 'karambit' ? 'karambit' : 'knife';
 function skinOf(id) { if (!id || W[id]?.pap) return null; return PROF.data?.equipped?.[id] || null; }
 function equipItem(it, on) {
   const d = PROF.data, { w, f } = itemInfo(it); if (!d || !d.items.includes(it)) return;
-  if (on) d.equipped[w] = f; else if (d.equipped[w] === f) delete d.equipped[w];
+  if (on) { d.equipped[w] = f; if (w === 'karambit') d.equipped._faca = 'karambit'; else if (w === 'knife') delete d.equipped._faca; } else if (d.equipped[w] === f) delete d.equipped[w];
   profSave(); skinsUI(); skinsChanged();
 }
 // avisa o jogo (arma na mão) e os outros jogadores quando a skin equipada muda
@@ -4723,7 +4813,7 @@ function skinsUI() {
   if (grid) {
     setHTMLm('vGrid', vCategories().map(col => `<div class="vcol">${col.map(([cat, ws]) => `<div class="vcat">${cat}</div>` + ws.map(w => {
       const n = items.filter(it => it.startsWith(w + ':')).length, f = d.equipped[w] || '', rar = f ? SKIN_BY[f].r : -1, url = thumbURL(w, f);
-      return `<div class="vtile" data-w="${w}" style="--rc:${rar >= 0 ? RARITY[rar].css : 'transparent'}">${url ? `<img src="${url}" alt="">` : `<img data-th="${w}:${f}" alt="">`}<b>${esc(itemInfo(w + ':x').wn)}</b>${f ? `<i>${esc(SKIN_BY[f].name)}</i>` : ''}${n ? `<span>${n}</span>` : ''}</div>`;
+      return `<div class="vtile" data-w="${w}" style="--rc:${rar >= 0 ? RARITY[rar].css : 'transparent'}">${url ? `<img src="${url}" alt="">` : `<img data-th="${w}:${f}" alt="">`}<b>${esc(itemInfo(w + ':x').wn)}</b>${isKnife(w) && knifeInUse() === w ? `<i style="color:var(--acc)">em uso${f ? ' · ' + esc(SKIN_BY[f].name) : ''}</i>` : f ? `<i>${esc(SKIN_BY[f].name)}</i>` : ''}${n ? `<span>${n}</span>` : ''}</div>`;
     }).join('')).join('')}</div>`).join(''));
     pvShow(null);
     return;
@@ -4731,7 +4821,8 @@ function skinsUI() {
   const w = SKUI.weap, mine = items.filter(it => it.startsWith(w + ':')).sort((a, b) => itemInfo(b).rar - itemInfo(a).rar);
   const eqDef = !d.equipped[w];
   setHTMLm('skDTitle', esc(itemInfo(w + ':x').wn));
-  setHTMLm('skDCount', mine.length ? `${mine.length} de ${SKINS.length} skins` : 'nenhuma skin ainda — abra caixas!');
+  setHTMLm('skDCount', (mine.length ? `${mine.length} de ${SKINS.length} skins` : 'nenhuma skin ainda — abra caixas!') + (isKnife(w) ? (knifeInUse() === w ? ' · <b style="color:var(--acc)">faca em uso</b>' : ' · <button id="skUseK" style="padding:3px 10px">Usar esta faca</button>') : ''));
+  if ($('#skUseK')) $('#skUseK').onclick = () => { if (w === 'karambit') d.equipped._faca = 'karambit'; else delete d.equipped._faca; profSave(); skinsUI(); skinsChanged(); };
   setHTMLm('skGrid', `<div class="skc${SKUI.sel === 'def:' + w ? ' on' : ''}" data-def="${w}" style="--rc:#5a6070"><div class="sw def"></div><b>Padrão</b><small style="color:#9aa">sem skin</small>${eqDef ? '<i>EQUIPADA</i>' : ''}</div>` + mine.map(it => skCard(it)).join(''));
   if (SKUI.sel && SKUI.sel !== 'def:' + w && !mine.includes(SKUI.sel)) SKUI.sel = null;
   if (!SKUI.sel) SKUI.sel = d.equipped[w] && mine.includes(w + ':' + d.equipped[w]) ? w + ':' + d.equipped[w] : 'def:' + w;
@@ -4753,7 +4844,7 @@ function vCategories() {
     [['Pistolas', ['glock', 'usp', 'p250', 'deagle', 'm1911', 'cz75', 'python']]],
     [['SMGs', ['mp5', 'p90', 'mp40', 'mp5k', 'ak74u']], ['Escopetas', ['nova', 'olympia', 'stakeout', 'spas']]],
     [['Rifles', ['ak47', 'm4', 'm14', 'galil', 'commando', 'fal']]],
-    [['Precisão', ['scout', 'awp', 'dragunov']], ['Pesadas', ['rpk', 'hk21', 'chinalake']], ['Corpo a corpo', ['knife']]],
+    [['Precisão', ['scout', 'awp', 'dragunov']], ['Pesadas', ['rpk', 'hk21', 'chinalake']], ['Corpo a corpo', ['knife', 'karambit']]],
   ].map(col => col.map(([c, ws]) => [c, ws.filter(w => all.includes(w) && !used.has(w) && used.add(w))]).filter(([, ws]) => ws.length));
   const rest = all.filter(w => !used.has(w)); if (rest.length) cols[3].push(['Outras', rest]);
   return cols;
@@ -4927,7 +5018,7 @@ function frame() {
   if (!inGame) { renderer.clear(); return; }
   if (window.__simLock) now = window.__simNow ?? now; else tick(dt); // testes automáticos controlam o tempo
   sky.position.copy(camera.position);
-  if (CFG.gfx === 'alto') composer.render();
+  if (CFG.gfx === 'alto') { gradePass.uniforms.time.value = now % 100; composer.render(); }
   else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); }
 }
 function tick(dt) {
@@ -4946,7 +5037,10 @@ function tick(dt) {
   for (const f of MAP_ANIM) f(dt);
   // câmera
   const w = W[G.cur];
-  let fov = (me.alive && w?.scope && G.scope > 0) ? w.scope[G.scope - 1] : CFG.fov + me.sprintK * 7; // correr abre um pouco o campo de visão
+  const adsT = G.adsHold && me.alive && !G.reloadEnd && !me.sprinting && now >= G.switchEnd && w && !w.scope && (w.slot === 'primary' || w.slot === 'secondary') ? 1 : 0;
+  G.ads = lerp(G.ads || 0, adsT, Math.min(1, dt * 11)); if (G.ads < .002) G.ads = 0;
+  $('#xhair').style.opacity = G.ads > .5 ? 0 : 1; // mirando: a mira de ferro substitui a cruz
+  let fov = (me.alive && w?.scope && G.scope > 0) ? w.scope[G.scope - 1] : CFG.fov * (1 - .2 * G.ads) + me.sprintK * 7; // mirar dá um zoom leve; correr abre um pouco
   fov = Math.round(fov * 10) / 10;
   if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
   me.shake = Math.max(0, me.shake - dt * 1.5);
@@ -4972,7 +5066,7 @@ applyQuality();
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos)
 window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
-  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
+  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>
 </body>

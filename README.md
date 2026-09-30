@@ -71,6 +71,8 @@ Aba **Skins** no menu.
 - **Coleção (estilo Valorant):** todas as armas aparecem ao mesmo tempo, em colunas por categoria (pistolas; SMGs e escopetas; rifles; precisão, pesadas e faca), cada uma desenhada com a skin que está equipada. Clique numa arma para abrir a tela dela: à esquerda as skins que você tem (e a Padrão), no centro a arma em 3D (arraste para girar), e o botão **Equipar**. Os outros jogadores veem a sua skin.
 - **Conta:** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
 
+- **Facas:** além da Faca, tem o **Karambit** (lâmina em garra, com anel). Na Coleção, abra a arma e clique em **Usar esta faca**; equipar uma skin de karambit também já troca a faca.
+
 ### Configurar as contas (Firebase, uma vez só)
 
 Já configurado no projeto `tiroteio-237ee`. Os passos abaixo servem só para refazer em outro projeto.
@@ -112,14 +114,14 @@ Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Mé
 |---|---|
 | W A S D | Mover |
 | Mouse / clique esquerdo | Mirar / atirar |
-| Clique direito | Mira da sniper, facada forte, granada rasteira |
+| Clique direito (segurar) | Mirar pela mira de ferro (zoom leve, mais precisão); na sniper, luneta; na faca, golpe forte; na granada, rasteira |
 | Espaço | Pular (morto: troca quem você assiste) |
 | C | Agachar (Ctrl também funciona, mas Ctrl+W fecha a aba fora da tela cheia) |
 | Shift | Andar em silêncio |
 | R | Recarregar |
 | 1 2 3 4 | Primária, pistola, faca, granadas |
 | Q / roda do mouse | Arma anterior / trocar arma |
-| B | Menu de compra (números escolhem) |
+| B | Loja estilo Valorant: clique na arma ou equipamento para comprar; B ou Esc fecha |
 | F | Zumbis: comprar, abrir porta, usar a caixa; segure para consertar janela e reanimar |
 | V | Zumbis: facada rápida |
 | Shift + W | Zumbis: correr (fôlego limitado, Stamin-Up dobra; atirar interrompe a corrida) |
