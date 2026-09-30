@@ -1,7 +1,7 @@
 # Exporta braços + esqueleto + soquetes das facas + câmera, com as animações assadas (30 fps)
 import bpy, os
 sc = bpy.context.scene
-keep = {'Arms', 'ArmsRig', 'Cam', 'Sock_karambit', 'Sock_knife', 'Spin_karambit', 'Spin_knife'}
+keep = {'Arms', 'ArmsRig', 'Cam', 'Sock_karambit', 'Sock_knife', 'Spin_karambit', 'Spin_knife', 'GunSock_r', 'GunSock_l'}
 for o in bpy.context.view_layer.objects: o.select_set(o.name in keep)
 bpy.context.view_layer.objects.active = bpy.data.objects['ArmsRig']
 out = r'C:\Users\Costa\Claude\tiroteio\assets\arms.glb'
