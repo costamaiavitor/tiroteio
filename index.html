@@ -2444,9 +2444,10 @@ function startSmoke(n) {
 // ================================================================
 const ICE = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' },
-  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'stun:stun.relay.metered.ca:80' },
+  // TURN da Metered (plano grátis): repassa o tráfego quando a ligação direta é bloqueada
+  ...['turn:global.relay.metered.ca:80', 'turn:global.relay.metered.ca:80?transport=tcp', 'turn:global.relay.metered.ca:443', 'turns:global.relay.metered.ca:443?transport=tcp']
+    .map(urls => ({ urls, username: '7e5e8e438db7850a900283eb', credential: 'lsm3R6Mx0fBbhLeX' })),
 ] };
 const NET = { peer: null, isHost: false, code: null, conns: new Map(), hostConn: null, online: false };
 const genCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
@@ -2496,13 +2497,17 @@ function joinRoom(code) {
   status.textContent = 'Conectando...'; status.className = 'status';
   NET.isHost = false;
   const peer = new Peer({ config: ICE, debug: 1 }); NET.peer = peer;
-  let welcomed = false;
+  let welcomed = false, stage = 'server';
   const fail = txt => { if (welcomed) return; status.textContent = txt; status.className = 'status err'; try { peer.destroy(); } catch (e) { } };
-  const timer = setTimeout(() => fail('Tempo esgotado. Confere o código; se persistir, a rede pode estar bloqueando (tente outra rede / 4G).'), 18000);
+  const timer = setTimeout(() => fail(
+    stage === 'server' ? 'Tempo esgotado: não deu pra falar com o servidor de pareamento. Confere a internet.'
+    : stage === 'linking' ? 'Tempo esgotado: a sala existe, mas a rede bloqueou a ligação com o host (firewall, VPN ou Wi-Fi com isolamento).'
+    : 'Tempo esgotado: conectou, mas o host não respondeu. Veja se a sala ainda está aberta.'), 30000);
   peer.on('open', () => {
+    stage = 'linking';
     const conn = peer.connect(PEER_PREFIX + code, { reliable: true });
     NET.hostConn = conn;
-    conn.on('open', () => { conn.send({ t: 'join', name: CFG.name, sk: cleanSk(PROF.data?.equipped) }); });
+    conn.on('open', () => { stage = 'waiting'; conn.send({ t: 'join', name: CFG.name, sk: cleanSk(PROF.data?.equipped) }); });
     conn.on('data', m => { NET.lastHost = performance.now(); if (m.t === 'welcome') { welcomed = true; clearTimeout(timer); NET.code = code; NET.online = true; status.textContent = ''; } onMsg(m); });
     conn.on('close', () => { if (welcomed) lostConnection(); else fail('Conexão recusada'); });
     conn.on('error', () => { if (welcomed) lostConnection(); });
