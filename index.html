@@ -395,6 +395,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { MarchingCubes } from 'three/addons/objects/MarchingCubes.js';
 
 // ================================================================
 // Utilidades
@@ -2251,7 +2252,7 @@ function armMats() {
     g.fillStyle = '#7c7560'; g.fillRect(0, 0, S, S);
     for (const [c, n, r0, r1] of [['#5d6048', 30, 10, 26], ['#8f8467', 26, 8, 20], ['#4a4436', 22, 6, 16], ['#a79d80', 16, 4, 10]])
       for (let i = 0; i < n; i++) { g.fillStyle = c; const x = rand(0, S), y = rand(0, S); for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) { g.beginPath(); g.ellipse(x + dx, y + dy, rand(r0, r1), rand(r0, r1) * .6, rand(0, 3), 0, 7); g.fill(); } }
-    g.globalAlpha = .18; for (let y = 0; y < S; y += 2) { g.fillStyle = y % 4 ? '#000' : '#fff'; g.fillRect(0, y, S, 1); } for (let x = 0; x < S; x += 2) { g.fillStyle = x % 4 ? '#000' : '#fff'; g.fillRect(x, 0, 1, S); } g.globalAlpha = 1;
+    g.globalAlpha = .05; for (let y = 0; y < S; y += 2) { g.fillStyle = y % 4 ? '#000' : '#fff'; g.fillRect(0, y, S, 1); } for (let x = 0; x < S; x += 2) { g.fillStyle = x % 4 ? '#000' : '#fff'; g.fillRect(x, 0, 1, S); } g.globalAlpha = 1;
     noise(g, 14);
   });
   // couro da luva: poros e costuras
@@ -2263,6 +2264,7 @@ function armMats() {
     sleeve: new THREE.MeshStandardMaterial({ map: cloth, color: 0xffffff, metalness: 0, roughness: .95, bumpMap: cloth, bumpScale: 1.2 }),
     cuff: new THREE.MeshStandardMaterial({ map: rib, color: 0x3a3f36, roughness: .92, bumpMap: rib, bumpScale: .8 }),
     watch: new THREE.MeshStandardMaterial({ color: 0x1a1b1d, metalness: .6, roughness: .35 }),
+    fist: new THREE.MeshStandardMaterial({ map: leather, color: 0x34302b, metalness: .05, roughness: .58, bumpMap: leather, bumpScale: .35 }),
     face: new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7dff9a).multiplyScalar(.6) }),
     shell: new THREE.MeshStandardMaterial({ color: 0xa82020, roughness: .5 }), brass: new THREE.MeshStandardMaterial({ color: 0xcaa24a, metalness: 1, roughness: .3 }),
   };
@@ -2301,40 +2303,57 @@ function rightHand(A) { // mão no punho da arma: dedos dando a volta pela frent
 // Punho fechado em volta de um cabo (eixo y local, origem no centro do cabo).
 // Cada dedo é um arco (pedaço de toro) que abraça o cabo: começa no nó do dedo, passa pela frente (+z) e a ponta
 // entra na palma. Dorso e palma são elipsoides colados nos arcos, então não sobra vão nem "salsicha" reta.
-function fistHand(A, o) {
-  const h = new THREE.Group(), R = o.R, deg = Math.PI / 180, a0 = (o.a0 ?? -35) * deg, a1 = (o.a1 ?? 200) * deg, arc = a1 - a0;
-  const ell = (x, y, z, sx, sy, sz, ry, mat = A.glove) => { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.y = ry; h.add(m); return m; };
-  const at = (a, rr, y) => [Math.cos(a) * rr, y, Math.sin(a) * rr];
-  const fy = o.fy, top = fy[0], bot = fy[fy.length - 1], mid = (top + bot) / 2, span = top - bot;
+// Punho fechado gerado como UMA malha orgânica (metaballs + marching cubes): dedos, nós, palma, dorso, polegar e
+// pulso são bolinhas de campo que se fundem suavemente — some a cara de "tubos empilhados". Eixo y = cabo.
+// A malha é feita uma vez por tipo de faca e reaproveitada.
+const FIST_GEO = {};
+function fistGeo(key, R, fy) {
+  if (FIST_GEO[key]) return FIST_GEO[key];
+  const res = 60, C = new V3(.004, (fy[0] + fy[3]) / 2 - .006, -.004), Hs = .082, ISO = 80, SUB = 55;
+  const mcb = new MarchingCubes(res, new THREE.MeshBasicMaterial(), true, false, 60000); mcb.isolation = ISO; mcb.reset();
+  const ball = (x, y, z, r) => { const d = r / (2 * Hs); mcb.addBall(.5 + (x - C.x) / (2 * Hs), .5 + (y - C.y) / (2 * Hs), .5 + (z - C.z) / (2 * Hs), d * d * (ISO + SUB), SUB); };
+  const deg = Math.PI / 180, a0 = -38 * deg, a1 = 196 * deg, top = fy[0], bot = fy[3], mid = (top + bot) / 2;
+  const at = (a, rr, y, r) => ball(Math.cos(a) * rr, y, Math.sin(a) * rr, r);
+  // dedos: arcos abraçando o cabo, afinando para a ponta; nó do dedo mais grosso
   fy.forEach((y, i) => {
-    const r = [.0088, .0093, .009, .0079][i], rr = R + r * .7, a1i = a1 - (i === 3 ? 10 * deg : 0);
-    const g = new THREE.Group(); g.position.y = y; g.rotation.y = -a0; h.add(g);
-    const t = new THREE.Mesh(new THREE.TorusGeometry(rr, r, 12, 30, a1i - a0), A.glove); t.rotation.x = Math.PI / 2; g.add(t);
-    const loc = a => [Math.cos(a) * rr, 0, Math.sin(a) * rr];
-    const kn = new THREE.Mesh(new THREE.SphereGeometry(r * 1.14, 12, 10), A.glove); kn.position.set(...loc(0)); g.add(kn); // nó do dedo
-    const pip = new THREE.Mesh(new THREE.SphereGeometry(r * 1.05, 12, 10), A.glove); pip.position.set(...loc(arc * .42)); g.add(pip); // junta do meio
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(r * .96, 12, 10), A.glove); tip.position.set(...loc(a1i - a0)); g.add(tip);
+    const r = [.0086, .0091, .0088, .0077][i], rr = R + r * .8, end = a1 - (i === 3 ? 14 : i === 0 ? 4 : 0) * deg;
+    for (let a = a0; a <= end; a += 7 * deg) { const t = (a - a0) / (end - a0); at(a, rr + (t < .15 ? .002 : 0), y, r * (1.12 - t * .2)); }
   });
-  // dorso da mão, atrás dos nós; palma do outro lado, fechando o punho; protetor dos nós por cima do dorso
-  const ab = a0 - 22 * deg, ap = a1 + 55 * deg;
-  ell(...at(ab, R + .016, mid), .014, span / 2 + .012, .03, -ab);
-  ell(...at(ap, R + .008, mid - .004), .012, span / 2 + .01, .026, -ap);
-  const pad = new THREE.Mesh(new RoundedBoxGeometry(.008, span + .006, .03, 2, .003), A.pad); pad.position.set(...at(ab, R + .03, mid)); pad.rotation.y = -ab; h.add(pad);
-  // polegar: sai da palma e trava por cima do indicador
-  finger(h, [at(ap + 8 * deg, R + .011, bot + .006), at(ap - 20 * deg, R + .014, mid + .008), at(a1 + 16 * deg, R + .014, top - .002), at(a1 - 4 * deg, R + .012, top - .006)], .0094, A.glove); // polegar por trás, encostando no indicador
-  h.userData.wrist = at(ab + 12 * deg, R + .008, bot - .012);
+  // dorso da mão (atrás dos nós) e palma (do outro lado), cobrindo as pontas dos dedos
+  for (let y = bot - .008; y <= top + .004; y += .006) {
+    for (const [a, rr, r] of [[-62, R + .014, .0125], [-50, R + .02, .011], [-78, R + .012, .012], [-95, R + .01, .011]]) at(a * deg, rr, y, r);
+    for (const [a, rr, r] of [[228, R + .008, .011], [250, R + .009, .012], [272, R + .009, .012], [206, R + .007, .0095]]) at(a * deg, rr, y, r);
+  }
+  // polegar: sai da base da palma e deita por cima do indicador
+  const th = [[262, R + .012, bot - .002, .0115], [245, R + .015, mid + .004, .0108], [226, R + .015, top - .004, .0102], [206, R + .014, top + .003, .0096], [188, R + .012, top + .004, .009]];
+  for (let i = 0; i + 1 < th.length; i++) for (let k = 0; k < 3; k++) { const t = k / 3, A = th[i], B = th[i + 1]; at(lerp(A[0], B[0], t) * deg, lerp(A[1], B[1], t), lerp(A[2], B[2], t), lerp(A[3], B[3], t)); }
+  // pulso: sai da base do dorso/palma e desce até o punho da luva
+  const W0 = new V3(Math.cos(-75 * deg) * (R + .004), bot - .012, Math.sin(-75 * deg) * (R + .004));
+  for (let k = 0; k < 6; k++) ball(W0.x + k * .0035, W0.y - k * .005, W0.z + k * .0012, .02 - k * .0006);
+  mcb.update();
+  const n = mcb.count, geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(mcb.positionArray.slice(0, n * 3), 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(mcb.normalArray.slice(0, n * 3), 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(mcb.uvArray.slice(0, n * 2), 2));
+  geo.scale(Hs, Hs, Hs); geo.translate(C.x, C.y, C.z);
+  mcb.geometry.dispose();
+  geo.userData.keep = true; geo.userData.wrist = [W0.x + 5 * .0035, W0.y - 5 * .005, W0.z + 5 * .0012];
+  return (FIST_GEO[key] = geo);
+}
+function fistHand(A, o) {
+  const h = new THREE.Group(), geo = fistGeo(o.key, o.R, o.fy);
+  const m = new THREE.Mesh(geo, A.fist); h.add(m);
+  h.userData.wrist = geo.userData.wrist;
   return h;
 }
 function knifeHand(A) { // faca em pé: índice em cima encostado na guarda, dedos virados para a câmera
-  const h = new THREE.Group();
-  const f = fistHand(A, { R: .0205, fy: [.04, .02, .0, -.019] }); f.scale.setScalar(1.12); h.add(f); // mão um pouco maior: cobre bem o cabo
-  forearm(h, [.024, -.03, -.014], [.8, -1, .45], .52, A, false);
+  const h = new THREE.Group(), f = fistHand(A, { key: 'faca', R: .0205, fy: [.04, .02, .0, -.019] }); f.scale.setScalar(1.12); h.add(f);
+  const w = f.userData.wrist; forearm(h, [w[0] * 1.12, w[1] * 1.12, w[2] * 1.12], [.8, -1, .45], .52, A, false);
   return h;
 }
 function karambitHand(A) { // karambit (como no CS2): cabo em pé, indicador no anel em cima, dedos virados para a câmera
-  const h = new THREE.Group();
-  const f = fistHand(A, { R: .018, fy: [.047, .024, .005, -.013] }); h.add(f);
-  forearm(h, [.02, -.034, -.012], [.8, -1, .45], .52, A, false);
+  const h = new THREE.Group(), f = fistHand(A, { key: 'karambit', R: .018, fy: [.047, .026, .007, -.011] }); h.add(f);
+  forearm(h, f.userData.wrist, [.8, -1, .45], .52, A, false);
   return h;
 }
 function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo, dedos subindo pelo lado direito
@@ -2347,7 +2366,7 @@ function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo,
   return h;
 }
 function vmSetWeapon(id) {
-  if (vmGun) { vmRoot.remove(vmGun); vmGun.traverse(o => o.geometry?.dispose()); }
+  if (vmGun) { vmRoot.remove(vmGun); vmGun.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); }
   vmGun = new THREE.Group();
   const mid = knifeModelOf(id, PROF.data?.equipped), gun = gunModel(mid, true, skinOf(mid)), ud = gun.userData, A = armMats(); vmGun.add(gun);
   gun.updateMatrixWorld(true); ud.sightY = new THREE.Box3().setFromObject(gun).max.y; // topo da arma = altura da mira
