@@ -4558,6 +4558,15 @@ const FIREBASE_CONFIG = {
   appId: '1:226278812286:web:c967aee2e976fc5e61862f',
 };
 const XP_CASE = 300; // XP para ganhar uma caixa
+const OWNERS = ['costamaiavitor@gmail.com']; // contas que recebem todas as skins ao entrar
+function grantAllSkins() {
+  const d = PROF.data; if (!d) return 0;
+  const before = d.items.length, all = [];
+  for (const w of SKIN_WEAPONS()) for (const f of SKINS) all.push(w + ':' + f.id);
+  d.items = [...new Set([...d.items, ...all])];
+  if (d.items.length > before) { profSave(true); PROF.status = `Conta do dono: todas as ${d.items.length} skins liberadas.`; }
+  return d.items.length - before;
+}
 const PROF = { uid: null, email: '', name: '', cloud: false, fb: false, data: null, saveT: 0, status: '' };
 const FB = {};
 const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0 });
@@ -4608,6 +4617,7 @@ async function profOnUser(u) {
       if (guest) save('prof.guest', newProfile(0));
     }
     PROF.cloud = true; PROF.status = ''; save(profKey(), PROF.data);
+    if (OWNERS.includes((u.email || '').toLowerCase())) grantAllSkins(); // conta do dono: todas as skins
   } catch (e) {
     console.warn('ler conta', e); profLoadLocal();
     PROF.status = 'Não consegui ler sua conta (' + (e.code || e.message) + '). Confira as regras do Firestore.';
@@ -4952,7 +4962,7 @@ applyQuality();
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos)
 window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
-  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
+  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>
 </body>
