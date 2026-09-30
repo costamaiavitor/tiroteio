@@ -2029,7 +2029,7 @@ function gunModel(id, fp = false, skin = null) {
       add(g, EX([[-.004, .038], [.006, .038], [.006, -.012], [-.004, -.012]], .04, null, .002), M.steel, 0, -.004, -.012);
       add(g, EX([[.0, .03], [.0, -.004], [-.03, -.006], ['q', -.045, .004, -.06, -.006], [-.105, -.008], [-.112, .0], [-.112, .03], [-.06, .034], ['q', -.045, .026, -.03, .034]], .024, null, .004), M.polymer, 0, -.004, -.012);
       add(g, EX([[-.112, .002], [-.122, .004], [-.122, .026], [-.112, .03]], .026), M.steel, 0, -.004, -.012);
-      ud.rig = 'none'; ud.rh = new V3(0, .006, .05); mz = 0; my = 0;
+      ud.rig = 'none'; ud.rh = new V3(0, .006, .05); ud.vm = [-.01, .005, .02]; mz = 0; my = 0;
       break;
     }
     case 'nade': {
@@ -2216,6 +2216,7 @@ function vmSetWeapon(id) {
     const sh = new THREE.Mesh(new THREE.CylinderGeometry(.0105, .0105, .06, 10), m === 'launcher' ? A.brass : A.shell); sh.rotation.x = Math.PI / 2; sh.position.set(0, .01, -.01); sh.visible = false; lh.add(sh);
     ud.lhG = lh; ud.lhRest = lh.position.clone(); ud.handShell = sh;
   }
+  if (m === 'knife') gun.rotation.set(1.05, .18, -.22); // faca em pé, lâmina para cima e um pouco para a frente, como no CS
   vmGun.scale.setScalar(1.18); vmGun.rotation.y = .05; // arma maior e levemente virada para dentro, como nos FPS grandes
   vmRoot.add(vmGun);
 }
