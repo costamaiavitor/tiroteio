@@ -1817,7 +1817,9 @@ function gunMats(pap, fp, skin) {
     glowB: new THREE.MeshBasicMaterial({ color: new THREE.Color(0x66ccff).multiplyScalar(3) }),
     dot: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff2020).multiplyScalar(4) }),
     trit: new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7dff6a).multiplyScalar(2.6) }), // pontos de trítio das miras de ferro
-    holoGlass: new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: .1, depthWrite: false }),
+    optic: mk({ color: 0x1c1e22, metalness: .45, roughness: .5 }), // corpo da mira holográfica (a skin não pinta)
+    reticle: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff3030).multiplyScalar(1.5) }),
+    holoGlass: new THREE.MeshBasicMaterial({ color: 0x7fb8e0, transparent: true, opacity: .05, depthWrite: false }),
     shell: mk({ color: 0xa82020, metalness: .2, roughness: .5 }),
   };
   return (GM[key] = M);
@@ -1843,17 +1845,18 @@ function gunModel(id, fp = false, skin = null) {
   // carregador curvo ("banana"): começa no topo (0,0) e desce curvando para a frente
   const banana = (L, R, w, w2 = w) => { const f = [], b = [], n = 10; for (let i = 0; i <= n; i++) { const t = i / n, th = t * L / R, cu = R * (1 - Math.cos(th)), cv = -R * Math.sin(th), ww = lerp(w, w2, t) / 2, nu = Math.cos(th), nv = Math.sin(th); f.push([cu + nu * ww, cv + nv * ww]); b.push([cu - nu * ww, cv - nv * ww]); } return f.concat(b.reverse()); };
   const rail = (par, x, y, z, len) => { add(par, RB(.022, .008, len, .001), M.metal, x, y, z); const n = Math.floor(len / .012); for (let k = 0; k < n; k++) add(par, new THREE.BoxGeometry(.024, .004, .005), M.metal, x, y + .006, z - len / 2 + .006 + k * .012); };
-  const holo = (par, x, y, z) => { // mira holográfica: armação vazada (dá para ver através), vidro leve e retícula vermelha brilhante
-    const Wd = .046, H = .034, t = .005, D = .036, yc = y + .014 + H / 2;
-    add(par, RB(.032, .014, .062, .003), M.polymer, x, y + .007, z);
-    add(par, RB(Wd, t, D, .002), M.polymer, x, yc + H / 2 - t / 2, z); add(par, RB(Wd, t + .002, D, .002), M.polymer, x, yc - H / 2 + t / 2, z);
-    for (const s2 of [-1, 1]) add(par, RB(t, H, D, .002), M.polymer, x + s2 * (Wd / 2 - t / 2), yc, z);
-    add(par, RB(.01, .008, .022, .002), M.dark, x + Wd / 2 + .004, yc - .008, z + .004); add(par, RB(.01, .008, .022, .002), M.dark, x - Wd / 2 - .004, yc - .008, z + .004); // botões
+  const holo = (par, x, y, z) => { // mira holográfica (tipo EOTech): armação fina vazada, vidro quase invisível, retícula fina (anel + ponto)
+    const Wd = .042, H = .03, t = .0035, D = .034, yc = y + .014 + H / 2, O = M.optic;
+    add(par, RB(.03, .014, .06, .003), O, x, y + .007, z);
+    add(par, RB(Wd + .004, t + .002, D + .004, .0015), O, x, yc + H / 2 - t / 2, z); // capuz
+    add(par, RB(Wd, t, D, .0015), O, x, yc - H / 2 + t / 2, z);
+    for (const s2 of [-1, 1]) add(par, RB(t, H, D, .0015), O, x + s2 * (Wd / 2 - t / 2), yc, z);
+    add(par, RB(.008, .007, .02, .002), M.dark, x + Wd / 2 + .004, yc - .008, z + .004); add(par, RB(.008, .007, .02, .002), M.dark, x - Wd / 2 - .004, yc - .008, z + .004); // botões
     const gl = add(par, new THREE.PlaneGeometry(Wd - 2 * t, H - 2 * t), M.holoGlass, x, yc, z - D / 2 + .003); gl.renderOrder = 2;
-    const rz = z - D / 2 + .005;
-    add(par, new THREE.SphereGeometry(.0009, 8, 6), M.dot, x, yc, rz);
-    add(par, new THREE.TorusGeometry(.0068, .0004, 6, 36), M.dot, x, yc, rz); // anel da retícula
-    for (const [dx, dy] of [[0, .0088], [0, -.0088], [.0088, 0], [-.0088, 0]]) add(par, new THREE.BoxGeometry(dy ? .0004 : .002, dy ? .002 : .0004, .0003), M.dot, x + dx, yc + dy, rz);
+    const rz = z - D / 2 + .005, Rt = M.reticle;
+    add(par, new THREE.CircleGeometry(.00055, 12), Rt, x, yc, rz); // ponto central (1 MOA)
+    add(par, new THREE.RingGeometry(.0052, .0056, 48), Rt, x, yc, rz); // anel de 65 MOA
+    for (const [dx, dy] of [[0, .0056], [0, -.0056], [.0056, 0], [-.0056, 0]]) add(par, new THREE.PlaneGeometry(dy ? .00035 : .0014, dy ? .0014 : .00035), Rt, x + dx * 1.12, yc + dy * 1.12, rz); // marcas no anel
     ud.sight = new V3(x, yc, rz); ud.sightR = z + D / 2;
   };
   // mira de ferro: alça (anel de abertura ou entalhe) atrás e massa (poste com orelhas de proteção) na frente, com ponto de trítio
@@ -2019,7 +2022,8 @@ function gunModel(id, fp = false, skin = null) {
       if (!fal) for (const s of [-1, 1]) { rail(g, s * .029, .032, -.2, .18); } else for (let i = 0; i < 5; i++) add(g, new THREE.BoxGeometry(.052, .012, .01), M.dark, 0, .03, -(.13 + i * .03));
       rail(g, 0, .062, -.09, .36);
       if (fal) add(g, EX([[-.006, 0], [.006, 0], [.006, .03], [-.006, .03]], .012), M.metal, 0, .066, .06); else holo(g, 0, .066, -.005);
-      add(g, EX([[.0, .0], [.0, .03], [.008, .05], [.016, .05], [.024, .03], [.024, .0]], .02), M.metal, 0, .066, -.295);
+      if (fal) add(g, EX([[.0, .0], [.0, .03], [.008, .05], [.016, .05], [.024, .03], [.024, .0]], .02), M.metal, 0, .066, -.295);
+      else add(g, EX([[.0, .0], [.0, .004], [.03, .004], [.03, .0]], .018, null, .001), M.dark, 0, .064, -.3); // massa rebatida, baixinha (não aparece na janela da holográfica)
       add(g, CY(.008, .14, 12), M.metal, 0, .032, -.37); add(g, CY(.011, .045, 10), M.dark, 0, .032, -.46);
       for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + .78; add(g, new THREE.BoxGeometry(.003, .003, .03), M.metal, Math.cos(a) * .012, .032 + Math.sin(a) * .012, -.46); }
       bore(0, .032, -.4825, .006); mz = -.485; my = .032;
