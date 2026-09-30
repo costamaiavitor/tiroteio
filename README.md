@@ -114,7 +114,7 @@ Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Mé
 |---|---|
 | W A S D | Mover |
 | Mouse / clique esquerdo | Mirar / atirar |
-| Clique direito (segurar) | Mirar pela mira de ferro (zoom leve, mais precisão); na sniper, luneta; na faca, golpe forte; na granada, rasteira |
+| Clique direito (segurar) | Mirar: a arma encosta no rosto e a mira dela fica no centro da tela (pistolas com 3 pontos luminosos, fuzis com anel de abertura e massa, M4/P90 com holográfica de anel e ponto, escopetas com conta). Zoom leve e mais precisão. Na sniper, luneta; na faca, golpe forte; na granada, rasteira |
 | Espaço | Pular (morto: troca quem você assiste) |
 | C | Agachar (Ctrl também funciona, mas Ctrl+W fecha a aba fora da tela cheia) |
 | Shift | Andar em silêncio |

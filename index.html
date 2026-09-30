@@ -1793,7 +1793,7 @@ function gunMats(pap, fp, skin) {
   const f = !pap && skin ? SKIN_BY[skin] : null;
   const key = (pap ? 'p' : 'n') + (fp ? 'f' : 't') + (f ? f.id : ''); if (GM[key]) return GM[key];
   const T = gunTextures();
-  const mk = o => { if (fp) { const m = new THREE.MeshStandardMaterial({ ...o }); m.userData.env = (o.metalness ?? 0) > .5 ? 1 : .35; m.envMapIntensity = VM_ENV * m.userData.env; return m; } const { metalness, roughness, roughnessMap, ...rest } = o; return new THREE.MeshLambertMaterial(rest); };
+  const mk = o => { if (fp) { const metal = (o.metalness ?? 0) > .5, m = metal ? new THREE.MeshPhysicalMaterial({ ...o, clearcoat: .35, clearcoatRoughness: .35 }) : new THREE.MeshStandardMaterial({ ...o }); m.userData.env = metal ? 1 : .35; m.envMapIntensity = VM_ENV * m.userData.env; return m; } const { metalness, roughness, roughnessMap, ...rest } = o; return new THREE.MeshLambertMaterial(rest); };
   const camo = pap ? mk({ map: T.pap, emissiveMap: T.papGlow, emissive: new THREE.Color(0xffffff).multiplyScalar(fp ? 1.6 : 1), metalness: .55, roughness: .35 }) : null;
   const sk = f ? skinMats(f, mk, fp) : null, A = sk?.a, Bm = sk?.b; // skin: 'a' no metal do corpo, 'b' (mais escuro) no polímero/madeira
   const M = {
@@ -1816,6 +1816,8 @@ function gunMats(pap, fp, skin) {
     glowG: new THREE.MeshBasicMaterial({ color: new THREE.Color(pap ? 0xff3355 : 0x44ff77).multiplyScalar(3) }),
     glowB: new THREE.MeshBasicMaterial({ color: new THREE.Color(0x66ccff).multiplyScalar(3) }),
     dot: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff2020).multiplyScalar(4) }),
+    trit: new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7dff6a).multiplyScalar(2.6) }), // pontos de trítio das miras de ferro
+    holoGlass: new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: .1, depthWrite: false }),
     shell: mk({ color: 0xa82020, metalness: .2, roughness: .5 }),
   };
   return (GM[key] = M);
@@ -1841,10 +1843,37 @@ function gunModel(id, fp = false, skin = null) {
   // carregador curvo ("banana"): começa no topo (0,0) e desce curvando para a frente
   const banana = (L, R, w, w2 = w) => { const f = [], b = [], n = 10; for (let i = 0; i <= n; i++) { const t = i / n, th = t * L / R, cu = R * (1 - Math.cos(th)), cv = -R * Math.sin(th), ww = lerp(w, w2, t) / 2, nu = Math.cos(th), nv = Math.sin(th); f.push([cu + nu * ww, cv + nv * ww]); b.push([cu - nu * ww, cv - nv * ww]); } return f.concat(b.reverse()); };
   const rail = (par, x, y, z, len) => { add(par, RB(.022, .008, len, .001), M.metal, x, y, z); const n = Math.floor(len / .012); for (let k = 0; k < n; k++) add(par, new THREE.BoxGeometry(.024, .004, .005), M.metal, x, y + .006, z - len / 2 + .006 + k * .012); };
-  const holo = (par, x, y, z) => { // mira holográfica: base, capuz com janela e ponto vermelho brilhante
-    add(par, RB(.03, .012, .06, .003), M.polymer, x, y + .006, z);
-    add(par, EX([[-.028, .0], [.028, .0], [.028, .036], [.02, .042], [-.022, .042], [-.028, .036]], .034, [[[-.02, .006], [.022, .006], [.022, .034], [-.02, .034]]]), M.polymer, x, y + .01, z);
-    add(par, new THREE.PlaneGeometry(.04, .028), M.glass, x, y + .03, z + .01); add(par, new THREE.SphereGeometry(.0016, 6, 4), M.dot, x, y + .03, z + .006);
+  const holo = (par, x, y, z) => { // mira holográfica: armação vazada (dá para ver através), vidro leve e retícula vermelha brilhante
+    const Wd = .046, H = .034, t = .005, D = .036, yc = y + .014 + H / 2;
+    add(par, RB(.032, .014, .062, .003), M.polymer, x, y + .007, z);
+    add(par, RB(Wd, t, D, .002), M.polymer, x, yc + H / 2 - t / 2, z); add(par, RB(Wd, t + .002, D, .002), M.polymer, x, yc - H / 2 + t / 2, z);
+    for (const s2 of [-1, 1]) add(par, RB(t, H, D, .002), M.polymer, x + s2 * (Wd / 2 - t / 2), yc, z);
+    add(par, RB(.01, .008, .022, .002), M.dark, x + Wd / 2 + .004, yc - .008, z + .004); add(par, RB(.01, .008, .022, .002), M.dark, x - Wd / 2 - .004, yc - .008, z + .004); // botões
+    const gl = add(par, new THREE.PlaneGeometry(Wd - 2 * t, H - 2 * t), M.holoGlass, x, yc, z - D / 2 + .003); gl.renderOrder = 2;
+    const rz = z - D / 2 + .005;
+    add(par, new THREE.SphereGeometry(.0009, 8, 6), M.dot, x, yc, rz);
+    add(par, new THREE.TorusGeometry(.0068, .0004, 6, 36), M.dot, x, yc, rz); // anel da retícula
+    for (const [dx, dy] of [[0, .0088], [0, -.0088], [.0088, 0], [-.0088, 0]]) add(par, new THREE.BoxGeometry(dy ? .0004 : .002, dy ? .002 : .0004, .0003), M.dot, x + dx, yc + dy, rz);
+    ud.sight = new V3(x, yc, rz); ud.sightR = z + D / 2;
+  };
+  // mira de ferro: alça (anel de abertura ou entalhe) atrás e massa (poste com orelhas de proteção) na frente, com ponto de trítio
+  const irons = (y, zr, zf, o = {}) => {
+    const hb = o.base ?? .012; // altura do suporte até a linha de mira
+    if (o.notch) { // entalhe em U (pistola/revólver)
+      add(g, new THREE.BoxGeometry(.014, hb - .005, .008), M.dark, 0, y - hb / 2 - .0025, zr);
+      for (const s2 of [-1, 1]) add(g, new THREE.BoxGeometry(.0048, .005, .008), M.dark, s2 * .0046, y - .0025, zr); // entalhe em U: vão de 4 mm
+      for (const s2 of [-1, 1]) add(g, new THREE.SphereGeometry(.0012, 8, 6), M.trit, s2 * .0045, y - .003, zr + .0042);
+    } else { // anel de abertura (fuzil/SMG)
+      add(g, RB(.016, hb - .006, .012, .002), M.dark, 0, y - hb / 2 - .004, zr);
+      add(g, new THREE.TorusGeometry(.0058, .0024, 8, 20), M.dark, 0, y, zr);
+      for (const s2 of [-1, 1]) add(g, RB(.003, .014, .012, .001), M.dark, s2 * .0095, y - .002, zr); // orelhas da alça
+    }
+    const fb = o.fbase ?? hb;
+    add(g, RB(.012, fb - .004, .01, .002), M.dark, 0, y - fb / 2 - .002, zf); // base da massa
+    add(g, new THREE.BoxGeometry(.0026, .01, .003), M.dark, 0, y - .005, zf); // poste
+    add(g, new THREE.SphereGeometry(.0012, 8, 6), M.trit, 0, y - .0012, zf + .0016);
+    if (!o.notch) for (const s2 of [-1, 1]) add(g, RB(.0026, .016, .008, .001), M.dark, s2 * .0082, y - .002, zf); // orelhas da massa
+    ud.sight = new V3(0, y, zf); ud.sightR = zr;
   };
   const scope = (par, x, y, z, len, r) => {
     add(par, CY(r, len, 18), M.metal, x, y, z); add(par, CY(r * 1.05, .07, 18, r * 1.55), M.metal, x, y, z - len / 2 - .03); add(par, CY(r * 1.4, .05, 18, r * 1.05), M.metal, x, y, z + len / 2 + .02);
@@ -1867,7 +1896,7 @@ function gunModel(id, fp = false, skin = null) {
     add(slide, EX([[-h, -sh], [-h, sh - .005], [-h + .01, sh], [h - .016, sh], [h, sh - .008], [h, -sh]], o.sw), o.slideM);
     for (let k = 0; k < 7; k++) add(slide, new THREE.BoxGeometry(o.sw + .002, sh * 1.3, .0022), M.dark, 0, -.001, h - .01 - k * .0055);
     add(slide, EX([[-.003, 0], [.003, 0], [.002, .008], [-.002, .008]], .004), M.dark, 0, sh, -h + .01);
-    add(slide, EX([[-.006, 0], [.006, 0], [.006, .008], [.002, .008], [.002, .004], [-.002, .004], [-.002, .008], [-.006, .008]], .018), M.dark, 0, sh, h - .01);
+    add(slide, new THREE.BoxGeometry(.018, .004, .009), M.dark, 0, sh + .002, h - .01); for (const s2 of [-1, 1]) add(slide, new THREE.BoxGeometry(.0065, .0042, .009), M.dark, s2 * .00575, sh + .0061, h - .01); // alça com entalhe
     add(slide, new THREE.BoxGeometry(.002, sh * .9, .042), M.dark, o.sw / 2 + .0006, sh * .15, -.014); // janela de ejeção
     if (o.rib) add(slide, EX([[-h + .02, 0], [h - .02, 0], [h - .02, .007], [-h + .026, .007]], .012), o.slideM, 0, sh, 0);
     add(g, EX([[-.03, fy], [o.fl, fy], [o.fl, fy - .012], [.064, fy - .012], [.05, fy - .018], [.032, fy - .05], [-.002, fy - .05], [-.016, fy - .03], [-.03, fy - .022]], o.sw - .003, [[[.004, fy - .02], [.044, fy - .02], [.028, fy - .043], [.004, fy - .043]]]), o.frameM);
@@ -1879,6 +1908,9 @@ function gunModel(id, fp = false, skin = null) {
     const mag = grp(g, 0, fy - .122 * gs, .044 * gs); add(mag, RB(o.sw + .006, .012, .052 * gs, .003), M.dark); add(mag, new THREE.BoxGeometry(.02, .09, .032), M.metal, 0, .05, -.008, -.2);
     ud.mag = mag; ud.slide = slide; ud.pistol = 1; ud.magGrab = new V3(0, fy - .14 * gs, .044 * gs);
     ud.rh = new V3(0, fy - .06 * gs, .034 * gs); ud.lh = new V3(-.021, fy - .075 * gs, .03); my = sy + .004; mz = -o.sz - h - .012; ud.vm = [.012, .012, -.03];
+    add(slide, new THREE.SphereGeometry(.0012, 8, 6), M.trit, 0, sh + .0058, -h + .0122); // ponto da massa
+    for (const s2 of [-1, 1]) add(slide, new THREE.SphereGeometry(.0011, 8, 6), M.trit, s2 * .0058, sh + .0055, h - .0055); // pontos da alça
+    ud.sight = new V3(0, sy + sh + .0072, -o.sz - h + .01); ud.sightR = -o.sz + h - .01;
   };
   switch (model) {
     case 'pistol': {
@@ -1900,6 +1932,7 @@ function gunModel(id, fp = false, skin = null) {
       add(g, EX([[-.03, .003], [-.004, -.012], ['q', .002, -.06, -.02, -.105], [-.064, -.105], ['q', -.074, -.04, -.03, .003]], .033, null, .004), M.woodDark);
       add(g, EX([[.014, -.004], [.02, -.004], ['q', .022, -.016, .014, -.026], [.009, -.024], ['q', .014, -.014, .014, -.004]], .006), M.dark);
       ud.cyl = cyl; ud.rig = 'revolver'; mz = -.25; my = .047;
+      irons(.074, -.022, -.232, { notch: 1, base: .012, fbase: .012 });
       ud.lh = new V3(-.021, -.06, .03); ud.rh = new V3(0, -.05, .038); ud.vm = [.012, .012, -.03];
       break;
     }
@@ -1911,7 +1944,6 @@ function gunModel(id, fp = false, skin = null) {
       add(g, EX(k ? [[fr, -.01], [fr, .05], [fr + .08, .05], [fr + .088, .04], [fr + .088, .0], [fr + .07, -.01]] : [[fr, -.014], [fr, .052], [fr + .1, .05], ['q', fr + .115, .045, fr + .112, .03], [fr + .112, .0], [fr + .09, -.016]], .05, null, .004), M.polymer);
       for (let i = 0; i < 4; i++) add(g, new THREE.BoxGeometry(.052, .003, .006), M.dark, 0, .0, -(fr + .02 + i * .02));
       add(g, new THREE.TorusGeometry(.013, .003, 6, 14), M.metal, 0, .07, -(fr + (k ? .13 : .17))); add(g, RB(.006, .02, .008, .001), M.metal, 0, .077, -(fr + (k ? .13 : .17)));
-      add(g, CY(.014, .02, 14), M.metal, 0, .07, .075); add(g, EX([[.0, .0], [.01, .0], [.01, .02], [.0, .02]], .024), M.metal, 0, .058, .062);
       if (sd) { add(g, CY(.021, .22, 18), M.dark, 0, .028, -.26); bore(0, .028, -.37, .006); mz = -.375; }
       else { const fz = k ? .2 : .26; add(g, CY(.009, .05, 12), M.metal, 0, .028, -fz); add(g, CY(.012, .022, 12), M.dark, 0, .028, -fz - .03); bore(0, .028, -fz - .041, .005); mz = -fz - .042; }
       const mag = grp(g, 0, -.012, -.044); add(mag, EX(banana(.16, .45, .036, .032), .026), M.metal); ud.mag = mag;
@@ -1919,6 +1951,7 @@ function gunModel(id, fp = false, skin = null) {
       if (k) { add(g, EX([[fr + .04, -.01], [fr + .07, -.01], ['q', fr + .068, -.05, fr + .064, -.08], [fr + .038, -.08], ['q', fr + .04, -.05, fr + .04, -.01]], .028, null, .004), M.polymer); ud.lh = new V3(-.005, -.055, -(fr + .052)); }
       else { for (const s of [-1, 1]) add(g, CY(.004, .2, 8), M.metal, s * .016, .034, .16); add(g, EX([[-.27, .06], [-.25, .06], [-.25, -.035], [-.27, -.035]], .05, null, .004), M.polymer); ud.lh = new V3(-.005, -.012, -(fr + .055)); }
       my = .028; ud.magGrab = new V3(0, -.15, -.07);
+      irons(.074, .05, -(fr + (k ? .13 : .17)), { base: .016, fbase: .012 });
       break;
     }
     case 'mp40': {
@@ -1933,6 +1966,7 @@ function gunModel(id, fp = false, skin = null) {
       grip(g, -.075, -.005, .085, M.bakelite); guard(g, -.02, -.005);
       add(g, EX([[-.08, .02], [-.3, .005], [-.31, .0], [-.31, -.06], [-.3, -.065], [-.27, -.06], [-.27, -.012], [-.1, .005], [-.08, .005]], .012, [[[-.26, .0], [-.12, .01], [-.12, .012], [-.26, -.002]]]), M.metal);
       mz = -.33; my = .028; ud.lh = new V3(-.005, -.065, -.1); ud.magGrab = new V3(0, -.24, -.1);
+      irons(.066, -.03, -.29, { notch: 1, base: .014, fbase: .02 });
       break;
     }
     case 'p90': {
@@ -1973,6 +2007,7 @@ function gunModel(id, fp = false, skin = null) {
       if (!short) add(g, EX([[-.377, .012], [-.387, .012], [-.387, -.074], [-.377, -.078]], .044), M.metal);
       if (lmg) { for (const s of [-1, 1]) add(g, CY(.004, .22, 8), M.metal, s * .013, .0, -(b0 + .12), -.12); add(g, EX([[-.04, .0], [.04, .0], [.03, .04], [-.03, .04]], .012), M.metal, 0, .062, -.02); }
       ud.lh = new V3(-.005, -.014, -(h0 + hl / 2)); my = .023;
+      irons(.076, -.13, -(b0 + bl - .025), { notch: !m14 && !galil, base: .016, fbase: .014 });
       break;
     }
     case 'm4': { // M4A4 / Commando / FAL
@@ -1995,6 +2030,7 @@ function gunModel(id, fp = false, skin = null) {
       if (fal) add(g, EX([[-.1, .045], [-.36, .03], [-.366, .022], [-.366, -.06], [-.36, -.066], ['q', -.25, -.045, -.12, -.01], [-.1, -.004]], .04, null, .004), M.polymer);
       else { add(g, CY(.014, .11, 14), M.metal, 0, .038, .15); add(g, EX([[-.2, .07], [-.33, .07], [-.34, .06], [-.34, -.035], [-.33, -.04], [-.29, -.025], [-.25, .025], [-.2, .03]], .044, null, .004), M.polymer); add(g, EX([[-.34, .062], [-.352, .062], [-.352, -.036], [-.34, -.04]], .046), M.dark); }
       ud.lh = new V3(-.005, -.012, -.21);
+      if (fal) irons(.118, .06, -.307, { base: .052, fbase: .052 });
       break;
     }
     case 'shotgun': case 'launcher': {
@@ -2013,6 +2049,7 @@ function gunModel(id, fp = false, skin = null) {
       add(g, EX([[-.1, .046], [-.38, .03], [-.386, .022], [-.386, -.085], [-.378, -.09], ['q', -.25, -.06, -.1, -.052], [-.075, -.02], ['q', -.085, .0, -.1, .0]], .044, null, .004), wood);
       add(g, EX([[-.386, .026], [-.396, .026], [-.396, -.088], [-.386, -.09]], .046), M.dark);
       ud.rig = 'shell'; ud.port = new V3(0, -.026, -.03); mz = -(.12 + bL + .002); my = .042; ud.lh = new V3(-.005, -.014, -.28); ud.rh = new V3(0, -.05, .075);
+      if (lz) irons(.12, .02, -.14, { base: .066, fbase: .05 }); else { add(g, RB(.008, .004, bL - .02, .001), M.dark, 0, .0555, -(.12 + bL / 2)); add(g, new THREE.SphereGeometry(.0034, 10, 8), M.trit, 0, .058, -.53); add(g, new THREE.SphereGeometry(.0022, 8, 6), M.brass, 0, .058, -.33); ud.sight = new V3(0, .058, -.53); }
       break;
     }
     case 'dbarrel': {
@@ -2026,6 +2063,7 @@ function gunModel(id, fp = false, skin = null) {
       guard(g, -.03, -.012);
       add(g, EX([[-.06, .03], [-.36, .012], [-.366, .004], [-.366, -.078], [-.358, -.084], ['q', -.2, -.05, -.06, -.012]], .04, null, .004), M.wood);
       mz = -.53; my = .036; ud.lh = new V3(-.005, -.02, -.17); ud.port = new V3(0, .03, -.05);
+      add(brk, new THREE.SphereGeometry(.0026, 8, 6), M.trit, 0, .026, -.469); ud.sight = new V3(0, .056, -.52);
       break;
     }
     case 'scout': case 'awp': case 'dmr': {
@@ -2065,6 +2103,7 @@ function gunModel(id, fp = false, skin = null) {
       const mag = grp(g, 0, .085, -.03); add(mag, CY(.012, .07, 12), M.glowG); add(mag, CY(.014, .012, 12), M.chrome, 0, 0, .04); add(mag, CY(.014, .012, 12), M.chrome, 0, 0, -.04);
       ud.mag = mag; ud.magUp = 1; ud.magGrab = new V3(0, .095, -.03);
       mz = -.3; my = .04; ud.lh = new V3(-.02, -.075, .035); ud.rh = new V3(0, -.055, .04); ud.pistol = 1; ud.vm = [.012, .012, -.03];
+      irons(.112, .06, -.195, { notch: 1, base: .03, fbase: .01 });
       break;
     }
     case 'thunder': {
@@ -2234,11 +2273,15 @@ function limb(par, a, b, r, mat, r2 = r, seg = 10) { // cápsula / tronco de con
   const m = new THREE.Mesh(geo, mat); m.position.copy(A).addScaledVector(d, .5); m.quaternion.setFromUnitVectors(_up, d.normalize()); par.add(m); return m;
 }
 // dedo: base → meio → ponta (a ponta afina)
-function finger(par, pts, r, mat) { for (let i = 0; i + 1 < pts.length; i++) limb(par, pts[i], pts[i + 1], r * (1 - i * .12), mat, undefined, 8); }
+function finger(par, pts, r, mat) {
+  for (let i = 0; i + 1 < pts.length; i++) limb(par, pts[i], pts[i + 1], r * (1 - i * .1), mat, undefined, 10);
+  for (let i = 1; i + 1 < pts.length; i++) { const j = new THREE.Mesh(new THREE.SphereGeometry(r * (1.06 - i * .1), 10, 8), mat); j.position.set(...pts[i]); par.add(j); } // articulações (nós dos dedos)
+}
 // antebraço: punho elástico, manga com dobras e (na esquerda) relógio
 function forearm(par, wrist, dir, len, A, watch) {
   const D = new V3(...dir).normalize(), W = new V3(...wrist), P = t => W.clone().addScaledVector(D, t).toArray();
   limb(par, P(-.005), P(.035), .026, A.cuff, .029, 14); // punho da luva
+  { const v = new THREE.Mesh(new RoundedBoxGeometry(.03, .008, .026, 2, .003), A.pad), q = P(.016); v.position.set(q[0], q[1] + .026, q[2]); v.quaternion.setFromUnitVectors(new V3(0, 0, 1), D); par.add(v); } // tira de velcro
   if (watch) { const w = limb(par, P(.05), P(.066), .031, A.watch, .031, 16); const f = new THREE.Mesh(new THREE.CircleGeometry(.011, 16), A.face); f.position.set(0, 0, .0315); f.rotation.y = 0; const fh = new THREE.Group(); fh.position.copy(w.position); fh.quaternion.copy(w.quaternion); fh.rotateX(Math.PI / 2); fh.add(f); par.add(fh); }
   limb(par, P(watch ? .07 : .04), P(len), .033, A.sleeve, .046, 16); // manga (mais grossa para o cotovelo)
   for (const t of [.14, .26, .38]) if (t < len - .04) limb(par, P(t), P(t + .018), .036 + t * .03, A.sleeve, .038 + t * .03, 16); // dobras do tecido
@@ -2405,8 +2448,8 @@ function updateViewmodel(dt) {
   if (me.sprintK > .01) { const k = me.sprintK; o.rx -= .55 * k; o.ry += .7 * k; o.x -= .06 * k; o.y -= .06 * k + Math.abs(Math.sin(bobT * 1.3)) * .03 * k; o.rz += Math.sin(bobT) * .08 * k; }
   const ak = smooth(G.ads || 0);
   if (ak > 0) { // mirando: arma no centro, com o topo (alça/mira holográfica) na linha do olho
-    const ay = -(ud.sightY ?? .05) * 1.18 + .004;
-    o.x = lerp(o.x, 0, ak); o.y = lerp(o.y, ay, ak); o.z = lerp(o.z, -.34 + vo[2] * .5, ak); o.ry = lerp(o.ry, -.05, ak); o.rx *= 1 - ak * .7;
+    const sp = ud.sight, ay = -(sp ? sp.y : (ud.sightY ?? .05)) * 1.18, az = sp ? clamp(-.17 - (ud.sightR ?? sp.z + .3) * 1.18, -.3, -.06) : -.34; // alça a ~17 cm do olho, como encostar a arma no rosto
+    o.x = lerp(o.x, -(sp ? sp.x : 0) * 1.18, ak); o.y = lerp(o.y, ay, ak); o.z = lerp(o.z, az, ak); o.ry = lerp(o.ry, -.05, ak); o.rx *= 1 - ak; o.rz *= 1 - ak;
   }
   gunAnim(ud, w, o);
   mouseDX *= Math.exp(-dt * 12);
