@@ -2186,6 +2186,15 @@ function rightHand(A) { // mão no punho da arma: dedos dando a volta pela frent
   forearm(h, [.03, -.045, .045], [.2, -.34, 1], .5, A, false);
   return h;
 }
+function knifeHand(A) { // punho fechado em volta do cabo deitado (eixo z): nós dos dedos em cima, dedos dando a volta, polegar por baixo
+  const h = new THREE.Group(), cy = .009, rx = .022, ry = .029, at = (t, dz) => [Math.cos(t) * rx, cy + Math.sin(t) * ry, dz];
+  const p = new THREE.Mesh(new RoundedBoxGeometry(.022, .06, .088, 3, .009), A.glove); p.position.set(.03, .002, .04); p.rotation.z = .25; h.add(p); // palma / dorso, do lado direito
+  const k = new THREE.Mesh(new RoundedBoxGeometry(.03, .014, .08, 2, .005), A.pad); k.position.set(.022, .036, .038); k.rotation.z = -.5; h.add(k); // protetor dos nós
+  [.004, .025, .046, .066].forEach((z, i) => { const r = i === 3 ? .0074 : .0084, deg = Math.PI / 180; finger(h, [at(50 * deg, z), at(110 * deg, z), at(170 * deg, z), at(228 * deg, z), at(262 * deg, z + .004)], r, A.glove); });
+  finger(h, [[.026, -.026, .062], [.004, -.038, .036], [-.018, -.03, .014], [-.027, -.012, .006]], .0098, A.glove); // polegar por baixo, travando o indicador
+  forearm(h, [.032, -.018, .092], [.25, -.45, 1], .52, A, false);
+  return h;
+}
 function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo, dedos subindo pelo lado direito
   const h = new THREE.Group();
   const p = new THREE.Mesh(new RoundedBoxGeometry(.06, .024, .078, 3, .01), A.glove); p.position.set(.002, -.036, .004); h.add(p);
@@ -2200,7 +2209,7 @@ function vmSetWeapon(id) {
   vmGun = new THREE.Group();
   const gun = gunModel(id, true, skinOf(id)), ud = gun.userData, A = armMats(); vmGun.add(gun);
   vmGun.userData = ud;
-  const rh = rightHand(A); rh.position.copy(ud.rh); gun.add(rh);
+  const rh = W[id]?.model === 'knife' ? knifeHand(A) : rightHand(A); rh.position.copy(ud.rh); gun.add(rh);
   const m = W[id]?.model;
   if (!['knife', 'nade', 'smoke', 'monkey'].includes(m)) {
     const lh = leftHand(A); lh.position.copy(ud.lh); gun.add(lh);
