@@ -396,6 +396,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MarchingCubes } from 'three/addons/objects/MarchingCubes.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // ================================================================
 // Utilidades
@@ -2265,6 +2266,7 @@ function armMats() {
     cuff: new THREE.MeshStandardMaterial({ map: rib, color: 0x3a3f36, roughness: .92, bumpMap: rib, bumpScale: .8 }),
     watch: new THREE.MeshStandardMaterial({ color: 0x1a1b1d, metalness: .6, roughness: .35 }),
     fist: new THREE.MeshStandardMaterial({ map: leather, color: 0x34302b, metalness: .05, roughness: .58, bumpMap: leather, bumpScale: .35 }),
+    hand: new THREE.MeshStandardMaterial({ map: leather, color: 0x3a342d, metalness: .04, roughness: .6, bumpMap: leather, bumpScale: .3 }),
     face: new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7dff9a).multiplyScalar(.6) }),
     shell: new THREE.MeshStandardMaterial({ color: 0xa82020, roughness: .5 }), brass: new THREE.MeshStandardMaterial({ color: 0xcaa24a, metalness: 1, roughness: .3 }),
   };
@@ -2360,11 +2362,54 @@ function karambitHand(A) { // karambit (como no CS2): cabo em pé, indicador no 
 }
 // Karambit no estilo do CS:GO, na mão direita: cabo deitado na horizontal, dorso da mão virado para cima/câmera,
 // anel para o lado de dentro (esquerda), garra saindo para a direita e curvando para cima. A outra mão fica aberta.
+// ---------- mãos 3D de verdade (modelo anatômico com esqueleto, pacote aberto WebXR "generic-hand", licença MIT) ----------
+// Os ossos são independentes (hierarquia plana), então a dobra de cada falange é calculada aqui (cinemática direta).
+const HAND3D = { R: null, L: null };
+function loadHands() {
+  const base = 'https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/generic-hand/', ld = new GLTFLoader();
+  for (const sd of ['R', 'L']) ld.load(base + (sd === 'R' ? 'right' : 'left') + '.glb', g => {
+    const bones = {}, rest = {}; let mesh = null;
+    g.scene.traverse(o => { if (o.isBone) { bones[o.name] = o; rest[o.name] = { p: o.position.clone(), q: o.quaternion.clone() }; } if (o.isSkinnedMesh) { mesh = o; o.frustumCulled = false; o.geometry.userData.keep = true; } });
+    HAND3D[sd] = { root: g.scene, bones, rest, mesh, side: sd };
+    if (vmGun && W[G.cur]?.slot === 'knife') vmSetWeapon(G.cur); // chegou o modelo: troca a mão provisória
+  }, undefined, e => console.warn('mão 3D não carregou', e));
+}
+// curl: [base, meio, ponta] em radianos; th: { ax, a, f1, f2 } do polegar
+function handPose(H, curl, th) {
+  const Q = THREE.Quaternion, R = H.rest, B = H.bones, sg = H.side === 'R' ? 1 : -1, ax = new V3(0, 0, 1);
+  const set = (n, pos, q) => { B[n].position.copy(pos); B[n].quaternion.copy(q).multiply(R[n].q); };
+  for (const f of ['index', 'middle', 'ring', 'pinky']) {
+    const ns = ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(k => `${f}-finger-${k}`), extra = { index: 0, middle: .04, ring: .08, pinky: .12 }[f] * (curl[0] > .6 ? 1 : 0);
+    let cur = R[ns[0]].p.clone(), acc = new Q();
+    for (let i = 0; i < 3; i++) { acc = acc.clone().multiply(new Q().setFromAxisAngle(ax, -sg * (curl[i] + (i ? 0 : extra)))); set(ns[i], cur, acc); cur = cur.clone().add(R[ns[i + 1]].p.clone().sub(R[ns[i]].p).applyQuaternion(acc)); }
+    set(ns[3], cur, acc);
+  }
+  const tn = ['thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip'], P = tn.map(k => R[k].p);
+  const tax = new V3(th.ax[0] * sg, th.ax[1], th.ax[2]).normalize();
+  let acc = new Q().setFromAxisAngle(tax, th.a * sg), cur = P[0].clone(); set(tn[0], cur, acc);
+  for (let i = 1; i < 4; i++) { cur = cur.clone().add(P[i].clone().sub(P[i - 1]).applyQuaternion(acc)); if (i < 3) acc = acc.clone().multiply(new Q().setFromAxisAngle(ax, sg * (i === 1 ? th.f1 : th.f2))); set(tn[i], cur, acc); }
+}
+// centro do "buraco" do punho (onde passa o cabo): círculo pelas 3 juntas do dedo médio
+function gripCenter(H) {
+  const b = H.bones, [A, Bp, C] = ['phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal'].map(k => b['middle-finger-' + k].position);
+  const d = 2 * (A.x * (Bp.y - C.y) + Bp.x * (C.y - A.y) + C.x * (A.y - Bp.y)), a2 = A.x * A.x + A.y * A.y, b2 = Bp.x * Bp.x + Bp.y * Bp.y, c2 = C.x * C.x + C.y * C.y;
+  const z = (b['index-finger-phalanx-proximal'].position.z + b['pinky-finger-phalanx-proximal'].position.z) / 2;
+  return new V3((a2 * (Bp.y - C.y) + b2 * (C.y - A.y) + c2 * (A.y - Bp.y)) / d, (a2 * (C.x - Bp.x) + b2 * (A.x - C.x) + c2 * (Bp.x - A.x)) / d, z);
+}
+const basis = (x, y) => { const X = new V3(...x).normalize(), Y = new V3(...y).normalize(), Z = new V3().crossVectors(X, Y).normalize(); Y.crossVectors(Z, X); return new THREE.Matrix4().makeBasis(X, Y, Z); };
 function karambitPose(gun, ud, A) {
   const vmg = gun.parent, bas = (a, b, c) => new THREE.Matrix4().makeBasis(new V3(...a).normalize(), new V3(...b).normalize(), new V3(...c).normalize());
   // arma: z do modelo (anel) → esquerda; -y do modelo (curva da garra) → para cima
   gun.quaternion.setFromRotationMatrix(bas([0, 0, -1], [0, -1, 0], [-1, 0, 0]));
   const hc = ud.rh.clone().applyQuaternion(gun.quaternion); // centro do cabo
+  if (HAND3D.R) { // mão anatômica: dorso para cima, pulso vindo para a câmera, dedos fechados em volta do cabo
+    const H = HAND3D.R; H.mesh.material = A.hand;
+    handPose(H, [1.2, 1.5, 1.0], { ax: [.2, 1, .3], a: .35, f1: -.55, f2: -.7 });
+    H.root.quaternion.setFromRotationMatrix(basis([0, .95, .3], [0, -.3, .95])); // x da mão (dorso) → cima; y (pulso) → câmera
+    H.root.position.copy(hc).sub(gripCenter(H).applyQuaternion(H.root.quaternion)); vmg.add(H.root);
+    const w = new V3(.036, .07, .012).applyQuaternion(H.root.quaternion).add(H.root.position);
+    forearm(vmg, w.toArray(), [.15, -.62, .78], .55, A, false);
+  } else {
   // punho: malha espelhada (mão direita); eixo do cabo → esquerda, dorso → cima, metacarpos → câmera
   const R = .018, fy = [.047, .026, .007, -.011], mid = (fy[0] + fy[3]) / 2, a = -60 * Math.PI / 180;
   const f = fistHand(A, { key: 'karambitH', R, fy, noWrist: true }); f.children[0].scale.x = -1;
@@ -2374,10 +2419,20 @@ function karambitPose(gun, ud, A) {
   f.position.copy(hc); vmg.add(f);
   const wl = new V3(0, mid, 0).addScaledVector(r, R + .008).addScaledVector(t, .026).applyQuaternion(f.quaternion).add(hc); wl.y -= .012;
   forearm(vmg, wl.toArray(), [.18, -.82, .55], .55, A, false); // antebraço desce para baixo da tela (não tapa o punho)
+  }
   // mão esquerda aberta e relaxada, embaixo à esquerda
-  const lh = new THREE.Group(); lh.add(new THREE.Mesh(openHandGeo(), A.fist)); vmg.add(lh);
-  lh.position.set(-.27, -.04, .1); lh.rotation.set(.25, -.55, .35, 'YXZ');
-  forearm(lh, [0, .0, .062], [0, -.45, .9], .55, A, true);
+  if (HAND3D.L) { // mão esquerda anatômica, aberta e relaxada: palma para baixo, dedos para a frente e para dentro
+    const H = HAND3D.L; H.mesh.material = A.hand;
+    handPose(H, [.18, .26, .18], { ax: [.2, 1, .3], a: .12, f1: -.15, f2: -.2 });
+    H.root.quaternion.setFromRotationMatrix(basis([.1, -.9, -.3], [-.5, .15, .85])); // x (palma) → baixo; y (pulso) → câmera
+    H.root.position.set(-.24, -.075, .02); vmg.add(H.root);
+    const w = new V3(-.034, .07, .01).applyQuaternion(H.root.quaternion).add(H.root.position);
+    forearm(vmg, w.toArray(), [-.35, -.5, .8], .55, A, true);
+  } else {
+    const lh = new THREE.Group(); lh.add(new THREE.Mesh(openHandGeo(), A.fist)); vmg.add(lh);
+    lh.position.set(-.27, -.04, .1); lh.rotation.set(.25, -.55, .35, 'YXZ');
+    forearm(lh, [0, .0, .062], [0, -.45, .9], .55, A, true);
+  }
 }
 // Mão esquerda aberta (palma para baixo, dedos levemente dobrados), também em metaballs. Dedos para -z, polegar para +x.
 let OPEN_GEO = null;
@@ -5214,6 +5269,7 @@ function tick(dt) {
   updateHud(dt);
 }
 applyQuality();
+loadHands();
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos)
 window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
