@@ -2134,7 +2134,7 @@ function gunModel(id, fp = false, skin = null) {
       add(g, EX([[-.004, .024], [.006, .022], [.006, -.009], [-.004, -.011]], .024, null, .002), M.steel, 0, 0, 0);
       add(g, EX([[-.004, -.008], [-.004, .022], [-.05, .024], ['q', -.064, .022, -.066, .006], [-.062, -.01], [-.03, -.012]], .021, null, .003), M.polymer, 0, 0, 0);
       add(g, new THREE.TorusGeometry(.016, .0045, 8, 22), M.steel, 0, .006, .08, 0, Math.PI / 2); // anel do indicador
-      ud.rig = 'none'; ud.rh = new V3(0, .006, .03); ud.vm = [-.02, .005, -.04]; mz = 0; my = 0;
+      ud.rig = 'none'; ud.rh = new V3(0, .006, .03); ud.vm = [-.035, .06, -.03]; mz = 0; my = 0;
       break;
     }
     case 'nade': {
@@ -2312,6 +2312,23 @@ function knifeHand(A, ring) {
   forearm(h, [.02, -.024, zc + L / 2 - .01], [.25, -.5, 1], .52, A, false);
   return h;
 }
+function karambitHand(A) {
+  // Pegada do karambit (como no CS2): mão em pé, cabo vertical dentro do punho, indicador passando pelo anel em cima,
+  // nós dos dedos à direita, pontas dos dedos na frente/esquerda, lâmina saindo por baixo. Eixo do cabo = y.
+  const h = new THREE.Group();
+  const core = new THREE.Mesh(new RoundedBoxGeometry(.05, .07, .054, 4, .019), A.glove); core.position.set(.006, -.004, 0); h.add(core);
+  const back = new THREE.Mesh(new RoundedBoxGeometry(.012, .06, .044, 2, .005), A.pad); back.position.set(.031, -.002, -.002); h.add(back); // protetor no dorso
+  [.02, .002, -.017].forEach((y, i) => { // médio, anelar e mindinho dando a volta pela frente
+    const r = i === 2 ? .0088 : .0098;
+    limb(h, [.02, y, .022], [-.014, y, .027], r, A.glove, undefined, 12);
+    limb(h, [-.018, y, .022], [-.026, y, .0], r * .92, A.glove, undefined, 12);
+    const k = new THREE.Mesh(new RoundedBoxGeometry(.012, r * 2, .012, 2, .005), A.glove); k.position.set(.026, y, .012); h.add(k);
+  });
+  finger(h, [[.024, .047, -.004], [.004, .047, .004], [-.016, .046, .008], [-.026, .04, .004]], .0096, A.glove); // indicador pelo anel
+  finger(h, [[.022, -.03, -.022], [.002, -.018, -.03], [-.016, .0, -.03], [-.022, .014, -.022]], .0102, A.glove); // polegar por trás
+  forearm(h, [.024, -.042, .012], [.8, -1, .45], .52, A, false);
+  return h;
+}
 function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo, dedos subindo pelo lado direito
   const h = new THREE.Group();
   const p = new THREE.Mesh(new RoundedBoxGeometry(.06, .024, .078, 3, .01), A.glove); p.position.set(.002, -.036, .004); h.add(p);
@@ -2328,14 +2345,18 @@ function vmSetWeapon(id) {
   gun.updateMatrixWorld(true); ud.sightY = new THREE.Box3().setFromObject(gun).max.y; // topo da arma = altura da mira
   vmGun.userData = ud;
   const m = W[mid]?.model;
-  const rh = m === 'knife' || m === 'karambit' ? knifeHand(A, m === 'karambit') : rightHand(A); rh.position.copy(ud.rh); gun.add(rh);
+  let rh;
+  if (m === 'karambit') { // cabo em pé com o anel em cima, garra saindo por baixo e curvando para a esquerda
+    const qy = new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), -1.45), qz = new THREE.Quaternion().setFromAxisAngle(new V3(0, 0, 1), .12), qx = new THREE.Quaternion().setFromAxisAngle(new V3(1, 0, 0), -Math.PI / 2);
+    const hq = qz.clone().multiply(qy); gun.quaternion.copy(hq).multiply(qx);
+    rh = karambitHand(A); rh.quaternion.copy(qz).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), -.45)); rh.position.copy(ud.rh).applyQuaternion(gun.quaternion); vmGun.add(rh); // mão de 3/4, lâmina de perfil
+  } else { rh = m === 'knife' ? knifeHand(A) : rightHand(A); rh.position.copy(ud.rh); gun.add(rh); }
   if (!['knife', 'karambit', 'nade', 'smoke', 'monkey'].includes(m)) {
     const lh = leftHand(A); lh.position.copy(ud.lh); gun.add(lh);
     const sh = new THREE.Mesh(new THREE.CylinderGeometry(.0105, .0105, .06, 10), m === 'launcher' ? A.brass : A.shell); sh.rotation.x = Math.PI / 2; sh.position.set(0, .01, -.01); sh.visible = false; lh.add(sh);
     ud.lhG = lh; ud.lhRest = lh.position.clone(); ud.handShell = sh;
   }
   if (m === 'knife') gun.rotation.set(.62, .3, -.3); // faca inclinada para cima e para a frente, como no CS
-  if (m === 'karambit') gun.rotation.set(.3, .3, -.55); // karambit: garra para baixo e para a frente
   vmGun.scale.setScalar(1.18); vmGun.rotation.y = .05; // arma maior e levemente virada para dentro, como nos FPS grandes
   vmRoot.add(vmGun);
 }
