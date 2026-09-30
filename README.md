@@ -22,7 +22,7 @@ O host roda a partida no navegador dele. Se o host fechar a aba, a partida acaba
 
 Dois mapas:
 
-- **Vila** (aberto): um octógono de uns 90 m cercado por muro de pedra e floresta. Vocês começam na Praça, em volta do chafariz. Portões de ferro levam à Igreja (norte), à Fazenda (leste, onde fica a energia), ao Cemitério (oeste, com o Pack-a-Punch no mausoléu) e ao Lago (sul, com o moinho). As grades de ferro deixam a bala passar, mas não deixam ninguém atravessar; as sebes e o muro seguram tudo. Os zumbis pulam o muro pelas janelas de tábua ou saem do chão no meio das áreas abertas.
+- **Vila** (aberto, ~170 m de lado): dois anéis de área em volta de uma praça com chafariz, onde vocês começam. No anel de dentro, portões de ferro levam à Igreja (norte), à Fazenda (leste), ao Cemitério (oeste) e ao Lago (sul). Portões no muro do meio (1500) levam ao anel de fora, que tem 4 áreas ligadas por portas nas sebes: Pedreira (nordeste, com o gerador de energia), Estação de trem (sudeste), Acampamento com fogueira (sudoeste) e Castelo em ruínas (noroeste, com o Pack-a-Punch no pátio). Grades de ferro deixam a bala passar, mas ninguém atravessa. Os zumbis pulam os muros pelas janelas de tábua ou saem do chão no meio das áreas.
 - **Sanatório** (fechado): seis cômodos com portas e janelas. Vocês começam na Recepção.
 
 Todo mundo começa com uma M1911.
@@ -47,9 +47,9 @@ A dificuldade aparece no canto de cima, junto com o nome do mapa.
 - **Portões, portas e entulho** (750 a 1250) liberam novas áreas, com mais armas e mais janelas.
 - **Armas de parede** (contorno de giz, na parede ou em placas de madeira): M14, Olympia, MP40, MP5K, AK-74u, Stakeout, granadas e Faca Bowie. Se você já tem a arma, compra munição pela metade do preço.
 - **Caixa Misteriosa (950):** arma aleatória: Ray Gun, Arma Trovão, Galil, Commando, FAL, RPK, HK21, SPAS-12, Python, CZ75, Dragunov, China Lake ou Macacos com Pratos. Às vezes sai o ursinho: você recebe os pontos de volta e a caixa muda de lugar.
-- **Energia:** fica no celeiro (Vila) ou no Laboratório (Sanatório). Ligue para ativar as bebidas e o Pack-a-Punch.
+- **Energia:** fica no gerador da Pedreira (Vila) ou no Laboratório (Sanatório). Ligue para ativar as bebidas e o Pack-a-Punch.
 - **Bebidas** (máximo de 4): Juggernog (aguenta 5 golpes), Speed Cola (recarrega rápido), Double Tap (atira mais rápido), Quick Revive (reanima rápido; sozinho, te levanta até 3 vezes) e Stamin-Up (corre mais).
-- **Pack-a-Punch (5000):** fica no mausoléu (Vila) ou no Teatro (Sanatório). Dobra o dano, aumenta o pente e dá nome e camuflagem novos à arma (a M1911 vira a explosiva Mustang & Sally).
+- **Pack-a-Punch (5000):** fica no pátio do Castelo (Vila) ou no Teatro (Sanatório). Dobra o dano, aumenta o pente e dá nome e camuflagem novos à arma (a M1911 vira a explosiva Mustang & Sally).
 - **Power-ups:** caem dos zumbis e duram 26s no chão. São eles: Munição Máxima, Insta-Kill, Pontos em Dobro, Nuke (+400) e Carpinteiro (+200).
 - **Cães do inferno:** uma rodada especial de tempos em tempos. O último cão sempre solta Munição Máxima.
 - **Vida:** a barra no centro de baixo da tela mostra a vida (com Juggernog vai até 250). Toda rodada nova começa com a vida cheia.
@@ -68,7 +68,7 @@ Aba **Skins** no menu.
   - Fim de jogo nos zumbis: 30 + 8 por rodada
 - **Abrir caixa:** roleta no estilo CS. Raridades: Comum 60%, Incomum 25%, Rara 10%, Épica 4%, Lendária 1%. Faca só sai em Épica ou Lendária. Skin repetida vira 60 XP.
 - **Acabamentos:** Floresta, Deserto, Urbano, Grafite, Areia, Oceano, Cereja, Carbono, Ártico, Tigre, Colmeia, Crepúsculo, Damasco, Neon, Lava, Asiimov, Esmeralda, Ouro, Dragão e Galáxia (Neon, Lava, Dragão e Galáxia brilham). Servem para todas as armas, menos Ray Gun e Arma Trovão. Com Pack-a-Punch vale a camuflagem do Pack-a-Punch.
-- **Equipar:** clique na skin e em **Equipar** (ou clique duas vezes). Os outros jogadores veem a sua skin.
+- **Inventário:** a lista mostra todas as armas; clique numa para ver as skins que você tem dela (e a opção Padrão). Clique na skin e em **Equipar** (ou clique duas vezes). Os outros jogadores veem a sua skin.
 - **Conta:** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
 
 ### Configurar as contas (Firebase, uma vez só)
