@@ -1,0 +1,10 @@
+exec(open(r'C:\Users\Costa\Claude\blender-tools\pose_test.py', encoding='utf-8').read())
+thumb('r', TH)
+bpy.context.view_layer.update()
+F, N, S, W = pose_frame('r')
+KQ = globals().get('KQ') or (.85, -.5)
+if KIND == 'karambit': place_knife('karambit', Q=F * KQ[0] + N * KQ[1])
+else:
+    KP = globals().get('KP') or (1, -.6, 0)   # pomo: S*a + F*b + N*c (lâmina sai pelo polegar, apontando para a frente/centro)
+    place_knife('knife', P=S * KP[0] + F * KP[1] + N * KP[2], Q=N + F * .3)
+bpy.context.view_layer.update()

@@ -71,7 +71,7 @@ Aba **Skins** no menu.
 - **Coleção (estilo Valorant):** todas as armas aparecem ao mesmo tempo, em colunas por categoria (pistolas; SMGs e escopetas; rifles; precisão, pesadas e faca), cada uma desenhada com a skin que está equipada. Clique numa arma para abrir a tela dela: à esquerda as skins que você tem (e a Padrão), no centro a arma em 3D (arraste para girar), e o botão **Equipar**. Os outros jogadores veem a sua skin.
 - **Conta:** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
 
-- **Facas:** além da Faca, tem o **Karambit** (lâmina em garra, com anel). As duas usam a mesma mão 3D e animações no estilo do CS: saque (a karambit gira no dedo), cortes alternando o lado, estocada no botão direito e inspeção no F. Na Coleção, abra a arma e clique em **Usar esta faca**; equipar uma skin de karambit também já troca a faca.
+- **Facas:** além da Faca, tem o **Karambit** (lâmina em garra, com anel). Os braços de primeira pessoa das facas foram feitos no Blender (`assets/arms.glb`) a partir de um humano do [MPFB/MakeHuman](https://static.makehumancommunity.org/mpfb.html) (licença CC0), com animações no estilo do CS2: parado, saque (a karambit gira no dedo), cortes alternando o lado, estocada no botão direito e inspeção no F. Os scripts que geram o arquivo ficam em `tools/blender/`. Na Coleção, abra a arma e clique em **Usar esta faca**; equipar uma skin de karambit também já troca a faca.
 
 ### Configurar as contas (Firebase, uma vez só)
 

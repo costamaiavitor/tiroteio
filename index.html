@@ -2499,14 +2499,55 @@ function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo,
   forearm(h, [-.006, -.05, .05], [-.36, -.3, 1], .56, A, true);
   return h;
 }
+// ---------- braços de primeira pessoa feitos no Blender (humano do MPFB, licença CC0) com as animações das facas ----------
+// assets/arms.glb traz os dois braços com esqueleto, a câmera usada para posar e dois soquetes na mão direita
+// (Spin_karambit / Spin_knife) onde a faca do jogo é pendurada. Uma linha do tempo só, cortada em clipes (30 fps).
+const ARMS = { holder: null, root: null, mixer: null, clips: {}, cur: null, knife: null };
+const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] };
+function loadArms() {
+  new GLTFLoader().load('assets/arms.glb', g => {
+    const root = g.scene, A = armMats(); root.updateMatrixWorld(true);
+    const cam = root.getObjectByName('Cam'), holder = new THREE.Group();
+    const rep = (m, n) => { const c = m.clone(); for (const k of ['map', 'bumpMap']) if (c[k]) { c[k] = c[k].clone(); c[k].repeat.set(n, n); c[k].needsUpdate = true; } return c; };
+    const sleeve = rep(A.sleeve, 2.5), glove = rep(A.hand, 4); // a UV do corpo inteiro é grande: repete a trama para o tecido ficar na escala certa
+    holder.matrixAutoUpdate = false; holder.matrix.copy(cam.matrixWorld).invert(); holder.add(root); // a câmera do Blender vira a câmera do jogo
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      o.frustumCulled = false; o.geometry.userData.keep = true; o.castShadow = false;
+      o.material = o.material.name === 'sleeve' ? sleeve : glove;
+    });
+    const all = new THREE.AnimationClip('all', -1, g.animations.flatMap(a => a.tracks));
+    ARMS.mixer = new THREE.AnimationMixer(root);
+    for (const [n, [a, b]] of Object.entries(ARMS_FR)) ARMS.clips[n] = THREE.AnimationUtils.subclip(all, n, a, b, 30);
+    ARMS.mixer.addEventListener('finished', () => armsPlay('idle'));
+    Object.assign(ARMS, { holder, root });
+    if (vmGun && W[G.cur]?.slot === 'knife') vmSetWeapon(G.cur);
+  }, undefined, e => console.warn('braços 3D não carregaram', e));
+}
+function armsPlay(name) {
+  if (!ARMS.mixer) return;
+  ARMS.mixer.stopAllAction();
+  const a = ARMS.mixer.clipAction(ARMS.clips[name]);
+  a.reset(); a.setLoop(name === 'idle' ? THREE.LoopRepeat : THREE.LoopOnce); a.clampWhenFinished = true; a.play();
+  ARMS.cur = name; ARMS.mixer.update(0);
+}
 function vmSetWeapon(id) {
   if (vmGun) { vmRoot.remove(vmGun); vmGun.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); }
+  if (ARMS.knife) { ARMS.knife.removeFromParent(); ARMS.knife = null; } // a faca antiga sai do soquete dos braços
   vmGun = new THREE.Group();
   const mid = knifeModelOf(id, PROF.data?.equipped), gun = gunModel(mid, true, skinOf(mid)), ud = gun.userData, A = armMats(); vmGun.add(gun);
   gun.updateMatrixWorld(true); ud.sightY = new THREE.Box3().setFromObject(gun).max.y; // topo da arma = altura da mira
   vmGun.userData = ud;
   const m = W[mid]?.model;
   let rh;
+  if ((m === 'karambit' || m === 'knife') && ARMS.root) { // braços do Blender: a faca vai para o soquete da mão direita
+    vmGun.add(ARMS.holder);
+    const sock = ARMS.root.getObjectByName(m === 'karambit' ? 'Spin_karambit' : 'Spin_knife');
+    gun.position.set(0, -.006, m === 'karambit' ? -.08 : -.05); gun.quaternion.identity(); sock.add(gun); ARMS.knife = gun;
+    ud.armsKnife = true; ud.vm = [-.165, .145, .43]; // o conjunto já está posado na frente da câmera
+    vmRoot.add(vmGun); armsPlay('draw');
+    return;
+  }
   if (m === 'karambit' || m === 'knife') { // punho em pé (como no CS2): faca com a lâmina para cima; karambit com o anel em cima e a garra por baixo
     const kn = m === 'knife', ax = (x, y, z, a) => new THREE.Quaternion().setFromAxisAngle(new V3(x, y, z), a);
     const qy = ax(0, 1, 0, kn ? -1.3 : -1.45), qz = ax(0, 0, 1, kn ? .3 : .12), qx = ax(1, 0, 0, kn ? Math.PI / 2 : -Math.PI / 2);
@@ -2671,6 +2712,7 @@ function knifeAnim(o, ud) {
   if (kp) kp.quaternion.setFromAxisAngle(ud.spinAx, spin);
 }
 function knifeInspect() {
+  if (vmGun?.userData.armsKnife) { if (ARMS.cur === 'idle') armsPlay('inspect'); return; }
   if (!['knife', 'karambit'].includes(W[G.cur]?.model) || G.kan || now < G.switchEnd) return;
   G.kan = { type: 'inspect', t0: now };
 }
@@ -2682,9 +2724,10 @@ function updateViewmodel(dt) {
   const o = { x: .165 + vo[0] + Math.cos(bobT) * .012 * bob - mouseDX * .0004, y: -.145 + vo[1] + Math.abs(Math.sin(bobT)) * .014 * bob + breathe, z: -.43 + vo[2], rx: breathe * 2, ry: 0, rz: 0 };
   G.kick = Math.max(0, G.kick - dt * 10);
   o.z += G.kick * .06; o.rx += G.kick * .1;
-  if (now < G.switchEnd) { const k = smooth((G.switchEnd - now) / (G.switchDur || .35)); o.y -= k * .22; o.rx -= k * .9; o.rz += k * .35; } // sacando a arma
+  if (now < G.switchEnd && !ud.armsKnife) { const k = smooth((G.switchEnd - now) / (G.switchDur || .35)); o.y -= k * .22; o.rx -= k * .9; o.rz += k * .35; } // sacando a arma (os braços do Blender têm animação própria)
+  if (ud.armsKnife) ARMS.mixer.update(dt);
   if (G.swing > 0) { G.swing = Math.max(0, G.swing - dt * 4); const s = Math.sin(G.swing * Math.PI); o.ry += s * 1.1; o.x -= s * .12; o.z -= s * .1; }
-  if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model)) knifeAnim(o, ud);
+  if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model) && !ud.armsKnife) knifeAnim(o, ud);
   if (me.downed) { o.y -= .04; o.rz += .35; }
   // correndo: arma abaixada e de lado, balançando mais
   me.sprintK = lerp(me.sprintK, me.sprinting ? 1 : 0, Math.min(1, dt * 10));
@@ -2798,6 +2841,7 @@ function shoot() {
 }
 function knifeAttack(heavy) {
   const w = W.knife; G.nextFire = now + (heavy ? w.altRate : w.rate); G.swing = 0; G.kan = { type: heavy ? 'stab' : G.lastSlash?.type === 'slash' && now - G.lastSlash.t0 < 1 ? 'slash2' : 'slash', t0: now }; if (!heavy) G.lastSlash = G.kan; // golpes seguidos alternam o lado
+  if (vmGun?.userData.armsKnife) armsPlay(G.kan.type);
   const o = camera.position.clone(), d = new V3(0, 0, -1).applyQuaternion(camera.quaternion);
   if (ZC.on) { // zumbis: 150 de dano (mata na rodada 1 com uma facada), Bowie 1000
     const res = trace(o, d, w.range, zCands());
@@ -5350,6 +5394,7 @@ function tick(dt) {
 }
 applyQuality();
 loadHands();
+loadArms();
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos)
 window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
