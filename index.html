@@ -2947,7 +2947,7 @@ function shoot() {
   const w = W[G.cur], a = G.ammo[G.cur];
   if (!a) return;
   if (a.mag <= 0) { play('empty'); G.nextFire = now + .25; if (a.res > 0) startReload(); return; }
-  a.mag--; G.nextFire = now + w.rate * (zPerk('dt') ? .67 : 1); G.lastShot = now; G.lastShotW = G.cur; G.shots++;
+  a.mag--; G.nextFire = now + w.rate * (zPerk('dt') ? .75 : 1); G.lastShot = now; G.lastShotW = G.cur; G.shots++;
   const mz = muzzleWorld();
   if (w.thunder) thunderBlast(w, mz);
   else {
@@ -2964,7 +2964,7 @@ function shoot() {
         cur.dmg += dmg; cur.sp = false; if (res.zone === 'head' || (res.zone === 'body' && cur.zone === 'legs')) cur.zone = res.zone;
         dmgBy.set(res.id, cur); puff(res.p, zmode ? 0x6a0000 : 0xa01010, .35, .3, 0); bloodSplat(res.p);
       } else if (!w.splash) impact(res.p, res.n);
-      if (w.splash && zmode) zSplash(res.p, w, dmgBy);
+      if (w.splash && zmode) zSplash(res.p, w, dmgBy, res.n);
     }
     let hs = false;
     for (const [id, h] of dmgBy) {
@@ -3410,7 +3410,7 @@ function srvOnData(conn, d) {
     const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk);
     conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code });
     broadcast({ t: 'info', txt: name + ' entrou na sala' });
-    if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') { zResetPlayer(np); srvSpawn(np, zSpawnPoint(S.players.size - 1), true, Math.PI); } // entra já jogando
+    if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') { zResetPlayer(np); np.money = zDf().pts; srvSpawn(np, zSpawnPoint(S.players.size - 1), true, Math.PI); } // entra já jogando, com os pontos da dificuldade
     srvState();
     return;
   }
@@ -3428,6 +3428,7 @@ function srvDrop(conn) {
 // outros clientes, e mensagem acima de 16 KB fazia o PeerJS dar erro e o host derrubar jogadores inocentes
 const vec3 = a => Array.isArray(a) && a.length === 3 && a.every(x => typeof x === 'number' && Number.isFinite(x) && Math.abs(x) < 1e4);
 const finN = v => typeof v === 'number' && Number.isFinite(v);
+const isW = k => typeof k === 'string' && Object.hasOwn(W, k);
 function srvHandle(pid, m) {
   const p = S.players.get(pid); if (!p || !m) return;
   switch (m.t) {
@@ -3435,14 +3436,24 @@ function srvHandle(pid, m) {
       if (!p.alive || !vec3(m.p) || !finN(m.y) || !finN(m.pi)) return;
       if (m.sq !== undefined && p.sq && m.sq !== p.sq) return; // posição de antes do último spawn (desfazia o teleporte do começo da rodada)
       if (m.ts && m.ts < (p.posTs || 0)) return; p.posTs = m.ts || 0; // canal sem ordem: ignora posição velha
-      p.pos = m.p; p.yaw = m.y; p.pitch = m.pi; p.crouch = m.c ? 1 : 0; p.w = W[m.w] ? m.w : p.w;
+      p.pos = m.p; p.yaw = m.y; p.pitch = m.pi; p.crouch = m.c ? 1 : 0; p.w = isW(m.w) ? m.w : p.w;
       broadcastFast({ t: 'pos', id: pid, p: m.p, y: m.y, pi: m.pi, c: p.crouch, w: p.w, d: p.downed ? 1 : 0, ts: finN(m.ts) ? m.ts : 0, sq: p.sq }, pid); break;
     case 'shot': {
-      if (!vec3(m.o) || !W[m.w]) return;
+      if (!vec3(m.o) || !isW(m.w)) return;
       const e = (Array.isArray(m.e) ? m.e : []).slice(0, 12).filter(vec3);
       broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e }, pid); break;
     }
-    case 'zhit': if (S.st.mode === 'zombies' && Z.on && p.alive) zHit(p, +m.v, +m.dmg || 0, m.z, W[m.w] ? m.w : 'm1911', !!m.sp); break;
+    case 'zhit': {
+      // o cliente decide o acerto, mas o host confere: arma que ele tem, dano que a arma pode dar
+      // e cadência (antes, mandar {dmg:1e7} ou repetir a mensagem matava tudo e rendia pontos à vontade)
+      if (S.st.mode !== 'zombies' || !Z.on || !p.alive || S.phase === 'over' || !isW(m.w)) return;
+      const w = m.w, wd = W[w], z = Z.zs.get(+m.v); if (!z) return;
+      if (!(w === 'knife' || p.inv.primary === w || p.inv.secondary === w || (w === 'm1911_ls' && p.downed))) return;
+      const cap = wd.thunder ? 1e7 : w === 'knife' ? (p.bowie ? 1000 : 150) : (wd.dmg || 0) * Math.max(wd.head || 4, 1) * (wd.pellets || 1) * 1.1 + (wd.splash?.dmg || 0);
+      const gap = wd.thunder ? 0 : w === 'knife' ? .3 : (wd.rate || .1) * .6; // Double Tap = 0,75 da cadência
+      if (gap) { const B = Math.max(3, .5 / gap), tb = (z.tb ||= {}), b = tb[pid] || (tb[pid] = { n: B, t: now }); b.n = Math.min(B, b.n + (now - b.t) / gap); b.t = now; if (b.n < 1) return; b.n--; } // folga de 0,5 s: tiros que chegam juntos depois de um soluço da rede valem
+      zHit(p, z.id, clamp(+m.dmg || 0, 0, cap), m.z === 'head' || m.z === 'legs' ? m.z : 'body', w, !!m.sp); break;
+    }
     case 'use': if (S.st.mode === 'zombies' && Z.on) srvZUse(p, m); break;
     case 'hold': if (S.st.mode === 'zombies' && Z.on) srvZHold(p, m); break;
     case 'selfdmg': if (S.st.mode === 'zombies' && Z.on) zHurt(p, clamp(+m.d || 0, 0, 100), null); break;
@@ -3450,10 +3461,11 @@ function srvHandle(pid, m) {
       if (S.st.mode === 'zombies') return; // sem fogo amigo no cooperativo
       if (!p.alive && now - p.diedAt > .6) return; // tiro dado antes de saber que morreu (com TURN o ping passa de 300 ms)
       if (S.phase === 'freeze' || m.v === pid) return;
-      srvDamage(m.v, pid, clamp(+m.dmg || 0, 0, 500), m.z, W[m.w] ? m.w : 'glock'); break;
+      srvDamage(m.v, pid, clamp(+m.dmg || 0, 0, 500), m.z, isW(m.w) ? m.w : 'glock'); break;
     case 'buy': srvBuy(p, m.it); break;
     case 'skins': p.skins = cleanSk(m.sk); S.skDirty = true; break;
-    case 'nade': if (!p.alive || !W[m.k] || W[m.k].slot !== 'nade' || !vec3(m.p) || !vec3(m.v) || !(p.inv[m.k] > 0)) return; p.inv[m.k]--; broadcast({ t: 'nade', id: pid, k: m.k, p: m.p, v: m.v }, pid); break;
+    case 'nade': if (!p.alive || p.downed || !isW(m.k) || W[m.k].slot !== 'nade' || !vec3(m.p) || !vec3(m.v) || !(p.inv[m.k] > 0)
+      || Math.hypot(m.p[0] - p.pos[0], m.p[1] - p.pos[1] - 1.5, m.p[2] - p.pos[2]) > 4 || Math.hypot(m.v[0], m.v[1], m.v[2]) > 30) return; p.inv[m.k]--; broadcast({ t: 'nade', id: pid, k: m.k, p: m.p, v: m.v }, pid); break;
     case 'chat': broadcast({ t: 'chat', id: pid, txt: String(m.txt || '').slice(0, 120) }); break;
     case 'suicide': if (p.alive) srvKill(p, null, 'world', false); break;
   }
@@ -3508,7 +3520,7 @@ function srvStartMatch() {
   Z.on = false;
   syncBots();
   S.round = 0; S.winner = null; S.pre = 0;
-  for (const p of S.players.values()) { p.kills = p.deaths = p.rw = 0; p.money = 800; p.lossStreak = 0; p.inv = defInv(); p.armor = 0; p.helmet = false; p.alive = false; p.respawnAt = now + .3; p.pref = {}; }
+  for (const p of S.players.values()) { p.kills = p.deaths = p.rw = 0; p.money = 800; p.lossStreak = 0; p.downed = false; p.perks = []; p.maxHp = 100; p.bowie = false; p.inv = defInv(); p.armor = 0; p.helmet = false; p.alive = false; p.respawnAt = now + .3; p.pref = {}; }
   if (S.st.mode === 'dm') { S.phase = 'live'; S.phaseEnd = now + 10 * 60; for (const p of S.players.values()) srvSpawnDM(p); broadcast({ t: 'msg', txt: 'MATA-MATA', sub: `Primeiro a ${S.st.frags} abates vence`, dur: 3 }); }
   else if (S.players.size >= 2) srvStartRound();
   else { S.phase = 'warmup'; S.phaseEnd = 0; broadcast({ t: 'msg', txt: 'AQUECIMENTO', sub: 'Esperando outro jogador (ou adicione bots)', dur: 4 }); }
@@ -3575,7 +3587,7 @@ function srvState() {
   for (const p of S.players.values()) {
     const o = { id: p.id, n: p.name, c: p.color, b: p.isBot ? 1 : 0, hp: Math.round(p.hp), ar: p.armor, hm: p.helmet ? 1 : 0, al: p.alive ? 1 : 0, k: p.kills, d: p.deaths, m: p.money, rw: p.rw, sk: p.skins || {} };
     if (zmode) Object.assign(o, { hs: p.hs, dw: p.downs, rvs: p.revives, pk: p.perks, dn: p.downed ? 1 : 0, bl: p.downed && !p.selfRev ? r2(Math.max(0, p.bleedAt - now)) : 0,
-      rv: p.downed && p.revBy ? r2(p.revProg / (S.players.get(p.revBy)?.perks.includes('qr') ? 2 : 4)) : 0, mh: p.maxHp, bw: p.bowie ? 1 : 0 });
+      rv: p.downed && p.revBy && now - p.revLast < .5 ? r2(p.revProg / (S.players.get(p.revBy)?.perks.includes('qr') ? 2 : 4)) : 0, mh: p.maxHp, bw: p.bowie ? 1 : 0 });
     pl.push(o);
   }
   const full = (S.stN = (S.stN || 0) + 1) % 8 === 1;
@@ -3716,7 +3728,7 @@ function botShoot(p, tgt, D, wid, eye, dist) {
 // ================================================================
 let ZD = MAPS.sanatorio.z; // dados do mapa zumbi atual (troca em zBuildWorld)
 const ZPERKS = {
-  jug:   { name: 'Juggernog', cost: 2500, color: 0xc0201c, css: '#c0201c', ab: 'J', desc: 'Aguenta 5 golpes em vez de 2' },
+  jug:   { name: 'Juggernog', cost: 2500, color: 0xc0201c, css: '#c0201c', ab: 'J', desc: 'Vida vai a 250: aguenta 2,5 vezes mais golpes' },
   speed: { name: 'Speed Cola', cost: 3000, color: 0x2fae4e, css: '#2fae4e', ab: 'S', desc: 'Recarrega na metade do tempo' },
   dt:    { name: 'Double Tap', cost: 2000, color: 0xd08a22, css: '#d08a22', ab: 'D', desc: 'Atira 33% mais rápido' },
   qr:    { name: 'Quick Revive', cost: 1500, color: 0x4fb6e6, css: '#4fb6e6', ab: 'Q', desc: 'Reanima mais rápido (sozinho: te levanta)' },
@@ -3817,7 +3829,7 @@ function zBuildWorld(M) {
   if (FF.nx !== D.ff.nx || FF.nz !== D.ff.nz || !FF.walk) { Object.assign(FF, D.ff); FF.walk = new Uint8Array(FF.nx * FF.nz); FF.dist = new Float32Array(FF.nx * FF.nz); }
   else Object.assign(FF, D.ff);
   Object.assign(ZC, { on: true, round: 0, phase: '', power: false, doors: new Set(), box: { loc: 0, st: 'idle', user: null, w: null, t0: now }, pap: { st: 'idle', user: null, w: null, t0: now },
-    boards: D.windows.map(() => 6), insta: 0, dbl: 0, dog: false, fogDog: false, perks: [], bowie: false, qrBuys: 0, act: null, over: false, builtAt: now, selfRev: false, gone: new Set(), snapTs: 0 });
+    boards: D.windows.map(() => 6), insta: 0, dbl: 0, dog: false, fogDog: false, perks: [], bowie: false, qrBuys: 0, act: null, over: false, builtAt: now, selfRev: false, gone: new Set() }); // snapTs fica: a hora do host só sobe, e uma foto de antes do reinício é descartada
   const Wd = ZC.world = { doors: new Map(), planks: [], perks: new Map(), lights: [], box: null, pap: null, power: null, boxCol: null };
   const woodM = mc(0x6e4b2a), stoneM = mc(0x6a655c);
   const face = (o, n) => { o.rotation.y = Math.atan2(n[0], n[1]); };
@@ -4040,11 +4052,15 @@ function zOnSnap(m) {
   }
   ZC.insta = m.ins ? now + m.ins : 0; ZC.dbl = m.dbl ? now + m.dbl : 0;
 }
+// as caixas seguem o desenho: f = metros à frente do pé (para onde o zumbi olha). Antes ficavam todas
+// em cima do pé: na cabeça do corredor (inclinado) quase nunca pegava, e no rastejante o tiro no corpo errava
 function zBoxes(zc) {
-  const p = zc.pos, x = p.x, y = p.y, z = p.z, bb = (r, y0, y1) => ({ minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, minY: y + y0, maxY: y + y1 });
-  if (zc.dog) return [['head', bb(.2, .65, .95)], ['body', bb(.45, .15, .85)]];
-  if (zc.f & 8) return [['head', bb(.2, .25, .6)], ['body', bb(.45, 0, .4)]]; // rastejando
-  return [['head', bb(.19, 1.44, 1.84)], ['body', bb(.32, .85, 1.44)], ['legs', bb(.27, 0, .85)]];
+  const p = zc.pos, fx = -Math.sin(zc.yaw), fz = -Math.cos(zc.yaw);
+  const bb = (f, r, y0, y1) => { const x = p.x + fx * f, z = p.z + fz * f; return { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, minY: p.y + y0, maxY: p.y + y1 }; };
+  if (zc.dog) return [['head', bb(.5, .2, .62, 1)], ['body', bb(0, .45, .15, .85)]];
+  if (zc.f & 8) return [['head', bb(1.5, .22, .3, .85)], ['body', bb(.85, .45, 0, .55)], ['legs', bb(.2, .3, 0, .35)]]; // rastejando (deitado para a frente)
+  const L = [.08, .25, .38, .38][zc.f & 3], o = Math.sin(L) * .8, dy = (1 - Math.cos(L)) * .8; // inclinação do tronco de quem anda/corre
+  return [['head', bb(o, .19, 1.44 - dy, 1.84 - dy)], ['body', bb(o * .4, .32, .85, 1.44 - dy)], ['legs', bb(0, .27, 0, .85)]];
 }
 function zCands() { const out = []; for (const zc of ZC.zs.values()) if (!zc.dead) out.push({ id: zc.sid, pos: zc.pos, boxes: zBoxes(zc) }); return out; }
 function updateZombies(dt) {
@@ -4124,10 +4140,10 @@ function zBoomFx(p, w) {
   m.position.copy(p); addFx(m, .3, (k, o) => { o.scale.setScalar(1 + k * s.r); o.material.opacity = .8 * (1 - k); });
   flashLight.position.copy(p); flashLight.intensity = 40; if (s.r > 3) play('boom', p);
 }
-function zSplash(p, w, dmgBy) {
-  const s = w.splash;
+function zSplash(p, w, dmgBy, n) {
+  const s = w.splash, q = n ? p.clone().add(new V3(n[0], n[1], n[2]).multiplyScalar(.05)) : p; // um pouco para fora da parede atingida (trace devolve a normal como lista)
   for (const zc of ZC.zs.values()) {
-    if (zc.dead) continue; const c = zc.pos.clone(); c.y += zc.dog ? .5 : 1; const d = c.distanceTo(p); if (d > s.r) continue;
+    if (zc.dead) continue; const c = zc.pos.clone(); c.y += zc.dog ? .5 : 1; const d = c.distanceTo(p); if (d > s.r || !losClear(q, c)) continue;
     const cur = dmgBy.get(zc.sid) || { dmg: 0, zone: 'body', sp: true }; cur.dmg += s.dmg * (1 - .5 * d / s.r); dmgBy.set(zc.sid, cur);
   }
   const self = me.pos.clone(); self.y += .9; const ds = self.distanceTo(p);
@@ -4267,7 +4283,7 @@ function zHud(dt) {
   const a = ZC.act;
   setHTML('zprompt', a ? `<span class="${a.ok === false || (a.cost && a.cost > me.money) ? 'no' : ''}">${a.hold ? '' : '<b>F</b> — '}${esc(a.txt)}</span>` : '');
   let bar = 0;
-  if (a?.k === 'rev' && ZC.revLocal > 0) bar = ZC.revLocal / (zPerk('qr') ? 2 : 4);
+  if (a?.k === 'rev' && ZC.revLocal > 0) bar = Math.min(ZC.revLocal / (zPerk('qr') ? 2 : 4), (C.players.get(a.id)?.rv || 0) + .3); // não passa do que o host contou
   if (me.downed && mine?.rv) bar = mine.rv;
   $('#zbar').classList.toggle('hidden', !(bar > 0));
   if (bar > 0) $('#zbar').firstElementChild.style.width = clamp(bar, 0, 1) * 100 + '%';
@@ -4290,11 +4306,11 @@ const ZDIFF = [
   { name: 'Fácil', desc: 'Zumbis 30% mais fracos e mais lentos, 3 golpes para cair, começa com 1500 pontos e mais power-ups.', hp: .7, dmg: 34, atk: 1.4, run: -14, spd: .92, cnt: .75, pts: 1500, bleed: 60, drop: .7, regen: 1.8, dog: [6, 6], max: 20, spawn: 1.25 },
   { name: 'Normal', desc: 'Como no CoD: 2 golpes para cair, começa com 500 pontos.', hp: 1, dmg: 50, atk: 1.2, run: 0, spd: 1, cnt: 1, pts: 500, bleed: 45, drop: 1, regen: 2.5, dog: [5, 4], max: 24, spawn: 1 },
   { name: 'Difícil', desc: '35% mais vida, mais zumbis, começam a correr antes, menos power-ups e cães mais cedo.', hp: 1.35, dmg: 60, atk: 1.05, run: 14, spd: 1.06, cnt: 1.25, pts: 500, bleed: 35, drop: 1.3, regen: 3.5, dog: [4, 4], max: 28, spawn: .8 },
-  { name: 'Pesadelo', desc: 'Um golpe derruba (sem Juggernog), quase o dobro de vida, correm desde a rodada 1, 250 pontos iniciais.', hp: 1.8, dmg: 100, atk: .95, run: 30, spd: 1.12, cnt: 1.5, pts: 250, bleed: 25, drop: 1.7, regen: 5, dog: [4, 3], max: 32, spawn: .65 },
+  { name: 'Pesadelo', desc: 'Um golpe derruba (sem Juggernog), quase o dobro de vida, correm desde a rodada 1, 250 pontos iniciais.', hp: 1.8, dmg: 100, atk: .95, run: 40, spd: 1.12, cnt: 1.5, pts: 250, bleed: 25, drop: 1.7, regen: 5, dog: [4, 3], max: 32, spawn: .65 },
 ];
 const zDf = () => ZDIFF[S.st?.zdiff ?? 1] || ZDIFF[1];
 const zHp = r => r < 10 ? 150 + 100 * (r - 1) : Math.round(950 * Math.pow(1.1, r - 9)); // vida do zumbi (fórmula do CoD)
-const zCount = (r, np) => { const max = 24 + 6 * (np - 1), mult = r < 5 ? [.25, .33, .54, .75][r - 1] : r < 10 ? 1 : r * .15; return Math.max(1, Math.round(max * mult)); };
+const zCount = (r, np) => { const max = 24 + 6 * (np - 1), mult = r < 5 ? [.25, .33, .54, .75][r - 1] : r < 10 ? 1 + (r - 5) * .1 : r * .15; return Math.max(1, Math.round(max * mult)); };
 const zInv = () => ({ primary: 'm1911', secondary: null, he: 0, smoke: 0, monkey: 0 }); // as granadas chegam no início de cada rodada (+2)
 // grade de navegação (1 m) + campo de fluxo: cada zumbi desce o gradiente até o jogador mais próximo
 const FF = { x0: -27, z0: -8, nx: 54, nz: 32 };
@@ -4417,6 +4433,7 @@ function zTickPlayers(dt) {
     if (p.downed) {
       if (p.revBy && now - p.revLast > .4) { p.revBy = null; p.revProg = 0; }
       if (p.selfRev) { if (now >= p.selfRev) zRevive(p, null); }
+      else if (p.revBy) p.bleedAt += dt; // o tempo para sangrar fica parado enquanto alguém reanima
       else if (now >= p.bleedAt) zBleed(p);
     } else if (p.hp < p.maxHp && now - p.lastHurt > zDf().regen * (p.perks.includes('qr') ? .6 : 1)) p.hp = Math.min(p.maxHp, p.hp + 120 * dt); // regenera
     if (S.phase === 'over') return;
@@ -4541,7 +4558,7 @@ function zTickZombies(dt) {
 function zChase(z, dt) {
   const b = z.body, P = b.pos, tgt = z.tgt;
   let gx = 0, gz = 0, has = false, dist = 0, dir = [0, 0];
-  if (Z.lure) { gx = Z.lure[0]; gz = Z.lure[1]; has = true; } else if (tgt) { gx = tgt.pos[0]; gz = tgt.pos[2]; has = true; }
+  if (Z.lure) { gx = Z.lure[0]; gz = Z.lure[1]; has = true; z.atkWind = 0; } else if (tgt) { gx = tgt.pos[0]; gz = tgt.pos[2]; has = true; }
   if (has) {
     const dx = gx - P.x, dz = gz - P.z; dist = Math.hypot(dx, dz);
     if (now >= z.losT) { z.losT = now + .35 + Math.random() * .1; z.los = dist < 14 && segClearR(P.x, P.z, gx, gz); }
@@ -4558,7 +4575,8 @@ function zChase(z, dt) {
   if (P.y < -5) { zRecycle(z); return; }
   if (now >= z.chkT) { // travado atrás de alguma coisa por muito tempo? volta pra fila e renasce
     const moved = Math.hypot(P.x - z.chkX, P.z - z.chkZ);
-    z.stuck = moved < .6 && dist > 2.5 ? z.stuck + 1 : 0; z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z;
+    const unreach = !Z.lure && tgt && dist < 2.5 && Math.abs(tgt.pos[1] - P.y) >= 1.5; // jogador num lugar alto: não alcança e a rodada não acabava
+    z.stuck = (moved < .6 && dist > 2.5) || (unreach && moved < 1.5) ? z.stuck + 1 : 0; z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z;
     if (z.stuck >= 2) zRecycle(z);
   }
 }
@@ -4575,7 +4593,7 @@ function zRecycle(z) { Z.zs.delete(z.id); Z.toSpawn++; broadcast({ t: 'zgone', i
 function zPts(p, n) { if (Z.dbl > now) n *= 2; p.money += n; sendTo(p.id, { t: 'pts', n, m: p.money }); }
 function zPay(p, c) { if (p.money < c) { sendTo(p.id, { t: 'err', txt: 'Pontos insuficientes' }); return false; } p.money -= c; sendTo(p.id, { t: 'pts', n: -c, m: p.money }); return true; }
 function zHit(p, zid, dmg, zone, w, splash) {
-  const z = Z.zs.get(zid); if (!z || !(dmg > 0)) return;
+  const z = Z.zs.get(zid); if (!z || !(dmg > 0) || S.phase === 'over') return;
   dmg = Math.min(dmg, 1e7);
   if (Z.insta > now) dmg = z.hp; // Insta-Kill
   z.hp -= dmg;
@@ -4616,7 +4634,7 @@ function zGive(p, w, cur, pref) { // até 2 armas: se já tiver 2, troca a que e
   zSendInv(p, w);
 }
 function zBoxPick(p) {
-  const own = w => [p.inv.primary, p.inv.secondary].some(x => x === w || x === w + '_pap'), pool = [];
+  const own = w => [p.inv.primary, p.inv.secondary].some(x => x === w || x === w + '_pap') || (Z.pap.user === p.id && Z.pap.st !== 'idle' && Z.pap.w === w + '_pap'), pool = [];
   for (const [id, w] of Object.entries(ZWEAP)) if (w.box && !own(id)) pool.push([id, w.box]);
   if (!(p.inv.monkey > 0)) pool.push(['monkey', 5]);
   let r = Math.random() * pool.reduce((s, x) => s + x[1], 0);
@@ -4661,7 +4679,10 @@ function srvZUse(p, m) {
     case 'boxtake': {
       const L = ZD.boxes[Z.box.loc]; if (Z.box.st !== 'offer' || Z.box.user !== p.id || !near(L.x, L.z, 3)) return;
       const w = Z.box.w;
-      if (w === 'monkey') { p.inv.monkey = 3; zSendInv(p, 'monkey'); } else zGive(p, w, m.cur);
+      const owned = w !== 'monkey' && ([p.inv.primary, p.inv.secondary].some(x => x === w || x === w + '_pap') || (Z.pap.user === p.id && Z.pap.st !== 'idle' && Z.pap.w === w + '_pap'));
+      if (w === 'monkey') { p.inv.monkey = 3; zSendInv(p, 'monkey'); }
+      else if (owned) { p.money += 950; sendTo(p.id, { t: 'pts', n: 950, m: p.money }); sendTo(p.id, { t: 'err', txt: 'Você já tem essa arma: pontos devolvidos' }); }
+      else zGive(p, w, m.cur);
       Z.box.st = 'idle'; Z.box.uses++; broadcast({ t: 'zbox', st: 'idle', loc: Z.box.loc }); break;
     }
     case 'pap': {
@@ -4690,6 +4711,7 @@ function srvZHold(p, m) {
   } else if (m.k === 'rev') {
     const t = S.players.get(m.id); if (!t || t === p || !t.alive || !t.downed) return;
     if (Math.hypot(p.pos[0] - t.pos[0], p.pos[2] - t.pos[2]) > 2.4) return;
+    if (t.revBy && t.revBy !== p.id && now - t.revLast <= .4) return; // outro já está reanimando
     if (t.revBy !== p.id || now - t.revLast > .4) { t.revBy = p.id; t.revProg = 0; t.revLast = now; }
     t.revProg += Math.min(.3, now - t.revLast); t.revLast = now;
     if (t.revProg >= (p.perks.includes('qr') ? 2 : 4)) zRevive(t, p);
@@ -4724,6 +4746,7 @@ function zWorldState() {
     dr: Z.drops.map(d => [d.id, d.type, r2(d.x), r2(d.z), r2(Math.max(0, 26 - (now - d.t0)))]), qr: Z.qrBuys, dog: Z.dogRound ? 1 : 0 };
 }
 function zExplode(pos, owner, r, dmgMax, w, insta) { // granada / macaco
+  if (S.phase === 'over') return;
   const p = S.players.get(owner);
   for (const z of [...Z.zs.values()]) {
     const c = z.body.pos.clone(); c.y += z.dog ? .5 : 1; const d = c.distanceTo(pos);
@@ -4740,7 +4763,7 @@ function zExplode(pos, owner, r, dmgMax, w, insta) { // granada / macaco
 // ================================================================
 function onMsg(m) {
   switch (m.t) {
-    case 'welcome': C.myId = m.you; C.st = m.st; NET.code = m.code; buildMap(m.st.map); enterGame(); break;
+    case 'welcome': C.myId = m.you; C.st = m.st; NET.code = m.code; ZC.snapTs = 0; buildMap(m.st.map); enterGame(); break;
     case 'match':
       C.st = m.st; if (curMapId !== m.st.map) buildMap(m.st.map); else clearFx();
       me.alive = false; me.downed = false; for (const rp of R.values()) { rp.alive = rp.dead = rp.downed = false; rp.buf = []; }
@@ -4787,9 +4810,9 @@ function onMsg(m) {
     case 'zs': if (ZC.on) zOnSnap(m); break;
     case 'zdie': {
       ZC.gone.add(m.id);
+      if (m.by === C.myId) grantXP(m.hs ? 5 : 3);
       const zc = ZC.zs.get(m.id); if (!zc || zc.dead) break;
       zc.dead = true; zc.deadT = now;
-      if (m.by === C.myId) grantXP(m.hs ? 5 : 3);
       const hp = zc.pos.clone(); hp.y += zc.dog ? .7 : 1.5;
       if (m.hs && !zc.dog) { zc.model.userData.head.visible = false; puff(hp, 0x8a0000, .7, .5, 0); } else puff(hp, 0x8a0000, .45, .35, 0);
       if (m.fl) { const src = m.by === C.myId ? me.pos : (R.get(m.by)?.pos || zc.pos); const d = zc.pos.clone().sub(src); d.y = 0; if (d.lengthSq() < 1e-6) d.set(0, 0, 1); d.normalize(); zc.fling = d.multiplyScalar(14); zc.fling.y = 7; }
@@ -5034,7 +5057,7 @@ addEventListener('keydown', e => {
   if (me.downed && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyQ', 'KeyV', 'KeyF'].includes(e.code)) return; // caído: só a pistola
   switch (e.code) {
     case 'KeyF': if (ZC.on) zUse(); else knifeInspect(); break;
-    case 'KeyV': if (ZC.on && me.alive && now >= G.nextFire && now >= G.switchEnd) knifeAttack(false); break;
+    case 'KeyV': if (ZC.on && me.alive && !me.sprinting && !(ZC.revLocal > 0) && now >= G.nextFire && now >= G.switchEnd) knifeAttack(false); break;
     case 'Digit1': G.inv.primary && equip(G.inv.primary); break;
     case 'Digit2': G.inv.secondary && equip(G.inv.secondary); break;
     case 'Digit3': equip('knife'); break;
@@ -5566,7 +5589,7 @@ function tick(dt) {
   } else {
     const deadFor = now - C.deadAt;
     const rp = C.spec && R.get(C.spec);
-    if (rp && rp.alive) { camera.position.set(rp.pos.x, rp.pos.y + (rp.crouch ? EYE_CROUCH : EYE_STAND), rp.pos.z); camera.rotation.set(rp.pitch, rp.yaw, 0); }
+    if (rp && rp.alive) { camera.position.set(rp.pos.x, rp.pos.y + (rp.downed ? .55 : rp.crouch ? EYE_CROUCH : EYE_STAND), rp.pos.z); camera.rotation.set(rp.pitch, rp.yaw, 0); }
     else {
       const k = clamp(deadFor / 1.5, 0, 1);
       camera.position.set(me.pos.x, me.pos.y + lerp(me.eye, 3.2, k), me.pos.z);
