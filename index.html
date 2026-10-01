@@ -240,7 +240,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 .pk.s{font-size:14px}
 #zrem{position:absolute;top:52px;left:12px;font-size:16px;color:#ddd;text-shadow:0 1px 2px #000}
 #zrem b{color:#fff}
-#zstreak{position:absolute;left:0;right:0;top:22%;text-align:center;font-size:34px;font-weight:700;color:#ffcf5a;text-shadow:0 0 10px rgba(255,120,0,.6),0 2px 2px #000;opacity:0}
+#zstreak{position:absolute;left:0;right:0;top:16%;text-align:center;font-size:34px;font-weight:700;color:#ffcf5a;text-shadow:0 0 10px rgba(255,120,0,.6),0 2px 2px #000;opacity:0}
 #zstreak.go{animation:zst 1.6s ease-out}
 @keyframes zst{0%{opacity:1;transform:scale(1.4)}70%{opacity:1;transform:scale(1)}100%{opacity:0}}
 #zprompt{position:absolute;left:0;right:0;top:60%;text-align:center;font-size:23px;font-weight:700}
@@ -513,7 +513,7 @@ const ZWEAP = {
   law:        { name: 'M72 LAW', box: 4, dmg: 200, rate: 1, mag: 1, res: 10, reload: 2.6, spread: .004, head: 1, splash: { r: 4.5, dmg: 1600, self: 70 }, tracer: 0xffa060, speed: .95, model: 'law', snd: 'launcher', papName: 'M72 Anarchy', papMag: 5, papRes: 25 },
   crossbow:   { name: 'Besta', box: 4, dmg: 300, rate: .8, mag: 1, res: 12, reload: 2.4, spread: .003, head: 2, splash: { r: 3, dmg: 1100, self: 40 }, tracer: 0xff6040, model: 'xbow', snd: 'xbow', papName: 'Awful Lawton', papMag: 3, papRes: 20 },
   // armas maravilha novas (raras): chain = raio que pula entre zumbis (calculado no host); frost = cone que congela e deixa lento
-  wunderwaffe: { name: 'Wunderwaffe DG-2', box: 1.2, wonder: 1, dmg: 50000, rate: 1.1, mag: 3, res: 9, reload: 3.6, spread: .003, head: 1, rm: 1, chain: { n: 8, r: 6 }, papChain: { n: 14, r: 8 }, tracer: 0x66ccff, papTracer: 0xff5050, model: 'waffe', snd: 'zap', papName: 'Wunderwaffe DG-3 JZ', papMag: 6, papRes: 24 },
+  wunderwaffe: { name: 'Wunderwaffe DG-2', box: 1.2, wonder: 1, dmg: 50000, rate: 1.1, mag: 3, res: 9, reload: 3.6, spread: .003, head: 1, rm: 1, chain: { n: 8, r: 6 }, papChain: { n: 14, r: 8 }, tracer: 0x66ccff, papTracer: 0xff5050, model: 'waffe', snd: 'waffe', papName: 'Wunderwaffe DG-3 JZ', papMag: 6, papRes: 24 },
   wintershowl: { name: "Winter's Howl", box: 1.2, wonder: 1, dmg: 1100, rate: .35, mag: 6, res: 36, reload: 2.6, spread: 0, head: 1, frost: { range: 9, cos: .9, n: 12 }, papFrost: { range: 12, cos: .85, n: 16 }, tracer: 0xaee8ff, papTracer: 0x7fd8ff, model: 'howl', snd: 'frost', papName: "Winter's Fury" },
   raygun2:    { name: 'Ray Gun Mark II', box: 2, wonder: 1, burst: 3, brate: .07, dmg: 700, rate: .38, mag: 21, res: 168, reload: 2.6, spread: .006, head: 2, rm: 1, tracer: 0xff3030, papTracer: 0x30e0ff, model: 'raygun', snd: 'ray', papName: "Porter's Mark II Ray Gun", papMag: 33 },
   raygun:     { name: 'Ray Gun', box: 4, wonder: 1, dmg: 1000, rate: .3, mag: 20, res: 160, reload: 2.7, spread: .008, head: 1, splash: { r: 2.2, dmg: 300, self: 25 }, tracer: 0x33ff55, model: 'raygun', snd: 'ray', papName: "Porter's X2 Ray Gun", papTracer: 0xff3355 },
@@ -1939,7 +1939,7 @@ const SND = {
   ray: o => { tn(o, .18, 1400, 300, .3, 'square'); tn(o, .2, 700, 200, .25, 'sawtooth'); nz(o, .1, 3000, 1000, .2, 'bandpass', 2); },
   thunder: o => { nz(o, .9, 300, 60, 1.6); tn(o, .7, 60, 25, 1.4); nz(o, .5, 2500, 300, .6, 'bandpass', 1); },
   launcher: o => { nz(o, .2, 900, 200, .7); tn(o, .15, 160, 60, .6); },
-  zap: o => { tn(o, .35, 2200, 180, .35, 'sawtooth'); nz(o, .4, 4000, 600, .5, 'bandpass', 3); tn(o, .2, 90, 40, .6, 'square'); },
+  waffe: o => { tn(o, .35, 2200, 180, .35, 'sawtooth'); nz(o, .4, 4000, 600, .5, 'bandpass', 3); tn(o, .2, 90, 40, .6, 'square'); },
   frost: o => { nz(o, .5, 6000, 1500, .55, 'highpass'); tn(o, .3, 1600, 2600, .15, 'sine'); nz(o, .3, 900, 300, .4, 'bandpass', 2); },
   xbow: o => { tn(o, .08, 260, 90, .5, 'triangle'); nz(o, .12, 1800, 600, .35, 'bandpass', 2); },
   groan: o => vox(o, rand(75, 110), rand(.7, 1.2), rand(.6, 1.1), .3),
@@ -4049,20 +4049,23 @@ function srvHandle(pid, m) {
       if (!p.alive || !vec3(m.p) || !finN(m.y) || !finN(m.pi)) return;
       if (m.sq !== undefined && p.sq && m.sq !== p.sq) return; // posição de antes do último spawn (desfazia o teleporte do começo da rodada)
       if (m.ts && m.ts < (p.posTs || 0)) return; p.posTs = m.ts || 0; // canal sem ordem: ignora posição velha
+      if (p.posAt && now > p.posAt && Math.hypot(m.p[0] - p.pos[0], m.p[2] - p.pos[2]) / Math.max(.03, now - p.posAt) > 3.5) p.fastT = now; p.posAt = now; // última vez que andou rápido (o PhD confere o deslize)
       p.pos = m.p; p.yaw = m.y; p.pitch = m.pi; p.crouch = m.c ? 1 : 0; p.w = isW(m.w) ? m.w : p.w;
       broadcastFast({ t: 'pos', id: pid, p: m.p, y: m.y, pi: m.pi, c: p.crouch, w: p.w, d: p.downed ? 1 : 0, ts: finN(m.ts) ? m.ts : 0, sq: p.sq }, pid); break;
     case 'shot': {
       if (!vec3(m.o) || !isW(m.w)) return;
       const e = (Array.isArray(m.e) ? m.e : []).slice(0, 12).filter(vec3);
-      broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e }, pid); break;
+      p.shotT = now; broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e }, pid); break;
     }
     case 'zhit': {
       // o cliente decide o acerto, mas o host confere: arma que ele tem, dano que a arma pode dar
       // e cadência (antes, mandar {dmg:1e7} ou repetir a mensagem matava tudo e rendia pontos à vontade)
       if (S.st.mode !== 'zombies' || !Z.on || !p.alive || S.phase === 'over' || !isW(m.w)) return;
       const w = m.w, wd = W[w], z = Z.zs.get(+m.v); if (!z) return;
-      if (!(w === 'knife' || p.inv.primary === w || p.inv.secondary === w || (p.inv.third === w && !p.downed) || (w === 'm1911_ls' && p.downed) || (w === 'dmach' && !p.downed && p.dmEnd > now - .5))) return; // terceira arma (Mule Kick); Máquina da Morte com folga de rede
+      if (!((w === 'knife' && !p.downed) || ((p.inv.primary === w || p.inv.secondary === w) && (!p.downed || wd.slot === 'secondary')) || (p.inv.third === w && !p.downed) || (w === 'm1911_ls' && p.downed) || (w === 'dmach' && !p.downed && p.dmEnd > now - .5))) return; // caído: só pistola // terceira arma (Mule Kick); Máquina da Morte com folga de rede
       const cap = (wd.thunder ? 1e7 : w === 'knife' ? (p.bowie ? 1000 : 150) : (wd.dmg || 0) * Math.max(wd.head || 4, 1) * (wd.pellets || 1) * 1.1 + (wd.splash?.dmg || 0)) * (p.perks.includes('ds') && w !== 'knife' ? 1.5 : 1); // Deadshot: headshot +50%
+      if (w === 'knife' && Math.hypot(z.body.pos.x - p.pos[0], z.body.pos.z - p.pos[2]) > 4.5) return; // facada (com o bote) alcança uns 3,4 m
+      p.shotT = now; // atirou de verdade (Electric Cherry confere)
       const iv = w === 'knife' ? .5 : wd.burst ? (wd.rate + (wd.burst - 1) * wd.brate) / wd.burst : (wd.rate || .1); // intervalo médio entre tiros (rajada: média da rajada + pausa)
       const gap = wd.thunder ? 0 : iv * .6; // Double Tap = 0,75 da cadência
       if (gap) { const B = Math.max(3, .5 / gap), tb = (z.tb ||= {}), b = tb[pid] || (tb[pid] = { n: B, t: now }); b.n = Math.min(B, b.n + (now - b.t) / gap); b.t = now; if (b.n < 1) return; b.n--; } // folga de 0,5 s: tiros que chegam juntos depois de um soluço da rede valem
@@ -4071,7 +4074,7 @@ function srvHandle(pid, m) {
         b.n = Math.min(B, b.n + (now - b.t) * tg / g2); b.t = now; if (b.n < 1) return; b.n--;
       }
       zHit(p, z.id, clamp(+m.dmg || 0, 0, cap), m.z === 'head' || m.z === 'legs' ? m.z : 'body', w, !!m.sp);
-      if (wd.frost && Z.zs.has(z.id)) zFreeze(z, wd); // sobreviveu ao gelo: fica lento
+      if (wd.frost && +m.dmg > 0 && Z.zs.has(z.id)) zFreeze(z, wd); // sobreviveu ao gelo: fica lento
       if (wd.chain) zChain(p, z, wd, w); // raio pula para os vizinhos (calculado aqui, com limite de saltos e de distância)
       break;
     }
@@ -4505,7 +4508,7 @@ function zBuildWorld(M) {
   else Object.assign(FF, D.ff);
   Object.assign(ZC, { on: true, round: 0, phase: '', power: false, doors: new Set(), box: { loc: 0, st: 'idle', user: null, w: null, t0: now }, pap: { st: 'idle', user: null, w: null, t0: now },
     boards: D.windows.map(() => 6), insta: 0, dbl: 0, dog: false, fogDog: false, perks: [], bowie: false, qrBuys: 0, act: null, over: false, builtAt: now, selfRev: false, gone: new Set(),
-    fire: 0, bf: 0, dmEnd: 0, traps: (D.traps || []).map(() => ({ st: 'idle', end: 0 })), streak: 0, streakT: 0 }); // snapTs fica: a hora do host só sobe, e uma foto de antes do reinício é descartada
+    fire: 0, bf: 0, dmEnd: 0, traps: (D.traps || []).map(() => ({ st: 'idle', end: 0 })), streak: 0, streakT: 0, rem: 0, nextR: 0 }); // snapTs fica: a hora do host só sobe, e uma foto de antes do reinício é descartada
   const Wd = ZC.world = { doors: new Map(), planks: [], perks: new Map(), lights: [], box: null, pap: null, power: null, boxCol: null };
   const woodM = mc(0x6e4b2a), stoneM = mc(0x6a655c);
   const face = (o, n) => { o.rotation.y = Math.atan2(n[0], n[1]); };
@@ -4776,6 +4779,7 @@ function zOnSnap(m) {
     zc.f = a[i + 5]; zc.lastSeen = now;
     if (fresh) { zc.pos.set(a[i + 1], a[i + 2], a[i + 3]); zc.last.copy(zc.pos); zc.yaw = a[i + 4]; zc.model.position.copy(zc.pos); if (zc.dog || zc.kind === 6) zLightning(zc.pos); }
   }
+  if (typeof m.b === 'string') m.b = Array.from(m.b, c => c.charCodeAt(0) - 48); // tábuas vêm como texto ("6606...")
   if (m.b) for (let i = 0; i < m.b.length; i++) {
     const old = ZC.boards[i];
     if (old !== undefined && old !== m.b[i] && now - ZC.builtAt > 1.5) {
@@ -4984,7 +4988,7 @@ function zArcFx(pts, pap) { // raio da Wunderwaffe pulando de zumbi em zumbi (po
   }
   const l = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(v), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 1 }));
   addFx(l, .35, (k, o) => { o.material.opacity = 1 - k; });
-  const p0 = new V3(...pts[0]); flashLight.position.copy(p0); flashLight.intensity = 30; play('zap', p0);
+  const p0 = new V3(...pts[0]); flashLight.position.copy(p0); flashLight.intensity = 30; play('waffe', p0);
 }
 function zPush() { // zumbi é sólido: dá pra ficar encurralado
   for (const zc of ZC.zs.values()) {
@@ -5011,7 +5015,7 @@ function zSetDowned(on) {
     equip(hasW(C.downPrev) ? C.downPrev : bestW(), true);
   }
 }
-const zDownGun = () => ['m1911_pap', 'python_pap', 'cz75_pap', 'm1911', 'python', 'cz75'].find(id => G.inv.primary === id || G.inv.secondary === id) || 'm1911_ls'; // caído: pistola (a terceira arma se perde)
+const zDownGun = () => [G.inv.primary, G.inv.secondary].filter(id => id && W[id]?.zw && W[id].slot === 'secondary' && !W[id].ls).sort((a, b) => (W[b].pap | 0) - (W[a].pap | 0) || W[b].dmg - W[a].dmg)[0] || 'm1911_ls'; // caído: pistola (a terceira arma se perde)
 const zHasG = id => !!id && (G.inv.primary === id || G.inv.secondary === id || G.inv.third === id);
 function zInteract(dt) {
   if (G.cur === 'dmach' && !hasW('dmach')) equip(hasW(C.dmPrev) ? C.dmPrev : bestW(), true); // a Máquina da Morte acabou
@@ -5078,7 +5082,7 @@ function zUse() {
   const a = ZC.act; if (!a || a.hold) return;
   if (a.ok === false) { play('empty'); return; }
   if (a.cost && a.cost > me.money) { toast('Pontos insuficientes', 1.5); play('empty'); return; }
-  sendToHost({ t: 'use', k: a.k, id: a.id, cur: G.cur === 'dmach' ? C.dmPrev : G.cur }); // com a Máquina da Morte na mão, troca vale para a arma guardada
+  sendToHost({ t: 'use', k: a.k, id: a.id, cur: G.cur === 'dmach' ? C.dmPrev : G.cur, c: a.cost || 0 }); // c: preço que a pessoa viu // com a Máquina da Morte na mão, troca vale para a arma guardada
 }
 function zStreak() { // série de abates: 5, 10, 15... em até 2,5 s entre um e outro
   ZC.streak = now - ZC.streakT < 2.5 ? ZC.streak + 1 : 1; ZC.streakT = now;
@@ -5410,6 +5414,7 @@ function zTickZombies(dt) {
   const tg = [...S.players.values()].filter(p => p.alive && !p.downed);
   for (const z of [...Z.zs.values()]) {
     if (!Z.zs.has(z.id)) continue; // morreu nesta volta (explosão de outro)
+    if (z.frzT && now >= z.frzT) { z.frzT = 0; z.frz = 0; z.speed = z.spd0; z.sc = z.sc0; } // o gelo passou
     if (z.nukeAt && now >= z.nukeAt) { if (z.kind === 6) { z.nukeAt = 0; z.hp = Math.max(1, z.hp - z.maxHp * .2); } else { zKill(z, null, 'body', 'nuke', false, true); continue; } } // Nuke não mata o Carniceiro: tira 20%
     const P = z.body.pos;
     if (z.tgt && (!z.tgt.alive || z.tgt.downed || !S.players.has(z.tgt.id))) { z.tgt = null; z.tgtT = 0; }
@@ -5470,7 +5475,7 @@ function zChase(z, dt) {
     if (!Z.lure && tgt) { if (z.los || z.atkWind) zTryAttack(z, tgt, z.dog ? 1.5 : z.kind === 6 ? 2.3 : z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35); if (dist < (z.dog ? .9 : .85 + (z.rad - .3) * 2)) dir = [0, 0]; } // sem linha livre (grade no meio) não bate
     else if (Z.lure && dist < 1) dir = [0, 0];
   }
-  const spd = (z.crawler ? .9 : z.speed * (z.buffT > now ? 1.3 : 1) * (z.kind === 6 && z.hp < z.maxHp * .5 ? 1.4 : 1)) * (z.atkWind ? .35 : 1), k = Math.min(1, dt * 8); // grito: +30%; Carniceiro furioso abaixo da metade
+  const spd = (z.crawler ? .9 : z.speed * (z.buffT > now ? 1.3 : 1) * (z.kind === 6 && z.hp < z.maxHp * .5 ? 1.4 : 1) * (z.slowT > now ? .6 : 1)) * (z.atkWind ? .35 : 1), k = Math.min(1, dt * 8); // grito: +30%; Carniceiro furioso abaixo da metade
   b.vel.x += (dir[0] * spd - b.vel.x) * k; b.vel.z += (dir[1] * spd - b.vel.z) * k;
   const face = (dir[0] || dir[1]) ? Math.atan2(-dir[0], -dir[1]) : has ? Math.atan2(-(gx - P.x), -(gz - P.z)) : z.yaw;
   z.yaw += clamp(angDiff(z.yaw, face), -8 * dt, 8 * dt);
@@ -5514,7 +5519,7 @@ function zBloatBoom(x, y, zz, p) { // Explosivo estoura: muito dano nos zumbis e
     if (p) zHit(p, o.id, dmg, 'body', 'bloat', true); else { o.hp -= o.kind === 6 ? Math.min(dmg, o.maxHp * .12) : dmg; if (o.hp <= 0) zKill(o, null, 'body', 'bloat', true, false); } // sem dono: outro Explosivo em volta também estoura
   }
   for (const q of S.players.values()) {
-    if (!q.alive || q.downed) continue;
+    if (!q.alive || q.downed || q.perks.includes('phd')) continue; // PhD Flopper: explosão não machuca
     const t = new V3(q.pos[0], q.pos[1] + 1, q.pos[2]), d = t.distanceTo(c);
     if (d < R && losClear(c, t)) zHurt(q, Math.round(D.dmg * .4 * (1 - d / R) + 5), c);
   }
@@ -5538,9 +5543,9 @@ function zHit(p, zid, dmg, zone, w, splash) {
   if (z.kind === 6) dmg = Math.min(dmg, z.maxHp * .12); // nenhum golpe tira mais de 12% do Carniceiro (Arma Trovão, macaco, Insta-Kill)
   z.hp -= dmg;
   if (z.hp <= 0) zKill(z, p, zone, w, splash, false);
-  else { zPts(p, 10); if (z.kind === 6 && z.hp < z.maxHp * .5) z.sc = 1; if (splash && !z.dog && !z.crawler && z.kind !== 1 && z.kind !== 6 && z.st === 'in' && Math.random() < .3) z.crawler = true; } // explosão pode arrancar as pernas
+  else { zPts(p, 10); if (z.kind === 6 && z.hp < z.maxHp * .5) z.sc = 1; if (splash && !W[w]?.frost && !W[w]?.chain && !z.dog && !z.crawler && z.kind !== 1 && z.kind !== 6 && z.st === 'in' && Math.random() < .3) z.crawler = true; } // explosão pode arrancar as pernas
 }
-function zFreeze(z, wd) { if (z.dog) { z.speed = Math.min(z.speed, 3); return; } z.speed = Math.min(z.speed, wd.pap ? .8 : 1.1); z.sc = 0; z.frz = 1; } // congelado: passa a andar devagar
+function zFreeze(z, wd) { if (z.kind === 6) { z.slowT = now + 1.5; return; } if (!z.frzT) { z.spd0 = z.speed; z.sc0 = z.sc; } z.frzT = now + (wd.pap ? 6 : 4); z.frz = 1; if (z.dog) { z.speed = Math.min(z.speed, 3); return; } z.speed = Math.min(z.speed, wd.pap ? .8 : 1.1); z.sc = 0; } // congelado: passa a andar devagar
 function zChain(p, z0, wd, w) { // Wunderwaffe: o raio pula para o zumbi mais perto (até chain.n saltos de até chain.r metros, com linha de visão)
   const C_ = wd.chain, done = new Set([z0.id]), a = new V3(), b = new V3(); let cur = z0.body.pos;
   const pts = [[r2(cur.x), r2(cur.y + 1.2), r2(cur.z)]];
@@ -5562,11 +5567,12 @@ function zKill(z, p, zone, w, splash, nuke) {
   if (p && !nuke) { pts = (w === 'knife' ? 130 : splash ? 50 : zone === 'head' ? 100 : zone === 'legs' ? 50 : 60) + (ZKIND[z.kind]?.pts || 0); zPts(p, pts); p.kills++; if (zone === 'head' && !splash) p.hs++; }
   const K = z.kind | 0, msg = { t: 'zdie', id: z.id, hs: zone === 'head' && !splash ? 1 : 0, fl: w === 'thundergun' || w === 'thundergun_pap' ? 1 : 0, by: p ? p.id : null };
   if (W[w]?.frost) msg.ic = 1; // Uivo do Inverno: o zumbi congelado se estilhaça
-  if (K) msg.k = K; if (K === 2 && !nuke) msg.ex = [r2(dx), r2(Math.max(0, z.body.pos.y)), r2(dz)];
+  const bx = z.body.pos.x, bz = z.body.pos.z; // dx/dz é o ponto de dentro da janela (para o power-up); estouro e nuvem ficam onde ele está
+  if (K) msg.k = K; if (K === 2 && !nuke) msg.ex = [r2(bx), r2(Math.max(0, z.body.pos.y)), r2(bz)];
   broadcast(msg);
-  if (K === 6) { for (const q of S.players.values()) if (q !== p && q.alive) zPts(q, 300); zDrop(null, dx, dz, true); } // Carniceiro: pontos para o time e power-up garantido
-  if (msg.ex) zBloatBoom(dx, Math.max(0, z.body.pos.y), dz, p);
-  if (K === 4 && !nuke) { const c = { id: Z.cloudId++, x: dx, y: Math.max(0, z.body.pos.y), z: dz, end: now + 7 }; Z.clouds.push(c); }
+  if (K === 6) { if (p) for (const q of S.players.values()) if (q !== p && q.alive) zPts(q, 300); zDrop(null, dx, dz, true); } // Carniceiro: pontos para o time e power-up garantido
+  if (msg.ex) zBloatBoom(bx, Math.max(0, z.body.pos.y), bz, p);
+  if (K === 4 && !nuke) { const c = { id: Z.cloudId++, x: bx, y: Math.max(0, z.body.pos.y), z: bz, end: now + 7 }; Z.clouds.push(c); }
   if (z.dog && Z.dogRound && Z.toSpawn <= 0 && Z.zs.size === 0) zDrop('max', dx, dz, true); // último cão sempre solta Munição Máxima
   else if (!nuke && p && Z.dropsRound < 4) { Z.dropScore += pts; if (Z.dropScore >= Z.dropThresh || Math.random() < .02) zDrop(null, dx, dz, false); }
 }
@@ -5596,8 +5602,8 @@ function zPower(type, p) {
     case 'perk': // Bebida Grátis: uma bebida que cada um não tem (passa do limite)
       for (const q of S.players.values()) {
         if (!q.alive || q.downed) continue;
-        const opts = Object.keys(ZPERKS).filter(k => !q.perks.includes(k) && ZD.perks.some(x => x.k === k)); if (!opts.length) continue;
-        const k = opts[Math.floor(Math.random() * opts.length)]; q.perks.push(k); if (k === 'jug') { q.maxHp = 250; q.hp = 250; }
+        const opts = Object.keys(ZPERKS).filter(k => !q.perks.includes(k) && ZD.perks.some(x => x.k === k) && !(k === 'qr' && S.players.size === 1 && Z.qrBuys >= 3)); if (!opts.length) continue;
+        const k = opts[Math.floor(Math.random() * opts.length)]; q.perks.push(k); if (k === 'jug') { q.maxHp = 250; q.hp = 250; } if (k === 'qr' && S.players.size === 1) Z.qrBuys++;
         broadcast({ t: 'zperk', id: q.id, k });
       }
       break;
@@ -5655,6 +5661,7 @@ function srvZUse(p, m) {
     case 'box': {
       const L = ZD.boxes[Z.box.loc]; if (Z.box.st !== 'idle' || !near(L.x, L.z, 3)) return;
       const fire = Z.fire > now, cost = fire ? 10 : 950; // Liquidação: 10 pontos e sem ursinho
+      if (finN(m.c) && m.c > 0 && m.c < cost) return err('A Liquidação acabou'); // viu 10, agora custa 950: não cobra sem avisar
       if (!zPay(p, cost)) return;
       Z.box.st = 'roll'; Z.box.user = p.id; Z.box.t = now + 4; Z.box.paid = cost;
       Z.box.w = !fire && Z.box.uses >= 3 && Math.random() < .3 ? 'teddy' : zBoxPick(p); // depois de algumas usadas o ursinho pode aparecer
@@ -5674,6 +5681,7 @@ function srvZUse(p, m) {
       const P = ZD.pap; if (!near(P.x, P.z, 3)) return; if (!Z.power) return err('Sem energia'); if (Z.pap.st !== 'idle') return;
       const w = m.cur, wd = W[w];
       if (!wd || !wd.zw || wd.pap || wd.ls || !has(w)) return err('Essa arma não pode ser melhorada');
+      if (finN(m.c) && m.c > 0 && m.c < (Z.bf > now ? 1000 : 5000)) return err('A oferta do Pack-a-Punch acabou');
       if (!zPay(p, Z.bf > now ? 1000 : 5000)) return; // oferta do Pack-a-Punch: 1000
       const slot = ['primary', 'secondary', 'third'].find(k => p.inv[k] === w); p.inv[slot] = null;
       Z.pap = { st: 'work', user: p.id, w: w + '_pap', t: now + 3.5, slot };
@@ -5697,7 +5705,7 @@ function srvZUse(p, m) {
 function srvZFx(p, m) {
   if (!p.alive || p.downed || S.phase === 'over' || Z.phase === 'over') return;
   if (m.k === 'ch') {
-    if (!p.perks.includes('cherry') || now < (p.chT || 0) || !finN(m.f)) return;
+    if (!p.perks.includes('cherry') || now < (p.chT || 0) || !finN(m.f) || now - (p.shotT || -99) > 8) return; // só quem estava atirando recarrega
     const f = clamp(m.f, 0, 1); p.chT = now + 2.5;
     const r = 1.5 + 2.5 * f, dmg = 200 + 1300 * f, c = new V3(p.pos[0], p.pos[1] + 1, p.pos[2]);
     for (const z of [...Z.zs.values()]) {
@@ -5707,7 +5715,7 @@ function srvZFx(p, m) {
     }
     broadcast({ t: 'zfx', k: 'ch', id: p.id, r: r2(r) });
   } else if (m.k === 'phd') {
-    if (!p.perks.includes('phd') || now < (p.phdT || 0)) return;
+    if (!p.perks.includes('phd') || now < (p.phdT || 0) || now - (p.fastT || -99) > 1.2) return; // só deslizando (rápido no último 1,2 s), não parado
     p.phdT = now + 2;
     zExplode(new V3(p.pos[0], p.pos[1] + .5, p.pos[2]), p.id, 4, Math.min(5000, 600 + 150 * Z.round), 'phd');
     broadcast({ t: 'zfx', k: 'phd', id: p.id });
@@ -5719,7 +5727,11 @@ function zTickTraps(dt) { // armadilha ligada: mata zumbi que passa (sem pontos)
     if (T.st === 'on') {
       if (now >= T.t) { T.st = 'cool'; T.t = now + ZTRAP.cool; broadcast({ t: 'ztrap', i, st: 'cool', t: ZTRAP.cool }); return; }
       const x0 = t.x - t.w / 2 - .3, x1 = t.x + t.w / 2 + .3, z0 = t.z - t.d / 2 - .3, z1 = t.z + t.d / 2 + .3;
-      for (const z of [...Z.zs.values()]) { const P = z.body.pos; if (z.st !== 'rise' && P.x > x0 && P.x < x1 && P.z > z0 && P.z < z1 && P.y < 2) zKill(z, null, 'body', 'trap', false, true); }
+      for (const z of [...Z.zs.values()]) {
+        const P = z.body.pos; if (z.st === 'rise' || P.x <= x0 || P.x >= x1 || P.z <= z0 || P.z >= z1 || P.y >= 2) continue;
+        if (z.kind === 6) { if (now >= (z.trapT || 0)) { z.trapT = now + ZTRAP.every; z.hp -= z.maxHp * .06; if (z.hp <= 0) zKill(z, null, 'body', 'trap', false, true); } continue; } // Carniceiro: 6% a cada choque, não morre de uma vez
+        zKill(z, null, 'body', 'trap', false, true);
+      }
       for (const q of S.players.values()) {
         if (!q.alive || q.downed || q.pos[0] < x0 || q.pos[0] > x1 || q.pos[2] < z0 || q.pos[2] > z1 || q.pos[1] > 2.4) continue;
         if (now >= (T.hurt[q.id] || 0)) { T.hurt[q.id] = now + ZTRAP.every; zHurt(q, ZTRAP.dmg, null); }
@@ -5767,10 +5779,10 @@ function zSnap() {
     if (z.kind === 6) bo = Math.max(bo, r2(Math.max(0, z.hp) / z.maxHp));
   }
   const bk = Z.boards.join(), sendB = bk !== Z.lastB || (Z.snapN = (Z.snapN || 0) + 1) % 10 === 0; Z.lastB = bk;
-  const msg = { t: 'zs', ts: r3(now), z: a, b: sendB ? Z.boards.slice() : undefined, ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0, rem: Z.phase === 'round' ? Z.toSpawn + Z.zs.size : 0 };
+  const msg = { t: 'zs', ts: r3(now), z: a, b: sendB ? Z.boards.join('') : undefined, ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0, rem: Z.phase === 'round' ? Z.toSpawn + Z.zs.size : 0 };
   if (Z.fire > now) msg.fs = r2(Z.fire - now); if (Z.bf > now) msg.bf = r2(Z.bf - now); if (Z.phase === 'break') msg.nx = r2(Math.max(0, Z.phaseEnd - now)); // só vai quando tem
   if (bo) msg.bo = bo; // vida do Carniceiro
-  if (Z.clouds.length && (sendB || Z.clouds[Z.clouds.length - 1].id !== Z.lastCl)) { Z.lastCl = Z.clouds[Z.clouds.length - 1].id; msg.cl = Z.clouds.map(c => [c.id, r2(c.x), r2(c.z), r2(c.end - now)]); } // nuvens tóxicas: quando nasce uma e de 10 em 10 fotos (quem entra no meio também vê)
+  if (Z.clouds.length && ((Z.clN = (Z.clN || 0) + 1) % 10 === 5 || Z.clouds[Z.clouds.length - 1].id !== Z.lastCl)) { Z.lastCl = Z.clouds[Z.clouds.length - 1].id; msg.cl = Z.clouds.map(c => [c.id, r2(c.x), r2(c.z), r2(c.end - now)]); } // nuvens tóxicas: quando nasce uma e de 10 em 10 fotos (quem entra no meio também vê)
   broadcastFast(msg);
 }
 function zWorldState() {
