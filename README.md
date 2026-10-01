@@ -44,7 +44,7 @@ Todo mundo começa com uma M1911.
 A dificuldade aparece no canto de cima, junto com o nome do mapa.
 
 - **Rodadas infinitas.** A vida dos zumbis segue a fórmula do CoD (150 na rodada 1, +100 por rodada até a 9, depois ×1,1). A quantidade cresce a cada rodada. Os zumbis começam andando e passam a correr e disparar nas rodadas altas.
-- **Pontos:** 10 por acerto; ao matar, 60 (corpo), 50 (pernas ou explosão), 100 (headshot) ou 130 (faca). Consertar janela dá 10 por tábua (até 500 por rodada).
+- **Pontos:** 10 por acerto; ao matar, 60 (corpo), 50 (pernas ou explosão), 100 (headshot) ou 130 (faca), mais o extra dos zumbis especiais (veja abaixo). Consertar janela dá 10 por tábua (até 500 por rodada).
 - **Janelas:** os zumbis vêm de fora, arrancam as tábuas e pulam para dentro. Segure F perto da janela para pregar as tábuas de volta. Na Vila (e nos lugares abertos do Sanatório) eles também saem do chão.
 - **Portões, portas e entulho** (750 a 2000) liberam novas áreas, com mais armas e mais janelas.
 - **Armas de parede** (contorno de giz, na parede ou em placas de madeira): M14, Olympia, MP40, MP5K, AK-74u, Stakeout, granadas e Faca Bowie; nas alas novas do Sanatório e nos anéis de fora da Vila também Dragunov, Galil, SPAS-12, FAL, Commando, HK21 e RPK. Se você já tem a arma, compra munição pela metade do preço (arma com Pack-a-Punch: 4500).
@@ -54,6 +54,18 @@ A dificuldade aparece no canto de cima, junto com o nome do mapa.
 - **Pack-a-Punch (5000):** fica no pátio do Castelo (Vila) ou embaixo da Torre d'água (Sanatório). Dobra o dano, aumenta o pente e dá nome e camuflagem novos à arma (a M1911 vira a explosiva Mustang & Sally).
 - **Power-ups:** caem dos zumbis e duram 26s no chão. São eles: Munição Máxima, Insta-Kill, Pontos em Dobro, Nuke (+400) e Carpinteiro (+200).
 - **Cães do inferno:** uma rodada especial de tempos em tempos. O último cão sempre solta Munição Máxima.
+- **Zumbis especiais:** com as rodadas, parte da horda vira especial (nunca mais da metade da rodada, e nunca na rodada de cães). Cada um tem cor e forma próprias:
+
+  | Tipo | A partir da rodada | Como é | Pontos extras ao matar |
+  |---|---|---|---|
+  | **Veloz** | 4 | Magro, olhos vermelhos. Corre mais que os cães, mas tem só 55% da vida | +20 |
+  | **Explosivo** | 6 | Barriga inchada que brilha. Ao morrer estoura (4,5 m): tira muita vida dos zumbis em volta e um pouco de quem estiver perto (paredes e portas protegem) | +40 |
+  | **Brutamonte** | 8 | Maior, com ombreiras de ferro. 3,5 vezes a vida, anda devagar, bate 60% mais forte e arranca tábuas mais rápido. Poucos por rodada | +100 |
+  | **Tóxico** | 10 | Pele verde com pústulas. Ao morrer deixa uma nuvem verde por 7 s que tira vida de quem fica dentro | +40 |
+  | **Gritador** | 12 | Pálido, cabeça comprida. De tempos em tempos grita e os zumbis em volta correm 30% mais por 5 s | +60 |
+
+  No Fácil eles aparecem 2 rodadas mais tarde e em menor número; no Difícil uma rodada antes e no Pesadelo duas, em maior número. Os zumbis comuns também variam de tamanho, pele e roupa.
+- **Carniceiro (chefe):** aparece na rodada 12 (Fácil 14, Difícil 11, Pesadelo 10) e volta a cada 10 rodadas (Difícil 9, Pesadelo 8; se cair numa rodada de cães, vem na seguinte), anunciado com um raio e uma barra de vida no alto da tela. Grande, de armadura e cutelo, muita vida (cresce com a rodada e com o número de jogadores), lento, mas fica 40% mais rápido abaixo da metade da vida. Quando ergue o cutelo, um anel vermelho aparece no chão: em 1 s ele bate e acerta todo mundo dentro do anel. Nenhum golpe tira mais de 12% da vida dele (vale para Arma Trovão e macaco), o Insta-Kill só dobra o dano e o Nuke tira 20% sem matar. Ao morrer dá 1000 pontos extras a quem matou, 300 a cada um dos outros e solta um power-up garantido. A rodada só acaba depois que ele morre.
 - **Vida:** a barra no centro de baixo da tela mostra a vida (com Juggernog vai até 250). Toda rodada nova começa com a vida cheia.
 - **Cair e reanimar:** com a vida zerada, você cai com uma pistola e tem 45 s (no Normal) para alguém segurar F em você (o tempo para enquanto alguém está reanimando). Quem sangra volta na rodada seguinte, com a M1911 e os mesmos pontos. Se todos caírem, fim de jogo.
 
@@ -63,7 +75,7 @@ Aba **Skins** no menu.
 
 - **Caixas:** você ganha XP jogando e, a cada 300 XP, recebe uma caixa. Conta nova começa com 2.
   - Abate: 10 XP (headshot 15; contra bot vale metade)
-  - Zumbi morto: 3 (headshot 5)
+  - Zumbi morto: 3 (headshot 5); especiais dão mais (Veloz +2, Explosivo e Tóxico +3, Gritador +4, Brutamonte +6, Carniceiro +50)
   - Rodada de zumbi sobrevivida: 25
   - Reanimar alguém: 20
   - Fim de partida: 40 (vitória: 150)
