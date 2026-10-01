@@ -4575,7 +4575,7 @@ let ZRING = null;
 // sorteios do visual (mesma ordem de antes: pele, roupa, calça, pé descalço, cabelo); o mesmo id dá o mesmo zumbi em todos
 function zLook(kind, id) {
   const R = zSeed(id), pick = a => Math.floor(R() * a.length), s = pick(ZSKIN), c = pick(ZCLOTH), p = pick(ZPANTS), bare = R() < .5, hair = !!kind || R() < .75;
-  return { s, c, p, bare, hair, key: kind + ',' + s + ',' + c + ',' + p + ',' + (+bare) + (+hair) };
+  return { s, c, p, bare, hair, key: kind ? kind + ',' + (kind === 6 ? 0 : p) + ',' + (+bare) : kind + ',' + s + ',' + c + ',' + p + ',' + (+bare) + (+hair) }; // especiais: pele e roupa vêm do tipo (no Carniceiro a calça também), então só calça/pé mudam o molde
 }
 // cada visual é montado (e juntado) uma vez só; os outros zumbis iguais são cópias leves do molde
 const ZTPL = new Map(), ZMG = new Map(); // moldes por visual; peças já juntadas (pela receita), nunca descartadas
