@@ -429,7 +429,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // Utilidades
 // ================================================================
 const V3 = THREE.Vector3;
-const $ = s => document.querySelector(s);
+const $C = new Map(), $ = s => { let e = $C.get(s); if (!e || !e.isConnected) { e = document.querySelector(s); if (e) $C.set(s, e); } return e; }; // a HUD pede os mesmos elementos a cada quadro: guarda
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const rand = (a, b) => a + Math.random() * (b - a);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -2179,6 +2179,14 @@ function buildMap(id) {
   const vmWarm = new THREE.Group(); for (const id of ['m4', 'ak47', 'm1911_pap', 'awp', 'raygun', 'knife']) vmWarm.add(gunModel(id, true)); vmScene.add(vmWarm); // armas PBR da primeira pessoa
   renderer.compile(scene, camera);
   renderer.compile(vmScene, vmCam);
+  // e desenha um quadro de verdade com tudo isso (sem recorte, projetando sombra): compila as variantes que o compile()
+  // não pega (sombra com e sem ossos, alvo do pós-processamento no Alto, passes do composer) e já sobe texturas e malhas.
+  // Sem isso o primeiro quadro da partida travava segundos. A imagem não aparece: o próximo frame() desenha por cima.
+  const fc = [], inW = new Set(); warm.traverse(o => inW.add(o)); // o mapa inteiro também, sem recorte: sobe todas as malhas e texturas
+  for (const g of [scene, vmWarm]) g.traverse(o => { fc.push([o, o.frustumCulled, o.castShadow]); o.frustumCulled = false; if (inW.has(o) && o.isMesh && !o.material.transparent) o.castShadow = true; });
+  renderer.shadowMap.needsUpdate = true; renderScene(); renderer.clear();
+  for (const [o, f, c] of fc) { o.frustumCulled = f; o.castShadow = c; }
+  renderer.shadowMap.needsUpdate = true;
   scene.remove(warm); vmScene.remove(vmWarm);
   vmWarm.traverse(o => o.geometry?.dispose());
   warm.traverse(o => { o.skeleton?.dispose(); if (!o.geometry?.userData.keep) o.geometry?.dispose(); if (o.material?.map && o.material.map !== SOFT && !Object.values(GTX || {}).includes(o.material.map)) o.material.map.dispose(); });
@@ -2450,7 +2458,15 @@ function vox(out, f0, bend, dur, vol) {
   const g = AC.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .08); g.gain.exponentialRampToValueAtTime(.001, t + dur);
   o.connect(f); f.connect(g); g.connect(out); o.start(t); o.stop(t + dur + .05);
 }
-function play(name, pos) { if (!AC || !SND[name]) return; try { SND[name](sdest(pos)); } catch (e) { } }
+// mesmo som muitas vezes no mesmo instante (chumbo acertando vários zumbis, Thundergun, Wunderwaffe) soa igual a 3
+// e cada um cria filtro, ganho e painel 3D novos: além de 3 no mesmo quadro (40 ms) o resto é pulado
+const SNDN = new Map();
+function play(name, pos) {
+  if (!AC || !SND[name]) return;
+  const t = performance.now(), r = SNDN.get(name);
+  if (r && t - r.t < 40) { if (++r.n > 3) return; } else if (r) { r.t = t; r.n = 1; } else SNDN.set(name, { t, n: 1 });
+  try { SND[name](sdest(pos)); } catch (e) { }
+}
 function updateListener() {
   if (!AC) return;
   const L = AC.listener, p = camera.position, f = new V3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -3631,48 +3647,51 @@ function armsGunBase() {
     k.foreH = E.clone().sub(H).normalize().applyQuaternion(qh.clone().invert()); // direção pulso→cotovelo vista pela mão (pulso reto)
   }
 }
-function twistAbout(q, axis) { // parte da rotação q em volta do eixo (decomposição swing-twist)
-  const d = q.x * axis.x + q.y * axis.y + q.z * axis.z, t = new THREE.Quaternion(axis.x * d, axis.y * d, axis.z * d, q.w);
-  return t.lengthSq() < 1e-12 ? new THREE.Quaternion() : t.normalize();
+function twistAbout(q, axis, t = new THREE.Quaternion()) { // parte da rotação q em volta do eixo (decomposição swing-twist)
+  const d = q.x * axis.x + q.y * axis.y + q.z * axis.z; t.set(axis.x * d, axis.y * d, axis.z * d, q.w);
+  return t.lengthSq() < 1e-12 ? t.identity() : t.normalize();
 }
 const _bm = new THREE.Matrix4();
-function frameQuat(ax, n) { // rotação com colunas (eixo, normal, eixo × normal)
-  const x = ax.clone().normalize(), y = n.clone().addScaledVector(x, -n.dot(x)).normalize(), z = new V3().crossVectors(x, y);
-  return new THREE.Quaternion().setFromRotationMatrix(_bm.makeBasis(x, y, z));
+// IK dos braços roda 2× por quadro: tudo em vetores de rascunho (sem lixo para o coletor)
+const IK = { x: new V3(), y: new V3(), z: new V3(), T: new V3(), E0: new V3(), S: new V3(), D: new V3(), u: new V3(), pv: new V3(), E: new V3(), n: new V3(), a1: new V3(), a2: new V3(),
+  f1: new THREE.Quaternion(), f2: new THREE.Quaternion(), qT: new THREE.Quaternion(), qlo: new THREE.Quaternion(), rel: new THREE.Quaternion(), tw: new THREE.Quaternion(), q: new THREE.Quaternion(), q2: new THREE.Quaternion() };
+function frameQuat(ax, n, out = new THREE.Quaternion()) { // rotação com colunas (eixo, normal, eixo × normal)
+  const x = IK.x.copy(ax).normalize(), y = IK.y.copy(n).addScaledVector(x, -n.dot(x)).normalize(), z = IK.z.crossVectors(x, y);
+  return out.setFromRotationMatrix(_bm.makeBasis(x, y, z));
 }
 function aimBone(b, axLocal, nLocal, axWorld, nWorld) { // gira o osso para o eixo e a normal locais caírem nos do mundo
-  const qW = frameQuat(axWorld, nWorld).multiply(frameQuat(axLocal, nLocal).invert());
+  const qW = frameQuat(axWorld, nWorld, IK.f1).multiply(frameQuat(axLocal, nLocal, IK.f2).invert());
   setBoneWorldQuat(b, qW);
 }
 function setBoneWorldQuat(b, q) { b.parent.getWorldQuaternion(_q1); b.quaternion.copy(_q1.invert().multiply(q)); b.updateMatrixWorld(true); }
 function armIK(s, target, pole) {
   const k = ARMS.ik[s];
-  k.base.forEach(([p, q], i) => { const b = [k.up, k.lo, k.hand][i]; b.position.copy(p); b.quaternion.copy(q); });
+  const bs = k.bs ||= [k.up, k.lo, k.hand]; for (let i = 0; i < 3; i++) { bs[i].position.copy(k.base[i][0]); bs[i].quaternion.copy(k.base[i][1]); }
   k.up.parent.updateMatrixWorld(true); k.up.updateMatrixWorld(true);
   // mão desejada no mundo: soquete na arma × mão em relação ao soquete
-  target.decompose(_v1, _q1, _v2); _m2.compose(_v1, _q1, _v2.set(1, 1, 1)).multiply(k.relInv); const HW = _m2, T = new V3().setFromMatrixPosition(HW);
-  const qT = new THREE.Quaternion().setFromRotationMatrix(_m1.extractRotation(HW));
+  target.decompose(_v1, _q1, _v2); _m2.compose(_v1, _q1, _v2.set(1, 1, 1)).multiply(k.relInv); const HW = _m2, T = IK.T.setFromMatrixPosition(HW);
+  const qT = IK.qT.setFromRotationMatrix(_m1.extractRotation(HW));
   const a = k.L1, b = k.L2;
   // Como nos FPS, o ombro não fica preso ao corpo: ele é posto fora da tela, atrás e abaixo de cada mão, para o
   // antebraço entrar na diagonal pelo canto (esquerdo por baixo do guarda-mão, direito pelo canto inferior direito).
   // Pulso reto: o cotovelo vai exatamente na direção natural do antebraço vista pela mão, e o ombro fica além dele,
   // puxado para o lado de GRIP.sh (fora da tela). Assim a mão nunca dobra no pulso ("munheca quebrada").
-  const E0 = T.clone().addScaledVector(k.foreH.clone().applyQuaternion(qT), b);
-  const S = E0.clone().addScaledVector(_v1.fromArray(GRIP['sh' + s]).normalize(), a * .97);
+  const E0 = IK.E0.copy(T).addScaledVector(IK.a1.copy(k.foreH).applyQuaternion(qT), b);
+  const S = IK.S.copy(E0).addScaledVector(_v1.fromArray(GRIP['sh' + s]).normalize(), a * .97);
   pole = E0;
   k.up.parent.worldToLocal(_v2.copy(S)); k.up.position.copy(_v2); k.up.updateMatrixWorld(true);
-  let D = T.clone().sub(S), d = D.length();
+  const D = IK.D.copy(T).sub(S); let d = D.length();
   d = Math.max(Math.abs(a - b) + 1e-3, Math.min(d, a + b - 1e-4));
-  const u = D.clone().normalize(), pv = pole.clone().sub(S); pv.addScaledVector(u, -pv.dot(u)).normalize();
+  const u = IK.u.copy(D).normalize(), pv = IK.pv.copy(pole).sub(S); pv.addScaledVector(u, -pv.dot(u)).normalize();
   const cosA = (a * a + d * d - b * b) / (2 * a * d), sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
-  const E = S.clone().addScaledVector(u, a * cosA).addScaledVector(pv, a * sinA);
-  const n = E.clone().sub(S).cross(T.clone().sub(E)).normalize();                // novo plano de dobra
-  aimBone(k.up, k.upAx, k.upN, E.clone().sub(S), n);
-  aimBone(k.lo, k.loAx, k.loN, T.clone().sub(E), n);
+  const E = IK.E.copy(S).addScaledVector(u, a * cosA).addScaledVector(pv, a * sinA);
+  const n = IK.n.copy(E).sub(S).cross(IK.a1.copy(T).sub(E)).normalize();                // novo plano de dobra
+  aimBone(k.up, k.upAx, k.upN, IK.a2.copy(E).sub(S), n);
+  aimBone(k.lo, k.loAx, k.loN, IK.a2.copy(T).sub(E), n);
   // o antebraço gira junto com a mão (metade), o resto fica no pulso
-  const qlo = k.lo.getWorldQuaternion(new THREE.Quaternion()), rel = qlo.clone().invert().multiply(qT);
-  const tw = twistAbout(rel, k.loAx).multiply(k.twist0.clone().invert());
-  k.lo.quaternion.multiply(new THREE.Quaternion().slerp(tw, .5)); k.lo.updateMatrixWorld(true);
+  const qlo = k.lo.getWorldQuaternion(IK.qlo), rel = IK.rel.copy(qlo).invert().multiply(qT);
+  const tw = twistAbout(rel, k.loAx, IK.tw).multiply(IK.q.copy(k.twist0).invert());
+  k.lo.quaternion.multiply(IK.q2.identity().slerp(tw, .5)); k.lo.updateMatrixWorld(true);
   setBoneWorldQuat(k.hand, qT);
 }
 function armsIK(ud) {
@@ -5665,7 +5684,7 @@ function zBoxes(zc) {
 function zCands() { const out = []; for (const zc of ZC.zs.values()) if (!zc.dead) out.push({ id: zc.sid, pos: zc.pos, boxes: zBoxes(zc) }); return out; }
 function updateZombies(dt) {
   const rt = now - netDelay('z');
-  for (const zc of [...ZC.zs.values()]) {
+  for (const zc of ZC.zs.values()) { // apagar do Map durante o laço é seguro
     const ud = zc.model.userData, M_ = zc.model;
     if (zc.dead) { if (zAnimDead(zc, ud, dt)) zRemoveClient(zc); continue; }
     if (now - zc.lastSeen > 2.5) { zRemoveClient(zc); continue; } // folga para picos de rede (antes sumiam e voltavam)
@@ -6944,7 +6963,7 @@ function hpBar(mh, hv = me.hp) {
   fill.style.width = w; fill.style.backgroundColor = `hsl(${Math.round(f * 115)},75%,48%)`;
   el.querySelector('.trail').style.width = w;
 }
-function setHTML(id, html) { if (hudCache[id] !== html) { hudCache[id] = html; document.getElementById(id).innerHTML = html; } }
+function setHTML(id, html) { if (hudCache[id] !== html) { hudCache[id] = html; $('#' + id).innerHTML = html; } }
 function updateHud(dt) {
   const w = W[G.cur], st = C.st || {}, ZM = st.mode === 'zombies';
   $('#zhud').classList.toggle('hidden', !ZM);
@@ -7594,6 +7613,9 @@ function frame() {
   now = performance.now() / 1000; lastFrameAt = performance.now();
   if (!inGame) { renderer.clear(); return; }
   if (window.__simLock) now = window.__simNow ?? now; else tick(dt); // testes automáticos controlam o tempo
+  renderScene();
+}
+function renderScene() {
   sky.position.copy(camera.position); if (CULL.length) zCull();
   if (CFG.gfx === 'alto') { gradePass.uniforms.time.value = now % 100; composer.render(); }
   else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); }
