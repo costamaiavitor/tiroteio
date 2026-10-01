@@ -248,6 +248,9 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #zstam{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);width:160px;height:5px;background:rgba(255,255,255,.18);border-radius:3px;transition:opacity .4s}
 #zstam i{display:block;height:100%;width:100%;background:#e8e2c8;border-radius:3px}
 #zstam.low i{background:#ff7a50}
+#zboss{position:absolute;left:50%;top:74px;transform:translateX(-50%);width:420px;max-width:70vw;text-align:center;font-size:17px;font-weight:700;color:#ffb3a3;text-shadow:0 1px 2px #000;letter-spacing:3px}
+#zboss div{height:10px;margin-top:3px;background:rgba(0,0,0,.55);border:1px solid rgba(255,120,90,.7)}
+#zboss i{display:block;height:100%;width:100%;background:linear-gradient(#ff4a2a,#9a1206)}
 #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.42) 100%)}
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -278,6 +281,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
     <div id="zdown"></div>
     <div id="zflash"></div>
     <div id="zstam"><i></i></div>
+    <div id="zboss" class="hidden">CARNICEIRO<div><i></i></div></div>
     <div id="zinfo"></div>
   </div>
   <div id="room"></div>
@@ -1346,7 +1350,7 @@ function buildMap(id) {
   // compila na hora e trava a câmera por alguns frames.
   const warm = new THREE.Group();
   warm.add(playerModel('#888888'), gunModel('ak47'), nameSprite('x', '#fff'));
-  if (M.zombie) warm.add(zombieModel(false), zombieModel(true), gunModel('raygun_pap'), gunModel('thundergun'));
+  if (M.zombie) warm.add(zombieModel(false), zombieModel(true), zombieModel(false, 2), zombieModel(false, 6), gunModel('raygun_pap'), gunModel('thundergun'));
   warm.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, transparent: true, depthWrite: false })));
   warm.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(), new V3(0, 1, 0)]), new THREE.LineBasicMaterial({ transparent: true })));
   warm.add(new THREE.Mesh(new THREE.SphereGeometry(.1), new THREE.MeshBasicMaterial({ transparent: true })));
@@ -1356,7 +1360,7 @@ function buildMap(id) {
   renderer.compile(vmScene, vmCam);
   scene.remove(warm); vmScene.remove(vmWarm);
   vmWarm.traverse(o => o.geometry?.dispose());
-  warm.traverse(o => { o.geometry?.dispose(); if (o.material?.map && o.material.map !== SOFT && !Object.values(GTX || {}).includes(o.material.map)) o.material.map.dispose(); });
+  warm.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); if (o.material?.map && o.material.map !== SOFT && !Object.values(GTX || {}).includes(o.material.map)) o.material.map.dispose(); });
 }
 
 // ---------- navegação dos bots (grade automática) ----------
@@ -1535,6 +1539,14 @@ const SND = {
   groan: o => vox(o, rand(75, 110), rand(.7, 1.2), rand(.6, 1.1), .3),
   snarl: o => { vox(o, rand(140, 190), 1.4, .35, .45); nz(o, .3, 1400, 500, .2, 'bandpass', 3); },
   dog: o => { vox(o, rand(220, 300), .6, .25, .4); nz(o, .2, 1800, 600, .2, 'bandpass', 3); },
+  groan2: o => vox(o, rand(55, 80), rand(.6, .9), rand(.8, 1.3), .32),
+  groan3: o => { vox(o, rand(120, 160), rand(.8, 1.3), rand(.4, .7), .25); nz(o, .3, 900, 400, .1, 'bandpass', 4); },
+  brute: o => { vox(o, rand(42, 58), .7, 1.1, .5); nz(o, .6, 300, 80, .3, 'lowpass', 1); },
+  hiss: o => nz(o, .45, 3400, 1800, .3, 'bandpass', 4),
+  gurgle: o => { vox(o, rand(60, 90), 1.3, .7, .35); nz(o, .5, 500, 200, .25, 'bandpass', 6); },
+  scream: o => { vox(o, rand(500, 620), 1.6, 1.3, .55); vox(o, rand(700, 820), 1.4, 1.1, .35); },
+  slam: o => { nz(o, .8, 900, 60, 1.6); tn(o, .6, 60, 22, 1.4); },
+  boss: o => { [98, 92, 87, 73].forEach((f, i) => tn(o, 1.2, f, f * .97, .35, 'sawtooth', i * .5)); vox(o, 70, .6, 2.2, .5); nz(o, 2.5, 400, 60, .35, 'lowpass', .7); },
   crack: o => { nz(o, .12, 2500, 500, .8, 'bandpass', 1.5); tn(o, .08, 300, 120, .4, 'triangle'); },
   hammer: o => { tn(o, .05, 500, 300, .4, 'triangle'); nz(o, .05, 2000, 800, .3, 'bandpass', 2); },
   kaching: o => { tn(o, .08, 1800, 1800, .2, 'triangle'); tn(o, .25, 2400, 2400, .18, 'triangle', .07); },
@@ -3745,7 +3757,7 @@ function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.fl
 // ---------- estado do cliente ----------
 const ZC = { on: false, round: 0, phase: '', power: false, doors: new Set(), box: { loc: 0, st: 'idle', user: null, w: null, t0: 0 }, pap: { st: 'idle', user: null, w: null, t0: 0 },
   boards: [], drops: new Map(), zs: new Map(), gone: new Set(), snapTs: 0, insta: 0, dbl: 0, dog: false, fogDog: false, perks: [], bowie: false, qrBuys: 0, act: null, holdT: 0, revLocal: 0,
-  world: null, downPrev: null, bleedEnd: 0, selfRev: false, groanN: 0, groanT: 0, over: false, builtAt: 0 };
+  world: null, downPrev: null, bleedEnd: 0, selfRev: false, groanN: 0, groanT: 0, over: false, builtAt: 0, clouds: new Map(), bo: 0, boT: 0 };
 const zGroup = new THREE.Group(); scene.add(zGroup);
 
 // ---------- texturas desenhadas em canvas ----------
@@ -3774,39 +3786,79 @@ function zIconTex(k) {
 function planeGeo(w, d, s) { const g = new THREE.PlaneGeometry(w, d), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w / s, uv.getY(i) * d / s); return g; }
 
 // ---------- modelos ----------
-const ZSKIN = [0x7f9270, 0x8a9a78, 0x6f8466, 0x96a087], ZCLOTH = [0x4e4034, 0x3f4a55, 0x5a5a4c, 0x3c4a3a, 0x5c3f3a];
-function zombieModel(dog) {
+// paletas pequenas: o material é um por cor (cache em mc), então variar não cria material por zumbi
+const ZSKIN = [0x7f9270, 0x8a9a78, 0x6f8466, 0x96a087, 0x9a9484, 0x7c7468, 0xa3a08c, 0x6c7a5c], ZCLOTH = [0x4e4034, 0x3f4a55, 0x5a5a4c, 0x3c4a3a, 0x5c3f3a, 0x6a6458, 0x2e3440, 0x55302a, 0x7a6a50],
+  ZPANTS = [0x2b2823, 0x22272e, 0x3a3328, 0x30302a];
+// tipos de zumbi: o índice viaja nos bits 128-512 de f. hp = vida × comum, pts/xp = extra ao matar, sz = escala do modelo (e das caixas de acerto), rad = raio
+const ZKIND = [{ n: 'Zumbi', sz: 1 }, { n: 'Brutamonte', hp: 3.5, pts: 100, xp: 6, sz: 1.32, rad: .4 }, { n: 'Explosivo', hp: 1.1, pts: 40, xp: 3, sz: 1.05 }, { n: 'Veloz', hp: .55, pts: 20, xp: 2, sz: .96 },
+  { n: 'Tóxico', hp: 1.3, pts: 40, xp: 3, sz: 1 }, { n: 'Gritador', hp: 1.2, pts: 60, xp: 4, sz: 1.04 }, { n: 'Carniceiro', pts: 1000, xp: 50, sz: 1.6, rad: .55 }];
+const ZGEO = {};
+function zbx(g, w, h, d, x, y, z, m) { // caixa com geometria em cache (não é descartada quando o zumbi sai)
+  const k = w + ',' + h + ',' + d; let geo = ZGEO[k]; if (!geo) { geo = ZGEO[k] = new THREE.BoxGeometry(w, h, d); geo.userData.keep = true; }
+  const b = new THREE.Mesh(geo, m); b.position.set(x, y, z); g.add(b); return b;
+}
+const zSeed = id => { let s = (id * 2654435761) >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }; // mesmo id = mesmo visual em todos os clientes
+const zSize = (kind, id) => kind ? ZKIND[kind].sz : .92 + ((id * 7919) % 17) * .01; // comuns: 0,92 a 1,08
+let ZRING = null;
+function zombieModel(dog, kind = 0, id = (Math.random() * 1e6) | 0) {
   const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner); g.rotation.order = 'YXZ';
   if (dog) {
     const fur = mc(0x2b1a14), glow = zGlow(0xff6a1a, 3), head = new THREE.Group();
-    bx(inner, .34, .36, .95, 0, .62, 0, fur);
+    zbx(inner, .34, .36, .95, 0, .62, 0, fur);
     head.position.set(0, .82, -.52); inner.add(head);
-    bx(head, .28, .26, .32, 0, 0, 0, fur); bx(head, .18, .13, .2, 0, -.05, -.22, fur);
-    bx(head, .05, .04, .02, .08, .05, -.165, glow); bx(head, .05, .04, .02, -.08, .05, -.165, glow);
-    bx(head, .06, .1, .06, .09, .16, .05, fur); bx(head, .06, .1, .06, -.09, .16, .05, fur);
+    zbx(head, .28, .26, .32, 0, 0, 0, fur); zbx(head, .18, .13, .2, 0, -.05, -.22, fur);
+    zbx(head, .05, .04, .02, .08, .05, -.165, glow); zbx(head, .05, .04, .02, -.08, .05, -.165, glow);
+    zbx(head, .06, .1, .06, .09, .16, .05, fur); zbx(head, .06, .1, .06, -.09, .16, .05, fur);
     const legs = [];
-    for (const [x, z] of [[.12, -.35], [-.12, -.35], [.12, .35], [-.12, .35]]) { const L = new THREE.Group(); L.position.set(x, .45, z); bx(L, .1, .45, .1, 0, -.22, 0, fur); inner.add(L); legs.push(L); }
-    bx(inner, .06, .06, .35, 0, .75, .6, fur).rotation.x = .5;
-    bx(inner, .36, .04, .6, 0, .81, 0, glow); // brasa nas costas
+    for (const [x, z] of [[.12, -.35], [-.12, -.35], [.12, .35], [-.12, .35]]) { const L = new THREE.Group(); L.position.set(x, .45, z); zbx(L, .1, .45, .1, 0, -.22, 0, fur); inner.add(L); legs.push(L); }
+    zbx(inner, .06, .06, .35, 0, .75, .6, fur).rotation.x = .5;
+    zbx(inner, .36, .04, .6, 0, .81, 0, glow); // brasa nas costas
     g.userData = { inner, legs, head, dog: 1 };
     return g;
   }
-  const skin = mc(ZSKIN[Math.floor(Math.random() * ZSKIN.length)]), cloth = mc(ZCLOTH[Math.floor(Math.random() * ZCLOTH.length)]), pants = mc(0x2b2823), eye = zGlow(0xffc21a, 4);
+  const R = zSeed(id), pick = a => a[Math.floor(R() * a.length)];
+  let skin = mc(pick(ZSKIN)), cloth = mc(pick(ZCLOTH)), pants = mc(pick(ZPANTS)), eye = zGlow(0xffc21a, 4);
+  if (kind === 1) { skin = mc(0x6a7458); cloth = mc(0x3a2a22); eye = zGlow(0xff7a1a, 4); }
+  else if (kind === 2) { skin = mc(0x9c9a68); cloth = mc(0x5a4a30); eye = zGlow(0xffa020, 5); }
+  else if (kind === 3) { skin = mc(0x8a8f86); cloth = mc(0x24262a); eye = zGlow(0xff2a1a, 5); }
+  else if (kind === 4) { skin = mc(0x6aa04a); cloth = mc(0x34402a); eye = zGlow(0x7aff3a, 5); }
+  else if (kind === 5) { skin = mc(0xb8b4aa); cloth = mc(0x4a3a4a); eye = zGlow(0xd0f0ff, 5); }
+  else if (kind === 6) { skin = mc(0x7a6a5a); cloth = mc(0x2a2624); pants = mc(0x1e1c1a); eye = zGlow(0xff1a0a, 6); }
   const legL = new THREE.Group(), legR = new THREE.Group(); legL.position.set(-.13, .85, 0); legR.position.set(.13, .85, 0);
   const blood = mc(0x3e0808), dark = mc(0x14100e), shoe = mc(0x1c1a18);
-  bx(legL, .22, .85, .26, 0, -.42, 0, pants); bx(legR, .22, .85, .26, 0, -.42, 0, pants);
-  bx(legL, .24, .1, .3, 0, -.82, -.03, shoe); if (Math.random() < .5) bx(legR, .23, .3, .27, 0, -.7, 0, skin); else bx(legR, .24, .1, .3, 0, -.82, -.03, shoe); // calça rasgada / pé descalço
+  zbx(legL, .22, .85, .26, 0, -.42, 0, pants); zbx(legR, .22, .85, .26, 0, -.42, 0, pants);
+  zbx(legL, .24, .1, .3, 0, -.82, -.03, shoe); if (R() < .5) zbx(legR, .23, .3, .27, 0, -.7, 0, skin); else zbx(legR, .24, .1, .3, 0, -.82, -.03, shoe); // calça rasgada / pé descalço
   inner.add(legL, legR);
   const torso = new THREE.Group(); torso.position.set(0, .85, 0); inner.add(torso);
-  bx(torso, .54, .62, .3, 0, .31, 0, cloth); bx(torso, .3, .2, .02, .08, .2, -.16, skin); // camisa rasgada
-  bx(torso, .16, .12, .02, -.14, .42, -.161, blood); bx(torso, .1, .18, .02, .18, .12, -.161, blood); bx(torso, .5, .06, .31, 0, .02, 0, dark); // manchas e cinto
+  zbx(torso, .54, .62, .3, 0, .31, 0, cloth); zbx(torso, .3, .2, .02, .08, .2, -.16, skin); // camisa rasgada
+  zbx(torso, .16, .12, .02, -.14, .42, -.161, blood); zbx(torso, .1, .18, .02, .18, .12, -.161, blood); zbx(torso, .5, .06, .31, 0, .02, 0, dark); // manchas e cinto
   const head = new THREE.Group(); head.position.set(0, .65, -.02); torso.add(head);
-  bx(head, .3, .3, .3, 0, .14, 0, skin); bx(head, .06, .045, .02, .07, .17, -.155, eye); bx(head, .06, .045, .02, -.07, .17, -.155, eye);
-  bx(head, .18, .07, .02, 0, .04, -.155, dark); bx(head, .12, .03, .02, 0, .07, -.157, mc(0xd8d0b0)); // boca aberta com dentes
-  bx(head, .1, .08, .02, .1, .24, -.155, blood); bx(head, .32, .06, .32, 0, .3, .01, dark); // ferida e cabelo
+  zbx(head, .3, .3, .3, 0, .14, 0, skin); zbx(head, .06, .045, .02, .07, .17, -.155, eye); zbx(head, .06, .045, .02, -.07, .17, -.155, eye);
+  zbx(head, .18, .07, .02, 0, .04, -.155, dark); zbx(head, .12, .03, .02, 0, .07, -.157, mc(0xd8d0b0)); // boca aberta com dentes
+  zbx(head, .1, .08, .02, .1, .24, -.155, blood); if (kind || R() < .75) zbx(head, .32, .06, .32, 0, .3, .01, dark); // ferida e cabelo (alguns carecas)
   const armL = new THREE.Group(), armR = new THREE.Group(); armL.position.set(-.33, .55, 0); armR.position.set(.33, .55, 0); torso.add(armL, armR);
-  for (const A of [armL, armR]) { bx(A, .12, .12, .3, 0, 0, -.14, cloth); bx(A, .1, .1, .28, 0, 0, -.42, skin); bx(A, .1, .1, .1, 0, -.02, -.6, skin); } // manga curta, antebraço à mostra
-  g.userData = { inner, legL, legR, torso, head, armL, armR };
+  for (const A of [armL, armR]) { zbx(A, .12, .12, .3, 0, 0, -.14, cloth); zbx(A, .1, .1, .28, 0, 0, -.42, skin); zbx(A, .1, .1, .1, 0, -.02, -.6, skin); } // manga curta, antebraço à mostra
+  const ud = { inner, legL, legR, torso, head, armL, armR };
+  if (kind === 1) { // Brutamonte: ombreiras de ferro e punhos grandes
+    const iron = mc(0x3a3a3c); zbx(torso, .74, .14, .4, 0, .6, 0, iron); zbx(torso, .56, .3, .32, 0, .3, .01, mc(0x4a3a2c));
+    for (const A of [armL, armR]) zbx(A, .17, .17, .17, 0, -.02, -.62, skin);
+  } else if (kind === 2) { // Explosivo: barriga inchada com bolhas que brilham
+    const bl = zGlow(0xffa020, 2.5); ud.belly = zbx(torso, .6, .5, .5, 0, .24, -.07, skin);
+    zbx(ud.belly, .12, .12, .04, .12, .06, -.25, bl); zbx(ud.belly, .1, .1, .04, -.15, -.08, -.25, bl); zbx(ud.belly, .08, .08, .04, .05, -.16, -.25, bl); zbx(ud.belly, .04, .1, .1, .3, .04, -.05, bl);
+  } else if (kind === 3) inner.scale.set(.8, 1, .8); // Veloz: magro
+  else if (kind === 4) { // Tóxico: pústulas verdes
+    const gl = zGlow(0x5aff2a, 2.2); zbx(torso, .1, .1, .04, -.12, .25, -.17, gl); zbx(torso, .08, .08, .04, .16, .45, -.17, gl); zbx(head, .07, .07, .03, -.1, .25, -.16, gl); zbx(torso, .04, .1, .1, -.28, .35, 0, gl);
+  } else if (kind === 5) { // Gritador: cabeça comprida, boca que brilha
+    head.scale.y = 1.25; zbx(head, .14, .12, .02, 0, .03, -.158, zGlow(0xd0f0ff, 2));
+  } else if (kind === 6) { // Carniceiro: armadura, capacete com visor e cutelo
+    const metal = mc(0x4a4c50), rust = mc(0x5a3a28);
+    zbx(torso, .62, .5, .36, 0, .36, 0, metal); zbx(torso, .78, .14, .42, 0, .6, 0, rust); zbx(head, .36, .26, .36, 0, .2, .01, metal); zbx(head, .26, .04, .02, 0, .18, -.19, zGlow(0xff2a0a, 5));
+    zbx(armR, .06, .06, .3, 0, -.02, -.72, dark); zbx(armR, .04, .34, .44, 0, -.18, -1, mc(0x9a9a9e)); zbx(armR, .045, .05, .44, 0, -.36, -1, blood); // cutelo
+    if (!ZRING) { ZRING = new THREE.Mesh(new THREE.RingGeometry(1.45, 1.81, 40), new THREE.MeshBasicMaterial({ color: 0xff2a10, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide })); ZRING.geometry.userData.keep = true; }
+    const ring = new THREE.Mesh(ZRING.geometry, ZRING.material); ring.rotation.x = -Math.PI / 2; ring.position.y = .04; ring.visible = false; ring.userData.noShadow = true; g.add(ring); ud.ring = ring; // raio 1,81 × escala 1,6 = 2,9 m (alcance do golpe)
+  }
+  g.scale.setScalar(zSize(kind, id));
+  g.userData = ud;
   return g;
 }
 function teddyModel() {
@@ -3819,8 +3871,9 @@ function teddyModel() {
 
 // ---------- mundo do mapa zumbi (cliente e host usam o mesmo) ----------
 function zClearDynamic() {
-  for (const zc of ZC.zs.values()) { zGroup.remove(zc.model); zc.model.traverse(o => o.geometry?.dispose()); }
-  ZC.zs.clear();
+  for (const zc of ZC.zs.values()) { zGroup.remove(zc.model); zc.model.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); }
+  ZC.zs.clear(); ZC.bo = 0;
+  for (const c of ZC.clouds.values()) { zGroup.remove(c.g); c.mat.dispose(); } ZC.clouds.clear();
   for (const d of ZC.drops.values()) { zGroup.remove(d.g); d.g.children.forEach(s => s.material.dispose()); }
   ZC.drops.clear();
 }
@@ -4025,12 +4078,12 @@ function zUpdateWorld(dt) {
 
 // ---------- zumbis no cliente (só desenho + interpolação) ----------
 function zNewClientZombie(id, f) {
-  const dog = !!(f & 16), model = zombieModel(dog); zGroup.add(model);
-  if (CFG.gfx === 'alto') model.traverse(o => { if (o.isMesh) o.castShadow = true; });
-  const zc = { id, sid: 'z' + id, model, buf: [], pos: new V3(), last: new V3(), yaw: 0, f, dog, dead: false, deadT: 0, anim: Math.random() * 6, spd: 0, groanT: rand(1, 6), lastSeen: now, atk: false, fling: null };
+  const dog = !!(f & 16), kind = dog ? 0 : ((f >> 7) & 7) % ZKIND.length, model = zombieModel(dog, kind, id); zGroup.add(model); // o tipo vem nos bits 128-512 e não muda
+  if (CFG.gfx === 'alto') model.traverse(o => { if (o.isMesh && !o.userData.noShadow) o.castShadow = true; });
+  const zc = { id, sid: 'z' + id, model, buf: [], pos: new V3(), last: new V3(), yaw: 0, f, dog, kind, sz: dog ? 1 : zSize(kind, id), dead: false, deadT: 0, anim: Math.random() * 6, spd: 0, groanT: rand(1, 6), lastSeen: now, atk: false, atk0: 0, fling: null };
   ZC.zs.set(id, zc); return zc;
 }
-function zRemoveClient(zc) { zGroup.remove(zc.model); zc.model.traverse(o => o.geometry?.dispose()); ZC.zs.delete(zc.id); }
+function zRemoveClient(zc) { zGroup.remove(zc.model); zc.model.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); ZC.zs.delete(zc.id); }
 function zOnSnap(m) {
   if (m.ts) { if (m.ts <= (ZC.snapTs || 0)) return; ZC.snapTs = m.ts; } // canal sem ordem: foto velha é descartada
   const a = m.z, t = netTime('z', m.ts);
@@ -4040,7 +4093,7 @@ function zOnSnap(m) {
     if (zc.dead) continue;
     zc.buf.push({ t, p: [a[i + 1], a[i + 2], a[i + 3]], y: a[i + 4] }); if (zc.buf.length > 30) zc.buf.shift();
     zc.f = a[i + 5]; zc.lastSeen = now;
-    if (fresh) { zc.pos.set(a[i + 1], a[i + 2], a[i + 3]); zc.last.copy(zc.pos); zc.yaw = a[i + 4]; zc.model.position.copy(zc.pos); if (zc.dog) zLightning(zc.pos); }
+    if (fresh) { zc.pos.set(a[i + 1], a[i + 2], a[i + 3]); zc.last.copy(zc.pos); zc.yaw = a[i + 4]; zc.model.position.copy(zc.pos); if (zc.dog || zc.kind === 6) zLightning(zc.pos); }
   }
   if (m.b) for (let i = 0; i < m.b.length; i++) {
     const old = ZC.boards[i];
@@ -4051,16 +4104,18 @@ function zOnSnap(m) {
     ZC.boards[i] = m.b[i]; zBoardsVis(i);
   }
   ZC.insta = m.ins ? now + m.ins : 0; ZC.dbl = m.dbl ? now + m.dbl : 0;
+  ZC.bo = +m.bo || 0; ZC.boT = now; // vida do Carniceiro (fração)
+  if (m.cl) for (const c of m.cl) zCloudAdd(c);
 }
 // as caixas seguem o desenho: f = metros à frente do pé (para onde o zumbi olha). Antes ficavam todas
 // em cima do pé: na cabeça do corredor (inclinado) quase nunca pegava, e no rastejante o tiro no corpo errava
 function zBoxes(zc) {
-  const p = zc.pos, fx = -Math.sin(zc.yaw), fz = -Math.cos(zc.yaw);
-  const bb = (f, r, y0, y1) => { const x = p.x + fx * f, z = p.z + fz * f; return { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, minY: p.y + y0, maxY: p.y + y1 }; };
+  const p = zc.pos, fx = -Math.sin(zc.yaw), fz = -Math.cos(zc.yaw), s = zc.sz || 1, k = zc.kind | 0; // s = escala do modelo (Brutamonte, Carniceiro, variação dos comuns)
+  const bb = (f, r, y0, y1) => { const x = p.x + fx * f * s, z = p.z + fz * f * s; r *= s; return { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, minY: p.y + y0 * s, maxY: p.y + y1 * s }; };
   if (zc.dog) return [['head', bb(.5, .2, .62, 1)], ['body', bb(0, .45, .15, .85)]];
   if (zc.f & 8) return [['head', bb(1.5, .22, .3, .85)], ['body', bb(.85, .45, 0, .55)], ['legs', bb(.2, .3, 0, .35)]]; // rastejando (deitado para a frente)
   const L = [.08, .25, .38, .38][zc.f & 3], o = Math.sin(L) * .8, dy = (1 - Math.cos(L)) * .8; // inclinação do tronco de quem anda/corre
-  return [['head', bb(o, .19, 1.44 - dy, 1.84 - dy)], ['body', bb(o * .4, .32, .85, 1.44 - dy)], ['legs', bb(0, .27, 0, .85)]];
+  return [['head', bb(o, k === 6 ? .23 : .19, 1.44 - dy, 1.84 - dy)], ['body', bb(o * .4, k === 2 ? .44 : k === 3 ? .27 : .32, .85, 1.44 - dy)], ['legs', bb(0, .27, 0, .85)]]; // Explosivo: barriga larga; Veloz: magro
 }
 function zCands() { const out = []; for (const zc of ZC.zs.values()) if (!zc.dead) out.push({ id: zc.sid, pos: zc.pos, boxes: zBoxes(zc) }); return out; }
 function updateZombies(dt) {
@@ -4071,6 +4126,7 @@ function updateZombies(dt) {
       const k = now - zc.deadT;
       if (zc.fling) { zc.fling.y -= 18 * dt; M_.position.addScaledVector(zc.fling, dt); if (M_.position.y <= 0 && zc.fling.y < 0) { M_.position.y = 0; zc.fling.set(0, 0, 0); } else M_.rotation.x -= dt * 8; }
       else { const a = clamp(k / .45, 0, 1); if (zc.dog) M_.rotation.z = a * Math.PI / 2; else M_.rotation.x = a * Math.PI / 2 * .95; }
+      if (ud.ring) ud.ring.visible = false;
       if (k > 2.2) zRemoveClient(zc);
       continue;
     }
@@ -4099,13 +4155,34 @@ function updateZombies(dt) {
       const swing = atk ? Math.sin(now * 14) * .9 : Math.sin(zc.anim * .5) * .12;
       ud.armL.rotation.x = swing; ud.armR.rotation.x = atk ? swing : -swing;
       ud.head.rotation.z = Math.sin(zc.anim * .3) * .15;
+      if (ud.belly) ud.belly.scale.setScalar(1 + Math.sin(now * 4 + zc.id) * .05); // Explosivo pulsa
+      if (ud.ring) { // Carniceiro: golpe no chão anunciado (braços sobem com o cutelo e o anel vermelho cresce)
+        if (atk) { if (!zc.atk) zc.atk0 = now; const q = clamp((now - zc.atk0) / .95, 0, 1); ud.armL.rotation.x = ud.armR.rotation.x = 1.5 * q; ud.torso.rotation.x = .25 * q; ud.ring.visible = true; ud.ring.scale.setScalar(.35 + .65 * q); ud.ring.material.opacity = .25 + .5 * q; }
+        else ud.ring.visible = false;
+      }
     }
-    if (atk && !zc.atk) play(zc.dog ? 'dog' : 'snarl', zc.pos);
+    if (atk && !zc.atk) play(zc.dog ? 'dog' : zc.kind === 6 || zc.kind === 1 ? 'brute' : 'snarl', zc.pos);
     zc.atk = atk;
     zc.groanT -= dt;
-    if (zc.groanT <= 0) { zc.groanT = rand(3, 8); if (ZC.groanN < 3 && zc.pos.distanceTo(camera.position) < 28) { ZC.groanN++; play(zc.dog ? 'dog' : 'groan', zc.pos); } }
+    if (zc.groanT <= 0) { zc.groanT = rand(3, 8); if (ZC.groanN < 3 && zc.pos.distanceTo(camera.position) < 28) { ZC.groanN++; play(zc.dog ? 'dog' : ZGROAN[zc.kind] || ZGROAN[7 + zc.id % 3], zc.pos); } }
   }
   ZC.groanT -= dt; if (ZC.groanT <= 0) { ZC.groanT = 1; ZC.groanN = 0; }
+  for (const c of ZC.clouds.values()) { // nuvens do Tóxico
+    const left = c.end - now; if (left <= 0) { zGroup.remove(c.g); c.mat.dispose(); ZC.clouds.delete(c.id); continue; }
+    c.mat.opacity = .42 * Math.min(1, left / 1.5, (now - c.t0) / .3); c.g.rotation.y += dt * .3;
+  }
+}
+const ZGROAN = [null, 'brute', 'gurgle', 'hiss', null, 'groan3', 'brute', 'groan', 'groan2', 'groan3']; // som por tipo (comuns variam pelo id)
+function zCloudAdd(c) {
+  const [id, x, z, life] = c; if (ZC.clouds.has(id) || !(life > 0)) return;
+  const g = new THREE.Group(), mat = new THREE.SpriteMaterial({ map: SOFT, color: 0x6aff3a, transparent: true, depthWrite: false, opacity: 0 });
+  for (let i = 0; i < 7; i++) { const sp = new THREE.Sprite(mat), a = i * .9, d = i ? rand(.8, 2) : 0; sp.position.set(Math.cos(a) * d, rand(.4, 1.3), Math.sin(a) * d); sp.scale.setScalar(rand(2, 3.2)); g.add(sp); }
+  g.position.set(x, 0, z); zGroup.add(g); ZC.clouds.set(id, { id, g, mat, end: now + life, t0: now });
+  play('gurgle', g.position);
+}
+function zBloatFx(e) { // Explosivo estourando
+  const p = new V3(e[0], e[1] + 1, e[2]); play('boom', p); puff(p, 0xffa030, 3.2, .45, .3); puff(p, 0x7a9a20, 2.4, .8, .5);
+  flashLight.position.copy(p); flashLight.intensity = 60;
 }
 function zLightning(p) {
   const pts = []; for (let y = 30; y > 0; y -= 3) pts.push(new V3(p.x + rand(-1, 1), y, p.z + rand(-1, 1))); pts.push(p.clone());
@@ -4278,6 +4355,8 @@ function zHud(dt) {
   setHTML('zperks', ZC.perks.map(k => `<span class="pk" style="background:${ZPERKS[k].css}">${ZPERKS[k].ab}</span>`).join(''));
   const pw = []; if (ZC.insta > now) pw.push(`<div>☠ INSTA-KILL ${Math.ceil(ZC.insta - now)}</div>`); if (ZC.dbl > now) pw.push(`<div>x2 PONTOS ${Math.ceil(ZC.dbl - now)}</div>`);
   setHTML('zpw', pw.join(''));
+  const bo = ZC.bo > 0 && now - ZC.boT < 2 ? ZC.bo : 0, zb = $('#zboss'); // barra de vida do Carniceiro
+  zb.classList.toggle('hidden', !bo); if (bo) zb.querySelector('i').style.width = (clamp(bo, 0, 1) * 100).toFixed(1) + '%';
   const sm = zPerk('stam') ? 8 : 4, sf = clamp((me.stamina ?? sm) / sm, 0, 1), sb = $('#zstam'); // fôlego
   sb.style.opacity = me.alive && !me.downed && sf < .999 ? 1 : 0; sb.firstElementChild.style.width = (sf * 100).toFixed(1) + '%'; sb.classList.toggle('low', sf < .3);
   const a = ZC.act;
@@ -4309,6 +4388,20 @@ const ZDIFF = [
   { name: 'Pesadelo', desc: 'Um golpe derruba (sem Juggernog), quase o dobro de vida, correm desde a rodada 1, 250 pontos iniciais.', hp: 1.8, dmg: 100, atk: .95, run: 40, spd: 1.12, cnt: 1.5, pts: 250, bleed: 25, drop: 1.7, regen: 5, dog: [4, 3], max: 32, spawn: .65 },
 ];
 const zDf = () => ZDIFF[S.st?.zdiff ?? 1] || ZDIFF[1];
+// zumbis especiais por dificuldade: k = quantidade (×), dr = rodadas de atraso na estreia de cada tipo, boss = 1ª rodada do Carniceiro, cada = intervalo entre eles
+const ZSPEC = [{ k: .7, dr: 2, boss: 14, cada: 10 }, { k: 1, dr: 0, boss: 12, cada: 10 }, { k: 1.2, dr: -1, boss: 11, cada: 9 }, { k: 1.4, dr: -2, boss: 10, cada: 8 }];
+const zSp = () => ZSPEC[S.st?.zdiff ?? 1] || ZSPEC[1];
+function zMix(r, n, np) { // quantos de cada tipo especial nesta rodada (índices de ZKIND; o resto é zumbi comum)
+  const sp = zSp(), q = r - sp.dr, m = [0, 0, 0, 0, 0, 0], f = x => Math.round(n * x * sp.k);
+  if (q >= 4) m[3] = f(Math.min(.16, .06 + (q - 4) * .012)); // Veloz
+  if (q >= 6) m[2] = Math.max(1, f(Math.min(.08, .03 + (q - 6) * .006))); // Explosivo
+  if (q >= 8) m[1] = Math.min(2 + np, Math.max(1, Math.round((1 + Math.floor((q - 8) / 3)) * sp.k))); // Brutamonte: poucos
+  if (q >= 10) m[4] = Math.max(1, f(Math.min(.08, .03 + (q - 10) * .006))); // Tóxico
+  if (q >= 12) m[5] = Math.min(3, 1 + Math.floor((q - 12) / 5)); // Gritador
+  let t = m[1] + m[2] + m[3] + m[4] + m[5]; const cap = Math.floor(n * .5);
+  while (t > cap) { let i = 1; for (let j = 2; j < 6; j++) if (m[j] > m[i]) i = j; m[i]--; t--; } // nunca mais da metade da rodada
+  Z.mix = m; Z.mixN = t;
+}
 const zHp = r => r < 10 ? 150 + 100 * (r - 1) : Math.round(950 * Math.pow(1.1, r - 9)); // vida do zumbi (fórmula do CoD)
 const zCount = (r, np) => { const max = 24 + 6 * (np - 1), mult = r < 5 ? [.25, .33, .54, .75][r - 1] : r < 10 ? 1 + (r - 5) * .1 : r * .15; return Math.max(1, Math.round(max * mult)); };
 const zInv = () => ({ primary: 'm1911', secondary: null, he: 0, smoke: 0, monkey: 0 }); // as granadas chegam no início de cada rodada (+2)
@@ -4381,6 +4474,7 @@ function zReset() {
     drops: [], dropId: 1, dropsRound: 0, dropThresh: 2000 * zDf().drop, dropScore: 0, bag: [], insta: 0, dbl: 0, power: false, doors: new Set(), boards: ZD.windows.map(() => 6),
     winT: ZD.windows.map(() => ({ tear: 0, climb: 0, busy: false })), box: { loc: 0, st: 'idle', user: null, w: null, t: 0, uses: 0 }, pap: { st: 'idle', user: null, w: null, t: 0, slot: null },
     qrBuys: 0, lure: null, zsT: 0, ffT: 0, repPts: new Map(), repT: {} });
+  Object.assign(Z, { mix: [0, 0, 0, 0, 0, 0], mixN: 0, reQ: [], bossQ: 0, bossAt: 0, nextBoss: zSp().boss, clouds: [], cloudId: 1 }); // especiais, Carniceiro e nuvens tóxicas
   zBuildWalk();
 }
 function zResetPlayer(p) { p.inv = zInv(); p.perks = []; p.maxHp = 100; p.downed = false; p.bowie = false; p.selfRev = 0; p.bleedAt = 0; p.revBy = null; p.revProg = 0; p.revLast = 0; p.lastHurt = 0; }
@@ -4402,13 +4496,18 @@ function zStartRound() {
   Z.toSpawn = Z.dogRound ? Math.min(24, Math.round(6 * np * Math.min(D.cnt, 1.25))) : Math.max(1, Math.round(zCount(Z.round, np) * D.cnt));
   Z.spawnDelay = (Z.dogRound ? 1.4 : Math.max(.15, 2 * Math.pow(.95, Z.round - 1))) * D.spawn;
   Z.spawnT = now + (Z.dogRound ? 3 : 1.5); Z.dropsRound = 0; Z.repPts = new Map();
+  Z.mix = [0, 0, 0, 0, 0, 0]; Z.mixN = 0; Z.reQ = []; Z.bossQ = 0;
+  if (!Z.dogRound) { // rodada de cães nunca tem especiais; o Carniceiro cai na primeira rodada comum a partir de nextBoss
+    zMix(Z.round, Z.toSpawn, np);
+    if (Z.round >= Z.nextBoss) { Z.bossQ = 1; Z.toSpawn++; Z.bossAt = Math.max(1, Math.floor(Z.toSpawn * .65)); Z.nextBoss = Z.round + zSp().cada; }
+  }
   let i = 0;
   for (const p of S.players.values()) {
     if (!p.alive) { zResetPlayer(p); srvSpawn(p, zSpawnPoint(i++), true, Math.PI); } // quem sangrou volta com a M1911
     else if (!p.downed) p.hp = p.maxHp; // rodada nova: vida cheia
     if (p.inv.he < 4) { p.inv.he = Math.min(4, p.inv.he + 2); zSendInv(p); } // +2 granadas por rodada (máx. 4)
   }
-  broadcast({ t: 'zround', r: Z.round, dog: Z.dogRound ? 1 : 0 });
+  broadcast({ t: 'zround', r: Z.round, dog: Z.dogRound ? 1 : 0, bo: Z.bossQ });
   srvState();
 }
 function zEndRound() { Z.phase = 'break'; Z.phaseEnd = now + 10; broadcast({ t: 'zrend', r: Z.round }); srvState(); }
@@ -4420,6 +4519,7 @@ function zTick(dt) {
     if (Z.toSpawn > 0 && Z.zs.size < zDf().max && now >= Z.spawnT) Z.spawnT = now + (zSpawnOne() ? Z.spawnDelay : .5);
     if (Z.toSpawn <= 0 && Z.zs.size === 0) zEndRound();
   }
+  zTickClouds();
   zTickPlayers(dt);
   if (S.phase === 'over') return;
   if (now >= Z.ffT) { Z.ffT = now + .3; zFlow(Z.lure ? [Z.lure] : [...S.players.values()].filter(p => p.alive && !p.downed).map(p => [p.pos[0], p.pos[2]])); }
@@ -4475,18 +4575,26 @@ function zActive() { const s = new Set([ZD.start || 'A']); for (const d of ZD.do
 function zRoomAt(x, z) { if (ZD.zoneAt) return ZD.zoneAt(x, z); for (const [k, r] of Object.entries(ZD.rooms)) if (x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3]) return k; return null; }
 function zSpawnOne() {
   const act = zActive(), tg = [...S.players.values()].filter(p => p.alive && !p.downed), r = Z.round;
+  let kind = 0, keep = null; // tipo: primeiro os que voltaram para a fila, depois o Carniceiro (lá pelos 35% da rodada), depois especiais sorteados
+  if (!Z.dogRound) {
+    if (Z.reQ.length) { keep = Z.reQ[Z.reQ.length - 1]; kind = keep[0]; }
+    else if (Z.bossQ && Z.toSpawn <= Z.bossAt) kind = 6;
+    else { const rem = Z.toSpawn - Z.bossQ; if (Z.mixN > 0 && Math.random() * rem < Z.mixN) { let k = Math.random() * Z.mixN; for (let i = 1; i < 6 && !kind; i++) { k -= Z.mix[i]; if (k < 0) kind = i; } if (!kind) kind = Z.mix.findIndex((x, i) => i && x > 0); if (kind < 0) kind = 0; } }
+  }
   const z = { id: Z.nextId, hp: 0, st: 'in', body: { pos: new V3(), vel: new V3(), onGround: true, h: 1.8, stepUp: 0 }, yaw: 0, speed: 1.5, sc: 0, dog: false, crawler: false,
-    atkT: 0, atkWind: 0, atkQ: null, tgt: null, tgtT: 0, losT: 0, los: false, chkT: now + 6, chkX: 0, chkZ: 0, stuck: 0, off: rand(-.5, .5), win: -1, t0: now, nukeAt: 0 };
+    atkT: 0, atkWind: 0, atkQ: null, tgt: null, tgtT: 0, losT: 0, los: false, chkT: now + 6, chkX: 0, chkZ: 0, stuck: 0, off: rand(-.5, .5), win: -1, t0: now, nukeAt: 0,
+    kind, dm: 1, aw: .45, ac: 1, rad: ZKIND[kind].rad || .3, buffT: 0, scrT: 0 };
   const P = z.body.pos;
-  if (Z.dogRound) { // cães nascem com um raio perto de um jogador
+  if (Z.dogRound || kind === 6) { // cães e o Carniceiro nascem com um raio perto de um jogador
     if (!tg.length) return false;
     const q = tg[Math.floor(Math.random() * tg.length)]; let ok = false;
     for (let k = 0; k < 30 && !ok; k++) {
-      const a = Math.random() * Math.PI * 2, d = rand(6, 13), x = q.pos[0] + Math.cos(a) * d, zz = q.pos[2] + Math.sin(a) * d, c = ffCell(x, zz);
-      if (c >= 0 && FF.walk[c] && act.has(zRoomAt(x, zz)) && isFinite(FF.dist[c])) { P.set(x, 0, zz); ok = true; }
+      const a = Math.random() * Math.PI * 2, d = kind ? rand(9, 16) : rand(6, 13), x = q.pos[0] + Math.cos(a) * d, zz = q.pos[2] + Math.sin(a) * d, c = ffCell(x, zz);
+      if (c >= 0 && FF.walk[c] && act.has(zRoomAt(x, zz)) && isFinite(FF.dist[c]) && (!kind || footFreeR(x, zz, .6))) { P.set(x, 0, zz); ok = true; }
     }
     if (!ok) return false;
-    z.dog = true; z.hp = Math.round(Math.min(1800, 150 + 50 * r) * zDf().hp); z.speed = rand(5.6, 6.1) * Math.min(zDf().spd, 1.05); z.sc = 2;
+    if (kind) { const D = zDf(), np = Math.max(1, S.players.size); z.hp = Math.round(zHp(r) * D.hp * (4 + 3 * np)); z.speed = 2.4 * D.spd; z.aw = .95; z.ac = 1.7; z.yaw = Math.atan2(-(q.pos[0] - P.x), -(q.pos[2] - P.z)); } // Carniceiro: lento, muita vida, golpe em área
+    else { z.dog = true; z.hp = Math.round(Math.min(1800, 150 + 50 * r) * zDf().hp); z.speed = rand(5.6, 6.1) * Math.min(zDf().spd, 1.05); z.sc = 2; }
   } else {
     const cands = [];
     ZD.windows.forEach((w, i) => { if (act.has(w.room)) cands.push({ i, x: w.x, z: w.z }); });
@@ -4496,18 +4604,28 @@ function zSpawnOne() {
     for (const c of cands) { let md = 40; for (const q of tg) md = Math.min(md, Math.hypot(q.pos[0] - c.x, q.pos[2] - c.z)); c.wt = (c.i < 0 && md < 4 ? .03 : 1) / (1 + (md / 10) ** 2); tot += c.wt; } // prefere perto dos jogadores (mas não sai do chão no pé de ninguém)
     let pick = Math.random() * tot, c = cands[cands.length - 1]; for (const cc of cands) { pick -= cc.wt; if (pick <= 0) { c = cc; break; } }
     const D = zDf(); z.hp = Math.round(zHp(r) * D.hp); const v = r * 8 + rand(-12, 12) + D.run; z.sc = v < 35 ? 0 : v < 70 ? 1 : 2; z.speed = [rand(1.3, 1.8), rand(3.6, 4.3), rand(5, 5.5)][z.sc] * D.spd;
+    if (kind) z.hp = Math.round(z.hp * ZKIND[kind].hp);
+    if (kind === 1) { z.sc = 0; z.speed = Math.min(2.8, 1.3 + r * .05) * D.spd; z.dm = 1.6; z.ac = 1.25; z.aw = .6; } // Brutamonte: anda devagar, bate forte
+    else if (kind === 2) { z.sc = Math.min(z.sc, 1); z.speed = [rand(1.3, 1.8), rand(3, 3.4)][z.sc] * D.spd; } // Explosivo
+    else if (kind === 3) { z.sc = 2; z.speed = rand(6, 6.5) * Math.min(D.spd, 1.05); z.dm = .7; z.aw = .3; } // Veloz: corre mais que os cães, morre fácil
+    else if (kind === 5) { z.sc = 1; z.speed = rand(3, 3.4) * D.spd; z.scrT = now + 3; } // Gritador
     if (c.i >= 0) { const w = ZD.windows[c.i], d = rand(4, 7), t = rand(-2, 2); z.st = 'out'; z.win = c.i; P.set(w.x + w.n[0] * d + w.tx * t, 0, w.z + w.n[1] * d + w.tz * t); z.yaw = Math.atan2(w.n[0], w.n[1]); }
     else { let x = c.x, zz = c.z; for (let k = 0; k < 6; k++) { const tx = c.x + rand(-1, 1), tz = c.z + rand(-1, 1), cc = ffCell(tx, tz); if (cc >= 0 && FF.walk[cc]) { x = tx; zz = tz; break; } } z.st = 'rise'; P.set(x, -1.8, zz); }
   }
   z.maxHp = z.hp; z.chkX = P.x; z.chkZ = P.z;
+  if (keep) { Z.reQ.pop(); if (keep[1] > 0) { z.hp = keep[1]; z.maxHp = keep[2]; } } // voltou da fila: o Carniceiro mantém a vida que tinha
+  else if (kind === 6) Z.bossQ = 0;
+  else if (kind) { Z.mix[kind]--; Z.mixN--; }
   Z.zs.set(z.id, z); Z.nextId++; Z.toSpawn--;
+  if (kind === 6 && !keep) broadcast({ t: 'zboss', id: z.id });
   return true;
 }
 function zTickZombies(dt) {
   for (const w of Z.winT) w.busy = false;
   const tg = [...S.players.values()].filter(p => p.alive && !p.downed);
   for (const z of [...Z.zs.values()]) {
-    if (z.nukeAt && now >= z.nukeAt) { zKill(z, null, 'body', 'nuke', false, true); continue; }
+    if (!Z.zs.has(z.id)) continue; // morreu nesta volta (explosão de outro)
+    if (z.nukeAt && now >= z.nukeAt) { if (z.kind === 6) { z.nukeAt = 0; z.hp = Math.max(1, z.hp - z.maxHp * .2); } else { zKill(z, null, 'body', 'nuke', false, true); continue; } } // Nuke não mata o Carniceiro: tira 20%
     const P = z.body.pos;
     if (z.tgt && (!z.tgt.alive || z.tgt.downed || !S.players.has(z.tgt.id))) { z.tgt = null; z.tgtT = 0; }
     if (now >= z.tgtT) { z.tgtT = now + .5; let best = null, bd = 1e9; for (const q of tg) { const d = Math.hypot(q.pos[0] - P.x, q.pos[2] - P.z); if (d < bd) { bd = d; best = q; } } z.tgt = best; }
@@ -4521,7 +4639,7 @@ function zTickZombies(dt) {
       case 'tear': { // arranca as tábuas uma a uma; se alguém estiver colado na janela, bate através dela
         const wi = z.win, w = ZD.windows[wi], wt = Z.winT[wi]; z.yaw = Math.atan2(w.n[0], w.n[1]);
         if (Z.boards[wi] > 0) {
-          if (!wt.busy) { wt.busy = true; wt.tear += dt; if (wt.tear >= (z.sc ? .9 : 1.5)) { wt.tear = 0; Z.boards[wi]--; } }
+          if (!wt.busy) { wt.busy = true; wt.tear += dt; if (wt.tear >= (z.kind === 1 ? .7 : z.sc ? .9 : 1.5)) { wt.tear = 0; Z.boards[wi]--; } }
           let near = null, nd = 1e9; for (const q of tg) { const d = Math.hypot(q.pos[0] - w.ix, q.pos[2] - w.iz); if (d < nd) { nd = d; near = q; } }
           if (near && nd < 1.3) zTryAttack(z, near, 2.6);
         } else if (now >= wt.climb) { wt.climb = now + 1.1; z.st = 'climb'; z.t0 = now; z.cx = P.x; z.cz = P.z; z.atkWind = 0; }
@@ -4533,7 +4651,7 @@ function zTickZombies(dt) {
         if (k >= 1) { z.st = 'in'; P.y = 0; z.body.vel.set(0, 0, 0); z.body.onGround = true; z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z; }
         break;
       }
-      case 'in': zChase(z, dt); break;
+      case 'in': zChase(z, dt); if (z.kind === 5 && now >= z.scrT && Z.zs.has(z.id)) zScream(z); break;
     }
   }
   // separação: não empilhar zumbis
@@ -4542,7 +4660,7 @@ function zTickZombies(dt) {
     const a = arr[i], b = arr[j];
     if (a.st === 'climb' || b.st === 'climb' || a.st === 'rise' || b.st === 'rise') continue;
     const inA = a.st === 'in'; if (inA !== (b.st === 'in')) continue;
-    const pa = a.body.pos, pb = b.body.pos, dx = pb.x - pa.x, dz = pb.z - pa.z, d = Math.hypot(dx, dz), rr = inA ? .6 : .55;
+    const pa = a.body.pos, pb = b.body.pos, dx = pb.x - pa.x, dz = pb.z - pa.z, d = Math.hypot(dx, dz), rr = inA ? a.rad + b.rad : .55;
     if (d >= rr || d < 1e-4) continue;
     const push = (rr - d) / 2, nx = dx / d * push, nz = dz / d * push;
     if (inA) {
@@ -4564,10 +4682,10 @@ function zChase(z, dt) {
     if (now >= z.losT) { z.losT = now + .35 + Math.random() * .1; z.los = dist < 14 && segClearR(P.x, P.z, gx, gz); }
     if (z.los || dist < 1.2) dir = dist > .01 ? [dx / dist, dz / dist] : [0, 0];
     else dir = zFlowDir(P.x, P.z) || (dist > .01 ? [dx / dist, dz / dist] : [0, 0]);
-    if (!Z.lure && tgt) { if (z.los || z.atkWind) zTryAttack(z, tgt, z.dog ? 1.5 : z.crawler ? 1.2 : 1.35); if (dist < (z.dog ? .9 : .85)) dir = [0, 0]; } // sem linha livre (grade no meio) não bate
+    if (!Z.lure && tgt) { if (z.los || z.atkWind) zTryAttack(z, tgt, z.dog ? 1.5 : z.kind === 6 ? 2.3 : z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35); if (dist < (z.dog ? .9 : .85 + (z.rad - .3) * 2)) dir = [0, 0]; } // sem linha livre (grade no meio) não bate
     else if (Z.lure && dist < 1) dir = [0, 0];
   }
-  const spd = (z.crawler ? .9 : z.speed) * (z.atkWind ? .35 : 1), k = Math.min(1, dt * 8);
+  const spd = (z.crawler ? .9 : z.speed * (z.buffT > now ? 1.3 : 1) * (z.kind === 6 && z.hp < z.maxHp * .5 ? 1.4 : 1)) * (z.atkWind ? .35 : 1), k = Math.min(1, dt * 8); // grito: +30%; Carniceiro furioso abaixo da metade
   b.vel.x += (dir[0] * spd - b.vel.x) * k; b.vel.z += (dir[1] * spd - b.vel.z) * k;
   const face = (dir[0] || dir[1]) ? Math.atan2(-dir[0], -dir[1]) : has ? Math.atan2(-(gx - P.x), -(gz - P.z)) : z.yaw;
   z.yaw += clamp(angDiff(z.yaw, face), -8 * dt, 8 * dt);
@@ -4582,31 +4700,73 @@ function zChase(z, dt) {
 }
 function zTryAttack(z, q, reach) {
   const P = z.body.pos, d = Math.hypot(q.pos[0] - P.x, q.pos[2] - P.z), dy = Math.abs(q.pos[1] - P.y);
-  if (!z.atkWind && now >= z.atkT && d < reach && dy < 1.5) { z.atkWind = now + (z.dog ? .25 : .45); z.atkQ = q; }
+  if (!z.atkWind && now >= z.atkT && d < reach && dy < 1.5) { z.atkWind = now + (z.dog ? .25 : z.aw); z.atkQ = q; }
   if (z.atkWind && now >= z.atkWind) {
-    const D = zDf(); z.atkWind = 0; z.atkT = now + (z.dog ? .8 : 1.2) * D.atk;
+    const D = zDf(); z.atkWind = 0; z.atkT = now + (z.dog ? .8 : 1.2 * z.ac) * D.atk;
+    if (z.kind === 6) { zSlam(z); return; }
     const qq = z.atkQ;
-    if (qq && qq.alive && !qq.downed && S.players.has(qq.id) && Math.hypot(qq.pos[0] - P.x, qq.pos[2] - P.z) < reach + .5 && Math.abs(qq.pos[1] - P.y) < 1.6) zHurt(qq, Math.round(z.dog ? D.dmg * .8 : D.dmg), P);
+    if (qq && qq.alive && !qq.downed && S.players.has(qq.id) && Math.hypot(qq.pos[0] - P.x, qq.pos[2] - P.z) < reach + .5 && Math.abs(qq.pos[1] - P.y) < 1.6) zHurt(qq, Math.round((z.dog ? D.dmg * .8 : D.dmg) * z.dm), P);
   }
 }
-function zRecycle(z) { Z.zs.delete(z.id); Z.toSpawn++; broadcast({ t: 'zgone', id: z.id }); }
+function zSlam(z) { // Carniceiro: o cutelo bate no chão e acerta todo mundo no anel (2,9 m), quem saiu a tempo escapa
+  const P = z.body.pos, dmg = Math.round(zDf().dmg * 1.2);
+  broadcast({ t: 'zslam', x: r2(P.x), z: r2(P.z) });
+  for (const q of S.players.values()) if (q.alive && !q.downed && Math.hypot(q.pos[0] - P.x, q.pos[2] - P.z) < 2.9 && Math.abs(q.pos[1] - P.y) < 1.6) zHurt(q, dmg, P);
+}
+function zScream(z) { // Gritador: zumbis em volta (9 m) correm 30% mais por 5 s
+  const P = z.body.pos, t = z.tgt;
+  if (!t || Math.hypot(t.pos[0] - P.x, t.pos[2] - P.z) > 18) { z.scrT = now + 2; return; }
+  z.scrT = now + rand(7, 10); broadcast({ t: 'zscr', id: z.id });
+  for (const o of Z.zs.values()) if (o !== z && !o.dog && o.kind !== 6 && Math.hypot(o.body.pos.x - P.x, o.body.pos.z - P.z) < 9) o.buffT = now + 5;
+}
+function zBloatBoom(x, y, zz, p) { // Explosivo estoura: muito dano nos zumbis em volta, pouco nos jogadores; só com linha livre (como granada)
+  const R = 4.5, c = new V3(x, y + 1, zz), D = zDf(), dz = zHp(Z.round) * D.hp * 1.4;
+  for (const o of [...Z.zs.values()]) {
+    if (!Z.zs.has(o.id)) continue;
+    const t = o.body.pos.clone(); t.y += o.dog ? .5 : 1; const d = t.distanceTo(c);
+    if (d > R || !losClear(c, t)) continue;
+    const dmg = dz * (1 - d / (R * 1.3));
+    if (p) zHit(p, o.id, dmg, 'body', 'bloat', true); else { o.hp -= o.kind === 6 ? Math.min(dmg, o.maxHp * .12) : dmg; if (o.hp <= 0) zKill(o, null, 'body', 'bloat', true, false); } // sem dono: outro Explosivo em volta também estoura
+  }
+  for (const q of S.players.values()) {
+    if (!q.alive || q.downed) continue;
+    const t = new V3(q.pos[0], q.pos[1] + 1, q.pos[2]), d = t.distanceTo(c);
+    if (d < R && losClear(c, t)) zHurt(q, Math.round(D.dmg * .4 * (1 - d / R) + 5), c);
+  }
+}
+function zTickClouds() { // nuvem do Tóxico (7 s, 2,8 m): tira vida de quem fica dentro, a cada 0,5 s
+  if (!Z.clouds?.length) return;
+  for (let i = Z.clouds.length - 1; i >= 0; i--) if (now >= Z.clouds[i].end) Z.clouds.splice(i, 1);
+  const dmg = Math.round(zDf().dmg * .15);
+  for (const p of S.players.values()) {
+    if (!p.alive || p.downed || (now < p.toxT && p.toxT - now < 1)) continue;
+    for (const c of Z.clouds) if (Math.hypot(p.pos[0] - c.x, p.pos[2] - c.z) < 2.8 && Math.abs(p.pos[1] - c.y) < 2.5) { p.toxT = now + .5; zHurt(p, dmg, null); break; }
+  }
+}
+function zRecycle(z) { Z.zs.delete(z.id); Z.toSpawn++; if (z.kind) Z.reQ.push([z.kind, z.kind === 6 ? z.hp : 0, z.maxHp]); broadcast({ t: 'zgone', id: z.id }); } // especial volta para a fila com o mesmo tipo
 function zPts(p, n) { if (Z.dbl > now) n *= 2; p.money += n; sendTo(p.id, { t: 'pts', n, m: p.money }); }
 function zPay(p, c) { if (p.money < c) { sendTo(p.id, { t: 'err', txt: 'Pontos insuficientes' }); return false; } p.money -= c; sendTo(p.id, { t: 'pts', n: -c, m: p.money }); return true; }
 function zHit(p, zid, dmg, zone, w, splash) {
   const z = Z.zs.get(zid); if (!z || !(dmg > 0) || S.phase === 'over') return;
   dmg = Math.min(dmg, 1e7);
-  if (Z.insta > now) dmg = z.hp; // Insta-Kill
+  if (Z.insta > now) dmg = z.kind === 6 ? dmg * 2 : z.hp; // Insta-Kill (no Carniceiro só dobra o dano)
+  if (z.kind === 6) dmg = Math.min(dmg, z.maxHp * .12); // nenhum golpe tira mais de 12% do Carniceiro (Arma Trovão, macaco, Insta-Kill)
   z.hp -= dmg;
   if (z.hp <= 0) zKill(z, p, zone, w, splash, false);
-  else { zPts(p, 10); if (splash && !z.dog && !z.crawler && z.st === 'in' && Math.random() < .3) z.crawler = true; } // explosão pode arrancar as pernas
+  else { zPts(p, 10); if (z.kind === 6 && z.hp < z.maxHp * .5) z.sc = 1; if (splash && !z.dog && !z.crawler && z.kind !== 1 && z.kind !== 6 && z.st === 'in' && Math.random() < .3) z.crawler = true; } // explosão pode arrancar as pernas
 }
 function zKill(z, p, zone, w, splash, nuke) {
   if (!Z.zs.has(z.id)) return; Z.zs.delete(z.id);
   const wi = z.win >= 0 && z.st !== 'in' ? ZD.windows[z.win] : null;
   const dx = wi ? wi.ix : z.body.pos.x, dz = wi ? wi.iz : z.body.pos.z;
   let pts = 0;
-  if (p && !nuke) { pts = w === 'knife' ? 130 : splash ? 50 : zone === 'head' ? 100 : zone === 'legs' ? 50 : 60; zPts(p, pts); p.kills++; if (zone === 'head' && !splash) p.hs++; }
-  broadcast({ t: 'zdie', id: z.id, hs: zone === 'head' && !splash ? 1 : 0, fl: w === 'thundergun' || w === 'thundergun_pap' ? 1 : 0, by: p ? p.id : null });
+  if (p && !nuke) { pts = (w === 'knife' ? 130 : splash ? 50 : zone === 'head' ? 100 : zone === 'legs' ? 50 : 60) + (ZKIND[z.kind]?.pts || 0); zPts(p, pts); p.kills++; if (zone === 'head' && !splash) p.hs++; }
+  const K = z.kind | 0, msg = { t: 'zdie', id: z.id, hs: zone === 'head' && !splash ? 1 : 0, fl: w === 'thundergun' || w === 'thundergun_pap' ? 1 : 0, by: p ? p.id : null };
+  if (K) msg.k = K; if (K === 2 && !nuke) msg.ex = [r2(dx), r2(Math.max(0, z.body.pos.y)), r2(dz)];
+  broadcast(msg);
+  if (K === 6) { for (const q of S.players.values()) if (q !== p && q.alive) zPts(q, 300); zDrop(null, dx, dz, true); } // Carniceiro: pontos para o time e power-up garantido
+  if (msg.ex) zBloatBoom(dx, Math.max(0, z.body.pos.y), dz, p);
+  if (K === 4 && !nuke) { const c = { id: Z.cloudId++, x: dx, y: Math.max(0, z.body.pos.y), z: dz, end: now + 7 }; Z.clouds.push(c); }
   if (z.dog && Z.dogRound && Z.toSpawn <= 0 && Z.zs.size === 0) zDrop('max', dx, dz, true); // último cão sempre solta Munição Máxima
   else if (!nuke && p && Z.dropsRound < 4) { Z.dropScore += pts; if (Z.dropScore >= Z.dropThresh || Math.random() < .02) zDrop(null, dx, dz, false); }
 }
@@ -4733,13 +4893,17 @@ function zTickObjects() {
   else if (P.st === 'ready' && now >= P.t) { P.st = 'idle'; broadcast({ t: 'zpap', st: 'idle' }); }
 }
 function zSnap() {
-  const a = [];
+  const a = []; let bo = 0;
   for (const z of Z.zs.values()) {
-    const P = z.body.pos, f = z.sc | (z.atkWind ? 4 : 0) | (z.crawler ? 8 : 0) | (z.dog ? 16 : 0) | (z.st === 'out' || z.st === 'tear' || z.st === 'climb' ? 32 : 0) | (z.st === 'rise' ? 64 : 0);
+    const P = z.body.pos, f = z.sc | (z.atkWind ? 4 : 0) | (z.crawler ? 8 : 0) | (z.dog ? 16 : 0) | (z.st === 'out' || z.st === 'tear' || z.st === 'climb' ? 32 : 0) | (z.st === 'rise' ? 64 : 0) | (z.kind << 7); // 128-512: tipo
     a.push(z.id, r2(P.x), r2(P.y), r2(P.z), r2(wrapA(z.yaw)), f);
+    if (z.kind === 6) bo = Math.max(bo, r2(Math.max(0, z.hp) / z.maxHp));
   }
   const bk = Z.boards.join(), sendB = bk !== Z.lastB || (Z.snapN = (Z.snapN || 0) + 1) % 10 === 0; Z.lastB = bk;
-  broadcastFast({ t: 'zs', ts: r3(now), z: a, b: sendB ? Z.boards.slice() : undefined, ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0 });
+  const msg = { t: 'zs', ts: r3(now), z: a, b: sendB ? Z.boards.slice() : undefined, ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0 };
+  if (bo) msg.bo = bo; // vida do Carniceiro
+  if (Z.clouds.length && (sendB || Z.clouds[Z.clouds.length - 1].id !== Z.lastCl)) { Z.lastCl = Z.clouds[Z.clouds.length - 1].id; msg.cl = Z.clouds.map(c => [c.id, r2(c.x), r2(c.z), r2(c.end - now)]); } // nuvens tóxicas: quando nasce uma e de 10 em 10 fotos (quem entra no meio também vê)
+  broadcastFast(msg);
 }
 function zWorldState() {
   return { r: Z.round, ph: Z.phase, pw: Z.power ? 1 : 0, d: [...Z.doors], box: [Z.box.loc, Z.box.st, Z.box.user, Z.box.st === 'offer' ? Z.box.w : null], pap: [Z.pap.st, Z.pap.user, Z.pap.st === 'ready' ? Z.pap.w : null],
@@ -4753,7 +4917,7 @@ function zExplode(pos, owner, r, dmgMax, w, insta) { // granada / macaco
     if (d > r || !losClear(pos, c)) continue;
     const dmg = insta ? z.hp + 1 : dmgMax * (1 - d / (r * 1.3));
     if (p) zHit(p, z.id, dmg, 'body', w, true);
-    else { z.hp -= dmg; if (z.hp <= 0) zKill(z, null, 'body', w, true, true); }
+    else { z.hp -= z.kind === 6 ? Math.min(dmg, z.maxHp * .12) : dmg; if (z.hp <= 0) zKill(z, null, 'body', w, true, true); }
   }
   if (w === 'he' && p && p.alive && !p.downed) { const d = Math.hypot(p.pos[0] - pos.x, p.pos[2] - pos.z); if (d < 4) zHurt(p, Math.round(60 * (1 - d / 4)), null); } // a sua granada te machuca
 }
@@ -4810,7 +4974,9 @@ function onMsg(m) {
     case 'zs': if (ZC.on) zOnSnap(m); break;
     case 'zdie': {
       ZC.gone.add(m.id);
-      if (m.by === C.myId) grantXP(m.hs ? 5 : 3);
+      if (m.by === C.myId) grantXP((m.hs ? 5 : 3) + (ZKIND[m.k]?.xp || 0)); // especiais dão XP extra
+      if (Array.isArray(m.ex) && m.ex.length === 3) zBloatFx(m.ex);
+      if (m.k === 6) { ZC.bo = 0; play('win'); centerMsg('CARNICEIRO DERROTADO', m.by ? 'abatido por ' + nameOf(m.by) : '', 3.5); }
       const zc = ZC.zs.get(m.id); if (!zc || zc.dead) break;
       zc.dead = true; zc.deadT = now;
       const hp = zc.pos.clone(); hp.y += zc.dog ? .7 : 1.5;
@@ -4819,7 +4985,10 @@ function onMsg(m) {
       break;
     }
     case 'zgone': { ZC.gone.add(m.id); const zc = ZC.zs.get(m.id); if (zc) zRemoveClient(zc); break; }
-    case 'zround': ZC.round = m.r; ZC.dog = !!m.dog; ZC.phase = 'round'; zRoundFx(m.r, m.dog); break;
+    case 'zround': ZC.round = m.r; ZC.dog = !!m.dog; ZC.phase = 'round'; zRoundFx(m.r, m.dog); if (m.bo) centerMsg('RODADA ' + m.r, 'Algo grande está vindo...', 3); break;
+    case 'zboss': play('boss'); centerMsg('O CARNICEIRO CHEGOU', 'Quando ele erguer o cutelo, saia do anel vermelho', 4); break;
+    case 'zslam': { if (!finN(m.x) || !finN(m.z)) break; const p = new V3(m.x, .2, m.z); play('slam', p); puff(p, 0x6b5a48, 4, .6, .2); puff(p, 0xff4a20, 2, .3, 0); break; }
+    case 'zscr': { const zc = ZC.zs.get(m.id); if (zc && !zc.dead) { const p = zc.pos.clone(); p.y += 1.9; play('scream', p); puff(p, 0xd8f0ff, 3, .5, 0); } break; }
     case 'zrend': if (me.alive && !me.downed) grantXP(25); ZC.phase = 'break'; play('zend'); centerMsg('Rodada ' + m.r + ' concluída', 'Próxima rodada em 10 segundos', 4); zFogDog(false); break;
     case 'zdoor': if (zDoorOpen(m.id)) { const d = ZD.doors.find(x => x.id === m.id); play('door', d ? new V3(d.x, 1.5, d.z) : null); } break;
     case 'zpower': zPowerOn(); play('power'); centerMsg('ENERGIA LIGADA', 'Bebidas e Pack-a-Punch funcionando', 3); break;
