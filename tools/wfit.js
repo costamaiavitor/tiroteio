@@ -101,3 +101,17 @@ export async function view(name, key, { filt = () => true, bone, ax = 0, sign = 
   const bl = await new Promise(res => cv.toBlob(res, 'image/png')); await fetch('http://127.0.0.1:8799/' + name + '.png', { method: 'POST', body: bl });
   return { h: AX[hA], v: AX[vA], min: lo.map(x => +x.toFixed(4)), max: hi.map(x => +x.toFixed(4)) };
 }
+// vista em perspectiva (para pacotes de braços: olho na origem olhando para o centro das malhas)
+export async function persp(name, key, { eye = [0, 0, 0], target, fov = 62, w = 640, h = 360 } = {}) {
+  const s = S[key], cam = new THREE.PerspectiveCamera(fov, w / h, .001, 100);
+  if (!target) { const bb = new THREE.Box3(); for (const p of points(key, () => true, 7)) bb.expandByPoint(p); target = bb.getCenter(new THREE.Vector3()).toArray(); }
+  cam.position.set(...eye); cam.lookAt(new THREE.Vector3(...target)); cam.updateMatrixWorld();
+  const r = window.__T.renderer, rt = new THREE.WebGLRenderTarget(w, h, { samples: 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace;
+  const prev = r.getRenderTarget(); r.setRenderTarget(rt); r.clear(); r.render(s.scene, cam);
+  const px = new Uint8Array(w * h * 4); r.readRenderTargetPixels(rt, 0, 0, w, h, px); r.setRenderTarget(prev); rt.dispose();
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const g = cv.getContext('2d'), id = g.createImageData(w, h);
+  for (let y = 0; y < h; y++) id.data.set(px.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+  g.putImageData(id, 0, 0);
+  const bl = await new Promise(res => cv.toBlob(res, 'image/png')); await fetch('http://127.0.0.1:8799/' + name + '.png', { method: 'POST', body: bl });
+  return target;
+}

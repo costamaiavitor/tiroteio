@@ -2872,11 +2872,11 @@ function fpMeshScale(o, Ri) {
   const w = (i, v) => { v.fromBufferAttribute(p, i); if (o.isSkinnedMesh) o.applyBoneTransform(i, v); return v.applyMatrix4(o.matrixWorld).applyMatrix4(Ri); };
   return w(0, A).distanceTo(w(j, B)) / Math.sqrt(best);
 }
-function fpSkin(root, mats, L, keep = []) {
+function fpSkin(root, mats, L, keep = [], all = false) { // all: pinta também as peças que brilham (facas: o KA-BAR usa mapa de emissão)
   root.updateMatrixWorld(true);
   const Ri = root.matrixWorld.clone().invert(), cache = {};
   root.traverse(o => {
-    if (!o.isMesh || keep.includes(o.material.name) || o.material.emissive?.getHex()) return;
+    if (!o.isMesh || keep.includes(o.material.name) || (!all && o.material.emissive?.getHex())) return;
     const c = o.material.color, wood = c.r > c.b * 1.6 && c.r > .08; // madeira / marrom
     const sc = +(2.5 / L * fpMeshScale(o, Ri)).toPrecision(3), k = (wood ? 'b' : 'a') + sc; // a malha pode ter escala própria
     o.material = cache[k] || (cache[k] = triMat(wood ? mats.b || mats.a : mats.a, sc));
@@ -2896,7 +2896,7 @@ function knifeSwap(g, kind, skin) {
   h.matrix.copy(fpFrame(new V3(...K.P), new V3(0, 0, -1), new V3(0, 1, 0))).multiply(new THREE.Matrix4().makeScale(sc, sc, sc)).multiply(Mi);
   g.traverse(o => { if (o.isMesh) o.visible = false; });
   ms.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); o.material.envMapIntensity = .8; } });
-  if (skin) fpSkin(ms, skin, z1 - z0);
+  if (skin) fpSkin(ms, skin, z1 - z0, [], true);
   h.add(ms); g.add(h); g.userData.dl = true;
 }
 function fpPlay(ud, name, dur) {
@@ -2916,6 +2916,7 @@ function fpUpdate(ud, dt) {
   if (!F.until && !F.reloading) fpPlay(ud, me.sprinting && F.clips.run ? 'run' : hs > 1.5 && me.onGround && F.clips.walk ? 'walk' : 'idle');
   if (F.ik?.sv) { F.ik.arms.forEach((a, i) => { const v = F.ik.sv[i]; a.cl.position.copy(v[0]); a.ua.quaternion.copy(v[1]); a.fa.quaternion.copy(v[2]); }); if (F.ik.hp) F.ik.hl.position.copy(F.ik.hp); } // desfaz o IK do quadro anterior (ossos sem chave na animação)
   F.mixer.update(dt);
+  if (F.hideL) F.hideL.scale.setScalar(1e-3); // faca: a mão esquerda do pacote fica parada no canto da tela, então some (como no CS)
   if (F.follow.length) { // peças móveis do modelo copiam o movimento das peças do pacote
     F.root.updateMatrixWorld(true);
     for (const f of F.follow) { _fm.copy(f.b.parent.matrixWorld).invert().multiply(_fm.clone().copy(f.a.matrixWorld).multiply(f.d)); _fm.decompose(f.b.position, f.b.quaternion, f.b.scale); }
@@ -2960,6 +2961,41 @@ function fpIK(F) {
     fpRot(a.fa, I.w.clone().sub(I.e), a.tw.clone().sub(I.e));
   }
 }
+// braços prontos das facas (Sketchfab "Knife animated", CC-BY): a mão já fecha no cabo de uma faca. A faca do jogo (KA-BAR ou karambit)
+// entra no lugar da faca do pacote, presa ao mesmo nó: o referencial "knife" do pacote tem o cabo no eixo Y (lâmina para +Y, saindo pelo
+// lado do indicador), o fio para +Z (para onde apontam os nós dos dedos) e as unidades em centímetros. O pacote tem uma animação só,
+// cortada em clipes (quadros a 30 fps). A câmera do jogo fica em eye olhando para look (espaço do pacote).
+const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 8, -22], look: [0, -2, 30],
+  clips: { idle: [0, 42], inspect: [43, 66], stab: [66, 87], slash: [87, 112], slash2: [112, 138], draw: [138, 153] },
+  // ponto de encaixe do modelo (FPKN: guarda da KA-BAR / centro do anel da karambit) vai para Q no pacote,
+  // fwd/up: para onde vão o cano (lâmina) e o dorso do modelo; len: comprimento total (cm)
+  fit: { knife: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 30 }, karambit: { Q: [.2, -3, 2.4], fwd: [0, 1, 0], up: [-1, 0, -.3], len: 22 } } }; // karambit na pegada invertida (mindinho no anel), garra saindo pelo lado do polegar e curvando para baixo
+function knBuild(kind, ud, skin) {
+  const key = 'k:pack', mk = 'm:' + kind;
+  if (!FPC[key]) FPC[key] = new GLTFLoader().loadAsync(FPKNIFE.url).then(g => (FPC[key] = g), e => { console.warn('faca', e); delete FPC[key]; });
+  if (!fpReady(key) || !fpReady(mk)) { Promise.all([FPC[key], fpLoad(mk)]).then(() => { if (vmGun && W[G.cur]?.slot === 'knife' && !vmGun.userData.fps2) vmSetWeapon(G.cur); }); return false; }
+  const g = FPC[key], root = SkeletonUtils.clone(g.scene), K = FPKNIFE, F = K.fit[kind], D = FPKN[kind];
+  const all = g.animations[0], mixer = new THREE.AnimationMixer(root), clips = {};
+  for (const [n, [a, b]] of Object.entries(K.clips)) clips[n] = THREE.AnimationUtils.subclip(all, n, a, b, 30);
+  root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; } });
+  // faca do jogo no nó da faca do pacote
+  const node = root.getObjectByName('knife'); node.traverse(o => { if (o.isMesh) o.visible = false; });
+  const ms = FPC[mk].scene.clone(true); ms.updateMatrixWorld(true);
+  const pts = fpPts(ms, () => true), Mf = fpFit({ T: D.A, fwd: D.fwd, up: D.up }, pts, new THREE.Matrix4()), Mi = Mf.clone().invert();
+  let z0 = 1e9, z1 = -1e9; for (const p of pts) { p.applyMatrix4(Mi); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); }
+  const sc = F.len / (z1 - z0), h = new THREE.Group(); h.matrixAutoUpdate = false;
+  h.matrix.copy(fpFrame(new V3(...F.Q), new V3(...F.fwd), new V3(...F.up))).multiply(new THREE.Matrix4().makeScale(sc, sc, sc)).multiply(Mi);
+  ms.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; } });
+  if (skin) fpSkin(ms, skin, z1 - z0, [], true);
+  h.add(ms); node.add(h);
+  // câmera do pacote → câmera do jogo
+  const C = new THREE.Matrix4().lookAt(new V3(...K.eye), new V3(...K.look), new V3(0, 1, 0)).setPosition(new V3(...K.eye));
+  const holder = new THREE.Group(); holder.matrixAutoUpdate = false; holder.matrix.makeScale(K.k, K.k, K.k).multiply(C.invert()); holder.add(root);
+  const mz = new THREE.Object3D(); root.add(mz);
+  Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P: { hr: 1 }, mz, follow: [], ik: null, aq: new THREE.Quaternion(), ap: new V3(), knife: true, hideL: root.getObjectByName('L_arm_02') }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
+  fpPlay(ud, 'draw'); mixer.update(0);
+  return holder;
+}
 function vmSetWeapon(id) {
   if (vmGun) { vmRoot.remove(vmGun); vmGun.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); }
   if (ARMS.knife) { ARMS.knife.removeFromParent(); ARMS.knife = null; } // a faca antiga sai do soquete dos braços
@@ -2974,6 +3010,10 @@ function vmSetWeapon(id) {
     if (h) { gun.visible = false; vmGun.add(h); vmRoot.add(vmGun); return; }
   }
   let rh;
+  if (m === 'karambit' || m === 'knife') { // braços prontos com a mão fechada no cabo
+    const M = gunMats(false, true, skinOf(mid)), h = knBuild(m, ud, M.blade !== gunMats(false, true, null).blade ? { a: M.blade, b: M.polymer } : null);
+    if (h) { gun.visible = false; vmGun.add(h); vmRoot.add(vmGun); return; }
+  }
   if ((m === 'karambit' || m === 'knife') && ARMS.root) { // braços do Blender: a faca vai para o soquete da mão direita
     vmGun.add(ARMS.holder);
     const sock = ARMS.root.getObjectByName(m === 'karambit' ? 'Spin_karambit' : 'Spin_knife');
@@ -3166,6 +3206,7 @@ function knifeAnim(o, ud) {
 }
 function knifeInspect() {
   if (vmGun?.userData.armsKnife) { if (ARMS.cur === 'idle') armsPlay('inspect'); return; }
+  if (vmGun?.userData.fps2?.knife) { if (vmGun.userData.fps2.cur === 'idle') fpPlay(vmGun.userData, 'inspect'); return; }
   if (!['knife', 'karambit'].includes(W[G.cur]?.model) || G.kan || now < G.switchEnd) return;
   G.kan = { type: 'inspect', t0: now };
 }
@@ -3181,7 +3222,7 @@ function updateViewmodel(dt) {
   if (ud.armsKnife) ARMS.mixer.update(dt);
   if (ud.fps2) fpUpdate(ud, dt);
   if (G.swing > 0) { G.swing = Math.max(0, G.swing - dt * 4); const s = Math.sin(G.swing * Math.PI); o.ry += s * 1.1; o.x -= s * .12; o.z -= s * .1; }
-  if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model) && !ud.armsKnife) knifeAnim(o, ud);
+  if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model) && !ud.armsKnife && !ud.fps2) knifeAnim(o, ud);
   if (me.downed) { o.y -= .04; o.rz += .35; }
   // correndo: arma abaixada e de lado, balançando mais
   me.sprintK = lerp(me.sprintK, me.sprinting ? 1 : 0, Math.min(1, dt * 10));
@@ -3303,6 +3344,7 @@ function shoot() {
 function knifeAttack(heavy) {
   const w = W.knife; G.nextFire = now + (heavy ? w.altRate : w.rate); G.swing = 0; G.kan = { type: heavy ? 'stab' : G.lastSlash?.type === 'slash' && now - G.lastSlash.t0 < 1 ? 'slash2' : 'slash', t0: now }; if (!heavy) G.lastSlash = G.kan; // golpes seguidos alternam o lado
   if (vmGun?.userData.armsKnife) armsPlay(G.kan.type);
+  if (vmGun?.userData.fps2?.knife) fpPlay(vmGun.userData, G.kan.type);
   const o = camera.position.clone(), d = new V3(0, 0, -1).applyQuaternion(camera.quaternion);
   if (ZC.on) { // zumbis: 150 de dano (mata na rodada 1 com uma facada), Bowie 1000
     const res = trace(o, d, w.range, zCands());
@@ -5935,12 +5977,12 @@ function tick(dt) {
 applyQuality();
 loadHands();
 loadArms();
-fpLoad('p:ak'); fpLoad('m:knife'); fpLoad('m:karambit');
+fpLoad('p:ak'); fpLoad('m:knife'); fpLoad('m:karambit'); FPC['k:pack'] = new GLTFLoader().loadAsync(FPKNIFE.url).then(g => (FPC['k:pack'] = g));
 setTimeout(() => { let q = Promise.resolve(); for (const k of Object.keys(FPM)) q = q.then(() => fpLoad('m:' + k)); }, 8000); // modelos das armas aos poucos (mundo e mãos dos outros)
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos)
 window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
-  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
+  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>
 </body>

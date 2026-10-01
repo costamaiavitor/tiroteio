@@ -154,6 +154,7 @@ Braços e animações (um pacote por classe de arma):
 - braços de fuzil: [Animated FPS hands (rifle animation pack)](https://sketchfab.com/3d-models/animated-fps-hands-rifle-animation-pack-5f2d0ed780a94724b36ab505f7564057), de [Cransh](https://sketchfab.com/ccransh)
 - braços de rifle de precisão: [FPS animations sniper rifle](https://sketchfab.com/3d-models/fps-animations-sniper-rifle-c15ae8393d824f5b929e3f69691cdd31), de [Cransh](https://sketchfab.com/ccransh)
 - braços + Remington (Nova): [FPS Arms remington (shotgun)](https://sketchfab.com/3d-models/fps-arms-remington-shotgun-e68ef617fe8a48cca8610d016ffd5881), de [Cransh](https://sketchfab.com/ccransh)
+- braços das facas (a faca do jogo entra na mão deles): [Knife animated](https://sketchfab.com/3d-models/knife-animated-5f83f0bd4b2c429aa14aa46461efe404), de [DJMaesen](https://sketchfab.com/bumstrum)
 
 Armas e facas:
 
