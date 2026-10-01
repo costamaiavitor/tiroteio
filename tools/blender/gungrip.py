@@ -6,6 +6,7 @@
 import numpy as np
 sc = bpy.context.scene
 FR = 2000
+GR_R = globals().get('GR_R') or {'middle': .026, 'ring': .025, 'pinky': .023}   # raio do túnel do punho (centro dos dedos): punho da arma ~1.7 cm + metade do dedo
 def pw(n, tail=False):
     pb = rig.pose.bones[n]; return rig.matrix_world @ (pb.tail if tail else pb.head)
 def circle(pts):
@@ -37,17 +38,19 @@ def frame_m(x, y, z, o):
     return Matrix(((x.x, y.x, z.x, o.x), (x.y, y.y, z.y, o.y), (x.z, y.z, z.z, o.z), (0, 0, 0, 1)))
 sc.frame_set(FR); bpy.context.view_layer.update()
 # ---------- mão direita ----------
-L, c0, A = fit('r', ['middle', 'ring', 'pinky'], {'middle': .021, 'ring': .02, 'pinky': .018})
+L, c0, A = fit('r', ['middle', 'ring', 'pinky'], GR_R)
 if A.dot(L['middle'][0] - L['pinky'][0]) < 0: A = -A           # A: do mindinho para o médio = cima do punho
 curl('r', ['index'], [.45, 1.0, .6])                              # indicador no gatilho
 thumb('r', TH_R)
 bpy.context.view_layer.update()
-up = A; fwd = pw('middle_02_r') - L['middle'][0]; fwd = (fwd - fwd.dot(up) * up).normalized()
-rt = fwd.cross(up)                                                  # direita = frente × cima
+up = A
+# o dorso da mão fica do lado direito do punho: direita = do centro do túnel para o nó (MCP) do dedo médio
+rt = pw('middle_01_r') - L['middle'][0]; rt = (rt - rt.dot(up) * up).normalized()
+fwd = up.cross(rt)                                                  # frente = cima × direita (x × y = z)
 o = c0 + up * (up.dot(L['middle'][0] - c0))                         # altura do dedo médio
 make_sock('GunSock_r', 'r', frame_m(rt, fwd, up, o))
 # ---------- mão esquerda ----------
-L2, c2, A2 = fit('l', FING, {'index': .026, 'middle': .027, 'ring': .026, 'pinky': .023})
+L2, c2, A2 = fit('l', FING, globals().get('GR_L') or {'index': .03, 'middle': .031, 'ring': .03, 'pinky': .027})
 if A2.dot(L2['index'][0] - L2['pinky'][0]) < 0: A2 = -A2         # A2: do mindinho para o indicador = frente
 thumb('l', [(.3, 0, .2), (.3, 0, 0), (.2, 0, 0)])
 bpy.context.view_layer.update()

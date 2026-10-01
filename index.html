@@ -1784,7 +1784,7 @@ function skinMats(f, mk, fp) {
   const T = skinTex(f), em = T.glow ? { emissiveMap: T.glow, emissive: new THREE.Color(0xffffff).multiplyScalar(fp ? 1.4 : 1) } : {};
   return {
     a: mk({ map: T.map, color: 0xffffff, metalness: f.m ?? .45, roughness: f.rg ?? .45, ...em }),
-    b: mk({ map: T.map, color: 0xb0b0b0, metalness: Math.min(f.m ?? .45, .35), roughness: Math.max(f.rg ?? .45, .5), ...em }),
+    b: mk({ map: T.map, color: 0xb0b0b0, metalness: Math.min(f.m ?? .45, .35), roughness: Math.max(f.rg ?? .45, .72), ...em }), // coronha/cabo foscos (senão o topo da coronha vira um risco branco de reflexo)
   };
 }
 const skinSwatch = id => { const f = SKIN_BY[id]; return f ? skinTex(f).map.image.toDataURL('image/jpeg', .7) : ''; };
@@ -1890,7 +1890,7 @@ function gunModel(id, fp = false, skin = null) {
     add(par, EX([[u0 - .006, v0], [u0 + len, v0], [u0 + len, v0 - .005], [u0 + len - .018, v0 - .03], [u0 - .004, v0 - .03], [u0 - .01, v0 - .018]], w, [[[u0, v0 - .005], [u0 + len - .007, v0 - .005], [u0 + len - .022, v0 - .025], [u0, v0 - .025]]]), M.metal);
     add(par, EX([[u0 + .012, v0 - .002], [u0 + .018, v0 - .002], ['q', u0 + .02, v0 - .015, u0 + .012, v0 - .024], [u0 + .007, v0 - .022], ['q', u0 + .012, v0 - .012, u0 + .012, v0 - .002]], .006), M.dark);
   };
-  const grip = (par, u0, v0, h, mat, w = .032) => add(par, EX([[u0 + .008, v0], [u0 + .042, v0], ['q', u0 + .034, v0 - h * .45, u0 + .026, v0 - h], [u0 - .012, v0 - h], ['q', u0 - .016, v0 - h * .5, u0 + .008, v0]], w, null, .004), mat);
+  const grip = (par, u0, v0, h, mat, w = .032) => (ud.gripAx = { top: new V3(0, v0, -(u0 + .025)), bot: new V3(0, v0 - h, -(u0 + .007)) }, add(par, EX([[u0 + .008, v0], [u0 + .042, v0], ['q', u0 + .034, v0 - h * .45, u0 + .026, v0 - h], [u0 - .012, v0 - h], ['q', u0 - .016, v0 - h * .5, u0 + .008, v0]], w, null, .004), mat));
   const bore = (x, y, z, r) => add(g, new THREE.CircleGeometry(r, 10), M.dark, x, y, z - .0005, 0, Math.PI);
   let mz = -.3, my = .04;
   const model = wd?.model || id;
@@ -1908,6 +1908,7 @@ function gunModel(id, fp = false, skin = null) {
     add(g, EX([[.014, fy - .018], [.02, fy - .018], ['q', .022, fy - .03, .014, fy - .04], [.009, fy - .038], ['q', .014, fy - .028, .014, fy - .018]], .006), M.dark);
     const gs = o.gs;
     add(g, EX([[-.042, fy - .02], [-.004, fy - .02], ['q', -.01, fy - .06 * gs, -.02 * gs, fy - .118 * gs], [-.064 * gs, fy - .118 * gs], ['q', -.07 * gs, fy - .06 * gs, -.058, fy - .02]], o.sw + .004, null, .004), o.gripM);
+    ud.gripAx = { top: new V3(0, fy - .02, .023), bot: new V3(0, fy - .118 * gs, .042 * gs) }; // eixo do punho da pistola
     if (o.stipple) for (let k = 0; k < 5; k++) add(g, new THREE.BoxGeometry(o.sw + .006, .006, .03), M.dark, 0, fy - .04 - k * .015, .034 + k * .002);
     add(g, CY(.0068 * o.bs, .014), M.dark, 0, sy + .004, -o.sz - h - .004); bore(0, sy + .004, -o.sz - h - .011, .004 * o.bs);
     const mag = grp(g, 0, fy - .122 * gs, .044 * gs); add(mag, RB(o.sw + .006, .012, .052 * gs, .003), M.dark); add(mag, new THREE.BoxGeometry(.02, .09, .032), M.metal, 0, .05, -.008, -.2);
@@ -2502,12 +2503,13 @@ function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo,
 // ---------- braços de primeira pessoa feitos no Blender (humano do MPFB, licença CC0) com as animações das facas ----------
 // assets/arms.glb traz os dois braços com esqueleto, a câmera usada para posar e dois soquetes na mão direita
 // (Spin_karambit / Spin_knife) onde a faca do jogo é pendurada. Uma linha do tempo só, cortada em clipes (30 fps).
-const GRIP = { tilt: -.3, r: [0, 0, 0], l: [0, -.01, 0], lroll: 0, shr: [.32, -.28, .12], shl: [-.25, -.38, .05], elr: [.15, -.3, .05], ell: [-.3, -.25, 0], lift: [-.02, .07, .04], yaw: .3 }; // alvos das mãos; ombro (sh) e cotovelo (el) em relação à mão, espaço da câmera; lift sobe a arma para as mãos aparecerem
+const GRIP = { gripAt: .62, tilt: -.3, r: [0, 0, 0], l: [0, -.01, 0], lroll: -.6, shr: [.32, -.28, .12], shl: [-.25, -.38, .05], elr: [.15, -.3, .05], ell: [-.3, -.25, 0], lift: [-.06, .06, .04], liftP: [0, 0, 0], pl: [-.03, 0, -.012], yaw: .45 }; // alvos das mãos; ombro (sh) e cotovelo (el) em relação à mão, espaço da câmera; lift sobe a arma para as mãos aparecerem
 const ARMS = { holder: null, root: null, mixer: null, clips: {}, cur: null, knife: null };
 // cada faca tem a sua pose de mão: karambit a partir do quadro 0, faca a partir do 1000
 const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] }, ARMS_OFF = { karambit: 0, knife: 1000 };
+const ARMS_VER = location.hostname === 'localhost' ? Date.now() : 5; // subir a cada nova exportação do Blender (o navegador guarda o arquivo em cache)
 function loadArms() {
-  new GLTFLoader().load('assets/arms.glb', g => {
+  new GLTFLoader().load('assets/arms.glb?v=' + ARMS_VER, g => {
     const root = g.scene; root.updateMatrixWorld(true);
     const cam = root.getObjectByName('Cam'), holder = new THREE.Group();
     holder.matrixAutoUpdate = false; holder.matrix.copy(cam.matrixWorld).invert(); holder.add(root); // a câmera do Blender vira a câmera do jogo
@@ -2586,7 +2588,7 @@ function armIK(s, target, pole) {
   k.base.forEach(([p, q], i) => { const b = [k.up, k.lo, k.hand][i]; b.position.copy(p); b.quaternion.copy(q); });
   k.up.parent.updateMatrixWorld(true); k.up.updateMatrixWorld(true);
   // mão desejada no mundo: soquete na arma × mão em relação ao soquete
-  const HW = _m2.copy(target).multiply(k.relInv), T = new V3().setFromMatrixPosition(HW);
+  target.decompose(_v1, _q1, _v2); _m2.compose(_v1, _q1, _v2.set(1, 1, 1)).multiply(k.relInv); const HW = _m2, T = new V3().setFromMatrixPosition(HW);
   const qT = new THREE.Quaternion().setFromRotationMatrix(_m1.extractRotation(HW));
   const a = k.L1, b = k.L2;
   // Como nos FPS, o ombro não fica preso ao corpo: ele é posto fora da tela, atrás e abaixo de cada mão, para o
@@ -2614,6 +2616,29 @@ function armsIK(ud) {
     const T = _v3.setFromMatrixPosition(t.matrixWorld);
     armIK(s, t.matrixWorld, _v4.copy(T).add(_v1.fromArray(GRIP['sh' + s])).add(_v2.fromArray(GRIP['el' + s]))); // cotovelo para baixo e para fora
   }
+}
+// Enquadramento no estilo do CS: cada arma tem um comprimento, então em vez de um deslocamento fixo procura o
+// deslocamento (ud.vm) que põe a boca do cano e as duas mãos nos mesmos pontos da tela (16:9, 0..1) para todas.
+const FRAME = {
+  primary: { muzzle: [.41, .59, 1.5], lh: [.47, .68, 1], rh: [.70, .87, 1] },
+  pistol: { muzzle: [.56, .56, 1.5], rh: [.63, .86, 1], lh: [.6, .88, .5] },
+};
+function frameArms(ud, F) {
+  const vo = ud.vm || [0, 0, 0], cam = vmCam.clone(); cam.aspect = 16 / 9; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+  vmRoot.position.set(.165 + vo[0], -.145 + vo[1], -.43 + vo[2]); vmRoot.rotation.set(0, 0, 0); vmRoot.updateMatrixWorld(true);
+  // ponta da arma = o canto mais à frente das peças (ud.muzzle é só o ponto do clarão, nem sempre na ponta do cano)
+  const gun = vmGun.children[0], tip = new V3(0, 0, 1e9), c = new V3();
+  gun.traverse(o => { if (!o.isMesh || !o.visible) return; o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox; for (let i = 0; i < 8; i++) { c.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld); if (c.z < tip.z) tip.copy(c); } });
+  const pts = { muzzle: tip, lh: ud.armsGun.lt.getWorldPosition(new V3()), rh: ud.armsGun.rt.getWorldPosition(new V3()) };
+  const v = new V3(); let best = null;
+  // limites do deslocamento final (armas curtas/grossas, como P90 e Thundergun, não podem vir para cima da câmera)
+  const lo = [-.09, -.02, -.06], hi = [.0, .08, .1], st = .01;
+  for (let dz = lo[2] - vo[2]; dz <= hi[2] - vo[2] + 1e-6; dz += st) for (let dx = lo[0] - vo[0]; dx <= hi[0] - vo[0] + 1e-6; dx += st) for (let dy = lo[1] - vo[1]; dy <= hi[1] - vo[1] + 1e-6; dy += st) {
+    let e = 0;
+    for (const k in F) { v.copy(pts[k]); v.x += dx; v.y += dy; v.z += dz; v.project(cam); const sx = (v.x + 1) / 2 - F[k][0], sy = (1 - v.y) / 2 - F[k][1]; e += (sx * sx + sy * sy) * F[k][2]; }
+    if (!best || e < best.e) best = { e, d: [dx, dy, dz] };
+  }
+  ud.vm = vo.map((x, i) => x + best.d[i]);
 }
 function vmSetWeapon(id) {
   if (vmGun) { vmRoot.remove(vmGun); vmGun.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); }
@@ -2648,9 +2673,17 @@ function vmSetWeapon(id) {
     const lh = leftHand(A); lh.position.copy(ud.lh); gun.add(lh);
     if (armsOn) {
       lh.traverse(o => { if (o.isMesh) o.visible = false; });
-      const rt = new THREE.Group(); rt.rotation.x = GRIP.tilt; rt.position.fromArray(GRIP.r); rh.add(rt); // punho inclinado
-      const lt = new THREE.Group(); lt.position.fromArray(GRIP.l); lt.rotation.z = GRIP.lroll; lh.add(lt); // eixo do guarda-mão; mão por baixo
-      ud.armsGun = { rt, lt }; ud.vm = (ud.vm || [0, 0, 0]).map((v, i) => v + GRIP.lift[i]);
+      const rt = new THREE.Group();
+      if (ud.gripAx) { // punho modelado: mão em volta do eixo real, inclinada igual a ele
+        const { top, bot } = ud.gripAx, up = top.clone().sub(bot).normalize(), x = new V3(1, 0, 0), z = new V3().crossVectors(x, up);
+        rt.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, up, z)); rt.position.copy(bot).lerp(top, GRIP.gripAt); gun.add(rt);
+      } else { rt.rotation.x = GRIP.tilt; rt.position.fromArray(GRIP.r); rh.add(rt); } // sem punho modelado: usa o lugar antigo da mão
+      const lt = new THREE.Group();
+      if (ud.pistol && ud.gripAx) { // pistola com as duas mãos: a esquerda fecha por fora dos dedos da direita, no mesmo eixo do punho
+        const { top, bot } = ud.gripAx, up = top.clone().sub(bot).normalize(), z = up.clone().negate(), y = new V3(1, 0, 0), x = new V3().crossVectors(y, z);
+        lt.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z)); lt.position.copy(bot).lerp(top, GRIP.gripAt - .1).add(new V3(...GRIP.pl)); gun.add(lt);
+      } else { lt.position.fromArray(GRIP.l); lt.rotation.z = GRIP.lroll; lh.add(lt); } // eixo do guarda-mão; mão por baixo
+      ud.armsGun = { rt, lt }; const lift = W[mid]?.slot === 'primary' ? GRIP.lift : GRIP.liftP; ud.vm = (ud.vm || [0, 0, 0]).map((v, i) => v + lift[i]);
       vmRoot.add(ARMS.gunC); ARMS.gunC.position.set(-.165, .145, .43); ARMS.gunC.add(ARMS.holder);
       ARMS.kind = 'gun'; armsGunBase();
     }
@@ -2659,6 +2692,7 @@ function vmSetWeapon(id) {
   }
   vmGun.scale.setScalar(1.18); ud.baseYaw = vmGun.rotation.y = ud.armsGun && W[mid]?.slot === 'primary' ? GRIP.yaw : .05; // arma maior e virada para dentro (com os braços, bem mais, como no CS: guarda-mão à esquerda da mão do gatilho)
   vmRoot.add(vmGun);
+  if (ud.armsGun) frameArms(ud, W[mid]?.slot === 'primary' ? FRAME.primary : FRAME.pistol);
 }
 // ---------- animações da arma (tiro, bomba, ferrolho, recargas) ----------
 const smooth = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
@@ -5495,7 +5529,7 @@ loadArms();
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos)
 window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
-  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
+  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>
 </body>
