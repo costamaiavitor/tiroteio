@@ -2684,13 +2684,13 @@ const FPG = .9, FPH = .6806; // unidades de pacote (mão 1) por metro de arma re
 // onde fica o gatilho na tela (metros do jogo a partir do olho; x direita, y cima, z para trás) e o giro do cano [guinada, arfagem, rolagem]
 const FPV = { long: { p: [.202, -.118, -.233], e: [.025, 0, -.102] }, pistol: { p: [.17, -.1, -.37], e: [.06, 0, -.2] } }; // padrão (cada pacote pode ter o seu em v)
 const FPK = {
-  ak: { url: 'assets/fps/ak/scene.gltf', mag2: 'Pmag2', armsFrom: 'rifle', v: { p: [.202, -.118, -.233], e: [.025, 0, -.102] }, sh: [.04, -.08, .1], hr: 1.99, body: 'PBody', ref: 'Rif', T: [null, .194, -.075], fwd: '-y', up: '+z', mag: 'Pmag', spare: ['Object_99'],
+  ak: { url: 'assets/fps/ak/scene.gltf', mag2: 'Pmag2', armsFrom: 'rifle', v: { p: [.2, -.095, -.25], e: [.025, 0, -.102] }, sh: [.04, -.08, .1], hr: 1.99, body: 'PBody', ref: 'Rif', T: [null, .194, -.075], fwd: '-y', up: '+z', mag: 'Pmag', spare: ['Object_99'],
     clips: { idle: 'AK_Idle', draw: 'AK_Draw', fire: 'AK_Shot', reload: 'AK_Reload', reloadE: 'AK_Reload_full', walk: 'AK_Walk', run: 'AK_Run' } },
   pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.14, -.1, -.30], e: [.06, 0, -.2] }, sh: [.04, -.08, .1], hr: 1, view: 'pistol', body: 'PBody', ref: 'Rif', T: [.061, null, .054], fwd: '+x', up: '-z', mag: 'Pmag', slide: 'Rif',
     clips: { idle: 'FPS_Pistol_Idle', fire: 'FPS_Pistol_Fire', reload: 'FPS_Pistol_Reload_easy', reloadE: 'FPS_Pistol_Reload_full', walk: 'FPS_Pistol_Walk' } },
-  smg: { url: 'assets/fps/smg/scene.gltf', armsFrom: 'rifle', v: { p: [.198, -.083, -.383], e: [.016, -.007, -.105] }, sh: [.04, -.08, .1], hr: 1.98, body: 'PBody', ref: 'Rif', T: [-.092, null, -.067], fwd: '+x', up: '+z', mag: 'Pmag', spare: ['Object_96'],
+  smg: { url: 'assets/fps/smg/scene.gltf', armsFrom: 'rifle', v: { p: [.198, -.083, -.383], e: [.016, -.007, -.105] }, sh: [.05, -.1, .13], hr: 1.98, body: 'PBody', ref: 'Rif', T: [-.092, null, -.067], fwd: '+x', up: '+z', mag: 'Pmag', spare: ['Object_96'],
     clips: { idle: 'KDW_DPose_Idle', draw: 'KDW_Draw', fire: 'KDW_Shot', reload: 'KDW_Reload_fast', reloadE: 'KDW_Reload_full', walk: 'KDW_Walk', run: 'KDW_Run' } },
-  rifle: { url: 'assets/fps/rifle/scene.gltf', v: { p: [.197, -.115, -.325], e: [0, 0, -.026] }, sh: [.04, -.08, .1], hr: 1, body: 'ACRRifle', ref: 'Rif', T: [.298, null, .124], fwd: '-x', up: '-z', mag: 'Pmag', spare: ['Object_13', 'Object_14'],
+  rifle: { url: 'assets/fps/rifle/scene.gltf', v: { p: [.197, -.115, -.325], e: [0, 0, -.026] }, sh: [.05, -.1, .13], hr: 1, body: 'ACRRifle', ref: 'Rif', T: [.298, null, .124], fwd: '-x', up: '-z', mag: 'Pmag', spare: ['Object_13', 'Object_14'],
     clips: { idle: 'Arms_FPS_Anim_Idle', draw: 'Arms_FPS_Anim_Draw', fire: 'Arms_FPS_Anim_Shoot', reload: 'Arms_FPS_Anim_Reload_Fast', walk: 'Arms_FPS_Anim_Walk', run: 'Arms_FPS_Anim_Run' } },
   sniper: { url: 'assets/fps/sniper/scene.gltf', armsFrom: 'rifle', v: { p: [.197, -.115, -.325], e: [0, 0, -.03] }, sh: [.04, -.08, .1], hr: 1, body: 'Body', ref: 'Bolt', T: [-.074, null, .045], fwd: '+z', up: '+x', mag: 'Mag', bolt: 'Bolt',
     clips: { idle: 'SRifle_Idle', fire: 'SRifle_Shot_nosight', reload: 'SRifle_Reload', reloadE: 'SRifle_Reload_Full', walk: 'SRifle_Walk' } },
@@ -2773,9 +2773,11 @@ function fpFit(D, pts, toLocal) {
 function fpTips(c) {
   let z1 = -1e9, z0 = 1e9; for (const p of c) { z1 = Math.max(z1, p.z); z0 = Math.min(z0, p.z); }
   const L = z1 - z0, tip = new V3(); let n = 0, sy = -1e9;
-  for (const p of c) { if (p.z > z1 - L * .015) { tip.add(p); n++; } if (p.z > -L * .05 && p.z < L * .3 && Math.abs(p.x) < L * .03) sy = Math.max(sy, p.y); }
+  for (const p of c) if (p.z > z1 - L * .015) { tip.add(p); n++; }
   tip.divideScalar(n || 1); tip.z = z1;
-  return { L, muzzle: tip, sight: new V3(0, sy, 0) };
+  // mira: o ponto mais alto perto da linha do cano (centro lateral tirado da boca do cano, que é simétrica)
+  for (const p of c) if (p.z > -L * .05 && p.z < L * .3 && Math.abs(p.x - tip.x) < L * .03) sy = Math.max(sy, p.y);
+  return { L, muzzle: tip, sight: new V3(tip.x, sy, 0) };
 }
 const fpArm = m => /arm/i.test(m.material?.name || '') || m.material?.name === 'material';
 // monta os braços + arma para a arma id; devolve false se ainda não carregou (aí usa o modelo antigo até carregar)
@@ -2806,6 +2808,10 @@ function fpBuild(id, ud) {
     ms.updateMatrixWorld(true);
     const mp = fpPts(ms, () => true), M = fpFit(D, mp, new THREE.Matrix4()), Mi = M.clone().invert();
     tips = fpTips(mp.map(p => p.applyMatrix4(Mi)));
+    if (D.lens) { // com luneta: a mira é o centro da ocular (o fundo da luneta), não o topo dela
+      const lp = fpPts(ms, o => D.lens.includes(o.material.name), 1).map(p => p.applyMatrix4(Mi));
+      if (lp.length) { let a = 1e9, b = -1e9; for (const p of lp) { a = Math.min(a, p.z); b = Math.max(b, p.z); } const e = lp.filter(p => p.z < a + (b - a) * .25), c = new V3(); for (const p of e) c.add(p); c.divideScalar(e.length); tips.sight.set(c.x, c.y, 0); }
+    }
     const s = D.L * FPG * P.hr / tips.L;
     C = new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A).multiply(new THREE.Matrix4().makeScale(s, s, s)); // referencial da arma → osso do corpo
     root.traverse(o => { if (o.isMesh && !fpArm(o)) o.visible = false; }); // some a arma do pacote
@@ -3044,7 +3050,7 @@ function fpIK(F) {
 // entra no lugar da faca do pacote, presa ao mesmo nó: o referencial "knife" do pacote tem o cabo no eixo Y (lâmina para +Y, saindo pelo
 // lado do indicador), o fio para +Z (para onde apontam os nós dos dedos) e as unidades em centímetros. O pacote tem uma animação só,
 // cortada em clipes (quadros a 30 fps). A câmera do jogo fica em eye olhando para look (espaço do pacote).
-const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 12, -34], look: [0, -2, 30], sh: [.27, -.12, .07],
+const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 12, -34], look: [0, -2, 30], sh: [.28, -.15, .1],
   clips: { idle: [0, 42], inspect: [43, 66], stab: [66, 87], slash: [87, 112], slash2: [112, 138], draw: [138, 153] },
   // ponto de encaixe do modelo (FPKN: guarda da KA-BAR / centro do anel da karambit) vai para Q no pacote,
   // fwd/up: para onde vão o cano (lâmina) e o dorso do modelo; len: comprimento total (cm)
