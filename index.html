@@ -618,6 +618,219 @@ function zWall(axis, c, a0, a1, holes, H = 4.5, mat = 'wall', T = 1) {
   return out;
 }
 const zWin = x => ({ a: x - .8, b: x + .8, win: 1 }), zGap = (a, b) => ({ a, b });
+// ---------- regiões novas dos mapas zumbis (geradas por dados) ----------
+// Região = retângulo [x0, x1, z0, z1] com muro em volta: os lados de fora ganham janelas, o cenário sai do tema
+// (sorteio com semente fixa: igual em todo mundo) e cada uma tem arma de parede, lugar da Caixa, lâmpadas e
+// zumbis que saem do chão. Ligações: porta no muro comum entre duas regiões ({ a, b, x, z }) ou corredor com
+// portão desde um muro velho ({ a, b, x, z, ax, c: 1 }: o portão fica no muro velho e o corredor já é da região nova).
+const mkRand = s => () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const ZG_THEME = { rock: ['rock', 0x7d7a72], grave: ['concrete', 0x8b8b86], crate: ['crate', 0x8a6a40], container: ['container', 0x4a5a3a], sandbag: ['sand', 0x8a7a58], tent: ['plaster', 0x5e6248],
+  hay: ['sand', 0xc9a85a], barn: ['wood', 0x7d3b2b], g_grass: ['grass', 0x4a5a34], g_dirt: ['dirt', 0x5a4a38], g_tile: ['tile', 0x9a9a90], g_concrete: ['concrete', 0x6a6a62], g_asphalt: ['asphalt', 0x444440], g_wood: ['wood', 0x6a5032], g_sand: ['sand', 0x9a8a68] }; // materiais das regiões geradas (o mapa pode sobrescrever)
+const ZG_ROWS = { cells: 1, stables: 1, laundry: 1, ovens: 1 }; // temas em fileiras
+const ZG_OPEN = { graves: 1, forest: 1, rocks: 1, ruins: 1, military: 1, swamp: 1, river: 1, island: 1, field: 1, junk: 1, parking: 1, mine: 1, yard: 1 }; // temas a céu aberto (mais zumbis saindo do chão)
+function zGen(seed, regs, links, o) {
+  const rr = mkRand(seed), rn = (a, b) => a + rr() * (b - a), H = o.H, WM = o.mat, T = 1;
+  const out = { boxes: [], windows: [], doors: [], risers: [], wall: [], boxLocs: [], lamps: [], rooms: {}, floors: {}, names: {}, rects: [], deco: { trees: [], dead: [], water: [], planks: [] } };
+  const R = {}; for (const g of regs) R[g.id] = g;
+  const inR = (x, z, m = 0) => regs.find(g => x > g.r[0] - m && x < g.r[1] + m && z > g.r[2] - m && z < g.r[3] + m);
+  const lines = new Map(), line = (ax, c) => { const k = ax + c; let L = lines.get(k); if (!L) lines.set(k, L = { ax, c, segs: [], holes: [] }); return L; };
+  const cors = []; // corredores: [x0, x1, z0, z1, região]
+  // muros de cada região (os comuns a duas regiões saem uma vez só)
+  for (const g of regs) { const [x0, x1, z0, z1] = g.r; line('x', z0).segs.push([x0 - .5, x1 + .5]); line('x', z1).segs.push([x0 - .5, x1 + .5]); line('z', x0).segs.push([z0, z1]); line('z', x1).segs.push([z0, z1]); }
+  // portas e corredores
+  for (const k of links) {
+    const g = R[k.b], [x0, x1, z0, z1] = g.r, kind = k.kind || (k.c ? 'gate' : 'door');
+    if (k.c) {
+      const along = k.ax === 'x' ? 'z' : 'x', p = along === 'z' ? k.z : k.x, q = along === 'z' ? (k.z < z0 ? z0 : z1) : (k.x < x0 ? x0 : x1), m = along === 'z' ? k.x : k.z, lo = Math.min(p, q), hi = Math.max(p, q);
+      line(along === 'z' ? 'x' : 'z', q).holes.push(zGap(m - 2, m + 2));
+      const Lp = lines.get((along === 'z' ? 'x' : 'z') + p); if (Lp) Lp.holes.push(zGap(m - 2, m + 2)); // começa num muro gerado (de outra região)
+      for (const s of [-2.6, 2.6]) out.boxes.push(along === 'z' ? B(m + s, (lo + hi) / 2, .6, hi - lo - 1, H, WM) : B((lo + hi) / 2, m + s, hi - lo - 1, .6, H, WM));
+      const cr = along === 'z' ? [m - 2.3, m + 2.3, lo + .5, hi] : [lo + .5, hi, m - 2.3, m + 2.3]; if (p > q) { if (along === 'z') { cr[2] = lo; cr[3] = hi - .5; } else { cr[0] = lo; cr[1] = hi - .5; } }
+      cors.push([...cr, k.b]); out.rects.push([...cr, k.b]);
+      out.doors.push({ id: k.a + k.b, x: k.x, z: k.z, axis: k.ax, cost: k.cost, rooms: [k.a, k.b], kind });
+    } else {
+      const ax = Math.abs(k.x - x0) < .01 || Math.abs(k.x - x1) < .01 ? 'z' : 'x', c = ax === 'z' ? k.x : k.z, m = ax === 'z' ? k.z : k.x;
+      line(ax, c).holes.push(zGap(m - 2, m + 2));
+      out.doors.push({ id: k.a + k.b, x: k.x, z: k.z, axis: ax, cost: k.cost, rooms: [k.a, k.b], kind });
+    }
+  }
+  const inCor = (x, z, m = 0) => cors.some(c => x > c[0] - m && x < c[1] + m && z > c[2] - m && z < c[3] + m);
+  // janelas: nos lados de fora, longe das quinas e dos vãos
+  const water = []; // água (colisor que a bala atravessa): nada de janela, porta ou riser em cima
+  for (const g of regs) {
+    const [x0, x1, z0, z1] = g.r, sides = [['x', z0, x0, x1, [0, -1]], ['x', z1, x0, x1, [0, 1]], ['z', x0, z0, z1, [-1, 0]], ['z', x1, z0, z1, [1, 0]]], cand = [];
+    for (const [ax, c, a0, a1, n] of sides) {
+      const L = line(ax, c), len = a1 - a0, k = Math.max(1, Math.round(len / o.winSp));
+      for (let i = 0; i < k; i++) {
+        const a = a0 + (i + .5) * len / k, px = ax === 'x' ? a : c, pz = ax === 'x' ? c : a;
+        if (a < a0 + 7 || a > a1 - 7 || inR(px + n[0] * 3, pz + n[1] * 3) || inCor(px + n[0] * 4, pz + n[1] * 4, 3) || L.holes.some(h => Math.abs((h.a + h.b) / 2 - a) < 7) || (g.th === 'river' && Math.abs(a - (a0 + a1) / 2) < 9)) continue; // (rio: o meio do lado é água)
+        cand.push({ L, a, px, pz, n });
+      }
+    }
+    const nw = Math.min(cand.length, o.maxWin); // espalhadas: pega de um em um até o limite
+    for (let i = 0; i < nw; i++) { const c = cand[Math.floor(i * cand.length / nw)]; c.L.holes.push(zWin(c.a)); out.windows.push({ room: g.id, x: c.px, z: c.pz, n: c.n }); }
+  }
+  // muros (intervalos do mesmo traço juntados)
+  for (const L of lines.values()) {
+    const sg = L.segs.sort((p, q) => p[0] - q[0]), m = [];
+    for (const s of sg) { const t = m[m.length - 1]; if (t && s[0] <= t[1] + .01) t[1] = Math.max(t[1], s[1]); else m.push([...s]); }
+    for (const [a0, a1] of m) out.boxes.push(...zWall(L.ax, L.c, a0, a1, L.holes.filter(h => h.a > a0 && h.b < a1), H, WM));
+  }
+  // cenário de cada região
+  for (const g of regs) {
+    const [x0, x1, z0, z1] = g.r, W = x1 - x0, D = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, open = ZG_OPEN[g.th], rsv = [], props = [];
+    out.rooms[g.id] = g.r; out.names[g.id] = g.nm; out.floors[g.id] = g.fl;
+    out.boxes.push(B(cx, cz, W - 1, D - 1, .02, 'g_' + g.fl[0], 0, g.fl[1])); // piso (textura do tema)
+    // pontos reservados: frente das portas e das janelas, corredores
+    for (const d of out.doors) if (d.rooms.includes(g.id)) for (const s of [-1, 1]) rsv.push([d.x + (d.axis === 'z' ? s * 4 : 0), d.z + (d.axis === 'x' ? s * 4 : 0), 4.5]);
+    for (const c of cors) if (c[4] === g.id) for (const [x, z] of [[c[0], c[2]], [c[1], c[3]], [(c[0] + c[1]) / 2, (c[2] + c[3]) / 2]]) rsv.push([x, z, 5]);
+    for (const w of out.windows) if (w.room === g.id) rsv.push([w.x - w.n[0] * 2, w.z - w.n[1] * 2, 3]);
+    const free = (x, z, w, d, m = 1.2) => x - w / 2 > x0 + 2.5 && x + w / 2 < x1 - 2.5 && z - d / 2 > z0 + 2.5 && z + d / 2 < z1 - 2.5 &&
+      !rsv.some(([a, b, r]) => Math.max(Math.abs(a - x) - w / 2, 0) ** 2 + Math.max(Math.abs(b - z) - d / 2, 0) ** 2 < r * r) &&
+      !props.some(p => Math.abs(p.x - x) < (p.w + w) / 2 + m && Math.abs(p.z - z) < (p.d + d) / 2 + m);
+    const put = (x, z, w, d, h, mat, y = 0, c, m) => { if (!free(x, z, w, d, m)) return false; const b = B(x, z, w, d, h, mat, y, c); props.push(b); out.boxes.push(b); return true; };
+    const spot = (r = 3) => { for (let i = 0; i < 80; i++) { const x = rn(x0 + 6, x1 - 6), z = rn(z0 + 6, z1 - 6); if (free(x, z, r, r, 0)) { rsv.push([x, z, r]); return [x, z]; } } return null; };
+    const face = (x, z) => Math.abs(cx - x) > Math.abs(cz - z) ? [Math.sign(cx - x) || 1, 0] : [0, Math.sign(cz - z) || 1];
+    const pool = (x, z, w, d) => { out.boxes.push(B(x, z, w, d, 1.2, 'inv')); out.deco.water.push([x, z, w, d]); water.push([x - w / 2, x + w / 2, z - d / 2, z + d / 2]); props.push(B(x, z, w, d, 1.2, 'inv')); };
+    const tree = (x, z, dead) => { if (!free(x, z, .8, .8, 1.5)) return; const b = B(x, z, .8, .8, 4, 'col'); props.push(b); out.boxes.push(b); out.deco[dead ? 'dead' : 'trees'].push([x, z]); };
+    const scatter = (n, w0, w1, d0, d1, h0, h1, mat, c) => { for (let i = 0, k = 0; i < n && k < n * 12; k++) if (put(rn(x0 + 4, x1 - 4), rn(z0 + 4, z1 - 4), rn(w0, w1), rn(d0, d1), rn(h0, h1), mat, 0, typeof c === 'function' ? c() : c)) i++; };
+    const along = W >= D; // tema com rio, fileiras ou celas segue o lado comprido
+    if (g.th === 'river') { // rio atravessando no lado comprido, com duas pontes
+      const bw = 8, b1 = along ? x0 + W / 3 : z0 + D / 3, b2 = along ? x0 + 2 * W / 3 : z0 + 2 * D / 3, a0 = along ? x0 : z0, a1 = along ? x1 : z1;
+      for (const [p, q] of [[a0 + .5, b1 - 2.5], [b1 + 2.5, b2 - 2.5], [b2 + 2.5, a1 - .5]]) along ? pool((p + q) / 2, cz, q - p, bw) : pool(cx, (p + q) / 2, bw, q - p);
+      for (const b of [b1, b2]) out.deco.planks.push(along ? [b, cz, 5, bw + 2] : [cx, b, bw + 2, 5]);
+    } else if (g.th === 'island') { // ilha: água em volta e um píer
+      const k = 7, ax0 = x0 + 9, ax1 = x1 - 9, az0 = z0 + 9, az1 = z1 - 9, q = (ax1 - ax0) / 2 - 2.5;
+      pool(cx - 2.5 - q / 2, az0 + k / 2, q, k); pool(cx + 2.5 + q / 2, az0 + k / 2, q, k); pool(cx, az1 - k / 2, ax1 - ax0, k);
+      pool(ax0 + k / 2, cz, k, az1 - az0 - 2 * k); pool(ax1 - k / 2, cz, k, az1 - az0 - 2 * k);
+      out.deco.planks.push([cx, az0 + k / 2, 5, k + 2]);
+    }
+    // lugares fixos (arma de parede, Caixa e lâmpadas): o cenário desvia deles (temas em fileiras vêm antes e os lugares procuram vão livre)
+    let sw, sb, lps; const spots = () => { sw = spot(3.5); sb = spot(3.5); lps = [spot(2), spot(2)]; };
+    if (!ZG_ROWS[g.th]) spots();
+    switch (g.th) {
+      case 'graves': {
+        const sx = along ? 3 : 4, sz = along ? 4 : 3;
+        for (let x = x0 + 6; x < x1 - 6; x += sx) for (let z = z0 + 6; z < z1 - 6; z += sz) if (Math.abs(x - cx) > 3 && Math.abs(z - cz) > 3 && rr() < .7) put(x + rn(-.3, .3), z, along ? 1 : .3, along ? .3 : 1, rn(.8, 1.3), 'grave', 0, undefined, .4);
+        put(cx + W / 4, cz - D / 4, 6, 5, 4.2, 'stone'); put(cx - W / 4, cz + D / 4, 4, 4, 3.4, 'stone');
+        for (let i = 0; i < 6; i++) tree(rn(x0 + 5, x1 - 5), rn(z0 + 5, z1 - 5), rr() < .5);
+        break;
+      }
+      case 'forest': { for (let i = 0; i < W * D / 70; i++) tree(rn(x0 + 4, x1 - 4), rn(z0 + 4, z1 - 4)); put(cx, cz, 6, 5, 3, 'wood'); scatter(6, 3, 6, .8, .9, .7, .8, 'wood'); break; }
+      case 'rocks': case 'mine': {
+        scatter(Math.round(W * D / 260), 2, 7, 2, 7, 1.2, g.th === 'mine' ? 3.5 : 6, 'rock');
+        if (g.th === 'mine') { scatter(4, 1.4, 1.4, 2.2, 2.2, 1.3, 1.3, 'metal'); for (let i = 0; i < 6; i++) { const x = rn(x0 + 8, x1 - 8), z = rn(z0 + 8, z1 - 8); if (put(x - 2, z, .4, .4, 3.4, 'wood', 0, undefined, 2.5) && put(x + 2, z, .4, .4, 3.4, 'wood', 0, undefined, .2)) put(x, z, 4.6, .4, .4, 'wood', 3.4, undefined, -1); } }
+        else { put(cx, cz, 3, 3, 12, 'rock'); put(cx + rn(-12, 12), cz + rn(-10, 10), 6, 2, 1.2, 'metal'); }
+        break;
+      }
+      case 'ruins': {
+        for (let i = 0, k = 0; i < W * D / 120 && k < 400; k++) { const x = rn(x0 + 5, x1 - 5), z = rn(z0 + 5, z1 - 5), l = rn(4, 11), h = rn(1, 4.2); if (rr() < .5 ? put(x, z, l, .8, h, 'brick') : put(x, z, .8, l, h, 'brick')) i++; }
+        scatter(10, 1, 2.4, 1, 2.4, .4, 1.1, 'stone'); put(cx, cz, 3, 3, 9, 'brick');
+        break;
+      }
+      case 'military': {
+        scatter(6, 6, 6, 2.5, 2.5, 2.6, 2.6, 'container', () => [0x4a5a3a, 0x5a5040, 0x3a4a52][Math.floor(rr() * 3)]);
+        for (let i = 0; i < 7; i++) { const x = rn(x0 + 8, x1 - 8), z = rn(z0 + 8, z1 - 8); put(x, z - 1.6, 4, .9, 1, 'sandbag'); put(x - 1.6, z + .4, .9, 2.4, 1, 'sandbag', 0, undefined, -1); }
+        put(cx + 6, cz + 6, 3, 3, 6.5, 'wood'); scatter(4, 4, 5, 3, 4, 2.2, 2.4, 'tent');
+        break;
+      }
+      case 'swamp': {
+        for (let i = 0, k = 0; i < 6 && k < 60; k++) { const w = rn(6, 12), d = rn(5, 10), x = rn(x0 + 8 + w / 2, x1 - 8 - w / 2), z = rn(z0 + 8 + d / 2, z1 - 8 - d / 2); if (free(x, z, w, d, 3.5)) { pool(x, z, w, d); i++; } }
+        for (let i = 0; i < W * D / 160; i++) tree(rn(x0 + 4, x1 - 4), rn(z0 + 4, z1 - 4), true);
+        put(cx, cz, 5, 4, 2.8, 'wood'); break;
+      }
+      case 'river': scatter(8, 1.4, 2.4, 1.4, 2.4, 1, 2.2, 'crate'); break;
+      case 'island': put(cx + 4, cz, 4, 4, 9, 'stone'); put(cx - 6, cz + 2, 5, 4, 3, 'wood'); scatter(8, 1.4, 2.4, 1.4, 2.4, 1, 2.2, 'crate'); break;
+      case 'field': {
+        for (let a = (along ? z0 : x0) + 7; a < (along ? z1 : x1) - 6; a += 5) for (let b = (along ? x0 : z0) + 6; b < (along ? x1 : z1) - 6; b += 14) along ? put(b + 6, a, 11, .8, 1.3, 'hedge', 0, undefined, .3) : put(a, b + 6, .8, 11, 1.3, 'hedge', 0, undefined, .3);
+        put(cx, cz, 6, 5, 3.2, 'barn'); for (let i = 0; i < 6; i++) tree(rn(x0 + 5, x1 - 5), rn(z0 + 5, z1 - 5));
+        break;
+      }
+      case 'junk': case 'parking': {
+        const car = () => [0x6a3a30, 0x3a4a5a, 0x5a5a4a, 0x7a6a40, 0x404040][Math.floor(rr() * 5)];
+        if (g.th === 'parking') { for (let a = (along ? x0 : z0) + 8; a < (along ? x1 : z1) - 8; a += 3.2) for (const b of [-8, 8]) if (rr() < .6) along ? put(a, cz + b, 1.9, 4.2, 1.5, 'metal', 0, car(), .3) : put(cx + b, a, 4.2, 1.9, 1.5, 'metal', 0, car(), .3); put(cx, cz, 5, 4, 3, 'wall'); }
+        else { scatter(Math.round(W * D / 150), 1.9, 4.2, 1.9, 4.2, 1.4, 2.8, 'metal', car); scatter(4, 6, 6, 2.5, 2.5, 2.6, 5.2, 'container', car); }
+        break;
+      }
+      case 'yard': { scatter(10, 1.4, 2.4, 1.4, 2.4, 1, 2.4, 'crate'); scatter(4, 6, 6, 2.5, 2.5, 2.6, 2.6, 'container'); put(cx, cz, 12, 4, 4, 'wood'); scatter(3, 1, 1, 1, 1, 9, 12, 'metal'); break; }
+      // salas fechadas
+      case 'cells': { // anexo: celas dos dois lados de um corredor no meio
+        const half = (along ? D : W) / 2;
+        for (let a = (along ? x0 : z0) + 9; a < (along ? x1 : z1) - 6; a += 6) for (const s of [-1, 1]) {
+          const len = half - 7.5, c = (along ? cz : cx) + s * (half - len / 2 - 4); // corredor de 7 m no meio, passagem de 4 m atrás (longe das janelas)
+          if (along ? put(a, c, .3, len, 3.2, 'wall', 0, undefined, .2) : put(c, a, len, .3, 3.2, 'wall', 0, undefined, .2)) along ? put(a + 2, c + s * (len / 2 - 1.5), 2, 1, .5, 'metal', 0, undefined, .2) : put(c + s * (len / 2 - 1.5), a + 2, 1, 2, .5, 'metal', 0, undefined, .2);
+        }
+        break;
+      }
+      case 'tunnels': { // túneis de serviço: paredes soltas formando corredores, canos no chão
+        for (let i = 0, k = 0; i < W * D / 90 && k < 500; k++) { const x = rn(x0 + 7, x1 - 7), z = rn(z0 + 7, z1 - 7), l = rn(6, 14); if (rr() < .5 ? put(x, z, l, .8, H, 'wall', 0, undefined, 2.2) : put(x, z, .8, l, H, 'wall', 0, undefined, 2.2)) i++; }
+        scatter(8, 4, 8, .5, .5, .5, .5, 'metal'); break;
+      }
+      case 'ovens': { // crematório: fornos em fila, caixões, duas chaminés
+        for (let a = (along ? x0 : z0) + 8; a < (along ? x1 : z1) - 8; a += 6) along ? put(a, z0 + 4.5, 3, 2.5, 2.6, 'brick') : put(x0 + 4.5, a, 2.5, 3, 2.6, 'brick');
+        scatter(10, .8, .8, 2, 2, .6, .6, 'wood'); put(x1 - 5, z1 - 5, 3, 3, 14, 'brick'); put(cx, cz, 3, 3, 14, 'brick'); break;
+      }
+      case 'laundry': { for (let a = (along ? x0 : z0) + 7; a < (along ? x1 : z1) - 6; a += 2) for (const s of [-6, 0, 6]) along ? put(a, cz + s, 1.2, 1.2, 1.3, 'metal', 0, undefined, .3) : put(cx + s, a, 1.2, 1.2, 1.3, 'metal', 0, undefined, .3); scatter(6, 3, 3, 1.2, 1.2, .9, .9, 'wood'); break; }
+      case 'stables': { for (let a = (along ? x0 : z0) + 6; a < (along ? x1 : z1) - 4; a += 4.5) for (const s of [-1, 1]) { const c = (along ? cz : cx) + s * ((along ? D : W) / 2 - 6); along ? put(a, c, .3, 6, 1.6, 'wood', 0, undefined, .2) : put(c, a, 6, .3, 1.6, 'wood', 0, undefined, .2); } scatter(10, 1.2, 1.2, 1.2, 1.2, 1.1, 1.1, 'hay'); break; }
+    }
+    if (ZG_ROWS[g.th]) spots();
+    // arma de parede (placa em pé), Caixa, lâmpadas e zumbis que saem do chão
+    const wbP = sw || [cx + 3, cz + 3]; out.wall.push({ w: g.wb[0], cost: g.wb[1], x: wbP[0], z: wbP[1], n: face(wbP[0], wbP[1]), post: 1 });
+    if (sb) out.boxLocs.push({ x: sb[0], z: sb[1], n: face(sb[0], sb[1]) });
+    for (const l of lps) if (l) out.lamps.push({ x: l[0], z: l[1], y: open ? 3.5 : 3.9, base: 12, ...(g.lc ? { c: g.lc } : {}), ...(open ? { gp: 1 } : { nopost: 1 }) });
+    const nr = open ? 6 : 3;
+    for (let i = 0, k = 0; i < nr && k < 200; k++) { const x = rn(x0 + 4, x1 - 4), z = rn(z0 + 4, z1 - 4); if (!free(x, z, 1, 1, 1) || water.some(w => x > w[0] - 1.5 && x < w[1] + 1.5 && z > w[2] - 1.5 && z < w[3] + 1.5)) continue; out.risers.push([x, z, g.id]); rsv.push([x, z, 2]); i++; }
+  }
+  return out;
+}
+const zGenHit = (G, x, z, m) => zGenZone(G, x, z) || G.rects.some(r => x > r[0] - m && x < r[1] + m && z > r[2] - m && z < r[3] + m) || Object.values(G.rooms).some(r => x > r[0] - m && x < r[1] + m && z > r[2] - m && z < r[3] + m);
+function zGenJoin(d, G) { // junta o gerado nas listas do mapa (sem mexer nas listas escritas à mão)
+  d.windows.push(...G.windows); d.risers.push(...G.risers); d.doors.push(...G.doors); d.wall.push(...G.wall); d.boxes.push(...G.boxLocs); d.lamps.push(...G.lamps); Object.assign(d.roomNames, G.names);
+}
+const zGenZone = (G, x, z) => { for (const k in G.rooms) { const r = G.rooms[k]; if (x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3]) return k; } for (const r of G.rects) if (x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3]) return r[4]; return null; };
+// desenho do que não é caixa: árvores (com copa ou secas), água e tábuas das pontes
+function zGenDeco(G, posts) {
+  const Q = new THREE.Quaternion(), E3 = new THREE.Euler(), SC = new V3(), PO = new V3(), lam = (k, c) => worldMat(k, c, true);
+  const mtx = (x, y, z, ry = 0, s = 1, sy = s) => new THREE.Matrix4().compose(PO.set(x, y, z), Q.setFromEuler(E3.set(0, ry, 0)), SC.set(s, sy, s));
+  const inst = (geo, mat, list, cast = true) => { if (!list.length) return; const m = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((mx, i) => m.setMatrixAt(i, mx)); m.computeBoundingSphere(); m.castShadow = cast; m.receiveShadow = true; m.userData.own = true; world.add(m); };
+  const bark = lam('wood', 0x4a3a2a), tr = [], cp = [], dd = [], br = [];
+  for (const [x, z] of G.deco.trees) { const s = rand(.9, 1.3), r = rand(0, 6); tr.push(mtx(x, 1.6 * s, z, r, s)); cp.push(mtx(x, 4.4 * s, z, r, s * 2, s * 1.6), mtx(x + .6, 5.4 * s, z - .4, r, s * 1.3)); }
+  for (const [x, z] of G.deco.dead) { const s = rand(.8, 1.2), r = rand(0, 6); dd.push(mtx(x, 2.2 * s, z, r, s * .8, s * 1.4)); br.push(mtx(x, 3.6 * s, z, r, s)); }
+  inst(new THREE.CylinderGeometry(.24, .38, 3.2, 6), bark, [...tr, ...dd]); inst(new THREE.IcosahedronGeometry(1, 1), lam('leaf', 0x33502a), cp);
+  inst(new THREE.BoxGeometry(2.4, .14, .14), bark, br);
+  const wm = new THREE.MeshPhongMaterial({ color: 0x1d3440, specular: 0x8899aa, shininess: 100 }), pl = lam('wood', 0x5e4630);
+  for (const [x, z, w, d] of G.deco.water) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), wm); m.rotation.x = -Math.PI / 2; m.position.set(x, .08, z); m.receiveShadow = true; world.add(m); }
+  for (const [x, z, w, d] of G.deco.planks) { const m = new THREE.Mesh(boxGeo(w, .12, d, 1.5), pl); m.position.set(x, .06, z); m.receiveShadow = true; world.add(m); }
+  if (posts) { const ps = G.lamps.filter(l => l.gp).map(l => mtx(l.x, l.y / 2, l.z, 0, 1, l.y)); inst(new THREE.CylinderGeometry(.06, .1, 1, 6), new THREE.MeshLambertMaterial({ color: 0x2a2d31 }), ps); }
+}
+// Sanatório: anel de 14 regiões em volta do prédio (10 m de vão por fora, onde os zumbis chegam às janelas)
+const SAN_GEN = zGen(20261001, [
+  { id: 'r1', nm: 'Cemitério', r: [-73, -24, -90, -46], th: 'graves', wb: ['mp40', 1000], fl: ['grass', 0x3a4630] },
+  { id: 'r2', nm: 'Portaria', r: [-24, 24, -90, -46], th: 'parking', wb: ['m14', 500], fl: ['asphalt', 0x3a3c3a] },
+  { id: 'r3', nm: 'Pedreira', r: [24, 73, -90, -46], th: 'rocks', wb: ['dragunov', 2000], fl: ['dirt', 0x5a4e3c] },
+  { id: 'r4', nm: 'Ruínas do convento', r: [-121, -73, -90, -46], th: 'ruins', wb: ['rpk', 2500], fl: ['dirt', 0x4e4a3c] },
+  { id: 'r5', nm: 'Túneis de serviço', r: [-121, -73, -46, 14], th: 'tunnels', wb: ['mp5k', 1000], fl: ['concrete', 0x4a4a46], lc: 0xffb070 },
+  { id: 'r6', nm: 'Anexo do asilo', r: [-121, -73, 14, 64], th: 'cells', wb: ['spas', 1500], fl: ['tile', 0x8a8a80], lc: 0x9fd0ff },
+  { id: 'r7', nm: 'Crematório', r: [-121, -73, 64, 114], th: 'ovens', wb: ['hk21', 2500], fl: ['concrete', 0x55524a], lc: 0xff8a40 },
+  { id: 'r8', nm: 'Floresta', r: [73, 121, -90, -46], th: 'forest', wb: ['fal', 1500], fl: ['grass', 0x34452a] },
+  { id: 'r9', nm: 'Lavanderia', r: [73, 121, -46, 14], th: 'laundry', wb: ['ak74u', 1200], fl: ['tile', 0x9a9e98] },
+  { id: 'r10', nm: 'Pomar', r: [73, 121, 14, 64], th: 'field', wb: ['galil', 1500], fl: ['grass', 0x4a5a34] },
+  { id: 'r11', nm: 'Estábulo', r: [73, 121, 64, 114], th: 'stables', wb: ['stakeout', 1500], fl: ['wood', 0x6a5032] },
+  { id: 'r12', nm: 'Ferro-velho', r: [-73, -24, 74, 114], th: 'junk', wb: ['commando', 2000], fl: ['asphalt', 0x3e3e3a] },
+  { id: 'r13', nm: 'Brejo', r: [-24, 24, 74, 114], th: 'swamp', wb: ['he', 250], fl: ['dirt', 0x3a3a2a] },
+  { id: 'r14', nm: 'Ilha do lago', r: [24, 73, 74, 114], th: 'island', wb: ['rpk', 2500], fl: ['grass', 0x3e4a32] },
+], [
+  { a: 'N', b: 'r1', x: -56, z: -36, ax: 'x', c: 1, cost: 2000 }, { a: 'M', b: 'r3', x: 56, z: -36, ax: 'x', c: 1, cost: 2000 },
+  { a: 'N', b: 'r5', x: -63, z: -29, ax: 'z', c: 1, cost: 2250 }, { a: 'M', b: 'r9', x: 63, z: -14, ax: 'z', c: 1, cost: 2250 },
+  { a: 'L', b: 'r10', x: 63, z: 40, ax: 'z', c: 1, cost: 2500 }, { a: 'P', b: 'r12', x: -31, z: 64, ax: 'x', c: 1, cost: 2500 },
+  { a: 'I', b: 'r13', x: -12, z: 44, ax: 'x', c: 1, cost: 2250 },
+  { a: 'r1', b: 'r2', x: -24, z: -68, cost: 2500 }, { a: 'r2', b: 'r3', x: 24, z: -68, cost: 2500, kind: 'gate' },
+  { a: 'r1', b: 'r4', x: -73, z: -68, cost: 3000, kind: 'debris' }, { a: 'r3', b: 'r8', x: 73, z: -68, cost: 3000, kind: 'gate' },
+  { a: 'r5', b: 'r4', x: -97, z: -46, cost: 3000 }, { a: 'r5', b: 'r6', x: -97, z: 14, cost: 2500 }, { a: 'r6', b: 'r7', x: -97, z: 64, cost: 3500, kind: 'debris' },
+  { a: 'r9', b: 'r8', x: 97, z: -46, cost: 3000 }, { a: 'r9', b: 'r10', x: 97, z: 14, cost: 2500 }, { a: 'r10', b: 'r11', x: 97, z: 64, cost: 3000 },
+  { a: 'r12', b: 'r13', x: -24, z: 94, cost: 2500, kind: 'debris' }, { a: 'r13', b: 'r14', x: 24, z: 94, cost: 3000 },
+  { a: 'r12', b: 'r7', x: -73, z: 94, cost: 4000 }, { a: 'r14', b: 'r11', x: 73, z: 94, cost: 4000, kind: 'gate' },
+], { H: 4.5, mat: 'wall', winSp: 22, maxWin: 5 });
 const SAN_TREES = [[31, -5], [59, -5], [31, 20], [59, 20.5]]; // árvores do Jardim (colisor no tronco)
 // ---------- Sanatório: cenário que não é caixa (caldeiras, torre d'água, chafariz, árvores, estufa, livros) ----------
 function buildSanatorio() {
@@ -673,13 +886,14 @@ function buildSanatorio() {
   { const sh = []; for (const [x, z] of [[-18, 29.5], [-13, 29.5], [-18, 37]]) sh.push(mtx(x, .95, z, rand(-.1, .1), 1));
     for (const x of [-6.5, 3.5, 10.5, 23.5]) sh.push(mtx(x, .55, 42.3, Math.PI / 2, 1));
     inst(new THREE.BoxGeometry(.95, .1, 2), lam('plaster', 0xc8c8c0), sh, false); }
+  zGenDeco(SAN_GEN, true); // regiões novas
 }
 MAPS.sanatorio = {
-  name: 'Sanatório', desc: 'fechado e enorme: 15 alas, de refeitório e necrotério a caldeiras, jardim e torre d\'água', zonly: 1, zombie: 1, w: 128, d: 102, sky: 0x06080d, skyTop: 0x020308, stars: 1, exposure: 1.3, fogC: 0x0a0d14, fog: [8, 52],
+  name: 'Sanatório', desc: 'enorme: 29 áreas, das alas do prédio a cemitério, túneis, crematório, floresta, pedreira e ilha do lago', zonly: 1, zombie: 1, w: 244, d: 206, sky: 0x06080d, skyTop: 0x020308, stars: 1, exposure: 1.3, fogC: 0x0a0d14, fog: [8, 52],
   hemi: .6, hemiC: [0x8090b8, 0x2a2a30], sunI: .5, sunC: 0x9fb4ff, sun: [-18, 40, 26],
-  theme: { floor: ['asphalt', 0x2a2d2a], wall: ['plaster', 0x7f8676], wood: ['wood', 0x6b4a2e], metal: ['metal', 0x7a8088], stone: ['concrete', 0x86847c], hedge: ['leaf', 0x4a7038], brick: ['brick', 0x6e4a3c] },
+  theme: { ...ZG_THEME, floor: ['asphalt', 0x2a2d2a], wall: ['plaster', 0x7f8676], wood: ['wood', 0x6b4a2e], metal: ['metal', 0x7a8088], stone: ['concrete', 0x86847c], hedge: ['leaf', 0x4a7038], brick: ['brick', 0x6e4a3c] },
   boxes: () => [
-    B(0, 14, 170, 140, 1, 'floor', -1.003),
+    B(0, 12, 280, 240, 1, 'floor', -1.003),
     // núcleo (seis cômodos do começo)
     ...zWall('x', -8, -27.5, 27.5, [zWin(-18), zWin(-4), zWin(4), zWin(18)]),
     ...zWall('x', 24, -27.5, 27.5, [zGap(-20, -16), zGap(-2, 2)]),
@@ -689,14 +903,14 @@ MAPS.sanatorio = {
     // alas novas: linhas de parede de ponta a ponta (com janelas por fora e portas entre as alas)
     ...zWall('z', -27, -36.5, 64.5, [zWin(-22), zGap(-2, 2), zGap(32, 36), zWin(54)]),
     ...zWall('z', 27, -36.5, 44.5, [zWin(-22), zGap(-2, 2), zGap(32, 36)]),
-    ...zWall('z', -63, -36.5, 64.5, [zWin(-22), zWin(0), zWin(12), zWin(28), zWin(38), zWin(54)]),
-    ...zWall('z', 63, -36.5, 44.5, [zWin(-22), zWin(0), zWin(14), zWin(34)]),
+    ...zWall('z', -63, -36.5, 64.5, [zWin(-22), zGap(-31, -27), zWin(0), zWin(12), zWin(28), zWin(38), zWin(54)]),
+    ...zWall('z', 63, -36.5, 44.5, [zWin(-22), zGap(-16, -12), zWin(0), zWin(14), zWin(34), zGap(38, 42)]),
     ...zWall('z', -9, 24, 44, [zGap(32, 36)]),
-    ...zWall('x', -36, -63.5, -26.5, [zWin(-45)]), ...zWall('x', -36, 26.5, 63.5, [zWin(45)]),
+    ...zWall('x', -36, -63.5, -26.5, [zGap(-58, -54), zWin(-45)]), ...zWall('x', -36, 26.5, 63.5, [zWin(45), zGap(54, 58)]),
     ...zWall('x', -8, -63, -27, [zGap(-47, -43)]), ...zWall('x', -8, 27, 63, [zGap(43, 47)]),
     ...zWall('x', 20, -63, -27, [zGap(-47, -43)]), ...zWall('x', 24, 27, 63, [zGap(43, 47)]),
-    ...zWall('x', 44, -63.5, 63.5, [zGap(-47, -43), zWin(-18), zWin(0), zWin(18), zWin(45)]),
-    ...zWall('x', 64, -63.5, -26.5, [zWin(-40)]),
+    ...zWall('x', 44, -63.5, 63.5, [zGap(-47, -43), zWin(-18), zGap(-14, -10), zWin(0), zWin(18), zWin(45)]),
+    ...zWall('x', 64, -63.5, -26.5, [zWin(-40), zGap(-33, -29)]),
     B(0, -1.5, 4, 1, 1.05, 'wood'),                                                                              // A: balcão
     B(-5, 12, 1.2, 2.2, .7, 'metal'), B(5, 12, 1.2, 2.2, .7, 'metal'), B(-5, 19, 1.2, 2.2, .7, 'metal'), B(4, 19, 1.2, 2.2, .7, 'metal'), // B: macas
     B(18, -1, 3, 3, .8, 'stone'),                                                                                 // C: fonte
@@ -729,12 +943,14 @@ MAPS.sanatorio = {
     // M Torre d'água: pernas da torre (caixa d'água em build), caixotes
     ...[[41, -26], [49, -26], [41, -18], [49, -18]].map(([x, z]) => B(x, z, .7, .7, 11, 'col')),
     B(32, -32, 2, 2, 1.2, 'wood'), B(33.6, -32.4, 1.2, 1.2, .9, 'wood'), B(58.5, -12.5, 2, 2, 1.2, 'wood'),
+    // anel de regiões novas em volta (geradas)
+    ...SAN_GEN.boxes,
   ],
   build: buildSanatorio,
   spawns: [[-3, -4], [3, -4], [-3, 2], [3, 2]],
   z: (() => {
     const d = {
-      ff: { x0: -64, z0: -37, nx: 128, nz: 102 },
+      ff: { x0: -128, z0: -96, nx: 256, nz: 216 },
       rooms: { A: [-8.5, 8.5, -7.5, 7.5], B: [-8.5, 8.5, 8.5, 23.5], C: [9.5, 26.5, -7.5, 7.5], D: [-26.5, -9.5, 8.5, 23.5], E: [9.5, 26.5, 8.5, 23.5], F: [-26.5, -9.5, -7.5, 7.5],
         G: [-62.5, -27.5, -7.5, 19.5], H: [-62.5, -27.5, 20.5, 43.5], P: [-62.5, -27.5, 44.5, 63.5], N: [-62.5, -27.5, -35.5, -8.5],
         I: [-26.5, -9.5, 24.5, 43.5], J: [-8.5, 26.5, 24.5, 43.5], K: [27.5, 62.5, -7.5, 23.5], L: [27.5, 62.5, 24.5, 43.5], M: [27.5, 62.5, -35.5, -8.5] },
@@ -814,6 +1030,7 @@ MAPS.sanatorio = {
         { x: 0, z: 8, w: 4, d: 2.4, sx: 3.1, sz: 7.45, n: [0, -1] },
       ],
     };
+    zGenJoin(d, SAN_GEN); d.zoneAt = (x, z) => { for (const k in d.rooms) { const r = d.rooms[k]; if (x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3]) return k; } return zGenZone(SAN_GEN, x, z); };
     // pontos de fora (onde o zumbi arranca as tábuas) e de dentro (onde ele cai depois de pular)
     for (const w of d.windows) { w.ox = w.x + w.n[0] * .9; w.oz = w.z + w.n[1] * .9; w.ix = w.x - w.n[0] * 1.2; w.iz = w.z - w.n[1] * 1.2; w.tx = -w.n[1]; w.tz = w.n[0]; }
     return d;
@@ -863,8 +1080,8 @@ const VILA_DIST = (() => {
     // muros: de dentro (janelas para o vão), fundo, laterais, divisória com porta e corredores
     out.boxes.push(
       ...lw(s, 'u', VI, -VS - .5, VS + .5, [zGap(-VG2 - 2, -VG2 + 2), zGap(VG2 - 2, VG2 + 2), zWin(-12), zWin(12)], 3.6, 'stone'),
-      ...lw(s, 'u', VO, -VS - .5, VS + .5, [zWin(-45), zWin(-20), zWin(20), zWin(45)], 3.6, 'stone'),
-      ...lw(s, 'v', -VS, VI, VO, [zWin(115), zWin(135)], 3.6, 'stone'), ...lw(s, 'v', VS, VI, VO, [zWin(115), zWin(135)], 3.6, 'stone'),
+      ...lw(s, 'u', VO, -VS - .5, VS + .5, [zWin(-45), zGap(-40, -36), zWin(-20), zWin(20), zWin(45)], 3.6, 'stone'),
+      ...lw(s, 'v', -VS, VI, VO, [zWin(115), zGap(107.5, 111.5), zWin(135)], 3.6, 'stone'), ...lw(s, 'v', VS, VI, VO, [zWin(115), zGap(107.5, 111.5), zWin(135)], 3.6, 'stone'),
       ...lw(s, 'v', 0, VI, VO, [zGap(121, 125)], 3.2, 'wall', .8),
       ...[-1, 1].flatMap(k => [...lw(s, 'v', k * (VG2 - 2.5), VD.wall, VI, [], 3.6, 'stone'), ...lw(s, 'v', k * (VG2 + 2.5), VD.wall, VI, [], 3.6, 'stone')]));
     const win = (u, v, n) => { const [x, z] = P(u, v); out.windows.push({ room: zone(u), x, z, n: vdN(s, n) }); };
@@ -929,11 +1146,39 @@ const VILA_DIST = (() => {
   out.risers = out.risers.filter(([x, z]) => !out.boxes.some(b => b.mat !== 'floor' && b.h > .3 && Math.abs(x - b.x) < b.w / 2 + 1 && Math.abs(z - b.z) < b.d / 2 + 1));
   return out;
 })();
+// Vila: 16 regiões novas. Quatro nos cantos (entre dois distritos) e um anel de 12 por fora (v de 160 a 240),
+// três por lado, girado como os distritos (catavento: o fim de um lado encosta no começo do outro).
+const VILA_GEN = (() => {
+  const T = [ // [nome, tema, arma, piso] por lado: canto, R0, R1, R2
+    [['Base militar', 'military', ['commando', 2000], ['concrete', 0x6a6a62]], ['Encosta', 'rocks', ['dragunov', 2000], ['dirt', 0x6a5a44]], ['Mina velha', 'mine', ['rpk', 2500], ['dirt', 0x5a4a38]], ['Pico da montanha', 'rocks', ['hk21', 2500], ['dirt', 0x7a7468]]],
+    [['Pântano', 'swamp', ['spas', 1500], ['dirt', 0x3c4030]], ['Margem do rio', 'river', ['galil', 1500], ['grass', 0x4a5a34]], ['Ponte velha', 'river', ['fal', 1500], ['grass', 0x4e5e38]], ['Bosque', 'forest', ['mp5k', 1000], ['grass', 0x3c4c2c]]],
+    [['Vinhedo', 'field', ['olympia', 500], ['grass', 0x5a6a3a]], ['Cais', 'yard', ['ak74u', 1200], ['concrete', 0x7a7870]], ['Ilha do porto', 'island', ['stakeout', 1500], ['sand', 0x9a8a68]], ['Estaleiro', 'yard', ['hk21', 2500], ['concrete', 0x6a6860]]],
+    [['Ruínas da cidade', 'ruins', ['m14', 500], ['asphalt', 0x55554e]], ['Bairro queimado', 'ruins', ['mp40', 1000], ['asphalt', 0x4a4a44]], ['Quartel', 'military', ['commando', 2000], ['concrete', 0x6a6a62]], ['Brejo negro', 'swamp', ['rpk', 2500], ['dirt', 0x34382a]]],
+  ];
+  const rect = (s, u0, u1, v0, v1) => { const [ax, az] = vdXZ(s, u0, v0), [bx, bz] = vdXZ(s, u1, v1); return [Math.min(ax, bx), Math.max(ax, bx), Math.min(az, bz), Math.max(az, bz)]; };
+  const axU = s => s % 2 ? 'z' : 'x', axV = s => s % 2 ? 'x' : 'z'; // muro ao longo de u / de v, no mundo
+  const P = (s, u, v) => { const [x, z] = vdXZ(s, u, v); return { x, z }; };
+  const regs = [], links = [];
+  for (let s = 0; s < 4; s++) {
+    const t = T[s], mk = (id, k, r) => regs.push({ id, nm: t[k][0], th: t[k][1], wb: t[k][2], fl: t[k][3], r });
+    mk('c' + s, 0, rect(s, 72, 150, 72, 150));
+    [[-160, -30], [-30, 100], [100, 240]].forEach(([u0, u1], i) => mk('b' + s + i, i + 1, rect(s, u0, u1, 160, 240)));
+    const s1 = (s + 1) % 4, sp = (s + 3) % 4;
+    links.push({ a: VD_ZONES[s][1], b: 'c' + s, ...P(s, VD.side, 109.5), ax: axV(s), c: 1, cost: 2500 },
+      { a: VD_ZONES[s1][0], b: 'c' + s, ...P(s1, -VD.side, 109.5), ax: axV(s1), c: 1, cost: 2500 },
+      { a: VD_ZONES[s][0], b: 'b' + s + 0, ...P(s, -38, VD.out), ax: axU(s), c: 1, cost: 3000 },
+      { a: 'c' + s, b: 'b' + s + 2, ...P(s, 125, 150), ax: axU(s), c: 1, cost: 3000 },
+      { a: 'b' + s + 0, b: 'b' + s + 1, ...P(s, -30, 184), cost: 3500, kind: s % 2 ? 'gate' : 'door' },
+      { a: 'b' + s + 1, b: 'b' + s + 2, ...P(s, 100, 184), cost: 3500, kind: s % 2 ? 'door' : 'debris' },
+      { a: 'b' + s + 0, b: 'b' + sp + 2, ...P(s, -160, 184), cost: 4000, kind: 'gate' });
+  }
+  return zGen(20261002, regs, links, { H: 3.6, mat: 'stone', winSp: 30, maxWin: 6 });
+})();
 MAPS.vila = {
-  name: 'Vila', desc: 'mapa aberto gigantesco: 17 áreas, de igreja e castelo a mina, fábrica, porto com farol e floresta', zonly: 1, zombie: 1, w: 302, d: 302,
+  name: 'Vila', desc: 'mapa aberto colossal: 33 áreas, de igreja e castelo a mina, base militar, rio, ilha do porto e montanha', zonly: 1, zombie: 1, w: 490, d: 490,
   sky: 0x3b3346, skyTop: 0x121829, fogC: 0x4a4152, fog: [20, 125], exposure: 1.05, cloudC: 0xb08a90,
   hemi: .8, hemiC: [0x9aa0d0, 0x3a3020], sunI: 1.3, sunC: 0xffa060, sun: [-110, 60, 84],
-  theme: { floor: ['grass', 0x55663a], wall: ['plaster', 0x9a917e], stone: ['rock', 0x7d7a72], wood: ['wood', 0x6b4a2e], plank: ['wood', 0x6a4a32],
+  theme: { ...ZG_THEME, floor: ['grass', 0x55663a], wall: ['plaster', 0x9a917e], stone: ['rock', 0x7d7a72], wood: ['wood', 0x6b4a2e], plank: ['wood', 0x6a4a32],
     grave: ['concrete', 0x8b8b86], barn: ['wood', 0x7d3b2b], hedge: ['leaf', 0x5a8240], hay: ['sand', 0xc9a85a], metal: ['metal', 0x5d6a50], brick: ['brick', 0x8a5a44],
     crate: ['crate', 0x8a6a40], sandbag: ['sand', 0x8a7a58] },
   boxes: () => [
@@ -995,12 +1240,14 @@ MAPS.vila = {
     ...VILA_TREES.map(([x, z]) => B(x, z, .7, .7, 4, 'col')),
     // distritos de fora
     ...VILA_DIST.boxes,
+    // cantos e anel de fora (gerados)
+    ...VILA_GEN.boxes,
   ],
   build: buildVila,
   spawns: [[-2.5, 6], [2.5, 6], [-2.5, 9], [2.5, 9]],
   z: (() => {
     const d = {
-      start: 'A', ff: { x0: -151, z0: -151, nx: 302, nz: 302 },
+      start: 'A', ff: { x0: -244, z0: -244, nx: 488, nz: 488 },
       zoneAt(x, z) {
         const ax = Math.abs(x), az = Math.abs(z), o = Math.max(ax, az, (ax + az) / Math.SQRT2);
         if (ax <= 14 && az <= 14 && ax + az <= 14 * Math.SQRT2) return 'A';
@@ -1009,7 +1256,7 @@ MAPS.vila = {
         // distritos de fora: lado (s), de lado (u) e para fora (v), como em VILA_DIST
         const s = az >= ax ? (z < 0 ? 0 : 2) : (x > 0 ? 1 : 3), v = Math.max(ax, az), u = s === 0 ? x : s === 1 ? z : s === 2 ? -x : -z, au = Math.abs(u);
         if ((v > VD.in && v <= VD.out && au <= VD.side) || (v > VD.wall && v <= VD.in && Math.abs(au - VD.gate) <= 2)) return VD_ZONES[s][u > 0 ? 1 : 0];
-        return null;
+        return zGenZone(VILA_GEN, x, z); // cantos e anel de fora
       },
       roomNames: { A: 'Praça', B: 'Igreja', C: 'Fazenda', D: 'Cemitério', E: 'Lago', F: 'Pedreira', G: 'Estação', H: 'Acampamento', I: 'Castelo',
         J: 'Mina', K: 'Hospital de campanha', L: 'Fábrica', M: 'Ferrovia', N: 'Porto', O: 'Farol', P: 'Floresta', Q: 'Serraria' },
@@ -1090,6 +1337,7 @@ MAPS.vila = {
         { x: 0, z: 14, w: 4.4, d: 2.6, sx: 4.2, sz: 12.4, n: [0, -1], post: 1 },
       ],
     };
+    zGenJoin(d, VILA_GEN);
     for (const w of d.windows) { w.ox = w.x + w.n[0] * .9; w.oz = w.z + w.n[1] * .9; w.ix = w.x - w.n[0] * 1.2; w.iz = w.z - w.n[1] * 1.2; w.tx = -w.n[1]; w.tz = w.n[0]; }
     return d;
   })(),
@@ -1353,9 +1601,9 @@ function buildVila() {
     const octD = (x, z) => Math.max(Math.abs(x), Math.abs(z), (Math.abs(x) + Math.abs(z)) / Math.SQRT2);
     for (const [x, z] of VILA_TREES) { const s = rand(.9, 1.2); blT.push(mtx(x, 1.6 * s, z, rand(0, 6), s)); bl.push(mtx(x, 4.6 * s, z, rand(0, 6), s * 2.1, s * 1.7), mtx(x + .9, 5.4 * s, z - .5, rand(0, 6), s * 1.4), mtx(x - .8, 5.2 * s, z + .6, rand(0, 6), s * 1.5)); }
     const wins = MAPS.vila.z.windows;
-    for (let n = 0, k = 0; n < 900 && k < 12000; k++) {
-      const a = Math.random() * Math.PI * 2, r = rand(90, 235), x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (octD(x, z) < 91 || (Math.min(Math.abs(x), Math.abs(z)) < 64 && Math.max(Math.abs(x), Math.abs(z)) < 154) || wins.some(w => Math.hypot(w.ox - x, w.oz - z) < 9)) continue;
+    for (let n = 0, k = 0; n < 1100 && k < 16000; k++) {
+      const a = Math.random() * Math.PI * 2, r = rand(90, 330), x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (octD(x, z) < 91 || zGenHit(VILA_GEN, x, z, 3) || (Math.min(Math.abs(x), Math.abs(z)) < 64 && Math.max(Math.abs(x), Math.abs(z)) < 154) || wins.some(w => Math.hypot(w.ox - x, w.oz - z) < 9)) continue;
       const s = rand(.8, 1.5), ry = rand(0, 6); n++;
       if (Math.random() < .7) { trunks.push(mtx(x, 1.5 * s, z, ry, s)); cones.push(mtx(x, 4.2 * s, z, ry, s)); cones2.push(mtx(x, 6.4 * s, z, ry, s)); }
       else { blT.push(mtx(x, 1.6 * s, z, ry, s)); bl.push(mtx(x, 4.6 * s, z, ry, s * 2.1, s * 1.7)); }
@@ -1451,6 +1699,7 @@ function buildVila() {
       }
     }
   }
+  zGenDeco(VILA_GEN, false); // regiões novas (os postes de luz já saem acima)
 }
 
 // ================================================================
@@ -1777,6 +2026,14 @@ function mergeParts(root, skip, cache) {
 // mapas zumbis: as peças paradas do cenário (postes, telhados, casas, carroças...) do mesmo material e do mesmo
 // bloco de 48 m viram uma malha só, já na posição do mundo. Menos chamadas de desenho (também na sombra do Alto).
 // Fica de fora o que se mexe (testado rodando MAP_ANIM uma vez), o transparente, o instanciado e o espelhado.
+// Mapa zumbi gigante: bloco juntado do cenário que fica além da neblina não é desenhado (a sombra fixa é feita com tudo à vista).
+let CULL = [], cullT = 0;
+function zCull(force) {
+  const sh = renderer.shadowMap.needsUpdate; if (!force && !sh && now < cullT) return;
+  cullT = sh ? 0 : now + .2; const f = (scene.fog?.far ?? 1e9) + 5, cx = camera.position.x, cz = camera.position.z;
+  for (const c of CULL) c.o.visible = (sh || Math.hypot(c.x - cx, c.z - cz) - c.r < f) && !(c.d && c.d.done && c.d.d.kind !== 'gate'); // porta aberta continua escondida
+}
+const cullAdd = (o, x, z, r, d) => CULL.push({ o, x, z, r, d }); // peça fixa do mundo zumbi (porta, placa, lâmpada, máquina)
 function mergeStatic() {
   const all = []; world.updateMatrixWorld(true); world.traverse(o => all.push(o));
   const st = all.map(o => [o.position.clone(), o.quaternion.clone(), o.scale.clone(), o.visible]), now0 = now;
@@ -1798,7 +2055,7 @@ function mergeStatic() {
   for (const { t, os } of grp.values()) {
     if (os.length < 2) continue;
     const vc = t === 'L' || t === 'B', geo = mergeMeshes(os, os.map(o => o.matrixWorld), vc, !vc);
-    const mm = new THREE.Mesh(geo, vc ? VC[t] : os[0].material); mm.castShadow = os[0].castShadow; mm.receiveShadow = os[0].receiveShadow; mm.userData.own = !vc && os.some(o => o.userData.own); world.add(mm);
+    const mm = new THREE.Mesh(geo, vc ? VC[t] : os[0].material); mm.userData.blk = 1; mm.castShadow = os[0].castShadow; mm.receiveShadow = os[0].receiveShadow; mm.userData.own = !vc && os.some(o => o.userData.own); world.add(mm);
     for (const o of os) o.parent.remove(o);
   }
   const used = new Set(); world.traverse(o => { if (o.geometry) used.add(o.geometry); });
@@ -1841,7 +2098,7 @@ function buildMap(id) {
     m.position.set(b.x, b.y + b.h / 2, b.z); m.castShadow = b.mat !== 'floor'; m.receiveShadow = true;
     world.add(m);
   }
-  if (merge) for (const { mat, gs } of merge.values()) { const m = new THREE.Mesh(mergeGeos(gs), mat); m.castShadow = m.receiveShadow = true; world.add(m); }
+  if (merge) for (const { mat, gs } of merge.values()) { const m = new THREE.Mesh(mergeGeos(gs), mat); m.userData.blk = 1; m.castShadow = m.receiveShadow = true; world.add(m); }
   const leaf = new THREE.MeshLambertMaterial({ color: 0x2f5d3a }), snow = new THREE.MeshLambertMaterial({ color: 0xf4f7fa });
   for (const [x, z] of trees) {
     const c1 = new THREE.Mesh(new THREE.ConeGeometry(1.8, 3.2, 8), leaf); c1.position.set(x, 3.6, z); c1.castShadow = true; world.add(c1);
@@ -1850,6 +2107,7 @@ function buildMap(id) {
   }
   if (M.build) M.build(M);
   if (M.zombie) mergeStatic();
+  CULL = []; if (M.zombie) for (const o of world.children) if (o.userData.blk && o.isMesh && !o.isInstancedMesh) { const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); CULL.push({ o, x: g.boundingSphere.center.x, z: g.boundingSphere.center.z, r: g.boundingSphere.radius }); }
   SPAWNS.a = M.spawns.map(([x, z]) => [x, 0, z]);
   SPAWNS.b = M.spawns.map(([x, z]) => [-x, 0, -z]);
   if (M.zombie) zBuildWorld(M);
@@ -4690,7 +4948,7 @@ function zBuildWorld(M) {
   if (D.floors) for (const [room, r] of Object.entries(D.rooms)) {
     const k = D.floors[room], w = r[1] - r[0], d = r[3] - r[2];
     const m = new THREE.Mesh(planeGeo(w, d, TEXS[k[0]] || 2), new THREE.MeshLambertMaterial({ map: tex(k[0]), bumpMap: tex(k[0]), bumpScale: BUMP[k[0]] ?? 1, color: k[1] }));
-    m.userData.own = true; m.rotation.x = -Math.PI / 2; m.position.set((r[0] + r[1]) / 2, .002, (r[2] + r[3]) / 2); m.receiveShadow = true; world.add(m);
+    m.userData.own = true; m.rotation.x = -Math.PI / 2; m.position.set((r[0] + r[1]) / 2, .002, (r[2] + r[3]) / 2); m.receiveShadow = true; world.add(m); cullAdd(m, m.position.x, m.position.z, Math.hypot(w, d) / 2);
   }
   // portas e entulhos (colisores removíveis)
   const iron = mc(0x23262b);
@@ -4718,7 +4976,7 @@ function zBuildWorld(M) {
       bx(g, .25, .08, .3, .7, 1.4, 0, mc(0xb89a4a));
     }
     mergeParts(g); // as peças de cada folha / porta / entulho se mexem juntas
-    world.add(g); Wd.doors.set(d.id, { d, col, g, halves, open: false, t0: 0, done: false });
+    world.add(g); Wd.doors.set(d.id, { d, col, g, halves, open: false, t0: 0, done: false }); cullAdd(g, d.x, d.z, 3, Wd.doors.get(d.id));
   }
   // tábuas das janelas
   // (todas numa malha instanciada só: tábua arrancada vira escala zero)
@@ -4740,11 +4998,11 @@ function zBuildWorld(M) {
       const g = new THREE.Group(); g.position.set(wb.x - wb.n[0] * .08, 0, wb.z - wb.n[1] * .08); face(g, wb.n);
       bx(g, 2.1, 1.2, .08, 0, 1.6, 0, mc(0x3e2c1e)).castShadow = true; bx(g, 2.2, .1, .14, 0, 2.25, 0, mc(0x2e2016));
       for (const s of [-1, 1]) bx(g, .12, 2.3, .12, s * .95, 1.15, -.1, mc(0x2e2016)).castShadow = true;
-      mergeParts(g); world.add(g); COL.push(aabb(g.position.x, g.position.z, wb.n, 2.1, .3, 2.3));
+      mergeParts(g); world.add(g); COL.push(aabb(g.position.x, g.position.z, wb.n, 2.1, .3, 2.3)); cullAdd(g, wb.x, wb.z, 2);
     }
     const name = wb.w === 'he' ? 'Granadas' : wb.w === 'bowie' ? 'Faca Bowie' : W[wb.w].name;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1.8, .9), new THREE.MeshBasicMaterial({ map: chalkTex(name, String(wb.cost)), transparent: true, depthWrite: false, color: 0xbbbbbb, toneMapped: false }));
-    m.userData.own = true; m.position.set(wb.x + wb.n[0] * .03, 1.6, wb.z + wb.n[1] * .03); m.rotation.y = Math.atan2(wb.n[0], wb.n[1]); world.add(m);
+    m.userData.own = true; m.position.set(wb.x + wb.n[0] * .03, 1.6, wb.z + wb.n[1] * .03); m.rotation.y = Math.atan2(wb.n[0], wb.n[1]); world.add(m); cullAdd(m, wb.x, wb.z, 1);
   }
   const signTex = (txt, css) => canvasTex(256, 64, g => { g.fillStyle = '#0d0d0d'; g.fillRect(0, 0, 256, 64); g.fillStyle = css; let fs = 34; g.font = `bold ${fs}px Rajdhani, Arial`; while (g.measureText(txt).width > 244 && fs > 16) g.font = `bold ${fs -= 2}px Rajdhani, Arial`; g.textAlign = 'center'; g.fillText(txt, 128, 44); }); // nome comprido encolhe para caber
   // máquinas de bebida
@@ -4756,7 +5014,7 @@ function zBuildWorld(M) {
     bx(g, .12, .3, .12, -.2, .95, .5, body); bx(g, .12, .3, .12, .2, .95, .5, body);
     const signM = new THREE.MeshBasicMaterial({ map: signTex(P.name, P.css), color: 0x333333, toneMapped: false });
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.05, .28), signM); sign.userData.own = true; sign.position.set(0, 1.95, .46); g.add(sign);
-    world.add(g); COL.push(aabb(pk.x, pk.z, pk.n, 1.1, .9, 2.2));
+    world.add(g); COL.push(aabb(pk.x, pk.z, pk.n, 1.1, .9, 2.2)); cullAdd(g, pk.x, pk.z, 2);
     Wd.perks.set(pk.k, { g, body, signM });
   }
   // Pack-a-Punch
@@ -4821,7 +5079,7 @@ function zBuildWorld(M) {
   for (let k = 0; k < nL; k++) { const L = new THREE.PointLight(0xffc98a, 0, 22, 1.3); world.add(L); Wd.pool.push({ L, l: null }); }
   for (const lp of lamps) { // lâmpada sem 'base' = só o bulbo aceso (poste decorativo)
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(lp.base ? .12 : .16, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffe2b0 })); bulb.userData.own = true; bulb.position.set(lp.x, lp.y, lp.z); world.add(bulb);
-    Wd.lights.push({ bulb, x: lp.x, y: lp.y, z: lp.z, dist: lp.dist ?? 22, lc: lp.c ?? 0xffc98a, base: lp.base || 0, ph: Math.random() * 10, c: lp.c ?? 0xffe2b0, fire: !!lp.fire, f: 0, tk: 0 });
+    cullAdd(bulb, lp.x, lp.z, 1); Wd.lights.push({ bulb, x: lp.x, y: lp.y, z: lp.z, dist: lp.dist ?? 22, lc: lp.c ?? 0xffc98a, base: lp.base || 0, ph: Math.random() * 10, c: lp.c ?? 0xffe2b0, fire: !!lp.fire, f: 0, tk: 0 });
   }
 }
 const ZERO_M4 = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -4871,7 +5129,7 @@ function zUpdateWorld(dt) {
   for (const l of Wd.lights) {
     let f = 1; if (l.fire) f = .8 + Math.sin(now * 11 + l.ph) * .1 + Math.sin(now * 23) * .08; // fogo: sempre aceso, tremulando
     else if (!ZC.power) { const n = Math.sin(now * 13 + l.ph) + Math.sin(now * 7.3 + l.ph * 2); f = n > 1.4 ? .12 : .5; }
-    l.f = f; l.bulb.material.color.set(l.c).multiplyScalar(f > .4 ? 3 : .45);
+    l.f = f; if (l.bulb.visible) l.bulb.material.color.set(l.c).multiplyScalar(f > .4 ? 3 : .45); // bulbo longe (escondido) não precisa
   }
   if (now >= Wd.poolT) { // 4x por segundo: as luzes vão para as lâmpadas mais perto da câmera
     Wd.poolT = now + .25; const cp = camera.position, tk = ++Wd.poolTk;
@@ -4953,7 +5211,7 @@ function zOnSnap(m) {
     zc.f = a[i + 5]; zc.lastSeen = now;
     if (fresh) { zc.pos.set(a[i + 1], a[i + 2], a[i + 3]); zc.last.copy(zc.pos); zc.yaw = a[i + 4]; zc.model.position.copy(zc.pos); if (zc.dog || zc.kind === 6) zLightning(zc.pos); }
   }
-  if (typeof m.b === 'string') m.b = Array.from(m.b, c => c.charCodeAt(0) - 48); // tábuas vêm como texto ("6606...")
+  if (typeof m.b === 'string') m.b = zBoardsDec(m.b); // tábuas vêm como texto ("6b4c": letra = corrida de janelas inteiras)
   if (m.b) for (let i = 0; i < m.b.length; i++) {
     const old = ZC.boards[i];
     if (old !== undefined && old !== m.b[i] && now - ZC.builtAt > 1.5) {
@@ -5374,7 +5632,7 @@ const ffCell = (x, z) => { const i = Math.floor(x - FF.x0), j = Math.floor(z - F
 // Dijkstra com fila de baldes (custo inteiro: reto 5, diagonal 7 ~ 1,4): sem heap, O(células), nunca perde item.
 // Cada balde guarda um só custo por vez e cada célula entra no máximo uma vez por custo: N posições por balde bastam.
 // Roda em fatias (zFlowStep) num buffer de trás (FF.back) e só troca com FF.dist quando termina: mapa grande sem engasgo.
-let FQ = new Int32Array(0); const FQN = new Int32Array(8), FS = { busy: false, cur: 0, pend: 0 };
+let FQ = new Int32Array(0); const FQN = new Int32Array(8), FS = { busy: false, cur: 0, pend: 0, lim: 800 }; // lim: custo 5 por metro, o campo vai até 160 m de caminho de algum jogador
 function zFlowStart(srcs) {
   const nx = FF.nx, nz = FF.nz, N = nx * nz, Wk = FF.walk;
   if (FQ.length < N * 8) FQ = new Int32Array(N * 8);
@@ -5391,8 +5649,8 @@ function zFlowStart(srcs) {
 function zFlowStep(budget) { // processa até 'budget' células; true quando o campo novo entrou em uso
   if (!FS.busy) return false;
   const D = FF.back, Wk = FF.walk, nx = FF.nx, nz = FF.nz, N = nx * nz, q = FQ, qn = FQN;
-  let cur = FS.cur, pend = FS.pend;
-  while (pend > 0 && budget > 0) {
+  let cur = FS.cur, pend = FS.pend; const lim = FS.lim;
+  while (pend > 0 && budget > 0 && cur <= lim) {
     const b = cur & 7, off = b * N;
     while (qn[b] > 0 && budget > 0) {
       const c = q[off + --qn[b]]; pend--;
@@ -5413,6 +5671,7 @@ function zFlowStep(budget) { // processa até 'budget' células; true quando o c
     }
     if (!qn[b]) cur++; // balde vazio: próximo custo (senão parou no meio por causa do orçamento)
   }
+  if (cur > lim) pend = 0; // longe demais de todo jogador: fica sem caminho (anda reto; se travar, renasce perto)
   FS.cur = cur; FS.pend = pend;
   if (pend > 0) return false;
   FS.busy = false; const t = FF.dist; FF.dist = FF.back; FF.back = t; return true;
@@ -5485,7 +5744,7 @@ function zTick(dt) {
   zTickPlayers(dt);
   if (S.phase === 'over') return;
   if (now >= Z.ffT && !FS.busy) { Z.ffT = now + .3; zFlowStart(Z.lure ? [Z.lure] : [...S.players.values()].filter(p => p.alive && !p.downed).map(p => [p.pos[0], p.pos[2]])); }
-  if (FS.busy) zFlowStep(Math.max(4000, FF.nx * FF.nz / 6)); // fatia por tick (o campo inteiro leva poucos ticks)
+  if (FS.busy) { const t0 = performance.now(); do zFlowStep(2500); while (FS.busy && performance.now() - t0 < .8); } // fatia por tick: até ~0,8 ms (mapa gigante todo aberto: o campo novo leva alguns ticks)
   zTickZombies(dt);
   zTickObjects();
   Z.zsT -= dt; if (Z.zsT <= 0) { Z.zsT = Math.max(0, Z.zsT + 1 / 20); zSnap(); }
@@ -5645,8 +5904,9 @@ function zChase(z, dt) {
   if (has) {
     const dx = gx - P.x, dz = gz - P.z; dist = Math.hypot(dx, dz);
     if (now >= z.losT) { z.losT = now + .35 + Math.random() * .1; z.los = dist < 14 && segClearR(P.x, P.z, gx, gz); }
-    if (z.los || dist < 1.2) dir = dist > .01 ? [dx / dist, dz / dist] : [0, 0];
-    else dir = zFlowDir(P.x, P.z) || (dist > .01 ? [dx / dist, dz / dist] : [0, 0]);
+    if (z.los || dist < 1.2) { dir = dist > .01 ? [dx / dist, dz / dist] : [0, 0]; z.lost = 0; }
+    else { const fd = zFlowDir(P.x, P.z); dir = fd || (dist > .01 ? [dx / dist, dz / dist] : [0, 0]); z.lost = fd ? 0 : (z.lost || 0) + dt; } // sem caminho (longe demais de todos): anda reto
+    if (z.lost > 8) { zRecycle(z); return; } // e se continuar sem caminho volta para a fila e renasce perto
     if (!Z.lure && tgt) { if (z.los || z.atkWind) zTryAttack(z, tgt, z.dog ? 1.5 : z.kind === 6 ? 2.3 : z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35); if (dist < (z.dog ? .9 : .85 + (z.rad - .3) * 2)) dir = [0, 0]; } // sem linha livre (grade no meio) não bate
     else if (Z.lure && dist < 1) dir = [0, 0];
   }
@@ -5939,13 +6199,16 @@ function zTickObjects() {
   } else if (Bx.st === 'offer' && now >= Bx.t) { Bx.st = 'idle'; Bx.uses++; broadcast({ t: 'zbox', st: 'idle', loc: Bx.loc }); }
   else if (Bx.st === 'teddy' && now >= Bx.t) { Bx.st = 'gone'; Bx.t = now + 5; broadcast({ t: 'zbox', st: 'gone' }); }
   else if (Bx.st === 'gone' && now >= Bx.t) {
-    let nl; do nl = Math.floor(Math.random() * ZD.boxes.length); while (nl === Bx.loc);
+    const act = zActive(), ok = []; ZD.boxes.forEach((L, i) => { if (i !== Bx.loc && act.has(zRoomAt(L.x + L.n[0], L.z + L.n[1]))) ok.push(i); }); // só para onde já abriram (mapa enorme: senão some atrás de porta fechada)
+    let nl; if (ok.length) nl = ok[Math.floor(Math.random() * ok.length)]; else do nl = Math.floor(Math.random() * ZD.boxes.length); while (nl === Bx.loc);
     Bx.loc = nl; Bx.st = 'idle'; Bx.uses = 0; broadcast({ t: 'zbox', st: 'idle', loc: nl }); zBuildWalk();
   }
   const P = Z.pap;
   if (P.st === 'work' && now >= P.t) { P.st = 'ready'; P.t = now + 15; broadcast({ t: 'zpap', st: 'ready', w: P.w, user: P.user }); }
   else if (P.st === 'ready' && now >= P.t) { P.st = 'idle'; broadcast({ t: 'zpap', st: 'idle' }); }
 }
+const zBoardsEnc = b => { let o = '', k = 0; for (const v of b) { if (v === 6 && k < 26) { k++; continue; } if (k) o += String.fromCharCode(96 + k); k = v === 6 ? 1 : 0; if (v !== 6) o += v; } if (k) o += String.fromCharCode(96 + k); return o; }; // "a".."z" = 1 a 26 janelas inteiras
+const zBoardsDec = s => { const o = []; for (const ch of s) { const c = ch.charCodeAt(0); if (c > 96) for (let i = 96; i < c; i++) o.push(6); else o.push(c - 48); } return o; };
 function zSnap() {
   const a = []; let bo = 0;
   for (const z of Z.zs.values()) {
@@ -5954,7 +6217,7 @@ function zSnap() {
     if (z.kind === 6) bo = Math.max(bo, r2(Math.max(0, z.hp) / z.maxHp));
   }
   const bk = Z.boards.join(), sendB = bk !== Z.lastB || (Z.snapN = (Z.snapN || 0) + 1) % 10 === 0; Z.lastB = bk;
-  const msg = { t: 'zs', ts: r3(now), z: a, b: sendB ? Z.boards.join('') : undefined, ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0, rem: Z.phase === 'round' ? Z.toSpawn + Z.zs.size : 0 };
+  const msg = { t: 'zs', ts: r3(now), z: a, b: sendB ? zBoardsEnc(Z.boards) : undefined, ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0, rem: Z.phase === 'round' ? Z.toSpawn + Z.zs.size : 0 };
   if (Z.fire > now) msg.fs = r2(Z.fire - now); if (Z.bf > now) msg.bf = r2(Z.bf - now); if (Z.phase === 'break') msg.nx = r2(Math.max(0, Z.phaseEnd - now)); // só vai quando tem
   if (bo) msg.bo = bo; // vida do Carniceiro
   if (Z.clouds.length && msg.b === undefined && ((Z.clN = (Z.clN || 0) + 1) % 10 === 5 || Z.clouds[Z.clouds.length - 1].id !== Z.lastCl)) { Z.lastCl = Z.clouds[Z.clouds.length - 1].id; msg.cl = Z.clouds.map(c => [c.id, r2(c.x), r2(c.z), r2(c.end - now)]); } // nuvens tóxicas: quando nasce uma e de 10 em 10 fotos (quem entra no meio também vê)
@@ -6802,7 +7065,7 @@ function frame() {
   now = performance.now() / 1000; lastFrameAt = performance.now();
   if (!inGame) { renderer.clear(); return; }
   if (window.__simLock) now = window.__simNow ?? now; else tick(dt); // testes automáticos controlam o tempo
-  sky.position.copy(camera.position);
+  sky.position.copy(camera.position); if (CULL.length) zCull();
   if (CFG.gfx === 'alto') { gradePass.uniforms.time.value = now % 100; composer.render(); }
   else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); }
 }
