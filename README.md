@@ -33,13 +33,19 @@ Todo mundo começa com uma M1911.
 
 | | Fácil | Normal | Difícil | Pesadelo |
 |---|---|---|---|---|
-| Vida dos zumbis | 70% | 100% (CoD) | 135% | 180% |
-| Golpes para cair (sem Juggernog) | 3 | 2 | 2 | 1 |
-| Quantidade por rodada | 75% | 100% | 125% | 150% |
-| Começam a correr | mais tarde | normal | mais cedo | desde a rodada 1 |
-| Pontos iniciais | 1500 | 500 | 500 | 250 |
+| Vida dos zumbis | 70% | 100% (CoD) | até 130% (cheia na rodada 6) | até 155% (cheia na rodada 10) |
+| Dano do golpe / golpes para cair | 34 / 3 | 50 / 2 | 60 / 2 | 75 / 2 |
+| Golpes para cair com Juggernog | 8 | 5 | 5 | 4 |
+| Quantidade por rodada | 75% | 100% | 120% | 135% |
+| Zumbis ao mesmo tempo (máx.) | 20 | 24 | 28 | 30 |
+| Começam a correr | mais tarde | normal | mais cedo | parte já trota na rodada 1 |
+| Pontos iniciais | 1500 | 500 | 500 | 500 |
+| Pontos por acerto e por morte | +35% | normal | -10% | -20% |
+| Vida volta depois de (sem levar golpe) | 2,5 s | 3,5 s | 4 s | 4,5 s |
+| Tempo para encher 100 de vida | 4 s | 5 s | 5,6 s | 6,3 s |
 | Tempo caído até sangrar | 60 s | 45 s | 35 s | 25 s |
 | Power-ups | mais | normal | menos | bem menos |
+| Especiais / Carniceiro | 2 rodadas depois, menos / rodada 14 | rodada 4+ / rodada 12 | 1 rodada antes / rodada 11 | 2 rodadas antes, mais / rodada 10 |
 
 A dificuldade aparece no canto de cima, junto com o nome do mapa.
 
@@ -91,7 +97,7 @@ A dificuldade aparece no canto de cima, junto com o nome do mapa.
   - **Janela e chão:** arranca as tábuas com um braço de cada vez e passa pelo batente encolhendo a perna; ao sair do chão arranha para cima com terra voando. Explosão que arranca as pernas deixa o zumbi rastejando sem as canelas (três jeitos: puxando com os dois braços, com um só, ou se arrastando).
   - **Morte:** de costas, de cara no chão, girando, caindo de joelhos ou, no tiro na cabeça, a cabeça some e o corpo desaba; rastejante esparrama; Carniceiro cai de joelhos e depois de cara; o cão rola e esperneia. O corpo afunda no chão antes de sumir.
   - As caixas de acerto acompanham a pose (inclinação, bote, tropeção, grito, salto do Veloz e do cão).
-- **Vida:** a barra no centro de baixo da tela mostra a vida (com Juggernog vai até 250). Toda rodada nova começa com a vida cheia.
+- **Vida:** a barra no centro de baixo da tela mostra a vida (com Juggernog vai até 250). Como no CoD, a vida volta sozinha e aos poucos: depois de alguns segundos sem levar golpe (3,5 s no Normal; o Quick Revive encurta em 25%) ela sobe até encher (100 de vida em 5 s no Normal; com Juggernog sobe mais rápido, 250 em ~8 s). Qualquer golpe reinicia a espera. A borda vermelha da tela mostra quanto falta e some aos poucos junto com a barra; com pouca vida ela pulsa. Toda rodada nova começa com a vida cheia.
 - **Cair e reanimar:** com a vida zerada, você cai com uma pistola e tem 45 s (no Normal) para alguém segurar F em você (o tempo para enquanto alguém está reanimando). Quem sangra volta na rodada seguinte, com a M1911 e os mesmos pontos. Se todos caírem, fim de jogo.
 
 ## Skins
