@@ -4561,7 +4561,12 @@ function srvOnData(conn, d) {
     const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk);
     conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code });
     broadcast({ t: 'info', txt: name + ' entrou na sala' });
-    if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') { zResetPlayer(np); np.money = zDf().pts; srvSpawn(np, zSpawnPoint(S.players.size - 1), true, Math.PI); } // entra já jogando, com os pontos da dificuldade
+    if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') { // entra já jogando, com os pontos da dificuldade; quem caiu e voltou (até 5 min, mesmo nome) recupera pontos e armas,
+      // e quem estava caído/morto na rodada só volta na próxima (sair e entrar não ressuscita mais)
+      zResetPlayer(np); const L = S.left?.get(name); if (L) S.left.delete(name);
+      if (L && now - L.at < 300) { Object.assign(np, { money: L.money, kills: L.kills, hs: L.hs, downs: L.downs, revives: L.revives }); np.inv = L.inv; } else np.money = zDf().pts;
+      if (!(L && L.dead && Z.phase === 'round' && now - L.at < 300)) srvSpawn(np, zSpawnPoint(S.players.size - 1), true, Math.PI);
+    }
     S.zKey = null; srvState(); // quem entrou recebe o mundo dos zumbis já
     return;
   }
@@ -4569,7 +4574,8 @@ function srvOnData(conn, d) {
 }
 function srvDrop(conn) {
   const id = conn.pid; if (!id || !S.players.has(id)) return;
-  const name = S.players.get(id).name;
+  const lp = S.players.get(id), name = lp.name;
+  if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') (S.left ||= new Map()).set(name, { money: lp.money, inv: { ...lp.inv, third: null }, kills: lp.kills, hs: lp.hs, downs: lp.downs, revives: lp.revives, dead: !lp.alive || lp.downed, at: now }); // para quem voltar
   S.players.delete(id); NET.conns.delete(id);
   try { conn.close(); } catch (e) { } // derrubado por erro: fecha de verdade, senão o cliente fica 12 s num jogo que não anda
   broadcast({ t: 'bye', id }); broadcast({ t: 'info', txt: name + ' saiu' });
@@ -4602,13 +4608,13 @@ function srvHandle(pid, m) {
       const w = m.w, wd = W[w], z = Z.zs.get(+m.v); if (!z) return;
       if (!((w === 'knife' && !p.downed) || ((p.inv.primary === w || p.inv.secondary === w) && (!p.downed || wd.slot === 'secondary')) || (p.inv.third === w && !p.downed) || (w === 'm1911_ls' && p.downed) || (w === 'dmach' && !p.downed && p.dmEnd > now - .5))) return; // caído: só pistola // terceira arma (Mule Kick); Máquina da Morte com folga de rede
       const cap = (wd.thunder ? 1e7 : w === 'knife' ? (p.bowie ? 1000 : 150) : (wd.dmg || 0) * Math.max(wd.head || 4, 1) * (wd.pellets || 1) * 1.1 + (wd.splash?.dmg || 0)) * (p.perks.includes('ds') && w !== 'knife' ? 1.5 : 1); // Deadshot: headshot +50%
-      if (w === 'knife' && Math.hypot(z.body.pos.x - p.pos[0], z.body.pos.z - p.pos[2]) > 4.5) return; // facada (com o bote) alcança uns 3,4 m
+      if (w === 'knife' && Math.hypot(z.body.pos.x - p.pos[0], z.body.pos.z - p.pos[2]) > 4.5 + Math.min(2.5, z.speed * .4)) return; // facada (com o bote) alcança uns 3,4 m, mais o que o zumbi andou desde o golpe
       p.shotT = now; // atirou de verdade (Electric Cherry confere)
       const iv = w === 'knife' ? .5 : wd.burst ? (wd.rate + (wd.burst - 1) * wd.brate) / wd.burst : (wd.rate || .1); // intervalo médio entre tiros (rajada: média da rajada + pausa)
       const gap = wd.thunder ? 0 : iv * .6; // Double Tap = 0,75 da cadência
-      if (gap) { const B = Math.max(3, .5 / gap), tb = (z.tb ||= {}), b = tb[pid] || (tb[pid] = { n: B, t: now }); b.n = Math.min(B, b.n + (now - b.t) / gap); b.t = now; if (b.n < 1) return; b.n--; } // folga de 0,5 s: tiros que chegam juntos depois de um soluço da rede valem
+      if (gap) { const B = Math.max(3, 1 / gap), tb = (z.tb ||= {}), b = tb[pid] || (tb[pid] = { n: B, t: now }); b.n = Math.min(B, b.n + (now - b.t) / gap); b.t = now; if (b.n < 1) return; b.n--; } // folga de 0,5 s: tiros que chegam juntos depois de um soluço da rede valem
       { // limite de alvos por tiro, somando todos os zumbis: cada arma acerta no máximo tg zumbis por disparo (bala 1, escopeta 1 por bago, explosão/cone mais)
-        const tg = wd.thunder ? 48 : wd.frost ? wd.frost.n : (wd.pellets || 1) + (wd.splash ? 24 : 0), g2 = iv * .6, B = tg * Math.max(3, .5 / g2), wb = (p.wb ||= {}), b = wb[w] || (wb[w] = { n: B, t: now });
+        const tg = wd.thunder ? 48 : wd.frost ? wd.frost.n : (wd.pellets || 1) + (wd.splash ? 24 : 0), g2 = iv * .6, B = tg * Math.max(3, 1 / g2), wb = (p.wb ||= {}), b = wb[w] || (wb[w] = { n: B, t: now });
         b.n = Math.min(B, b.n + (now - b.t) * tg / g2); b.t = now; if (b.n < 1) return; b.n--;
       }
       zHit(p, z.id, clamp(+m.dmg || 0, 0, cap), m.z === 'head' || m.z === 'legs' ? m.z : 'body', w, !!m.sp);
@@ -4751,7 +4757,7 @@ function srvState() {
   for (const p of S.players.values()) {
     const o = { id: p.id, n: p.name, c: p.color, b: p.isBot ? 1 : 0, hp: Math.round(p.hp), ar: p.armor, hm: p.helmet ? 1 : 0, al: p.alive ? 1 : 0, k: p.kills, d: p.deaths, m: p.money, rw: p.rw, sk: p.skins || {} };
     if (zmode) Object.assign(o, { hs: p.hs, dw: p.downs, rvs: p.revives, pk: p.perks, dn: p.downed ? 1 : 0, bl: p.downed && !p.selfRev ? r2(Math.max(0, p.bleedAt - now)) : 0,
-      rv: p.downed && p.revBy && now - p.revLast < .5 ? r2(p.revProg / (S.players.get(p.revBy)?.perks.includes('qr') ? 2 : 4)) : 0, mh: p.maxHp, bw: p.bowie ? 1 : 0 });
+      rv: p.downed && p.revBy && now - p.revLast < 1.3 ? r2(p.revProg / (S.players.get(p.revBy)?.perks.includes('qr') ? 2 : 4)) : 0, mh: p.maxHp, bw: p.bowie ? 1 : 0 });
     pl.push(o);
   }
   const full = (S.stN = (S.stN || 0) + 1) % 8 === 1;
@@ -6193,6 +6199,7 @@ function zFlowDir(x, z) {
 }
 function segClearR(ax, az, bx2, bz) { const d = hyp(bx2 - ax, bz - az), n = Math.ceil(d / .5); for (let i = 1; i < n; i++) { const t = i / n; if (!footFreeR(lerp(ax, bx2, t), lerp(az, bz, t), .3)) return false; } return true; }
 function zReset() {
+  S.left = new Map(); // partida nova: ninguém recupera nada da anterior
   Object.assign(Z, { on: true, round: 0, phase: 'pre', phaseEnd: now + 5, toSpawn: 0, spawnT: 0, spawnDelay: 2, zs: new Map(), nextId: 1, dogRound: false, nextDog: zDf().dog[0] + Math.floor(Math.random() * 3),
     drops: [], dropId: 1, dropsRound: 0, dropThresh: 2000 * zDf().drop, dropScore: 0, bag: [], insta: 0, dbl: 0, power: false, doors: new Set(), boards: ZD.windows.map(() => 6),
     winT: ZD.windows.map(() => ({ tear: 0, climb: 0, busy: false })), box: { loc: 0, st: 'idle', user: null, w: null, t: 0, uses: 0 }, pap: { st: 'idle', user: null, w: null, t: 0, slot: null },
@@ -6260,7 +6267,7 @@ function zTickPlayers(dt) {
   for (const p of S.players.values()) {
     if (!p.alive) continue;
     if (p.downed) {
-      if (p.revBy && now - p.revLast > .4) { p.revBy = null; p.revProg = 0; }
+      if (p.revBy && now - p.revLast > 1.2) { p.revBy = null; p.revProg = 0; } // folga para soluço da rede (cada mensagem soma no máximo 0,3 s)
       if (p.selfRev) { if (now >= p.selfRev) zRevive(p, null); }
       else if (p.revBy) p.bleedAt += dt; // o tempo para sangrar fica parado enquanto alguém reanima
       else if (now >= p.bleedAt) zBleed(p);
@@ -6529,7 +6536,7 @@ function zKill(z, p, zone, w, splash, nuke) {
   broadcast(msg);
   if (K === 6) { if (p) for (const q of S.players.values()) if (q !== p && q.alive) zPts(q, 300); zDrop(null, dx, dz, true); } // Carniceiro: pontos para o time e power-up garantido
   if (msg.ex) zBloatBoom(bx, Math.max(0, z.body.pos.y), bz, p);
-  if (p && !nuke && !z.dog && p.perks.includes('vult') && Math.random() < ZPK.vultP) zVultDrop(p, bx, bz);
+  if (p && !nuke && !z.dog && p.perks.includes('vult') && Math.random() < ZPK.vultP) zVultDrop(p, dx, dz);
   if (K === 4 && !nuke) { const c = { id: Z.cloudId++, x: bx, y: Math.max(0, z.body.pos.y), z: bz, end: now + 7 }; Z.clouds.push(c); }
   if (z.dog && Z.dogRound && Z.toSpawn <= 0 && Z.zs.size === 0) zDrop('max', dx, dz, true); // último cão sempre solta Munição Máxima
   else if (!nuke && p && Z.dropsRound < 4) { Z.dropScore += pts; if (Z.dropScore >= Z.dropThresh || Math.random() < .02) zDrop(null, dx, dz, false); }
@@ -6752,8 +6759,8 @@ function srvZHold(p, m) {
   } else if (m.k === 'rev') {
     const t = S.players.get(m.id); if (!t || t === p || !t.alive || !t.downed) return;
     if (Math.hypot(p.pos[0] - t.pos[0], p.pos[2] - t.pos[2]) > 2.4) return;
-    if (t.revBy && t.revBy !== p.id && now - t.revLast <= .4) return; // outro já está reanimando
-    if (t.revBy !== p.id || now - t.revLast > .4) { t.revBy = p.id; t.revProg = 0; t.revLast = now; }
+    if (t.revBy && t.revBy !== p.id && now - t.revLast <= 1.2) return; // outro já está reanimando
+    if (t.revBy !== p.id || now - t.revLast > 1.2) { t.revBy = p.id; t.revProg = 0; t.revLast = now; }
     t.revProg += Math.min(.3, now - t.revLast); t.revLast = now;
     if (t.revProg >= (p.perks.includes('qr') ? 2 : 4)) zRevive(t, p);
   }
@@ -6768,7 +6775,7 @@ function zTickObjects() {
   else if (Bx.st === 'teddy' && now >= Bx.t) { Bx.st = 'gone'; Bx.t = now + 5; broadcast({ t: 'zbox', st: 'gone' }); }
   else if (Bx.st === 'gone' && now >= Bx.t) {
     const act = zActive(), ok = []; ZD.boxes.forEach((L, i) => { if (i !== Bx.loc && act.has(zRoomAt(L.x + L.n[0], L.z + L.n[1]))) ok.push(i); }); // só para onde já abriram (mapa enorme: senão some atrás de porta fechada)
-    let nl; if (ok.length) nl = ok[Math.floor(Math.random() * ok.length)]; else do nl = Math.floor(Math.random() * ZD.boxes.length); while (nl === Bx.loc);
+    const nl = ok.length ? ok[Math.floor(Math.random() * ok.length)] : Bx.loc; // sem outro lugar nas áreas abertas: volta no mesmo lugar
     Bx.loc = nl; Bx.st = 'idle'; Bx.uses = 0; broadcast({ t: 'zbox', st: 'idle', loc: nl }); zBuildWalk();
   }
   const P = Z.pap;
@@ -7130,7 +7137,7 @@ addEventListener('keydown', e => {
   if (['Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code) || e.ctrlKey) e.preventDefault();
   keys[e.code] = true;
   // fora da tela cheia o navegador não deixa o jogo segurar o Ctrl+W (fecha a aba): avisa uma vez por partida
-  if ((e.code === 'ControlLeft' || e.code === 'ControlRight') && !(NET.kbLock && document.fullscreenElement) && !C.ctrlTip) { C.ctrlTip = true; toast(navigator.keyboard?.lock ? 'Ctrl agacha. Para o Ctrl+W nunca fechar a aba, ligue "Tela cheia ao jogar" (Esc → Configurações)' : 'Ctrl agacha. Neste navegador o Ctrl+W pede para sair: cancele e o jogo volta parado na pausa (ou agache com C)', 6); }
+  if ((e.code === 'ControlLeft' || e.code === 'ControlRight') && !(NET.kbLock && document.fullscreenElement) && !C.ctrlTip) { C.ctrlTip = true; toast(navigator.keyboard?.lock ? (CFG.autofull ? 'Ctrl agacha. Fora da tela cheia o Ctrl+W pede para sair: clique no jogo para voltar à tela cheia' : 'Ctrl agacha. Para o Ctrl+W nunca fechar a aba, ligue "Tela cheia ao jogar" (Esc → Configurações)') : 'Ctrl agacha. Neste navegador o Ctrl+W pede para sair: cancele e o jogo volta parado na pausa (ou agache com C)', 6); }
   if (e.repeat) return;
   if (me.downed && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ', 'KeyV', 'KeyF'].includes(e.code)) return; // caído: só a pistola
   if (G.cur === 'dmach' && hasW('dmach') && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ'].includes(e.code)) return; // Máquina da Morte: não troca até acabar
