@@ -355,7 +355,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
         <b>Mouse</b><span>Mirar / clique esquerdo atira</span>
         <b>Clique direito</b><span>Mira da sniper / facada forte / granada rasteira</span>
         <b>Espaço</b><span>Pular (morto: trocar quem assiste)</span>
-        <b>C</b><span>Agachar (Ctrl também, mas Ctrl+W fecha a aba!)</span>
+        <b>C</b><span>Agachar (Ctrl só na tela cheia: fora dela Ctrl+W fecharia a aba)</span>
         <b>Shift</b><span>Andar em silêncio</span>
         <b>R</b><span>Recarregar</span>
         <b>1 2 3 4</b><span>Primária, pistola, faca, granadas</span>
@@ -3057,7 +3057,7 @@ function updateMe(dt) {
   let fw = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), st = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
   if (C.chatOpen || frozen) fw = st = 0;
   const wish = f.multiplyScalar(fw).add(r.multiplyScalar(st)); if (wish.lengthSq()) wish.normalize();
-  const crouchKey = me.downed || (!C.chatOpen && (keys.KeyC || keys.ControlLeft));
+  const crouchKey = me.downed || (!C.chatOpen && (keys.KeyC || (NET.kbLock && document.fullscreenElement && keys.ControlLeft))); // Ctrl só com o teclado preso (tela cheia): fora dela Ctrl+W fecha a aba
   if (crouchKey && !me.crouch) { me.crouch = true; me.h = H_CROUCH; }
   else if (!crouchKey && me.crouch && !blockedAt(me.pos.x, me.pos.y, me.pos.z, H_STAND)) { me.crouch = false; me.h = H_STAND; }
   const w = W[G.cur] || W.knife, shift = keys.ShiftLeft || keys.ShiftRight;
@@ -5051,8 +5051,11 @@ addEventListener('keydown', e => {
   if (e.code === 'Tab') { e.preventDefault(); C.showBoard = true; return; }
   if (C.buyOpen && (e.code === 'KeyB' || e.code === 'Escape')) { e.preventDefault(); closeBuy(); return; }
   if (!locked()) return;
+  syncMods(e);
   if (['Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code) || e.ctrlKey) e.preventDefault();
   keys[e.code] = true;
+  // fora da tela cheia o navegador não deixa o jogo segurar o Ctrl+W (fecha a aba): avisa uma vez por partida
+  if ((e.code === 'ControlLeft' || e.code === 'ControlRight') && !(NET.kbLock && document.fullscreenElement) && !C.ctrlTip) { C.ctrlTip = true; toast('Agache com C. Fora da tela cheia o Ctrl não agacha: Ctrl+W fecharia a aba (Esc → Tela cheia libera o Ctrl)', 6); }
   if (e.repeat) return;
   if (me.downed && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyQ', 'KeyV', 'KeyF'].includes(e.code)) return; // caído: só a pistola
   switch (e.code) {
@@ -5070,7 +5073,15 @@ addEventListener('keydown', e => {
   }
 });
 addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'Tab') C.showBoard = false; });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseDown = false; C.showBoard = false; });
+function releaseInput() { for (const k in keys) keys[k] = false; mouseDown = false; G.adsHold = false; C.showBoard = false; }
+addEventListener('blur', releaseInput);
+// Tecla presa: se o navegador engoliu o "soltar" (o aviso "Sair do site?" do Ctrl+W congela a página e as teclas
+// soltas nesse meio-tempo nunca chegam), o próximo evento com o estado real dos modificadores corrige.
+function syncMods(e) {
+  if (!e.ctrlKey && (keys.ControlLeft || keys.ControlRight)) keys.ControlLeft = keys.ControlRight = false;
+  if (!e.shiftKey && (keys.ShiftLeft || keys.ShiftRight)) keys.ShiftLeft = keys.ShiftRight = false;
+}
+addEventListener('mousemove', syncMods, true); addEventListener('mousedown', syncMods, true);
 canvas.addEventListener('mousedown', e => {
   if (!inGame) return;
   if (!locked()) { requestLock(); return; }
@@ -5510,8 +5521,9 @@ $('#btnResume').onclick = () => requestLock();
 $('#click').onclick = () => requestLock();
 $('#btnLeave').onclick = () => leaveGame();
 $('#btnFull').onclick = async () => {
-  try { await document.documentElement.requestFullscreen(); if (navigator.keyboard?.lock) await navigator.keyboard.lock(); toast('Tela cheia (Ctrl liberado para agachar)', 3); } catch (e) { toast('Tela cheia não disponível', 2); }
+  try { await document.documentElement.requestFullscreen(); if (navigator.keyboard?.lock) { await navigator.keyboard.lock(); NET.kbLock = true; } toast(NET.kbLock ? 'Tela cheia (Ctrl liberado para agachar)' : 'Tela cheia', 3); } catch (e) { toast('Tela cheia não disponível', 2); }
 };
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) NET.kbLock = false; }); // saiu da tela cheia: o teclado deixa de estar preso
 let getPauseForm = null;
 $('#btnApply').onclick = () => {
   if (!NET.isHost || !getPauseForm) return;
@@ -5529,7 +5541,7 @@ function enterGame() {
   inGame = true;
   $('#menu').classList.add('hidden'); $('#hud').classList.remove('hidden'); $('#click').classList.remove('hidden');
   vmSetWeapon('knife'); updateRoomInfo();
-  window.onbeforeunload = e => { e.preventDefault(); return ''; };
+  window.onbeforeunload = e => { releaseInput(); document.exitPointerLock?.(); e.preventDefault(); return ''; }; // se a pessoa cancelar, volta parada e na pausa
 }
 function leaveGame() { window.onbeforeunload = null; try { NET.peer?.destroy(); } catch (e) { } location.href = location.pathname; }
 
