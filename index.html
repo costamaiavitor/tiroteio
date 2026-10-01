@@ -134,10 +134,10 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 /* HUD */
 #hud{position:fixed;inset:0;pointer-events:none;z-index:10;text-shadow:0 1px 3px #000,0 0 2px #000}
 #xhair{position:absolute;left:50%;top:50%}
-#xhair i{position:absolute;background:#6cff6c;box-shadow:0 0 1px #000}
+#xhair i{position:absolute;background:#6cff6c;box-shadow:0 0 0 1px rgba(0,0,0,.75)}
 #xhair .v{width:2px;height:18px;left:-1px;top:-9px}
 #xhair .h{width:18px;height:2px;left:-9px;top:-1px}
-#hitmark{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px;opacity:0}
+#hitmark{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px;opacity:0;transform:scale(1.2);filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 2px rgba(0,0,0,.8))}
 #hitmark:before,#hitmark:after{content:"";position:absolute;left:12px;top:0;width:2px;height:26px;background:#fff;transform:rotate(45deg);-webkit-mask:linear-gradient(#000 35%,transparent 35% 65%,#000 65%);mask:linear-gradient(#000 35%,transparent 35% 65%,#000 65%)}
 #hitmark:after{transform:rotate(-45deg)}
 #hitmark.hs:before,#hitmark.hs:after{background:var(--red)}
@@ -145,7 +145,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #scope:before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:#000}
 #scope:after{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;background:#000}
 #dmgflash{position:absolute;inset:0;box-shadow:inset 0 0 120px rgba(255,0,0,.7);opacity:0}
-.arc{position:absolute;left:50%;top:50%;width:220px;height:220px;margin:-110px;border-radius:50%;border-top:7px solid rgba(255,40,40,.9);transition:opacity 1s}
+.arc{position:absolute;left:50%;top:50%;width:240px;height:240px;margin:-120px;border-radius:50%;border-top:9px solid rgba(255,40,40,.95);filter:drop-shadow(0 -2px 6px rgba(255,0,0,.8));transition:opacity 1s}
 #top{position:absolute;top:10px;left:50%;transform:translateX(-50%);text-align:center}
 #score{font-size:26px;font-weight:700;background:rgba(0,0,0,.45);padding:2px 16px;border-radius:6px}
 #timer{font-size:22px;color:#fff}
@@ -243,14 +243,19 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #zstreak{position:absolute;left:0;right:0;top:16%;text-align:center;font-size:34px;font-weight:700;color:#ffcf5a;text-shadow:0 0 10px rgba(255,120,0,.6),0 2px 2px #000;opacity:0}
 #zstreak.go{animation:zst 1.6s ease-out}
 @keyframes zst{0%{opacity:1;transform:scale(1.4)}70%{opacity:1;transform:scale(1)}100%{opacity:0}}
-#zprompt{position:absolute;left:0;right:0;top:60%;text-align:center;font-size:23px;font-weight:700}
+#zprompt{position:absolute;left:0;right:0;top:60%;text-align:center;font-size:24px;font-weight:700}
+#zprompt span{background:rgba(0,0,0,.55);padding:3px 14px;border-radius:6px}
 #zprompt b{color:var(--acc)}
 #zprompt .no{color:#ff8a8a}
 #zbar{position:absolute;left:50%;top:66%;transform:translateX(-50%);width:240px;height:9px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4)}
 #zbar i{display:block;height:100%;background:#fff;width:0}
 #zdown{position:absolute;left:0;right:0;top:34%;text-align:center;font-size:40px;font-weight:700;color:#ff4040}
 #zdown small{font-size:22px;color:#fff}
-#zmarks span{position:absolute;transform:translate(-50%,-50%);color:#ff3b3b;font-size:30px;font-weight:700;text-align:center;line-height:1}
+#zmarks span{position:absolute;transform:translate(-50%,-50%);color:#ff3b3b;font-size:30px;font-weight:700;text-align:center;line-height:1;text-shadow:0 0 6px rgba(255,0,0,.7),0 1px 2px #000}
+#zmarks span.off{font-size:24px;opacity:.85}
+#zobj span{position:absolute;transform:translate(-50%,-50%);color:#ffd36a;font-size:13px;font-weight:700;letter-spacing:1px;text-align:center;line-height:1.1;opacity:.85;white-space:nowrap}
+#zobj span i{display:block;font-style:normal;font-size:16px}
+#zobj span.off{opacity:.55}
 #zmarks small{font-size:14px;color:#fff}
 #zflash{position:absolute;inset:0;background:#fff;opacity:0}
 #zstam{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);width:160px;height:5px;background:rgba(255,255,255,.18);border-radius:3px;transition:opacity .4s}
@@ -278,6 +283,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
   <div id="zhud" class="hidden">
     <div id="zvig"></div>
     <div id="zmarks"></div>
+    <div id="zobj"></div>
     <div id="zround"></div>
     <div id="zpts"></div>
     <div id="zpop"></div>
@@ -380,6 +386,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
         <b>Esc</b><span>Pausa / configurações / trocar mapa (host)</span>
         <b>F</b><span>Zumbis: comprar, abrir porta, usar a caixa (segure para consertar janela / reanimar)</span>
         <b>V</b><span>Zumbis: facada rápida (bote até 3 m)</span>
+        <b>L</b><span>Zumbis: lanterna</span>
         <b>Shift + W</b><span>Zumbis: correr (fôlego limitado; atirar interrompe)</span>
         <b>C correndo</b><span>Zumbis: deslizar (com PhD Flopper, explode)</span>
         <b>5</b><span>Zumbis: terceira arma (Mule Kick)</span>
@@ -434,6 +441,7 @@ let now = performance.now() / 1000;
 const CFG = {
   name: load('name', 'Jogador' + Math.floor(rand(100, 999))),
   sens: load('sens', 1), fov: load('fov', 85), vol: load('vol', 0.6), shadows: load('shadows', true), gfx: load('gfx', null),
+  bright: load('bright', 1), zmarks: load('zmarks', true), lant: load('lant', false),
 };
 
 // ================================================================
@@ -1489,6 +1497,34 @@ const sun = new THREE.DirectionalLight(0xffffff, 2.2);
 sun.castShadow = CFG.shadows; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -.0005; sun.shadow.normalBias = .03;
 scene.add(sun); scene.add(sun.target);
 const flashLight = new THREE.PointLight(0xffc070, 0, 12, 2); scene.add(flashLight);
+// Visibilidade nos mapas de zumbi (escuros): luz fraca de preenchimento presa na câmera (o zumbi que chega perto
+// aparece de frente) e lanterna do jogador (tecla L, sem sombra). Ficam na câmera só nos mapas de zumbi:
+// número fixo de luzes por mapa = o shader não recompila ao ligar/desligar a lanterna.
+const VIS = {
+  fill: new THREE.PointLight(0xd8e0ff, 0, 14, 1.6), lant: new THREE.SpotLight(0xfff0d6, 0, 40, .45, .55, 1.1),
+  k: { exp: 1.08, hemi: 1.6, hemiMin: .9, gnd: .25, fill: 7, lant: 70, fogN: 1.5, fogF: 1.35, fogL: .1, grade: .1 }, // ajustes medidos (luminância zumbi x fundo)
+};
+VIS.fill.position.set(0, .25, .2); VIS.lant.position.set(.18, -.12, 0); VIS.lant.target.position.set(0, -.05, -1); VIS.lant.castShadow = false;
+// cor da neblina/horizonte: nos mapas de zumbi a neblina escura clareia um pouco (o zumbi longe vira silhueta em vez de sumir no preto)
+function visFogC(M, c) { const col = new THREE.Color(c ?? M.fogC ?? M.sky); if (!M.zombie) return col; const h = {}; col.getHSL(h); if (h.l < VIS.k.fogL) col.setHSL(h.h, h.s, h.l + (VIS.k.fogL - h.l) * .6); return col; }
+function visMap(M) { // mapas de zumbi: neblina mais longe e menos preta, mais luz ambiente (o zumbi não vira só silhueta preta)
+  if (!M.zombie) return visApply();
+  const fc = visFogC(M);
+  scene.background.copy(fc); skyMat.uniforms.hor.value.set(M.fogC ?? M.sky).lerp(fc, .5); skyMat.uniforms.bot.value.copy(fc).multiplyScalar(.6); // céu clareia só metade: a noite continua noite
+  scene.fog = new THREE.Fog(fc, M.fog[0] * VIS.k.fogN, M.fog[1] * VIS.k.fogF);
+  hemi.intensity = Math.max((M.hemi ?? 1.4) * VIS.k.hemi, VIS.k.hemiMin); hemi.groundColor.set(M.hemiC?.[1] ?? 0x6b5a45).lerp(hemi.color, VIS.k.gnd);
+  visApply();
+}
+function visApply() { // brilho (configuração) e luzes extras; roda ao montar o mapa e ao mudar as configurações
+  const M = curMap; if (!M) return;
+  renderer.toneMappingExposure = (M.exposure ?? 1) * (M.zombie ? VIS.k.exp : 1) * clamp(+CFG.bright || 1, .5, 2);
+  if (M.zombie) { if (!VIS.fill.parent) camera.add(VIS.fill, VIS.lant, VIS.lant.target); VIS.fill.intensity = VIS.k.fill; }
+  else if (VIS.fill.parent) camera.remove(VIS.fill, VIS.lant, VIS.lant.target);
+  gradePass.uniforms.sc.value = M.zombie ? VIS.k.grade : .28;
+}
+function visTick() { // lanterna: segue o estado (L) só com o jogador vivo e na própria câmera
+  VIS.lant.intensity = CFG.lant && ZC.on && me.alive && !C.spec ? VIS.k.lant * (CFG.gfx === 'alto' ? 1.1 : 1) : 0;
+}
 let world = new THREE.Group(); scene.add(world);
 let fxGroup = new THREE.Group(); scene.add(fxGroup);
 
@@ -1540,14 +1576,14 @@ const vmPass = new RenderPass(vmScene, vmCam); vmPass.clear = false; vmPass.clea
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), .5, .45, .85);
 // correção de cor final (Alto): contraste em S suave, saturação, tom quente nas altas, aberração nas bordas e grão de filme
 const gradePass = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, time: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, sc: { value: .28 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float time; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float time, sc; varying vec2 vUv;
     void main(){ vec2 d = vUv - .5; float r = dot(d, d);
       vec3 c = vec3(texture2D(tDiffuse, vUv - d * r * .014).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv + d * r * .014).b);
       float l = dot(c, vec3(.2126, .7152, .0722));
       c = mix(vec3(l), c, 1.1);
-      c = mix(c, c * c * (3.0 - 2.0 * c), .28);
+      c = mix(c, c * c * (3.0 - 2.0 * c), sc);
       c *= mix(vec3(.97, .99, 1.04), vec3(1.03, 1.0, .96), smoothstep(.15, .8, l));
       float n = fract(sin(dot(vUv * 913.7 + time, vec2(12.9898, 78.233))) * 43758.5453);
       c += (n - .5) * .02;
@@ -1810,7 +1846,7 @@ function buildMap(id) {
   clearFx(); zClearDynamic(); MAP_ANIM = [];
   me.downed = false;
   scene.background = new THREE.Color(M.fogC ?? M.sky);
-  buildSky(M); renderer.toneMappingExposure = M.exposure ?? 1;
+  buildSky(M);
   // a arma em primeira pessoa acompanha a luz do mapa (à noite ela fica mais escura e reflete menos)
   const vl = M.stars ? .5 : 1; vmHemi.intensity = 1.1 * vl; vmKey.intensity = 2.2 * vl; vmRim.intensity = 1.2 * vl; VM_ENV = M.stars ? .3 : 1;
   for (const set of [...Object.values(GM), ARM || {}]) for (const m of Object.values(set)) if (m?.isMeshStandardMaterial) m.envMapIntensity = VM_ENV * (m.userData.env ?? .35);
@@ -1821,6 +1857,7 @@ function buildMap(id) {
   sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.near = 1; sc.far = Math.max(220, Math.hypot(s[0], s[1], s[2]) + ext * 1.6); sc.updateProjectionMatrix();
   hemi.intensity = M.hemi ?? 1.4; sun.intensity = M.sunI ?? 2.2; sun.color.set(M.sunC ?? 0xffffff);
   hemi.color.set(M.hemiC?.[0] ?? 0xffffff); hemi.groundColor.set(M.hemiC?.[1] ?? 0x6b5a45);
+  visMap(M);
   COL = [];
   const mats = {}, boxes = M.boxes();
   const trees = [];
@@ -3908,7 +3945,11 @@ function updateRemotes(dt) {
     else if (rp.downed) { rp.model.rotation.x = -1.25; rp.model.position.y = rp.pos.y + .25; }
     else rp.model.rotation.x = 0;
     rp.model.visible = (rp.alive || rp.dead) && !(C.spec === rp.id && !me.alive);
-    if (rp.tag) rp.tag.visible = rp.alive;
+    if (rp.tag) {
+      rp.tag.visible = rp.alive; const zt = ZC.on;
+      if (rp.tag.material.depthTest === zt) { rp.tag.material.depthTest = !zt; rp.tag.renderOrder = zt ? 9 : 0; }
+      const k = zt ? Math.max(1, rp.pos.distanceTo(camera.position) / 14) : 1; rp.tag.scale.set(1.3 * k, .325 * k, 1);
+    }
     if (rp.alive && rp.spd > 4.3 && vy < 2) { rp.stepT -= dt; if (rp.stepT <= 0) { rp.stepT = .36; play('step', rp.pos); } }
   }
 }
@@ -4834,7 +4875,7 @@ function zDoorOpen(id) {
 }
 function zBoxPlace(loc) {
   const Wd = ZC.world; if (!Wd?.box || !ZD.boxes[loc]) return;
-  const L = ZD.boxes[loc], g = Wd.box.g; ZC.box.loc = loc;
+  const L = ZD.boxes[loc], g = Wd.box.g; if (ZC.box.loc !== loc || !ZC.boxT) ZC.boxT = now; ZC.box.loc = loc;
   g.position.set(L.x, 0, L.z); g.rotation.set(0, Math.atan2(L.n[0], L.n[1]), 0); g.visible = true;
   if (Wd.boxCol) { const i = COL.indexOf(Wd.boxCol); if (i >= 0) COL.splice(i, 1); }
   const sw = Math.abs(L.n[0]) > 0, hw = sw ? .45 : .9, hd = sw ? .9 : .45;
@@ -4850,15 +4891,16 @@ function zBoxShow(w) {
   b.holder.add(m);
 }
 function zPowerOn() {
-  if (ZC.power) return; ZC.power = true;
+  if (ZC.power) return; ZC.power = true; ZC.powT = now;
   const Wd = ZC.world; if (!Wd) return;
   for (const p of Wd.perks.values()) { p.body.emissiveIntensity = .35; p.signM.color.set(0xffffff); }
   Wd.pap.body.emissiveIntensity = .25; Wd.pap.signM.color.set(0xffffff); Wd.power.lever.rotation.x = -.8;
 }
 function zFogDog(on) {
   if (!ZC.on || ZC.fogDog === on || !curMap) return; ZC.fogDog = on;
-  scene.fog.color.set(on ? 0x2a0c08 : curMap.fogC); scene.background.set(on ? 0x1a0604 : curMap.sky);
-  skyMat.uniforms.hor.value.set(on ? 0x2a0c08 : curMap.fogC); skyMat.uniforms.top.value.set(on ? 0x140302 : (curMap.skyTop ?? curMap.sky));
+  const fc = visFogC(curMap); if (on) fc.set(0x2a0c08);
+  scene.fog.color.copy(fc); scene.background.copy(on ? fc.set(0x1a0604) : visFogC(curMap));
+  if (on) skyMat.uniforms.hor.value.set(0x2a0c08); else skyMat.uniforms.hor.value.set(curMap.fogC ?? curMap.sky).lerp(visFogC(curMap), .5); skyMat.uniforms.top.value.set(on ? 0x140302 : (curMap.skyTop ?? curMap.sky));
 }
 function zUpdateWorld(dt) {
   const Wd = ZC.world; if (!Wd) return;
@@ -5073,12 +5115,15 @@ function zLightning(p) {
   addFx(l, .35, (k, o) => o.material.opacity = 1 - k);
   flashLight.position.set(p.x, 2, p.z); flashLight.intensity = 90; play('lightning', p);
 }
+const VIS_BEAM = new THREE.CylinderGeometry(.14, .3, 8, 10, 1, true);
 function zDropAdd(d) {
   const [id, type, x, z, life] = d; if (ZC.drops.has(id)) return;
   const g = new THREE.Group();
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, color: 0x55ff55, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: .8 })); glow.scale.setScalar(1.7);
   const ic = new THREE.Sprite(new THREE.SpriteMaterial({ map: zIconTex(type), transparent: true, depthWrite: false })); ic.scale.setScalar(.75);
-  g.add(glow, ic); g.position.set(x, 1, z); zGroup.add(g);
+  const beam = new THREE.Mesh(VIS_BEAM, new THREE.MeshBasicMaterial({ color: 0x55ff55, transparent: true, opacity: .2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+  beam.position.y = 3; // facho de 8 m: dá para achar o power-up de longe e por cima das paredes
+  g.add(glow, ic, beam); g.position.set(x, 1, z); zGroup.add(g);
   ZC.drops.set(id, { g, type, end: now + life });
   play('drop', g.position);
 }
@@ -5286,6 +5331,14 @@ function zSyncWorld(z) {
   const ids = new Set(z.dr.map(d => d[0])); for (const d of z.dr) zDropAdd(d); for (const id of [...ZC.drops.keys()]) if (!ids.has(id)) zDropRemove(id);
   zFogDog(ZC.dog && ZC.phase === 'round');
 }
+const _vp = new V3();
+function visScr(x, y, z) { // ponto na tela; fora dela (ou atrás da câmera) gruda na borda
+  _vp.set(x, y, z).project(camera); let sx = _vp.x, sy = _vp.y; const back = _vp.z > 1;
+  if (back) { sx = -sx; sy = -sy; if (Math.abs(sx) < .05 && Math.abs(sy) < .05) sy = -1; }
+  const k = Math.max(Math.abs(sx) / .92, Math.abs(sy) / .85), off = back || k > 1;
+  if (off) { sx /= k; sy /= k; }
+  return { x: ((sx + 1) / 2 * innerWidth) | 0, y: ((1 - sy) / 2 * innerHeight) | 0, off };
+}
 function zHud(dt) {
   const r = ZC.round;
   setHTML('zround', r <= 0 ? '' : r < 5 ? 'I'.repeat(r) : r === 5 ? '<s>IIII</s>' : String(r));
@@ -5319,10 +5372,21 @@ function zHud(dt) {
   $('#zvig').style.opacity = vig.toFixed(2);
   let mk = '';
   for (const rp of R.values()) if (rp.alive && rp.downed) {
-    const v = rp.pos.clone(); v.y += 1.2; v.project(camera); if (v.z > 1) continue;
-    mk += `<span style="left:${((v.x + 1) / 2 * innerWidth) | 0}px;top:${((1 - v.y) / 2 * innerHeight) | 0}px">✚<br><small>${Math.round(rp.pos.distanceTo(me.pos))}m</small></span>`;
+    const v = visScr(rp.pos.x, rp.pos.y + 1.2, rp.pos.z);
+    mk += `<span${v.off ? ' class="off"' : ''} style="left:${v.x}px;top:${v.y}px">✚<br><small>${Math.round(rp.pos.distanceTo(me.pos))}m</small></span>`;
   }
   setHTML('zmarks', mk);
+  let ob = ''; // objetivos: energia enquanto desligada; caixa ao começar/trocar de lugar; Pack-a-Punch quando a energia liga
+  if (CFG.zmarks && me.alive && ZD) {
+    let nOff = 0; // fora da tela: grudam na borda, um embaixo do outro, sem sair da tela
+    const add = (o, txt, edge) => { if (!o) return; const v = visScr(o.x, 1.4, o.z); if (v.off && !edge) return; const d = Math.hypot(o.x - me.pos.x, o.z - me.pos.z); if (d < 3) return;
+      if (v.off) { v.x = clamp(v.x, 70, innerWidth - 70); v.y = clamp(v.y + nOff++ * 34, 40, innerHeight - 40); }
+      ob += `<span${v.off ? ' class="off"' : ''} style="left:${v.x}px;top:${v.y}px"><i>◆</i>${txt} ${Math.round(d)}m</span>`; };
+    if (!ZC.power) add(ZD.power, 'ENERGIA', true);
+    else if (now - (ZC.powT || 0) < 15) add(ZD.pap, 'PACK-A-PUNCH', true);
+    if (ZC.box.st !== 'gone' && now - (ZC.boxT || 0) < 15) add(ZD.boxes?.[ZC.box.loc], 'CAIXA', true);
+  }
+  setHTML('zobj', ob);
 }
 
 // ---------- servidor dos zumbis (só roda no host) ----------
@@ -6305,6 +6369,7 @@ addEventListener('keydown', e => {
     case 'KeyR': startReload(); break;
     case 'KeyB': openBuy(); break;
     case 'KeyY': case 'Enter': openChat(); e.preventDefault(); break;
+    case 'KeyL': if (ZC.on) { CFG.lant = !CFG.lant; save('lant', CFG.lant); play('empty'); toast(CFG.lant ? 'Lanterna ligada (L)' : 'Lanterna desligada (L)'); } break;
     case 'Space': if (!me.alive) cycleSpec(); break;
   }
 });
@@ -6413,17 +6478,21 @@ function settingsForm(el) {
     <label>Sensibilidade <span class="v" data-v="sens"></span><input type="range" data-k="sens" min="0.1" max="4" step="0.05"></label>
     <label>Campo de visão <span class="v" data-v="fov"></span><input type="range" data-k="fov" min="60" max="110" step="1"></label>
     <label>Volume <span class="v" data-v="vol"></span><input type="range" data-k="vol" min="0" max="1" step="0.05"></label>
+    <label>Brilho <span class="v" data-v="bright"></span><input type="range" data-k="bright" min="0.6" max="1.8" step="0.05"></label>
     <label>Gráficos <select data-k="gfx"><option value="baixo">Baixo (notebook fraco)</option><option value="medio">Médio</option><option value="alto">Alto (brilho, sombras de tudo, resolução cheia)</option></select></label>
-    <label class="chk"><input type="checkbox" data-k="shadows"> Sombras (desligue se travar)</label>`;
+    <label class="chk"><input type="checkbox" data-k="shadows"> Sombras (desligue se travar)</label>
+    <label class="chk"><input type="checkbox" data-k="zmarks"> Zumbis: marcar energia, caixa e Pack-a-Punch na tela</label>`;
   const gq = el.querySelector('[data-k="gfx"]'); gq.value = CFG.gfx;
   gq.onchange = () => { CFG.gfx = gq.value; save('gfx', CFG.gfx); applySettings(); };
-  for (const k of ['sens', 'fov', 'vol']) {
+  for (const k of ['sens', 'fov', 'vol', 'bright']) {
     const i = el.querySelector(`[data-k="${k}"]`), v = el.querySelector(`[data-v="${k}"]`);
     i.value = CFG[k]; v.textContent = CFG[k];
     i.oninput = () => { CFG[k] = +i.value; v.textContent = i.value; save(k, CFG[k]); applySettings(); };
   }
   const sh = el.querySelector('[data-k="shadows"]'); sh.checked = CFG.shadows;
   sh.onchange = () => { CFG.shadows = sh.checked; save('shadows', CFG.shadows); applySettings(); };
+  const zm = el.querySelector('[data-k="zmarks"]'); zm.checked = CFG.zmarks;
+  zm.onchange = () => { CFG.zmarks = zm.checked; save('zmarks', CFG.zmarks); };
 }
 // ================================================================
 // Conta, progresso e skins
@@ -6734,7 +6803,7 @@ function skinsInit() {
 }
 function applySettings() {
   if (MASTER) MASTER.gain.value = CFG.vol;
-  applyQuality();
+  applyQuality(); visApply();
 }
 const lastSt = load('lastSt', { map: 'arena', mode: 'rounds', rounds: 8, frags: 20, bots: 0, diff: 1, zmap: 'vila', zdiff: 1 });
 skinsInit();
@@ -6818,6 +6887,7 @@ function tick(dt) {
   }
   updateRemotes(dt);
   if (ZC.on) { updateZombies(dt); zUpdateWorld(dt); zInteract(dt); }
+  visTick();
   updateNades(dt);
   updateFx();
   for (const f of MAP_ANIM) f(dt);

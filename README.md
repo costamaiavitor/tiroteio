@@ -137,6 +137,10 @@ No menu, aba **Configurações**, ou em Esc → Configurações → **Gráficos*
 
 Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Médio para integrada.
 
+- **Brilho** (0,6 a 1,8; padrão 1): clareia ou escurece a imagem em todos os mapas, em qualquer nível.
+- **Visibilidade nos Zumbis** (vale nos três níveis): os mapas de zumbi têm mais luz ambiente, a neblina começa mais longe e é um pouco mais clara (o zumbi distante vira silhueta em vez de sumir no escuro) e uma luz fraca acompanha o jogador, então quem chega perto aparece de frente. No Alto, o contraste final esmaga menos as sombras nesses mapas. Tecla **L** liga a lanterna (sem sombra, leve).
+- **Marcadores (Zumbis):** com a opção ligada (padrão), a tela marca o gerador de energia enquanto ela está desligada, a Caixa Misteriosa por 15 s no começo e sempre que ela muda de lugar, e o Pack-a-Punch por 15 s quando a energia liga. Colega caído (✚ com a distância) fica preso na borda da tela quando está fora dela, e o nome dos colegas aparece através das paredes (só nos Zumbis). Power-ups no chão têm um facho de luz verde de 8 m.
+
 ## Controles
 
 | Tecla | Ação |
@@ -154,6 +158,7 @@ Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Mé
 | B | Loja estilo Valorant: clique na arma ou equipamento para comprar; B ou Esc fecha |
 | F | Com a faca: inspecionar (a karambit gira no dedo). Zumbis: comprar, abrir porta, usar a caixa; segure para consertar janela e reanimar |
 | V | Zumbis: facada rápida (com um zumbi a até 3 m à frente, você dá um bote até ele) |
+| L | Zumbis: lanterna (liga/desliga; fica salva) |
 | Shift + W | Zumbis: correr (fôlego limitado, Stamin-Up dobra; atirar interrompe a corrida) |
 | C correndo | Zumbis: deslizar (com PhD Flopper, explode no fim) |
 | Tab | Placar |
