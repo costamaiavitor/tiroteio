@@ -48,11 +48,18 @@ A dificuldade aparece no canto de cima, junto com o nome do mapa.
 - **Janelas:** os zumbis vêm de fora, arrancam as tábuas e pulam para dentro. Segure F perto da janela para pregar as tábuas de volta. Na Vila (e no Pátio do Sanatório) eles também saem do chão.
 - **Portões, portas e entulho** (750 a 1500) liberam novas áreas, com mais armas e mais janelas.
 - **Armas de parede** (contorno de giz, na parede ou em placas de madeira): M14, Olympia, MP40, MP5K, AK-74u, Stakeout, granadas e Faca Bowie; no anel de fora da Vila também Dragunov, Galil, SPAS-12 e FAL. Se você já tem a arma, compra munição pela metade do preço (arma com Pack-a-Punch: 4500).
-- **Caixa Misteriosa (950):** arma aleatória: Ray Gun, Arma Trovão, Galil, Commando, FAL, RPK, HK21, SPAS-12, Python, CZ75, Dragunov, China Lake ou Macacos com Pratos. Às vezes sai o ursinho: você recebe os pontos de volta e a caixa muda de lugar.
+- **Caixa Misteriosa (950; 10 durante a Liquidação):** arma aleatória: Ray Gun, Arma Trovão, Galil, Commando, FAL, RPK, HK21, SPAS-12, Python, CZ75, Dragunov, China Lake ou Macacos com Pratos. Às vezes sai o ursinho: você recebe os pontos de volta e a caixa muda de lugar.
 - **Energia:** fica no gerador da Pedreira (Vila) ou no Laboratório (Sanatório). Ligue para ativar as bebidas e o Pack-a-Punch.
-- **Bebidas** (máximo de 4): Juggernog (vida vai a 250: 2,5 vezes mais golpes), Speed Cola (recarrega na metade do tempo), Double Tap (atira 33% mais rápido), Quick Revive (reanima rápido; sozinho, te levanta até 3 vezes) e Stamin-Up (corre mais).
-- **Pack-a-Punch (5000):** fica no pátio do Castelo (Vila) ou no Teatro (Sanatório). Dobra o dano, aumenta o pente e dá nome e camuflagem novos à arma (a M1911 vira a explosiva Mustang & Sally).
-- **Power-ups:** caem dos zumbis e duram 26s no chão. São eles: Munição Máxima, Insta-Kill, Pontos em Dobro, Nuke (+400) e Carpinteiro (+200).
+- **Bebidas** (máximo de 4 compradas; as máquinas ficam espalhadas pelas áreas): Juggernog (2500: vida vai a 250, 2,5 vezes mais golpes), Speed Cola (3000: recarrega na metade do tempo), Double Tap (2000: atira 33% mais rápido), Quick Revive (1500: reanima rápido; sozinho, te levanta até 3 vezes), Stamin-Up (2000: corre mais), e mais quatro:
+  - **PhD Flopper (2000):** suas explosões (granada, Ray Gun, China Lake, Mustang & Sally) não te machucam, e deslizar (correndo, aperte C) termina numa explosão em volta de você (raio de 4 m, uma a cada 2 s).
+  - **Deadshot Daiquiri (1500):** ao começar a mirar (botão direito), a mira vai para a cabeça do zumbi mais perto do centro; menos dispersão e headshot 50% mais forte.
+  - **Mule Kick (4000):** carrega uma terceira arma (tecla 5 ou a roda do mouse). Com as três cheias, a arma nova (parede, caixa) troca a que está na mão. Ao cair você perde o Mule Kick e a terceira arma, como no CoD.
+  - **Electric Cherry (2000):** recarregar solta um choque em volta: quanto mais vazio o pente, maior o raio (até 4 m) e o dano (uma vez a cada 2,5 s).
+  - Ao cair você perde todas as bebidas.
+- **Pack-a-Punch (5000; 1000 durante a oferta):** fica no pátio do Castelo (Vila) ou no Teatro (Sanatório). Dobra o dano, aumenta o pente e dá nome e camuflagem novos à arma (a M1911 vira a explosiva Mustang & Sally).
+- **Power-ups:** caem dos zumbis e duram 26s no chão. São eles: Munição Máxima (enche também a terceira arma e os Macacos com Pratos), Insta-Kill, Pontos em Dobro, Nuke (+400), Carpinteiro (+200), **Liquidação** (a Caixa Misteriosa custa 10 por 30 s e o ursinho não aparece), **Máquina da Morte** (quem pega fica 30 s com uma metralhadora giratória sem recarga e não troca de arma até acabar), **Pack-a-Punch em oferta** (1000 por 30 s; só cai com a energia ligada) e, rara, a partir da rodada 5, **Bebida Grátis** (cada um ganha uma bebida que não tem, mesmo passando do limite). O tempo que falta de cada power-up aparece em baixo, no centro, com uma barra.
+- **Armadilha elétrica (1000):** uma por mapa, na porta entre a Recepção e a Enfermaria (Sanatório) e no portão da Praça para o Lago (Vila). Precisa da energia; aperte F na alavanca. Fica ligada 25 s (raios entre os dois postes) e depois recarrega por 60 s (a lâmpada da alavanca fica verde quando está pronta, azul ligada e vermelha recarregando). Mata todo zumbi que passa, sem dar pontos, e dá choque em quem entra (25 de dano a cada meio segundo).
+- **Rodadas:** no começo de cada rodada aparece "RODADA N"; no canto de cima ficam os zumbis que faltam (ou a contagem para a próxima rodada). Matar 5, 10, 15... zumbis seguidos (até 2,5 s entre um e outro) mostra a série na tela.
 - **Cães do inferno:** uma rodada especial de tempos em tempos. O último cão sempre solta Munição Máxima.
 - **Vida:** a barra no centro de baixo da tela mostra a vida (com Juggernog vai até 250). Toda rodada nova começa com a vida cheia.
 - **Cair e reanimar:** com a vida zerada, você cai com uma pistola e tem 45 s (no Normal) para alguém segurar F em você (o tempo para enquanto alguém está reanimando). Quem sangra volta na rodada seguinte, com a M1911 e os mesmos pontos. Se todos caírem, fim de jogo.
@@ -122,11 +129,13 @@ Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Mé
 | Shift | Andar em silêncio |
 | R | Recarregar |
 | 1 2 3 4 | Primária, pistola, faca, granadas |
+| 5 | Zumbis: terceira arma (Mule Kick) |
 | Q / roda do mouse | Arma anterior / trocar arma |
 | B | Loja estilo Valorant: clique na arma ou equipamento para comprar; B ou Esc fecha |
 | F | Com a faca: inspecionar (a karambit gira no dedo). Zumbis: comprar, abrir porta, usar a caixa; segure para consertar janela e reanimar |
-| V | Zumbis: facada rápida |
+| V | Zumbis: facada rápida (com um zumbi a até 3 m à frente, você dá um bote até ele) |
 | Shift + W | Zumbis: correr (fôlego limitado, Stamin-Up dobra; atirar interrompe a corrida) |
+| C correndo | Zumbis: deslizar (com PhD Flopper, explode no fim) |
 | Tab | Placar |
 | Y ou Enter | Chat |
 | Esc | Pausa, configurações e troca de modo/mapa (host) |
