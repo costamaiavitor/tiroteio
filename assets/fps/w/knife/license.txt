@@ -1,0 +1,11 @@
+Model Information:
+* title:	KA-BAR USMC Knife
+* source:	https://sketchfab.com/3d-models/ka-bar-usmc-knife-73ddfa74144b49fd8bad8177646e5ed5
+* author:	Urpo (https://sketchfab.com/Urpo)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "KA-BAR USMC Knife" (https://sketchfab.com/3d-models/ka-bar-usmc-knife-73ddfa74144b49fd8bad8177646e5ed5) by Urpo (https://sketchfab.com/Urpo) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

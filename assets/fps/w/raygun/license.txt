@@ -1,0 +1,11 @@
+Model Information:
+* title:	Ray Gun v1
+* source:	https://sketchfab.com/3d-models/ray-gun-v1-fbbb221cb97f4e92a898e9b704e2c774
+* author:	dev-shawn (https://sketchfab.com/dev-shawn)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Ray Gun v1" (https://sketchfab.com/3d-models/ray-gun-v1-fbbb221cb97f4e92a898e9b704e2c774) by dev-shawn (https://sketchfab.com/dev-shawn) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
