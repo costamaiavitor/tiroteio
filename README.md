@@ -12,6 +12,8 @@ Funciona na mesma rede Wi-Fi ou em casas diferentes pela internet. A conexão é
 
 O host roda a partida no navegador dele. Se o host fechar a aba, a partida acaba.
 
+Como a conexão funciona: posições (30 por segundo), bots e zumbis (20 por segundo) vão num canal sem retransmissão, para um pacote perdido não segurar os seguintes; compras, abates e placar vão num canal confiável. Quem recebe desenha os outros um pouco no passado (80 a 300 ms, conforme a regularidade da rede) e interpola entre as fotos, para o movimento ficar liso. O host confere o que cada cliente manda antes de repassar.
+
 ## Modos
 
 - **Rodadas:** estilo CS. Uma vida por rodada, dinheiro, compra no começo da rodada.
@@ -133,7 +135,8 @@ Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Mé
 
 - **"Sala não encontrada":** confira o código. O código muda toda vez que o host cria uma sala nova.
 - **Fica em "Conectando..." e dá tempo esgotado:** algumas redes (faculdade, empresa, 4G com CGNAT) bloqueiam conexão P2P. Tente outra rede ou roteie pelo celular.
-- **Travando:** em Esc → Configurações, baixe **Gráficos** para Médio ou Baixo, ou desligue as sombras. O FPS aparece no rodapé.
+- **Travando:** em Esc → Configurações, baixe **Gráficos** para Médio ou Baixo, ou desligue as sombras. O FPS aparece no rodapé; para quem entrou numa sala, o ping até o host aparece ao lado.
+- **O servidor de pareamento caiu no meio da partida:** o jogo continua (a ligação entre vocês é direta); o host vê um aviso e a sala volta sozinha. Só ninguém novo consegue entrar até lá.
 
 ## Tecnologia
 
