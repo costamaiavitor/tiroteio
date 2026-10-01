@@ -12,7 +12,7 @@ Funciona na mesma rede Wi-Fi ou em casas diferentes pela internet. A conexão é
 
 O host roda a partida no navegador dele. Se o host fechar a aba, a partida acaba.
 
-Como a conexão funciona: posições (30 por segundo), bots e zumbis (20 por segundo) vão num canal sem retransmissão, para um pacote perdido não segurar os seguintes; compras, abates e placar vão num canal confiável. Quem recebe desenha os outros um pouco no passado (80 a 300 ms, conforme a regularidade da rede) e interpola entre as fotos, para o movimento ficar liso. O host confere o que cada cliente manda antes de repassar.
+Como a conexão funciona: posições (30 por segundo), bots e zumbis (20 por segundo) vão num canal sem retransmissão, para um pacote perdido não segurar os seguintes; compras, abates e placar vão num canal confiável. Quem recebe desenha os outros um pouco no passado (50 a 300 ms, medido pelo intervalo entre fotos e pela tremida da rede nos últimos segundos; numa rede boa fica perto de 100 ms) e interpola entre as fotos, para o movimento ficar liso. Se uma foto se perde ou atrasa, o boneco segue a última velocidade por até 0,2 s e, quando a foto chega, a diferença some aos poucos em vez de dar um tranco para trás; um salto grande (renascer) troca de uma vez, sem atravessar parede. O golpe de zumbi só vai para quem apanhou; os outros veem a vida no placar. O host confere o que cada cliente manda antes de repassar.
 
 ## Modos
 
