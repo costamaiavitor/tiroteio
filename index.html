@@ -2502,7 +2502,7 @@ function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo,
 // ---------- braços de primeira pessoa feitos no Blender (humano do MPFB, licença CC0) com as animações das facas ----------
 // assets/arms.glb traz os dois braços com esqueleto, a câmera usada para posar e dois soquetes na mão direita
 // (Spin_karambit / Spin_knife) onde a faca do jogo é pendurada. Uma linha do tempo só, cortada em clipes (30 fps).
-const GRIP = { tilt: -.3, r: [0, 0, 0], l: [0, .025, 0], lroll: 1.0, shr: [.38, -.22, .14], shl: [-.42, -.3, .02], elr: [.15, -.3, .05], ell: [-.25, -.35, -.05], lift: [.01, .075, -.08] }; // alvos das mãos; ombro (sh) e cotovelo (el) em relação à mão, espaço da câmera; lift sobe a arma para as mãos aparecerem
+const GRIP = { tilt: -.3, r: [0, 0, 0], l: [0, -.01, 0], lroll: 0, shr: [.32, -.28, .12], shl: [-.25, -.38, .05], elr: [.15, -.3, .05], ell: [-.3, -.25, 0], lift: [-.02, .07, .04], yaw: .3 }; // alvos das mãos; ombro (sh) e cotovelo (el) em relação à mão, espaço da câmera; lift sobe a arma para as mãos aparecerem
 const ARMS = { holder: null, root: null, mixer: null, clips: {}, cur: null, knife: null };
 // cada faca tem a sua pose de mão: karambit a partir do quadro 0, faca a partir do 1000
 const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] }, ARMS_OFF = { karambit: 0, knife: 1000 };
@@ -2657,7 +2657,7 @@ function vmSetWeapon(id) {
     const sh = new THREE.Mesh(new THREE.CylinderGeometry(.0105, .0105, .06, 10), m === 'launcher' ? A.brass : A.shell); sh.rotation.x = Math.PI / 2; sh.position.set(0, .01, -.01); sh.visible = false; lh.add(sh);
     ud.lhG = lh; ud.lhRest = lh.position.clone(); ud.handShell = sh;
   }
-  vmGun.scale.setScalar(1.18); vmGun.rotation.y = .05; // arma maior e levemente virada para dentro, como nos FPS grandes
+  vmGun.scale.setScalar(1.18); ud.baseYaw = vmGun.rotation.y = ud.armsGun && W[mid]?.slot === 'primary' ? GRIP.yaw : .05; // arma maior e virada para dentro (com os braços, bem mais, como no CS: guarda-mão à esquerda da mão do gatilho)
   vmRoot.add(vmGun);
 }
 // ---------- animações da arma (tiro, bomba, ferrolho, recargas) ----------
@@ -2828,6 +2828,7 @@ function updateViewmodel(dt) {
   me.sprintK = lerp(me.sprintK, me.sprinting ? 1 : 0, Math.min(1, dt * 10));
   if (me.sprintK > .01) { const k = me.sprintK; o.rx -= .55 * k; o.ry += .7 * k; o.x -= .06 * k; o.y -= .06 * k + Math.abs(Math.sin(bobT * 1.3)) * .03 * k; o.rz += Math.sin(bobT) * .08 * k; }
   const ak = smooth(G.ads || 0);
+  if (vmGun && ud.baseYaw != null) vmGun.rotation.y = lerp(ud.baseYaw, .05, ak); // mirando: a arma endireita (a mira foi calculada com ela reta)
   if (ak > 0) { // mirando: arma no centro, com o topo (alça/mira holográfica) na linha do olho
     const sp = ud.sight, ay = -(sp ? sp.y : (ud.sightY ?? .05)) * 1.18, az = sp ? clamp(-.17 - (ud.sightR ?? sp.z + .3) * 1.18, -.3, -.06) : -.34; // alça a ~17 cm do olho, como encostar a arma no rosto
     o.x = lerp(o.x, -(sp ? sp.x : 0) * 1.18, ak); o.y = lerp(o.y, ay, ak); o.z = lerp(o.z, az, ak); o.ry = lerp(o.ry, -.05, ak); o.rx *= 1 - ak; o.rz *= 1 - ak;
