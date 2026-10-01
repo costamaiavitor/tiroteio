@@ -552,7 +552,7 @@ const MAPS = {
 };
 
 // ---------- mapa do modo zumbis: Sanatório ----------
-// Seis cômodos (A = inicial). Janelas nas paredes externas são por onde os zumbis entram.
+// Quinze alas (A = inicial): o núcleo de seis cômodos e alas novas em volta. Janelas nas paredes externas são por onde os zumbis entram.
 // Parede ao longo de 'x' (em z = c) ou de 'z' (em x = c), com buracos de porta e de janela.
 function zWall(axis, c, a0, a1, holes, H = 4.5, mat = 'wall', T = 1) {
   const out = [], seg = (m, len, h, y, mt = mat, th = T) => axis === 'x' ? B(m, c, len, th, h, mt, y) : B(c, m, th, len, h, mt, y);
@@ -569,42 +569,146 @@ function zWall(axis, c, a0, a1, holes, H = 4.5, mat = 'wall', T = 1) {
   return out;
 }
 const zWin = x => ({ a: x - .8, b: x + .8, win: 1 }), zGap = (a, b) => ({ a, b });
+const SAN_TREES = [[31, -5], [59, -5], [31, 20], [59, 20.5]]; // árvores do Jardim (colisor no tronco)
+// ---------- Sanatório: cenário que não é caixa (caldeiras, torre d'água, chafariz, árvores, estufa, livros) ----------
+function buildSanatorio() {
+  const Q = new THREE.Quaternion(), E3 = new THREE.Euler(), SC = new V3(), PO = new V3();
+  const lam = (k, c) => worldMat(k, c, true);
+  const add = (m, cast = true) => { m.castShadow = cast; m.receiveShadow = true; m.userData.own = true; world.add(m); return m; };
+  const inst = (geo, mat, list, cast = true) => { if (!list.length) return; const m = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((mx, i) => m.setMatrixAt(i, mx)); m.computeBoundingSphere(); add(m, cast); return m; };
+  const mtx = (x, y, z, ry = 0, s = 1, sy = s, rx = 0, rz = 0) => new THREE.Matrix4().compose(PO.set(x, y, z), Q.setFromEuler(E3.set(rx, ry, rz)), SC.set(s, sy, s));
+  const cyl = (x, z, rt, rb, h, y, mat, seg = 12) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat); m.position.set(x, y + h / 2, z); return add(m); };
+  const iron = new THREE.MeshLambertMaterial({ color: 0x2a2d31 }), rust = lam('metal', 0x6a4a36), stoneM = lam('concrete', 0x86847c), barkM = lam('wood', 0x4a3a2a);
+  // caldeiras: corpo, tampa, chaminé até o teto e um brilho de fornalha
+  for (const [x, z] of [[-55, 52], [-36, 57]]) {
+    cyl(x, z, 1.75, 1.75, 3.2, 0, rust, 16); cyl(x, z, .6, 1.75, .6, 3.2, rust, 16); cyl(x, z, .25, .25, 1.6, 3.8, iron, 8);
+    const g = new THREE.Mesh(new THREE.PlaneGeometry(.9, .5), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff7020).multiplyScalar(1.6) })); g.userData.own = true;
+    g.position.set(x + (x < -45 ? 1.77 : -1.77), .7, z); g.rotation.y = x < -45 ? Math.PI / 2 : -Math.PI / 2; world.add(g);
+  }
+  { const pipes = []; // canos no alto das paredes das caldeiras
+    for (let x = -62; x <= -28; x += 1) pipes.push(mtx(x + .5, 4.1, 63.2, 0, 1)), pipes.push(mtx(x + .5, 3.7, 44.8, 0, 1));
+    inst(new THREE.CylinderGeometry(.18, .18, 1.02, 8).rotateZ(Math.PI / 2), iron, pipes, false); }
+  // torre d'água: caixa, teto cônico, travessas e escada
+  { const wood = lam('wood', 0x5e4630);
+    cyl(45, -22, 5, 5, 4.4, 11, wood, 20); const roof = new THREE.Mesh(new THREE.ConeGeometry(5.4, 2.2, 20), wood); roof.position.set(45, 16.5, -22); add(roof);
+    const br = [];
+    for (const y of [3.5, 7.5]) for (const [x, z, ry] of [[45, -26, 0], [45, -18, 0], [41, -22, Math.PI / 2], [49, -22, Math.PI / 2]]) br.push(mtx(x, y, z, ry, 1));
+    inst(new THREE.BoxGeometry(8, .25, .25), barkM, br);
+    const legs = []; for (const [x, z] of [[41, -26], [49, -26], [41, -18], [49, -18]]) legs.push(mtx(x, 5.5, z, 0, 1)); inst(new THREE.BoxGeometry(.6, 11, .6), barkM, legs);
+    const rungs = []; for (let y = .4; y < 11; y += .45) rungs.push(mtx(49.45, y, -21.6, 0, 1)); inst(new THREE.BoxGeometry(.06, .06, .6), iron, rungs, false); }
+  // chafariz do Jardim e postes
+  { const water = new THREE.MeshPhongMaterial({ color: 0x2b4a5a, specular: 0x9aaabb, shininess: 90, transparent: true, opacity: .88 });
+    cyl(45, 8, 2.05, 2.15, .8, 0, stoneM, 16); const w = cyl(45, 8, 1.85, 1.85, .05, .66, water, 24); w.castShadow = false;
+    cyl(45, 8, .35, .5, 1.7, .7, stoneM, 10); cyl(45, 8, .9, .45, .3, 2.2, stoneM, 12);
+    for (const [x, z] of [[36, 8], [54, 8]]) { cyl(x, z, .06, .1, 3.4, 0, iron, 6); const c = new THREE.Mesh(new THREE.ConeGeometry(.3, .3, 4), iron); c.position.set(x, 3.7, z); c.rotation.y = Math.PI / 4; add(c); } }
+  // árvores do Jardim (tronco e copa) e plantas da Estufa
+  { const tr = [], cp = [], pl = [];
+    for (const [x, z] of SAN_TREES) { const s = rand(.9, 1.15); tr.push(mtx(x, 1.6 * s, z, rand(0, 6), s)); cp.push(mtx(x, 4.4 * s, z, rand(0, 6), s * 1.9, s * 1.6), mtx(x + .7, 5.2 * s, z - .4, rand(0, 6), s * 1.3)); }
+    for (const z of [30, 38]) for (const x0 of [31.5, 49.5]) for (let x = x0; x < x0 + 9; x += .9) pl.push(mtx(x + rand(-.1, .1), 1, z + rand(-.4, .4), rand(0, 6), rand(.35, .55)));
+    inst(new THREE.CylinderGeometry(.24, .38, 3.2, 6), barkM, tr); inst(new THREE.IcosahedronGeometry(1, 1), lam('leaf', 0x37532a), cp);
+    inst(new THREE.IcosahedronGeometry(.6, 0), lam('leaf', 0x4f7a30), pl, false); }
+  // armação de vidro da Estufa (só visual)
+  { const fr = [];
+    for (let x = 28; x <= 62; x += 2.8) fr.push(mtx(x, 4.3, 34, 0, 1));
+    inst(new THREE.BoxGeometry(.12, .12, 19), iron, fr, false);
+    const gl = new THREE.Mesh(new THREE.PlaneGeometry(35, 19), new THREE.MeshBasicMaterial({ color: 0x9fc8b0, transparent: true, opacity: .1, depthWrite: false, side: THREE.DoubleSide }));
+    gl.userData.own = true; gl.rotation.x = -Math.PI / 2; gl.position.set(45, 4.36, 34); world.add(gl); }
+  // livros nas estantes da Biblioteca (uma malha instanciada com cor por livro)
+  { const list = [], cols = [0x6a2a24, 0x2f4a38, 0x2a3a5a, 0x7a6030, 0x4a2e4a, 0x5a4a3a];
+    for (const z of [-31, -25, -17.5, -12.5]) for (const [x0, len] of [[-58, 12], [-40, 9]]) for (const y of [.55, 1.25, 1.95]) for (const sd of [-.22, .22])
+      for (let x = x0 + .15; x < x0 + len - .15; x += rand(.12, .2)) if (Math.random() < .85) list.push([x, y, z + sd]);
+    const m = new THREE.InstancedMesh(new THREE.BoxGeometry(.1, .42, .3), new THREE.MeshLambertMaterial(), list.length), C3 = new THREE.Color();
+    list.forEach(([x, y, z], i) => { m.setMatrixAt(i, mtx(x, y + rand(-.03, .03), z, 0, 1, rand(.8, 1.1))); m.setColorAt(i, C3.set(cols[i % cols.length]).multiplyScalar(rand(.7, 1.1))); });
+    m.computeBoundingSphere(); add(m, false); }
+  // lençóis nas mesas do Necrotério e nas camas da Ala
+  { const sh = []; for (const [x, z] of [[-18, 29.5], [-13, 29.5], [-18, 37]]) sh.push(mtx(x, .95, z, rand(-.1, .1), 1));
+    for (const x of [-6.5, 3.5, 10.5, 23.5]) sh.push(mtx(x, .55, 42.3, Math.PI / 2, 1));
+    inst(new THREE.BoxGeometry(.95, .1, 2), lam('plaster', 0xc8c8c0), sh, false); }
+}
 MAPS.sanatorio = {
-  name: 'Sanatório', desc: 'fechado: seis cômodos, janelas e portas', zonly: 1, zombie: 1, w: 54, d: 34, sky: 0x06080d, skyTop: 0x020308, stars: 1, exposure: 1.3, fogC: 0x0a0d14, fog: [8, 52],
+  name: 'Sanatório', desc: 'fechado e enorme: 15 alas, de refeitório e necrotério a caldeiras, jardim e torre d\'água', zonly: 1, zombie: 1, w: 128, d: 102, sky: 0x06080d, skyTop: 0x020308, stars: 1, exposure: 1.3, fogC: 0x0a0d14, fog: [8, 52],
   hemi: .6, hemiC: [0x8090b8, 0x2a2a30], sunI: .5, sunC: 0x9fb4ff, sun: [-18, 40, 26],
-  theme: { floor: ['asphalt', 0x2a2d2a], wall: ['plaster', 0x7f8676], wood: ['wood', 0x6b4a2e], metal: ['metal', 0x7a8088], stone: ['concrete', 0x86847c] },
+  theme: { floor: ['asphalt', 0x2a2d2a], wall: ['plaster', 0x7f8676], wood: ['wood', 0x6b4a2e], metal: ['metal', 0x7a8088], stone: ['concrete', 0x86847c], hedge: ['leaf', 0x4a7038], brick: ['brick', 0x6e4a3c] },
   boxes: () => [
-    B(0, 8, 110, 90, 1, 'floor', -1.003),
+    B(0, 14, 170, 140, 1, 'floor', -1.003),
+    // núcleo (seis cômodos do começo)
     ...zWall('x', -8, -27.5, 27.5, [zWin(-18), zWin(-4), zWin(4), zWin(18)]),
-    ...zWall('x', 24, -27.5, 27.5, [zWin(-18), zWin(-4), zWin(4), zWin(18)]),
-    ...zWall('z', -27, -8, 24, [zWin(0), zWin(16)]),
-    ...zWall('z', 27, -8, 24, [zWin(0), zWin(16)]),
+    ...zWall('x', 24, -27.5, 27.5, [zGap(-20, -16), zGap(-2, 2)]),
     ...zWall('x', 8, -27, 27, [zGap(-20, -16), zGap(-2, 2), zGap(16, 20)]),
     ...zWall('z', -9, -8, 24, [zGap(-2, 2), zGap(14, 18)]),
     ...zWall('z', 9, -8, 24, [zGap(-2, 2), zGap(14, 18)]),
+    // alas novas: linhas de parede de ponta a ponta (com janelas por fora e portas entre as alas)
+    ...zWall('z', -27, -36.5, 64.5, [zWin(-22), zGap(-2, 2), zGap(32, 36), zWin(54)]),
+    ...zWall('z', 27, -36.5, 44.5, [zWin(-22), zGap(-2, 2), zGap(32, 36)]),
+    ...zWall('z', -63, -36.5, 64.5, [zWin(-22), zWin(0), zWin(12), zWin(28), zWin(38), zWin(54)]),
+    ...zWall('z', 63, -36.5, 44.5, [zWin(-22), zWin(0), zWin(14), zWin(34)]),
+    ...zWall('z', -9, 24, 44, [zGap(32, 36)]),
+    ...zWall('x', -36, -63.5, -26.5, [zWin(-45)]), ...zWall('x', -36, 26.5, 63.5, [zWin(45)]),
+    ...zWall('x', -8, -63, -27, [zGap(-47, -43)]), ...zWall('x', -8, 27, 63, [zGap(43, 47)]),
+    ...zWall('x', 20, -63, -27, [zGap(-47, -43)]), ...zWall('x', 24, 27, 63, [zGap(43, 47)]),
+    ...zWall('x', 44, -63.5, 63.5, [zGap(-47, -43), zWin(-18), zWin(0), zWin(18), zWin(45)]),
+    ...zWall('x', 64, -63.5, -26.5, [zWin(-40)]),
     B(0, -1.5, 4, 1, 1.05, 'wood'),                                                                              // A: balcão
     B(-5, 12, 1.2, 2.2, .7, 'metal'), B(5, 12, 1.2, 2.2, .7, 'metal'), B(-5, 19, 1.2, 2.2, .7, 'metal'), B(4, 19, 1.2, 2.2, .7, 'metal'), // B: macas
     B(18, -1, 3, 3, .8, 'stone'),                                                                                 // C: fonte
     B(-18, 13, 4, 1.2, 1, 'metal'), B(-18, 19, 4, 1.2, 1, 'metal'),                                              // D: bancadas
     B(18, 13, 6, .8, .6, 'wood'), B(18, 16, 6, .8, .6, 'wood'), B(18, 19, 6, .8, .6, 'wood'),                    // E: poltronas
     B(-18, -3, 5, .8, .7, 'wood'), B(-18, 0, 5, .8, .7, 'wood'), B(-18, 3, 5, .8, .7, 'wood'),                   // F: bancos
+    // G Refeitório: mesas compridas, balcão de servir e colunas
+    ...[-1, 6, 13].flatMap(z => [B(-54, z, 8, 1.4, .8, 'wood'), B(-37, z, 8, 1.4, .8, 'wood')]),
+    B(-56, 18.6, 8, 1, 1.05, 'metal'), B(-45, 2.5, .9, .9, 4.5, 'stone'), B(-45, 9.5, .9, .9, 4.5, 'stone'),
+    // H Cozinha: fogões no meio, bancadas, geladeiras
+    B(-48, 32, 8, 2.2, .95, 'metal'), B(-36, 28.5, 2.2, 6, .95, 'metal'), B(-31, 22.2, 3, 1.2, 2.2, 'metal'), B(-34.5, 42.7, 8, 1, 1, 'metal'),
+    // P Caldeiras: duas caldeiras (desenho em build) e um tanque
+    B(-55, 52, 3.6, 3.6, 3.6, 'col'), B(-36, 57, 3.6, 3.6, 3.6, 'col'), B(-45, 60.5, 6, 2, 1.6, 'metal'),
+    // N Biblioteca: estantes em fileiras (corredor no meio) e mesa de leitura
+    ...[-31, -25, -17.5, -12.5].flatMap(z => [B(-52, z, 12, .8, 2.6, 'wood'), B(-35.5, z, 9, .8, 2.6, 'wood')]),
+    B(-45, -21.5, 3, 1.6, .8, 'wood'),
+    // I Necrotério: gavetas frias na parede e mesas de autópsia
+    B(-25.9, 40, 1.2, 4.4, 2.2, 'metal'), B(-18, 29.5, 1.1, 2.2, .9, 'metal'), B(-13, 29.5, 1.1, 2.2, .9, 'metal'), B(-18, 37, 1.1, 2.2, .9, 'metal'),
+    // J Ala Psiquiátrica: celas abertas para o corredor, camas, posto de enfermagem
+    B(-3, 40.5, .3, 7, 3.2, 'wall'), B(6, 40.5, .3, 7, 3.2, 'wall'), B(15, 40.5, .3, 7, 3.2, 'wall'),
+    B(-6.5, 42.3, 2.2, 1, .5, 'metal'), B(3.5, 42.3, 2.2, 1, .5, 'metal'), B(10.5, 42.3, 2.2, 1, .5, 'metal'), B(23.5, 42.3, 2.2, 1, .5, 'metal'),
+    B(10, 30, 4, 1.2, 1.05, 'wood'),
+    // K Jardim (aberto): chafariz, sebes, bancos, árvores (copa em build)
+    B(45, 8, 4.2, 4.2, .8, 'col'), B(45, 8, 1, 1, 2.4, 'col'),
+    B(35, 1, 6, 1, 1.4, 'hedge'), B(55, 1, 6, 1, 1.4, 'hedge'), B(35, 15, 6, 1, 1.4, 'hedge'), B(55, 15, 6, 1, 1.4, 'hedge'),
+    B(45, 2.6, 2.6, .6, .5, 'wood'), B(45, 13.4, 2.6, .6, .5, 'wood'),
+    ...SAN_TREES.map(([x, z]) => B(x, z, .7, .7, 4, 'col')),
+    // L Estufa: canteiros
+    ...[30, 38].flatMap(z => [B(36, z, 10, 1.6, .8, 'wood'), B(54, z, 10, 1.6, .8, 'wood')]),
+    // M Torre d'água: pernas da torre (caixa d'água em build), caixotes
+    ...[[41, -26], [49, -26], [41, -18], [49, -18]].map(([x, z]) => B(x, z, .7, .7, 11, 'col')),
+    B(32, -32, 2, 2, 1.2, 'wood'), B(33.6, -32.4, 1.2, 1.2, .9, 'wood'), B(58.5, -12.5, 2, 2, 1.2, 'wood'),
   ],
+  build: buildSanatorio,
   spawns: [[-3, -4], [3, -4], [-3, 2], [3, 2]],
   z: (() => {
     const d = {
-      ff: { x0: -27, z0: -8, nx: 54, nz: 32 },
-      rooms: { A: [-8.5, 8.5, -7.5, 7.5], B: [-8.5, 8.5, 8.5, 23.5], C: [9.5, 26.5, -7.5, 7.5], D: [-26.5, -9.5, 8.5, 23.5], E: [9.5, 26.5, 8.5, 23.5], F: [-26.5, -9.5, -7.5, 7.5] },
-      roomNames: { A: 'Recepção', B: 'Enfermaria', C: 'Pátio', D: 'Laboratório', E: 'Teatro', F: 'Capela' },
-      floors: { A: ['tile', 0x9a9f94], B: ['tile', 0xa7ada2], C: ['sand', 0x5b5e4c], D: ['tile', 0x8e948a], E: ['wood', 0x6e5236], F: ['wood', 0x5e4630] },
+      ff: { x0: -64, z0: -37, nx: 128, nz: 102 },
+      rooms: { A: [-8.5, 8.5, -7.5, 7.5], B: [-8.5, 8.5, 8.5, 23.5], C: [9.5, 26.5, -7.5, 7.5], D: [-26.5, -9.5, 8.5, 23.5], E: [9.5, 26.5, 8.5, 23.5], F: [-26.5, -9.5, -7.5, 7.5],
+        G: [-62.5, -27.5, -7.5, 19.5], H: [-62.5, -27.5, 20.5, 43.5], P: [-62.5, -27.5, 44.5, 63.5], N: [-62.5, -27.5, -35.5, -8.5],
+        I: [-26.5, -9.5, 24.5, 43.5], J: [-8.5, 26.5, 24.5, 43.5], K: [27.5, 62.5, -7.5, 23.5], L: [27.5, 62.5, 24.5, 43.5], M: [27.5, 62.5, -35.5, -8.5] },
+      roomNames: { A: 'Recepção', B: 'Enfermaria', C: 'Pátio', D: 'Laboratório', E: 'Teatro', F: 'Capela', G: 'Refeitório', H: 'Cozinha', P: 'Caldeiras', N: 'Biblioteca',
+        I: 'Necrotério', J: 'Ala Psiquiátrica', K: 'Jardim', L: 'Estufa', M: 'Torre d\'água' },
+      floors: { A: ['tile', 0x9a9f94], B: ['tile', 0xa7ada2], C: ['sand', 0x5b5e4c], D: ['tile', 0x8e948a], E: ['wood', 0x6e5236], F: ['wood', 0x5e4630],
+        G: ['tile', 0x8c8778], H: ['tile', 0xa3a69c], P: ['concrete', 0x55534c], N: ['wood', 0x5a4330], I: ['tile', 0x8a9a9c], J: ['tile', 0x9c9a8e],
+        K: ['grass', 0x4a5a34], L: ['dirt', 0x5a4632], M: ['dirt', 0x4e4a3c] },
       windows: [
         { room: 'A', x: -4, z: -8, n: [0, -1] }, { room: 'A', x: 4, z: -8, n: [0, -1] },
-        { room: 'B', x: -4, z: 24, n: [0, 1] }, { room: 'B', x: 4, z: 24, n: [0, 1] },
-        { room: 'C', x: 18, z: -8, n: [0, -1] }, { room: 'C', x: 27, z: 0, n: [1, 0] },
-        { room: 'D', x: -18, z: 24, n: [0, 1] }, { room: 'D', x: -27, z: 16, n: [-1, 0] },
-        { room: 'E', x: 18, z: 24, n: [0, 1] }, { room: 'E', x: 27, z: 16, n: [1, 0] },
-        { room: 'F', x: -18, z: -8, n: [0, -1] }, { room: 'F', x: -27, z: 0, n: [-1, 0] },
+        { room: 'C', x: 18, z: -8, n: [0, -1] }, { room: 'F', x: -18, z: -8, n: [0, -1] },
+        { room: 'N', x: -63, z: -22, n: [-1, 0] }, { room: 'N', x: -45, z: -36, n: [0, -1] }, { room: 'N', x: -27, z: -22, n: [1, 0] },
+        { room: 'G', x: -63, z: 0, n: [-1, 0] }, { room: 'G', x: -63, z: 12, n: [-1, 0] },
+        { room: 'H', x: -63, z: 28, n: [-1, 0] }, { room: 'H', x: -63, z: 38, n: [-1, 0] },
+        { room: 'P', x: -63, z: 54, n: [-1, 0] }, { room: 'P', x: -40, z: 64, n: [0, 1] }, { room: 'P', x: -27, z: 54, n: [1, 0] },
+        { room: 'I', x: -18, z: 44, n: [0, 1] }, { room: 'J', x: 0, z: 44, n: [0, 1] }, { room: 'J', x: 18, z: 44, n: [0, 1] },
+        { room: 'L', x: 45, z: 44, n: [0, 1] }, { room: 'L', x: 63, z: 34, n: [1, 0] },
+        { room: 'K', x: 63, z: 0, n: [1, 0] }, { room: 'K', x: 63, z: 14, n: [1, 0] },
+        { room: 'M', x: 63, z: -22, n: [1, 0] }, { room: 'M', x: 45, z: -36, n: [0, -1] }, { room: 'M', x: 27, z: -22, n: [-1, 0] },
       ],
-      risers: [[14, -4, 'C'], [23, 4, 'C'], [22, -5, 'C']], // zumbis que saem do chão no pátio (x, z, cômodo)
+      risers: [[14, -4, 'C'], [23, 4, 'C'], [22, -5, 'C'], // zumbis que saem do chão nos lugares abertos (x, z, cômodo)
+        [37, -3, 'K'], [53, 5, 'K'], [39, 19, 'K'], [52, 20, 'K'], [31, 9, 'K'], [52, -4, 'K'],
+        [33, -27, 'M'], [57, -28, 'M'], [37, -13, 'M'], [55, -17, 'M'], [45, -32, 'M']],
       doors: [
         { id: 'AB', x: 0, z: 8, axis: 'x', cost: 750, rooms: ['A', 'B'], kind: 'door' },
         { id: 'AC', x: 9, z: 0, axis: 'z', cost: 1000, rooms: ['A', 'C'], kind: 'debris' },
@@ -613,20 +717,45 @@ MAPS.sanatorio = {
         { id: 'BE', x: 9, z: 16, axis: 'z', cost: 1250, rooms: ['B', 'E'], kind: 'door' },
         { id: 'CE', x: 18, z: 8, axis: 'x', cost: 1000, rooms: ['C', 'E'], kind: 'debris' },
         { id: 'FD', x: -18, z: 8, axis: 'x', cost: 1000, rooms: ['F', 'D'], kind: 'door' },
+        // alas novas
+        { id: 'FG', x: -27, z: 0, axis: 'z', cost: 1250, rooms: ['F', 'G'], kind: 'door' },
+        { id: 'GN', x: -45, z: -8, axis: 'x', cost: 1000, rooms: ['G', 'N'], kind: 'door' },
+        { id: 'GH', x: -45, z: 20, axis: 'x', cost: 1000, rooms: ['G', 'H'], kind: 'door' },
+        { id: 'HP', x: -45, z: 44, axis: 'x', cost: 1500, rooms: ['H', 'P'], kind: 'debris' },
+        { id: 'HI', x: -27, z: 34, axis: 'z', cost: 1250, rooms: ['H', 'I'], kind: 'door' },
+        { id: 'DI', x: -18, z: 24, axis: 'x', cost: 1250, rooms: ['D', 'I'], kind: 'door' },
+        { id: 'BJ', x: 0, z: 24, axis: 'x', cost: 1500, rooms: ['B', 'J'], kind: 'door' },
+        { id: 'IJ', x: -9, z: 34, axis: 'z', cost: 1000, rooms: ['I', 'J'], kind: 'door' },
+        { id: 'CK', x: 27, z: 0, axis: 'z', cost: 1250, rooms: ['C', 'K'], kind: 'gate' },
+        { id: 'KL', x: 45, z: 24, axis: 'x', cost: 1000, rooms: ['K', 'L'], kind: 'door' },
+        { id: 'JL', x: 27, z: 34, axis: 'z', cost: 1250, rooms: ['J', 'L'], kind: 'door' },
+        { id: 'KM', x: 45, z: -8, axis: 'x', cost: 1500, rooms: ['K', 'M'], kind: 'gate' },
       ],
       wall: [
         { w: 'm14', cost: 500, x: -5.5, z: 7.45, n: [0, -1] }, { w: 'olympia', cost: 500, x: 5.5, z: 7.45, n: [0, -1] },
         { w: 'he', cost: 250, x: -8.45, z: -5, n: [1, 0] }, { w: 'mp40', cost: 1000, x: -8.45, z: 11, n: [1, 0] },
         { w: 'ak74u', cost: 1200, x: 12.5, z: 7.45, n: [0, -1] }, { w: 'mp5k', cost: 1000, x: -26.45, z: -5, n: [1, 0] },
         { w: 'stakeout', cost: 1500, x: -9.55, z: 21, n: [-1, 0] }, { w: 'bowie', cost: 3000, x: 26.45, z: 21, n: [-1, 0] },
+        { w: 'spas', cost: 1500, x: -55, z: -7.45, n: [0, 1] }, { w: 'galil', cost: 1500, x: -55, z: 43.45, n: [0, -1] },
+        { w: 'dragunov', cost: 2000, x: -62.45, z: -14, n: [1, 0] }, { w: 'fal', cost: 1500, x: -26.45, z: 28, n: [1, 0] },
+        { w: 'hk21', cost: 2500, x: 16, z: 24.55, n: [0, 1] }, { w: 'he', cost: 250, x: -6, z: 24.55, n: [0, 1] },
+        { w: 'ak74u', cost: 1200, x: 62.45, z: 7, n: [-1, 0] }, { w: 'mp40', cost: 1000, x: 62.45, z: 28, n: [-1, 0] },
+        { w: 'stakeout', cost: 1500, x: 62.45, z: -30, n: [-1, 0] }, { w: 'mp5k', cost: 1000, x: -62.45, z: 48, n: [1, 0] },
       ],
       perks: [
         { k: 'qr', x: 7.3, z: 22.9, n: [0, -1] }, { k: 'jug', x: -25.9, z: 10.5, n: [1, 0] }, { k: 'speed', x: 12, z: -6.9, n: [0, 1] },
         { k: 'dt', x: -12, z: -6.9, n: [0, 1] }, { k: 'stam', x: 25.9, z: 10.5, n: [-1, 0] },
       ],
-      pap: { x: 12, z: 22.8, n: [0, -1] },
-      power: { x: -12, z: 23.45, n: [0, -1] },
-      boxes: [{ x: 7.95, z: 4.5, n: [-1, 0] }, { x: 0, z: 23.05, n: [0, -1] }, { x: -23.5, z: 23.05, n: [0, -1] }, { x: 22, z: 23.05, n: [0, -1] }, { x: 26.05, z: -4, n: [-1, 0] }],
+      pap: { x: 45, z: -22, n: [0, 1] }, // embaixo da torre d'água
+      power: { x: -52, z: 63.45, n: [0, -1] }, // nas caldeiras
+      boxes: [{ x: 7.95, z: 4.5, n: [-1, 0] }, { x: -4.5, z: 23.05, n: [0, -1] }, { x: -23.5, z: 23.05, n: [0, -1] }, { x: 22, z: 23.05, n: [0, -1] }, { x: 26.05, z: -4, n: [-1, 0] },
+        { x: -62.05, z: 6, n: [1, 0] }, { x: -36, z: -35.05, n: [0, 1] }, { x: 8, z: 43.05, n: [0, -1] }, { x: 36, z: 43.05, n: [0, -1] }, { x: 36, z: -35.05, n: [0, 1] }, { x: -27.95, z: 26, n: [-1, 0] }],
+      lamps: [
+        ...[[0, 0], [0, 16], [-18, 0], [-18, 16], [18, 16]].map(([x, z]) => ({ x, z, y: 3.9, base: 14 })), { x: 18, z: 0, y: 3.9, base: 9 },
+        { x: -45, z: 6, y: 3.9, base: 15 }, { x: -45, z: 32, y: 3.9, base: 14 }, { x: -45, z: -22, y: 3.9, base: 12, c: 0xffb070 },
+        { x: -45, z: 54, y: 3.9, base: 16, c: 0xff8a40 }, { x: -18, z: 34, y: 3.9, base: 12, c: 0x9fd0ff }, { x: 9, z: 31, y: 3.9, base: 14 },
+        { x: 45, z: 34, y: 3.9, base: 12, c: 0xc8ffb0 }, { x: 36, z: 8, y: 3.4, base: 9 }, { x: 54, z: 8, y: 3.4, base: 9 }, { x: 45, z: -22, y: 9.4, base: 12, dist: 26 },
+      ],
       spawns: [[-3, -4], [3, -4], [-3, 2], [3, 2]],
     };
     // pontos de fora (onde o zumbi arranca as tábuas) e de dentro (onde ele cai depois de pular)
@@ -649,24 +778,120 @@ const VILA_GRAVES = (() => {
     if (Math.abs(x) > Math.abs(z) + 2 && (Math.abs(x) + Math.abs(z)) / Math.SQRT2 < 42) g.push([x + rand(-.3, .3), z + rand(-.3, .3)]);
   return g;
 })();
+// ---------- Vila: oito distritos de fora (depois do muro externo) ----------
+// Um retângulo de 120 x 53 m em cada lado reto do octógono, dividido ao meio por um muro com porta.
+// Cada metade liga a uma área do anel de fora por um corredor com portão (o vão entre o muro externo e o
+// distrito fica do lado de fora: é por ali que os zumbis chegam às janelas). Tudo é escrito num lado
+// canônico (u = de lado, v = para fora) e girado para os quatro lados.
+const srand = (s => () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; })(20260928); // igual em todo mundo
+const srnd = (a, b) => a + srand() * (b - a);
+const VD = { in: 96.5, out: 150, side: 60, gate: 30, wall: 86.5 }; // v do muro de dentro e do de fundo, meia largura, u do portão
+// lado s: 0 norte, 1 leste, 2 sul, 3 oeste. (u, v) -> (x, z)
+const vdXZ = (s, u, v) => s === 0 ? [u, -v] : s === 1 ? [v, u] : s === 2 ? [-u, v] : [-v, -u];
+const vdN = (s, n) => s === 0 ? [n[0], -n[1]] : s === 1 ? [n[1], n[0]] : s === 2 ? [-n[0], n[1]] : [-n[1], -n[0]];
+// metade de cada lado: [zona do u < 0, zona do u > 0] e a área do anel em que cada corredor encosta
+const VD_ZONES = [['K', 'J'], ['L', 'M'], ['N', 'O'], ['P', 'Q']], VD_RING = [['I', 'F'], ['F', 'G'], ['G', 'H'], ['H', 'I']];
+const VD_TREES = (() => { const t = []; for (let i = 0; i < 240 && t.length < 46; i++) { const u = srnd(-57, -6), v = srnd(100, 147); if (Math.hypot(u + 34, v - 124) < 6 || Math.abs(u + 30) < 3.5 && v < 106 || t.some(([a, b]) => Math.hypot(a - u, b - v) < 4.2)) continue; t.push([u, v]); } return t; })(); // Floresta (lado oeste, u < 0)
+const VILA_DIST = (() => {
+  const out = { boxes: [], windows: [], doors: [], risers: [], wall: [], boxLocs: [], lamps: [] };
+  const neg = hs => hs.map(h => ({ a: -h.b, b: -h.a, win: h.win }));
+  // muro ao longo de u (em v = c) ou ao longo de v (em u = c), no lado s
+  const lw = (s, along, c, a0, a1, holes, H, mat, T) => {
+    if (along === 'u') return s === 0 ? zWall('x', -c, a0, a1, holes, H, mat, T) : s === 2 ? zWall('x', c, -a1, -a0, neg(holes), H, mat, T) : s === 1 ? zWall('z', c, a0, a1, holes, H, mat, T) : zWall('z', -c, -a1, -a0, neg(holes), H, mat, T);
+    return s === 0 ? zWall('z', c, -a1, -a0, neg(holes), H, mat, T) : s === 2 ? zWall('z', -c, a0, a1, holes, H, mat, T) : s === 1 ? zWall('x', c, a0, a1, holes, H, mat, T) : zWall('x', -c, -a1, -a0, neg(holes), H, mat, T);
+  };
+  const lb = (s, u, v, wu, wv, h, mat, y) => { const [x, z] = vdXZ(s, u, v), sw = s === 1 || s === 3; return B(x, z, sw ? wv : wu, sw ? wu : wv, h, mat, y); };
+  const { in: VI, out: VO, side: VS, gate: VG2 } = VD;
+  for (let s = 0; s < 4; s++) {
+    const Z2 = VD_ZONES[s], R2 = VD_RING[s], zone = u => Z2[u > 0 ? 1 : 0], P = (u, v) => vdXZ(s, u, v);
+    // muros: de dentro (janelas para o vão), fundo, laterais, divisória com porta e corredores
+    out.boxes.push(
+      ...lw(s, 'u', VI, -VS - .5, VS + .5, [zGap(-VG2 - 2, -VG2 + 2), zGap(VG2 - 2, VG2 + 2), zWin(-12), zWin(12)], 3.6, 'stone'),
+      ...lw(s, 'u', VO, -VS - .5, VS + .5, [zWin(-45), zWin(-20), zWin(20), zWin(45)], 3.6, 'stone'),
+      ...lw(s, 'v', -VS, VI, VO, [zWin(115), zWin(135)], 3.6, 'stone'), ...lw(s, 'v', VS, VI, VO, [zWin(115), zWin(135)], 3.6, 'stone'),
+      ...lw(s, 'v', 0, VI, VO, [zGap(121, 125)], 3.2, 'wall', .8),
+      ...[-1, 1].flatMap(k => [...lw(s, 'v', k * (VG2 - 2.5), VD.wall, VI, [], 3.6, 'stone'), ...lw(s, 'v', k * (VG2 + 2.5), VD.wall, VI, [], 3.6, 'stone')]));
+    const win = (u, v, n) => { const [x, z] = P(u, v); out.windows.push({ room: zone(u), x, z, n: vdN(s, n) }); };
+    for (const k of [-1, 1]) { win(k * 12, VI, [0, -1]); win(k * 20, VO, [0, 1]); win(k * 45, VO, [0, 1]); win(k * VS, 115, [k, 0]); win(k * VS, 135, [k, 0]); }
+    // portões no muro externo (corredor) e a porta da divisória
+    const ax = (along) => (along === 'u') === (s === 0 || s === 2) ? 'x' : 'z';
+    for (const k of [-1, 1]) { const [x, z] = P(k * VG2, VD.wall); out.doors.push({ id: R2[k > 0 ? 1 : 0] + Z2[k > 0 ? 1 : 0], x, z, axis: ax('u'), cost: 2000, rooms: [R2[k > 0 ? 1 : 0], Z2[k > 0 ? 1 : 0]], kind: 'gate' }); }
+    { const [x, z] = P(0, 123); out.doors.push({ id: Z2[0] + Z2[1], x, z, axis: ax('v'), cost: 1500, rooms: [Z2[0], Z2[1]], kind: s % 2 ? 'debris' : 'door' }); }
+    // zumbis que saem do chão
+    for (const [u, v] of [[-50, 104], [-14, 108], [-40, 128], [-20, 142], [-52, 146], [50, 104], [14, 108], [40, 128], [20, 142], [52, 146]]) { const [x, z] = P(u, v); out.risers.push([x, z, zone(u)]); }
+    const wb = (w, cost, u, v, n, post = 1) => { const [x, z] = P(u, v); out.wall.push({ w, cost, x, z, n: vdN(s, n), ...(post ? { post: 1 } : {}) }); };
+    const bl = (u, v, n) => { const [x, z] = P(u, v); out.boxLocs.push({ x, z, n: vdN(s, n) }); };
+    const lamp = (u, v, o) => { const [x, z] = P(u, v); out.lamps.push({ x, z, y: 3.5, base: 12, ...o }); };
+    const b = (...a) => out.boxes.push(lb(s, ...a));
+    if (s === 0) { // norte: Mina (u > 0) e Hospital de campanha (u < 0)
+      b(33, 145, 9, 8, 6, 'col'); b(54, 145, 6, 8, 4.5, 'col'); b(54, 128, 6, 6, 3.5, 'col'); // paredão de pedra da mina
+      b(30, 124, 1.4, 2.2, 1.3, 'col'); b(30, 112, 1.4, 2.2, 1.3, 'col'); // vagonetas
+      b(46, 110, 5, 5, 9, 'col'); // torre do poço
+      b(12, 128, 3, 3, 1.6, 'col'); b(20, 120, 2.4, 2.4, 1.2, 'col');
+      b(-20, 112, 6, 9, 3, 'col'); b(-42, 112, 6, 9, 3, 'col'); b(-31, 138, 12, 6, 3.2, 'col'); // barracas
+      b(-12, 130, 2, .8, .6, 'metal'); b(-12, 134, 2, .8, .6, 'metal'); b(-48, 132, 2, .8, .6, 'metal'); // macas
+      b(-54, 120, 2.6, 5.4, 2.6, 'col'); // ambulância
+      b(-6, 106, 4, 1, 1, 'sandbag'); b(-30, 104, 6, 1, 1, 'sandbag');
+      wb('commando', 2000, 59.2, 125, [-1, 0]); wb('mp40', 1000, -59.2, 125, [1, 0]);
+      bl(30, 140, [0, -1]); bl(-24, 125, [1, 0]);
+      lamp(30, 118, { base: 13, c: 0xffb060 }); lamp(-31, 124, { base: 12 });
+    } else if (s === 1) { // leste: Fábrica (u < 0) e Ferrovia (u > 0)
+      out.boxes.push(...lw(s, 'u', 108, -52, -18, [zGap(-37, -33)], 5, 'brick', .8), ...lw(s, 'u', 132, -52, -18, [zGap(-28, -24)], 5, 'brick', .8),
+        ...lw(s, 'v', -52, 108, 132, [], 5, 'brick', .8), ...lw(s, 'v', -18, 108, 132, [zGap(118, 122)], 5, 'brick', .8)); // galpão com três portas
+      b(-44, 120, 8, 2, 1.1, 'metal'); b(-28, 116, 2, 6, 1.1, 'metal'); b(-26, 127, 3, 3, 2.2, 'metal'); // máquinas
+      b(-10, 142, 3, 3, 18, 'col'); b(-56, 142, 3, 3, 18, 'col'); // chaminés
+      b(-8, 116, 2.2, 2.2, 2.2, 'crate'); b(-10.2, 116.4, 2, 2, 2, 'crate'); b(-56, 102, 2.2, 2.2, 2.2, 'crate');
+      for (const v of [110, 120]) b(30, v, 40, 3, 3.6, 'col'); // vagões parados em duas linhas
+      b(12, 138, 6, 6, 4, 'col'); // caixa d'água da ferrovia (pernas largas: colisor simples)
+      b(48, 140, 1, 1, 4, 'col'); b(54, 132, 4, 2, 1.2, 'crate');
+      wb('hk21', 2500, -40, 132.45, [0, 1], 0); wb('ak74u', 1200, 59.2, 104, [-1, 0]);
+      bl(-45, 108.85, [0, 1]); bl(30, 130, [0, -1]);
+      lamp(-35, 120, { y: 4.6, base: 14, nopost: 1 }); lamp(30, 127, { base: 12 });
+    } else if (s === 2) { // sul: Porto (u < 0) e Farol (u > 0)
+      b(-46, 135, 12, 18, 1.2, 'inv'); b(-28, 135, 14, 18, 1.2, 'inv'); // água da doca (bala passa); o píer fica no meio
+      b(-12, 138, 6, 2.4, 2.6, 'crate'); b(-12, 141, 6, 2.4, 2.6, 'crate'); b(-54, 112, 6, 2.4, 2.6, 'crate'); b(-20, 110, 2, 2, 1.4, 'crate');
+      b(-38, 108, 8, 5, 3.2, 'wall'); // armazém
+      b(40, 136, 6, 6, 3.2, 'col'); // farol
+      b(20, 132, 7, 6, 3.2, 'wall'); // casa do faroleiro
+      [[52, 112], [30, 110], [12, 146], [56, 124]].forEach(([u, v]) => b(u, v, 3, 3, 1.6, 'col')); // pedras
+      wb('spas', 1500, -59.2, 125, [1, 0]); wb('fal', 1500, 59.2, 140, [-1, 0]);
+      bl(-38, 111.1, [0, 1]); bl(28, 126, [0, 1]);
+      lamp(-37, 122, { base: 12 }); lamp(40, 128, { base: 12 });
+    } else { // oeste: Floresta (u < 0) e Serraria (u > 0)
+      for (const [u, v] of VD_TREES) b(u, v, .8, .8, 4, 'col');
+      b(-34, 124, 6, 5, 3, 'wood'); // cabana
+      b(14, 124, 10, 1.6, 1.6, 'col'); b(14, 127, 10, 1.6, 1.6, 'col'); b(14, 125.5, 10, 1.6, 1.6, 'col', 1.6); // pilha de toras
+      b(36, 112, .5, .5, 4, 'col'); b(48, 112, .5, .5, 4, 'col'); b(36, 124, .5, .5, 4, 'col'); b(48, 124, .5, .5, 4, 'col'); // galpão da serra (só pilares)
+      b(42, 118, 6, 1.4, 1, 'metal'); // bancada da serra
+      b(50, 140, 6, 3, 1.2, 'wood'); b(24, 140, 2, 6, 1.2, 'wood'); // tábuas empilhadas
+      wb('galil', 1500, -59.2, 104, [1, 0]); wb('rpk', 2500, 59.2, 104, [-1, 0]);
+      bl(-34, 127, [0, 1]); bl(42, 120.2, [0, 1]);
+      lamp(-34, 116, { base: 12, c: 0xffb060 }); lamp(42, 118, { y: 4.2, base: 14, nopost: 1 });
+    }
+  }
+  // riser em cima de obstáculo não serve: tira os que caem a menos de 1 m de uma caixa
+  out.risers = out.risers.filter(([x, z]) => !out.boxes.some(b => b.mat !== 'floor' && b.h > .3 && Math.abs(x - b.x) < b.w / 2 + 1 && Math.abs(z - b.z) < b.d / 2 + 1));
+  return out;
+})();
 MAPS.vila = {
-  name: 'Vila', desc: 'mapa aberto gigante: 9 áreas, de igreja e fazenda a castelo, pedreira e estação de trem', zonly: 1, zombie: 1, w: 176, d: 176,
+  name: 'Vila', desc: 'mapa aberto gigantesco: 17 áreas, de igreja e castelo a mina, fábrica, porto com farol e floresta', zonly: 1, zombie: 1, w: 302, d: 302,
   sky: 0x3b3346, skyTop: 0x121829, fogC: 0x4a4152, fog: [20, 125], exposure: 1.05, cloudC: 0xb08a90,
   hemi: .8, hemiC: [0x9aa0d0, 0x3a3020], sunI: 1.3, sunC: 0xffa060, sun: [-110, 60, 84],
   theme: { floor: ['grass', 0x55663a], wall: ['plaster', 0x9a917e], stone: ['rock', 0x7d7a72], wood: ['wood', 0x6b4a2e], plank: ['wood', 0x6a4a32],
-    grave: ['concrete', 0x8b8b86], barn: ['wood', 0x7d3b2b], hedge: ['leaf', 0x5a8240], hay: ['sand', 0xc9a85a], metal: ['metal', 0x5d6a50], brick: ['brick', 0x8a5a44] },
+    grave: ['concrete', 0x8b8b86], barn: ['wood', 0x7d3b2b], hedge: ['leaf', 0x5a8240], hay: ['sand', 0xc9a85a], metal: ['metal', 0x5d6a50], brick: ['brick', 0x8a5a44],
+    crate: ['crate', 0x8a6a40], sandbag: ['sand', 0x8a7a58] },
   boxes: () => [
-    B(0, 0, 400, 400, 1, 'floor', -1.003),
+    B(0, 0, 640, 640, 1, 'floor', -1.003),
     // muro do meio (lados retos, com janelas das áreas de dentro; as diagonais são grades montadas em build)
     ...zWall('x', -50.5, -21, 21, [zWin(-10), zWin(10)], 3.4, 'stone'),
     ...zWall('x', 50.5, -21, 21, [zWin(-10), zWin(10)], 3.4, 'stone'),
     ...zWall('z', 50.5, -21, 21, [zWin(-14), zWin(14)], 3.4, 'stone'),
     ...zWall('z', -50.5, -21, 21, [zWin(-14), zWin(14)], 3.4, 'stone'),
-    // muro externo (lados retos com janelas do anel de fora)
-    ...zWall('x', -86.5, -36, 36, [zWin(-18), zWin(18)], 3.6, 'stone'),
-    ...zWall('x', 86.5, -36, 36, [zWin(-18), zWin(18)], 3.6, 'stone'),
-    ...zWall('z', 86.5, -36, 36, [zWin(-18), zWin(18)], 3.6, 'stone'),
-    ...zWall('z', -86.5, -36, 36, [zWin(-18), zWin(18)], 3.6, 'stone'),
+    // muro externo (lados retos com janelas do anel de fora e os vãos dos corredores para os distritos)
+    ...zWall('x', -86.5, -36, 36, [zWin(-18), zWin(18), zGap(-32, -28), zGap(28, 32)], 3.6, 'stone'),
+    ...zWall('x', 86.5, -36, 36, [zWin(-18), zWin(18), zGap(-32, -28), zGap(28, 32)], 3.6, 'stone'),
+    ...zWall('z', 86.5, -36, 36, [zWin(-18), zWin(18), zGap(-32, -28), zGap(28, 32)], 3.6, 'stone'),
+    ...zWall('z', -86.5, -36, 36, [zWin(-18), zWin(18), zGap(-32, -28), zGap(28, 32)], 3.6, 'stone'),
     // sebes que dividem o anel de fora em 4 áreas (com porta de madeira)
     ...zWall('z', 0, -86, -51, [zGap(-70, -66)], 2.8, 'hedge', 1.2), ...zWall('z', 0, 51, 86, [zGap(66, 70)], 2.8, 'hedge', 1.2),
     ...zWall('x', 0, 51, 86, [zGap(66, 70)], 2.8, 'hedge', 1.2), ...zWall('x', 0, -86, -51, [zGap(-70, -66)], 2.8, 'hedge', 1.2),
@@ -712,20 +937,26 @@ MAPS.vila = {
     B(-14, 34, 5, 5, 9, 'col'), B(-2, 38, 7, 5, 3.2, 'wall', 0, 0x958d7c),
     // árvores com colisão (o desenho sai em build)
     ...VILA_TREES.map(([x, z]) => B(x, z, .7, .7, 4, 'col')),
+    // distritos de fora
+    ...VILA_DIST.boxes,
   ],
   build: buildVila,
   spawns: [[-2.5, 6], [2.5, 6], [-2.5, 9], [2.5, 9]],
   z: (() => {
     const d = {
-      start: 'A', ff: { x0: -88, z0: -88, nx: 176, nz: 176 },
+      start: 'A', ff: { x0: -151, z0: -151, nx: 302, nz: 302 },
       zoneAt(x, z) {
         const ax = Math.abs(x), az = Math.abs(z), o = Math.max(ax, az, (ax + az) / Math.SQRT2);
         if (ax <= 14 && az <= 14 && ax + az <= 14 * Math.SQRT2) return 'A';
         if (o <= 50) return az >= ax ? (z < 0 ? 'B' : 'E') : (x > 0 ? 'C' : 'D');
         if (o <= 86) return x >= 0 ? (z < 0 ? 'F' : 'G') : (z < 0 ? 'I' : 'H');
+        // distritos de fora: lado (s), de lado (u) e para fora (v), como em VILA_DIST
+        const s = az >= ax ? (z < 0 ? 0 : 2) : (x > 0 ? 1 : 3), v = Math.max(ax, az), u = s === 0 ? x : s === 1 ? z : s === 2 ? -x : -z, au = Math.abs(u);
+        if ((v > VD.in && v <= VD.out && au <= VD.side) || (v > VD.wall && v <= VD.in && Math.abs(au - VD.gate) <= 2)) return VD_ZONES[s][u > 0 ? 1 : 0];
         return null;
       },
-      roomNames: { A: 'Praça', B: 'Igreja', C: 'Fazenda', D: 'Cemitério', E: 'Lago', F: 'Pedreira', G: 'Estação', H: 'Acampamento', I: 'Castelo' },
+      roomNames: { A: 'Praça', B: 'Igreja', C: 'Fazenda', D: 'Cemitério', E: 'Lago', F: 'Pedreira', G: 'Estação', H: 'Acampamento', I: 'Castelo',
+        J: 'Mina', K: 'Hospital de campanha', L: 'Fábrica', M: 'Ferrovia', N: 'Porto', O: 'Farol', P: 'Floresta', Q: 'Serraria' },
       windows: [
         { room: 'B', x: -10, z: -50.5, n: [0, -1] }, { room: 'B', x: 10, z: -50.5, n: [0, -1] },
         { room: 'E', x: -10, z: 50.5, n: [0, 1] }, { room: 'E', x: 10, z: 50.5, n: [0, 1] },
@@ -735,6 +966,7 @@ MAPS.vila = {
         { room: 'G', x: 86.5, z: 18, n: [1, 0] }, { room: 'G', x: 18, z: 86.5, n: [0, 1] },
         { room: 'H', x: -18, z: 86.5, n: [0, 1] }, { room: 'H', x: -86.5, z: 18, n: [-1, 0] },
         { room: 'I', x: -86.5, z: -18, n: [-1, 0] }, { room: 'I', x: -18, z: -86.5, n: [0, -1] },
+        ...VILA_DIST.windows,
       ],
       risers: [
         [-4, -11, 'A'], [4, -11, 'A'], [-11, 1, 'A'], [11, -1, 'A'],
@@ -746,6 +978,7 @@ MAPS.vila = {
         [40, 60, 'G'], [66, 26, 'G'], [28, 70, 'G'], [76, 16, 'G'], [48, 50, 'G'],
         [-44, 40, 'H'], [-30, 68, 'H'], [-76, 10, 'H'], [-66, 44, 'H'], [-36, 56, 'H'],
         [-30, -68, 'I'], [-68, -30, 'I'], [-74, -12, 'I'], [-12, -74, 'I'], [-64, -40, 'I'],
+        ...VILA_DIST.risers,
       ],
       doors: [
         { id: 'AB', x: 0, z: -14, axis: 'x', cost: 750, rooms: ['A', 'B'], kind: 'gate' },
@@ -764,6 +997,8 @@ MAPS.vila = {
         { id: 'FG', x: 68, z: 0, axis: 'x', cost: 1250, rooms: ['F', 'G'], kind: 'door' },
         { id: 'GH', x: 0, z: 68, axis: 'z', cost: 1250, rooms: ['G', 'H'], kind: 'door' },
         { id: 'HI', x: -68, z: 0, axis: 'x', cost: 1250, rooms: ['H', 'I'], kind: 'door' },
+        // portões do muro externo (corredores) e portas no meio de cada distrito
+        ...VILA_DIST.doors,
       ],
       wall: [
         { w: 'm14', cost: 500, x: -9.5, z: -5, n: [1, 0], post: 1 }, { w: 'olympia', cost: 500, x: 9.5, z: -5, n: [-1, 0], post: 1 },
@@ -772,6 +1007,7 @@ MAPS.vila = {
         { w: 'mp5k', cost: 1000, x: -22, z: 5, n: [1, 0], post: 1 }, { w: 'bowie', cost: 3000, x: 6, z: 24, n: [0, -1], post: 1 },
         { w: 'dragunov', cost: 2000, x: 66, z: -24, n: [-1, 0], post: 1 }, { w: 'galil', cost: 1500, x: 58, z: 36.95, n: [0, -1] },
         { w: 'spas', cost: 1500, x: -58, z: 34, n: [1, 0], post: 1 }, { w: 'fal', cost: 1500, x: -28, z: -64, n: [1, 0], post: 1 },
+        ...VILA_DIST.wall,
       ],
       perks: [
         { k: 'qr', x: -4, z: 11.5, n: [0, -1] }, { k: 'jug', x: 6.2, z: -37.6, n: [-1, 0] }, { k: 'speed', x: 22, z: 12, n: [-1, 0] },
@@ -780,13 +1016,14 @@ MAPS.vila = {
       pap: { x: -48, z: -52, n: [0, 1] }, // no pátio do castelo
       power: { x: 52, z: -61.15, n: [0, 1] }, // gerador da pedreira
       boxes: [{ x: 9.6, z: 5, n: [-1, 0] }, { x: -5, z: -39.2, n: [0, 1] }, { x: 37, z: 6.2, n: [0, -1] }, { x: -40.5, z: -12, n: [1, 0] }, { x: 18, z: 41, n: [0, -1] },
-        { x: 62, z: -40, n: [-1, 0] }, { x: 36, z: 50, n: [0, -1] }, { x: -40, z: 58, n: [1, 0] }, { x: -66, z: -24, n: [1, 0] }],
+        { x: 62, z: -40, n: [-1, 0] }, { x: 36, z: 50, n: [0, -1] }, { x: -40, z: 58, n: [1, 0] }, { x: -66, z: -24, n: [1, 0] }, ...VILA_DIST.boxLocs],
       lamps: [
         { x: 0, z: 0, y: 5.2, base: 16, dist: 30 }, { x: 0, z: -33, y: 4.8, base: 11 }, { x: 36, z: 0, y: 5.2, base: 11 },
         { x: 26, z: -14, y: 3.5 }, { x: -27, z: -4, y: 3.5 }, { x: 1, z: 29, y: 3.5, base: 9 },
         { x: 7, z: 7, y: 3.5 }, { x: -7, z: 7, y: 3.5 }, { x: 7, z: -7, y: 3.5 }, { x: -7, z: -7, y: 3.5 }, { x: -35.5, z: 0, y: 4, base: 6, c: 0x9a70ff },
         { x: 47, z: -60, y: 3.5, base: 12 }, { x: 58, z: 33, y: 3.5, base: 11 }, { x: -44, z: -44, y: 3.5, base: 12, c: 0xffb060 },
         { x: -50, z: 48, y: 1.3, base: 14, c: 0xff8a30, fire: 1, nopost: 1, dist: 26 }, // fogueira: sempre acesa
+        ...VILA_DIST.lamps,
       ],
       spawns: [[-2.5, 6], [2.5, 6], [-2.5, 9], [2.5, 9]],
     };
@@ -1050,9 +1287,9 @@ function buildVila() {
     const octD = (x, z) => Math.max(Math.abs(x), Math.abs(z), (Math.abs(x) + Math.abs(z)) / Math.SQRT2);
     for (const [x, z] of VILA_TREES) { const s = rand(.9, 1.2); blT.push(mtx(x, 1.6 * s, z, rand(0, 6), s)); bl.push(mtx(x, 4.6 * s, z, rand(0, 6), s * 2.1, s * 1.7), mtx(x + .9, 5.4 * s, z - .5, rand(0, 6), s * 1.4), mtx(x - .8, 5.2 * s, z + .6, rand(0, 6), s * 1.5)); }
     const wins = MAPS.vila.z.windows;
-    for (let n = 0, k = 0; n < 520 && k < 6000; k++) {
-      const a = Math.random() * Math.PI * 2, r = rand(90, 165), x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (octD(x, z) < 91 || wins.some(w => Math.hypot(w.ox - x, w.oz - z) < 9)) continue;
+    for (let n = 0, k = 0; n < 900 && k < 12000; k++) {
+      const a = Math.random() * Math.PI * 2, r = rand(90, 235), x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (octD(x, z) < 91 || (Math.min(Math.abs(x), Math.abs(z)) < 64 && Math.max(Math.abs(x), Math.abs(z)) < 154) || wins.some(w => Math.hypot(w.ox - x, w.oz - z) < 9)) continue;
       const s = rand(.8, 1.5), ry = rand(0, 6); n++;
       if (Math.random() < .7) { trunks.push(mtx(x, 1.5 * s, z, ry, s)); cones.push(mtx(x, 4.2 * s, z, ry, s)); cones2.push(mtx(x, 6.4 * s, z, ry, s)); }
       else { blT.push(mtx(x, 1.6 * s, z, ry, s)); bl.push(mtx(x, 4.6 * s, z, ry, s * 2.1, s * 1.7)); }
@@ -1060,6 +1297,93 @@ function buildVila() {
     const pine = lam('leaf', 0x31503a), leafB = lam('leaf', 0x3d5a2c);
     inst(new THREE.CylinderGeometry(.22, .34, 3, 6), barkM, trunks); inst(new THREE.ConeGeometry(2.2, 4.4, 8), pine, cones); inst(new THREE.ConeGeometry(1.5, 3.2, 8), pine, cones2);
     inst(new THREE.CylinderGeometry(.24, .38, 3.2, 6), barkM, blT); inst(new THREE.IcosahedronGeometry(1, 1), leafB, bl);
+  }
+  // ---------- distritos de fora: cada lado num grupo girado (dentro dele: x = u, z = -v) ----------
+  { const RS = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
+    const ga = (G, m, cast = true) => { m.castShadow = cast; m.receiveShadow = true; m.userData.own = true; G.add(m); return m; };
+    const ginst = (G, geo, mat, list, cast = true) => { if (!list.length) return; const m = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((mx, i) => m.setMatrixAt(i, mx)); m.computeBoundingSphere(); return ga(G, m, cast); };
+    const gcyl = (G, u, v, rt, rb, h, y, mat, seg = 12) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat); m.position.set(u, y + h / 2, -v); return ga(G, m); };
+    const gbox = (G, u, v, w, h, d, y, mat, cast = true) => { const m = new THREE.Mesh(boxGeo(w, h, d, 2), mat); m.position.set(u, y + h / 2, -v); return ga(G, m, cast); };
+    const groof = (G, u, v, w, len, h, y, alongU, mat) => { // telhado de duas águas (cumeeira ao longo de u ou de v)
+      const sh = new THREE.Shape([new THREE.Vector2(-w / 2, 0), new THREE.Vector2(w / 2, 0), new THREE.Vector2(0, h)]);
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: len, bevelEnabled: false }); geo.translate(0, 0, -len / 2); if (alongU) geo.rotateY(Math.PI / 2);
+      const m = new THREE.Mesh(geo, mat); m.position.set(u, y, -v); return ga(G, m); };
+    const ground = (G, u0, u1, v0, v1, k, c) => { const m = new THREE.Mesh(planeGeo(u1 - u0, v1 - v0, TEXS[k] || 3), lam(k, c)); m.rotation.x = -Math.PI / 2; m.position.set((u0 + u1) / 2, .006, -(v0 + v1) / 2); return ga(G, m, false); };
+    const crossTex = canvasTex(64, 64, g => { g.fillStyle = '#e8e4d8'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#b01818'; g.fillRect(24, 8, 16, 48); g.fillRect(8, 24, 48, 16); });
+    const waterM = new THREE.MeshPhongMaterial({ color: 0x1f3a48, specular: 0x8899aa, shininess: 110 }), redM = mc(0x8a2a22), whiteM = mc(0xd8d4c8), dark = new THREE.MeshBasicMaterial({ color: 0x050505 });
+    const pineM = lam('leaf', 0x31503a), canvasM2 = lam('sand', 0x76764e);
+    for (let s = 0; s < 4; s++) {
+      const G = new THREE.Group(); G.rotation.y = RS[s]; world.add(G);
+      if (s === 0) { // Mina e Hospital de campanha
+        ground(G, 0, 60, 97, 150, 'rock', 0x6e6a62); ground(G, -60, 0, 97, 150, 'dirt', 0x6a5a40);
+        const rk = []; for (const [u, v, w, d, h] of [[33, 145, 9, 8, 6], [54, 145, 6, 8, 4.5], [54, 128, 6, 6, 3.5]]) for (let k = 0; k < 7; k++) rk.push(mtx(u + srnd(-w / 3, w / 3), srnd(.6, h * .8), -(v + srnd(-d / 3, d / 3)), srnd(0, 6), srnd(1.6, Math.min(w, d) * .45), srnd(1.4, h * .45)));
+        for (const [u, v] of [[12, 128], [20, 120]]) rk.push(mtx(u, .7, -v, srnd(0, 6), 1.5, .9));
+        ginst(G, new THREE.DodecahedronGeometry(1, 0), rockM, rk);
+        { const hole = new THREE.Mesh(new THREE.PlaneGeometry(3, 3.4), dark); hole.position.set(33, 1.7, -140.9); hole.userData.own = true; G.add(hole); // boca da mina
+          for (const x of [31.3, 34.7]) gbox(G, x, 140.7, .35, 3.8, .35, 0, barkM); gbox(G, 33, 140.7, 4, .4, .4, 3.8, barkM); }
+        { const sl = []; for (let v = 104; v <= 140; v += .9) sl.push(mtx(33, .04, -v, 0, 1)); ginst(G, new THREE.BoxGeometry(1.7, .08, .26), barkM, sl, false);
+          for (const o of [-.55, .55]) gbox(G, 33 + o, 122, .1, .1, 36, .06, iron, false); }
+        for (const v of [112, 124]) { const c = gbox(G, 30, v, 1.3, .8, 2, .4, mc(0x4a4540)); gbox(G, 30, v, 1.1, .3, 1.8, 1.2, rockM); c.rotation.y = .05; }
+        { // torre do poço: armação de madeira e roda
+          for (const [a, b] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) { const l = gbox(G, 46 + a * .8, 110 + b * .8, .3, 9.4, .3, 0, barkM); l.rotation.set(b * .03, 0, -a * .03); }
+          for (const y of [3, 6]) gbox(G, 46, 110, 4.4, .25, 4.4, y, barkM);
+          const wh = new THREE.Mesh(new THREE.TorusGeometry(1.3, .1, 6, 18), iron); wh.position.set(46, 9.6, -110); ga(G, wh); }
+        for (const [u, v, al] of [[-20, 112, false], [-42, 112, false], [-31, 138, true]]) { // barracas do hospital com cruz vermelha
+          groof(G, u, v, al ? 6.4 : 6.4, al ? 12.4 : 9.4, 3.1, 0, al, canvasM2);
+          const cr = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshLambertMaterial({ map: crossTex, side: THREE.DoubleSide })); cr.userData.own = true;
+          if (al) cr.position.set(u - 6.25, 1.6, -v); else cr.position.set(u, 1.6, -(v - 4.75)); cr.rotation.y = al ? Math.PI / 2 : 0; G.add(cr); }
+        { const amb = new THREE.Group(); amb.position.set(-54, 0, -120); G.add(amb); bx(amb, 2.4, 2.2, 5.2, 0, 1.4, 0, whiteM); bx(amb, 2.2, .9, 1.4, 0, 2.95, 1.6, whiteM); bx(amb, 2.45, .5, .6, 0, 1.8, -.5, redM);
+          for (const [x, z] of [[-1.15, 1.8], [1.15, 1.8], [-1.15, -1.6], [1.15, -1.6]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(.45, .45, .3, 12), iron); w.rotation.z = Math.PI / 2; w.position.set(x, .45, z); amb.add(w); }
+          amb.traverse(o => { if (o.isMesh) o.castShadow = true; }); }
+        { const pole = gcyl(G, -10, 112, .06, .08, 6, 0, iron, 6); pole.castShadow = true; const fl = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1), new THREE.MeshLambertMaterial({ map: crossTex, side: THREE.DoubleSide })); fl.userData.own = true; fl.position.set(-9.2, 5.4, -112); G.add(fl);
+          MAP_ANIM.push(() => { fl.rotation.y = Math.sin(now * 1.7) * .25; }); }
+      } else if (s === 1) { // Fábrica e Ferrovia
+        ground(G, -60, 0, 97, 150, 'concrete', 0x5e5c58); ground(G, 0, 60, 97, 150, 'rock', 0x625e58);
+        { const rf = new THREE.Mesh(boxGeo(34.6, .3, 24.6, 3), lam('metal', 0x4a4e52)); rf.position.set(-35, 5.15, -120); ga(G, rf); // telhado do galpão
+          for (const u of [-46, -35, -24]) { const sk = new THREE.Mesh(new THREE.BoxGeometry(5, 1.4, 24), mc(0x3a3e42)); sk.position.set(u, 5.9, -120); sk.rotation.z = .5; ga(G, sk); } }
+        for (const u of [-10, -56]) { gcyl(G, u, 142, 1.2, 1.6, 18, 0, lam('brick', 0x7a4434), 14); gcyl(G, u, 142, 1.35, 1.35, .6, 18, iron, 14); }
+        { const sl = [], rl = [];
+          for (const v of [110, 120, 128]) { for (let u = 3; u <= 59; u += .9) sl.push(mtx(u, .05, -v, Math.PI / 2, 1)); for (const o of [-.72, .72]) rl.push([v + o]); }
+          ginst(G, new THREE.BoxGeometry(.26, .1, 2.2), barkM, sl, false);
+          for (const [v] of rl) gbox(G, 31, v, 56, .12, .1, .08, iron, false); }
+        for (const v of [110, 120]) for (const [u0, col] of [[10, 0x2f4a38], [23.5, 0x6a2a24], [37, 0x3a3a46]]) { // vagões
+          const g = new THREE.Group(); g.position.set(u0 + 6.5, 0, -v); G.add(g);
+          bx(g, 12.6, 2.6, 2.8, 0, 2, 0, mc(col)); bx(g, 12.8, .25, 3, 0, 3.4, 0, mc(0x2a2a2a)); bx(g, 12.6, .4, 2.4, 0, .75, 0, mc(0x1a1a1a));
+          for (const x of [-4.6, -3.6, 3.6, 4.6]) for (const sd of [-.75, .75]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(.42, .42, .15, 12), iron); w.rotation.x = Math.PI / 2; w.position.set(x, .45, sd); g.add(w); }
+          g.traverse(o => { if (o.isMesh) o.castShadow = true; }); }
+        { gcyl(G, 12, 138, 2.6, 2.6, 3, 5.5, lam('wood', 0x5e4630), 16); for (const [a, b] of [[-2.4, -2.4], [2.4, -2.4], [-2.4, 2.4], [2.4, 2.4]]) gbox(G, 12 + a, 138 + b, .3, 5.6, .3, 0, barkM); }
+        { const sg = gcyl(G, 48, 140, .1, .12, 4, 0, iron, 6); sg.castShadow = true; const lt = new THREE.Mesh(new THREE.SphereGeometry(.18, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff3020).multiplyScalar(2) })); lt.userData.own = true; lt.position.set(48, 3.7, -139.8); G.add(lt); }
+      } else if (s === 2) { // Porto e Farol
+        ground(G, -60, 0, 97, 150, 'wood', 0x5a4a38); ground(G, 0, 60, 97, 150, 'sand', 0xb0a078);
+        for (const [u, w] of [[-46, 12], [-28, 14]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 18), waterM); m.rotation.x = -Math.PI / 2; m.position.set(u, .25, -135); ga(G, m, false);
+          gbox(G, u, 126, w, 1, .5, -.6, stoneM); gbox(G, u, 144, w, 1, .5, -.6, stoneM); }
+        { const pl = []; for (let v = 126; v <= 144; v += .55) pl.push(mtx(-37.5, .3, -v, 0, 1)); ginst(G, new THREE.BoxGeometry(5, .12, .5), barkM, pl);
+          for (const v of [127, 133, 139, 143]) for (const u of [-40.2, -34.8]) gcyl(G, u, v, .18, .2, .9, 0, barkM, 6); }
+        for (const [u, v, r] of [[-46, 133, .3], [-28, 139, -.4]]) { const bt = new THREE.Group(); bt.position.set(u, .3, -v); bt.rotation.y = r; G.add(bt); bx(bt, 1.6, .5, 4.4, 0, .25, 0, barkM); bx(bt, 1.3, .1, .3, 0, .5, .8, barkM); bt.traverse(o => { if (o.isMesh) o.castShadow = true; }); }
+        groof(G, -38, 108, 5.8, 8.8, 2, 3.2, true, roofM);
+        { // farol: torre listrada, lanterna e facho girando
+          for (let k = 0; k < 6; k++) gcyl(G, 40, 136, 2.6 - (k + 1) * .17, 2.6 - k * .17, 3.4, k * 3.4, k % 2 ? whiteM : redM, 16);
+          gcyl(G, 40, 136, 1.7, 1.7, .3, 20.4, iron, 16); const lan = gcyl(G, 40, 136, 1, 1, 1.6, 20.7, new THREE.MeshBasicMaterial({ color: new THREE.Color(0xfff0b0).multiplyScalar(2) }), 12); lan.castShadow = false;
+          const cap = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.4, 12), redM); cap.position.set(40, 23, -136); ga(G, cap);
+          const beam = new THREE.Group(); beam.position.set(40, 21.5, -136); G.add(beam);
+          const bm = new THREE.Mesh(new THREE.ConeGeometry(2.2, 40, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff2c0, transparent: true, opacity: .12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+          bm.userData.own = true; bm.rotation.z = Math.PI / 2; bm.position.x = 20; beam.add(bm);
+          MAP_ANIM.push(dt => { beam.rotation.y += dt * .6; }); }
+        groof(G, 20, 132, 6.8, 7.8, 2.4, 3.2, true, roofW);
+        { const rk = []; for (const [u, v] of [[52, 112], [30, 110], [12, 146], [56, 124]]) for (let k = 0; k < 3; k++) rk.push(mtx(u + srnd(-.6, .6), .6 + k * .4, -(v + srnd(-.6, .6)), srnd(0, 6), 1.5 - k * .35, 1.1 - k * .25)); ginst(G, new THREE.DodecahedronGeometry(1, 0), rockM, rk); }
+      } else { // Floresta e Serraria
+        ground(G, -60, 0, 97, 150, 'grass', 0x3c4c2c); ground(G, 0, 60, 97, 150, 'dirt', 0x6e5a3e);
+        { const tr = [], c1 = [], c2 = []; for (const [u, v] of VD_TREES) { const k = srnd(.9, 1.4), r = srnd(0, 6); tr.push(mtx(u, 1.5 * k, -v, r, k)); c1.push(mtx(u, 4.2 * k, -v, r, k)); c2.push(mtx(u, 6.4 * k, -v, r, k)); }
+          ginst(G, new THREE.CylinderGeometry(.22, .34, 3, 6), barkM, tr); ginst(G, new THREE.ConeGeometry(2.2, 4.4, 8), pineM, c1); ginst(G, new THREE.ConeGeometry(1.5, 3.2, 8), pineM, c2);
+          const st = []; for (let i = 0; i < 18; i++) st.push(mtx(srnd(-56, -8), .25, -srnd(100, 146), 0, 1)); ginst(G, new THREE.CylinderGeometry(.35, .4, .5, 8), barkM, st); }
+        groof(G, -34, 124, 5.8, 6.8, 2.2, 3, true, roofW);
+        { const lg = []; for (const [v, y] of [[124, .8], [127, .8], [125.5, 2.4]]) for (const o of [-.4, .4]) lg.push(mtx(14, y, -(v + o), 0, 1)); ginst(G, new THREE.CylinderGeometry(.42, .42, 10, 10).rotateZ(Math.PI / 2), barkM, lg); }
+        { const rf = new THREE.Mesh(boxGeo(14, .2, 14, 2), roofW); rf.position.set(42, 4.1, -118); ga(G, rf);
+          for (const [u, v] of [[36, 112], [48, 112], [36, 124], [48, 124]]) gbox(G, u, v, .4, 4, .4, 0, barkM);
+          const saw = new THREE.Mesh(new THREE.CylinderGeometry(.8, .8, .04, 24), mc(0xa0a4a8)); saw.rotation.x = Math.PI / 2; saw.position.set(42, 1.3, -118); ga(G, saw);
+          MAP_ANIM.push(dt => { saw.rotation.y += dt * 12; }); }
+      }
+    }
   }
 }
 
@@ -1298,6 +1622,20 @@ function disposeGroup(gr) {
     if (o.material && o.userData.own) { if (o.material.map?.userData.tmp) o.material.map.dispose(); o.material.dispose(); }
   });
 }
+// junta geometrias indexadas (posição, normal, uv) numa só: menos chamadas de desenho no mapa grande
+function mergeGeos(gs) {
+  let nv = 0, ni = 0; for (const g of gs) { nv += g.attributes.position.count; ni += g.index.count; }
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), idx = new Uint32Array(ni);
+  let ov = 0, oi = 0;
+  for (const g of gs) {
+    const A = g.attributes, I = g.index.array; pos.set(A.position.array, ov * 3); nor.set(A.normal.array, ov * 3); uv.set(A.uv.array, ov * 2);
+    for (let k = 0; k < I.length; k++) idx[oi + k] = I[k] + ov;
+    ov += A.position.count; oi += I.length; g.dispose();
+  }
+  const m = new THREE.BufferGeometry();
+  m.setAttribute('position', new THREE.BufferAttribute(pos, 3)); m.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); m.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  m.setIndex(new THREE.BufferAttribute(idx, 1)); m.computeBoundingSphere(); return m;
+}
 function buildMap(id) {
   const M = MAPS[id] || MAPS.arena; curMapId = MAPS[id] ? id : 'arena'; curMap = M;
   scene.remove(world); disposeGroup(world); world = new THREE.Group(); scene.add(world);
@@ -1319,17 +1657,23 @@ function buildMap(id) {
   const mats = {}, boxes = M.boxes();
   const trees = [];
   if (M.trees) for (const [x, z] of M.trees) { trees.push([x, z], [-x, -z]); boxes.push(B(x, z, .6, .6, 3, 'wood'), B(-x, -z, .6, .6, 3, 'wood')); }
+  const merge = M.zombie ? new Map() : null; // mapas zumbis (grandes): caixas do mesmo material e do mesmo bloco de 48 m viram uma malha só
   for (const b of boxes) {
     // 'inv' = colisor invisível do vão da janela: segura jogador e zumbi, mas deixa a bala passar (ns)
     // 'col' = colisor invisível sólido (o desenho é feito à parte, ex.: chafariz, moinho, tronco)
     if (b.mat === 'inv' || b.mat === 'col') { COL.push({ minX: b.x - b.w / 2, maxX: b.x + b.w / 2, minY: b.y, maxY: b.y + b.h, minZ: b.z - b.d / 2, maxZ: b.z + b.d / 2, ...(b.mat === 'inv' ? { ns: 1 } : {}) }); continue; }
     const th = M.theme[b.mat] || ['concrete', 0xaaaaaa], key = b.mat + '|' + (b.c ?? '');
     const mat = mats[key] || (mats[key] = worldMat(th[0], b.c ?? th[1], b.mat !== 'floor'));
+    COL.push({ minX: b.x - b.w / 2, maxX: b.x + b.w / 2, minY: b.y, maxY: b.y + b.h, minZ: b.z - b.d / 2, maxZ: b.z + b.d / 2 });
+    if (merge && b.mat !== 'floor') {
+      const g = boxGeo(b.w, b.h, b.d, TEXS[th[0]]); g.translate(b.x, b.y + b.h / 2, b.z);
+      const k = key + '|' + Math.floor(b.x / 48) + ',' + Math.floor(b.z / 48); let e = merge.get(k); if (!e) merge.set(k, e = { mat, gs: [] }); e.gs.push(g); continue;
+    }
     const m = new THREE.Mesh(boxGeo(b.w, b.h, b.d, TEXS[th[0]]), mat);
     m.position.set(b.x, b.y + b.h / 2, b.z); m.castShadow = b.mat !== 'floor'; m.receiveShadow = true;
     world.add(m);
-    COL.push({ minX: b.x - b.w / 2, maxX: b.x + b.w / 2, minY: b.y, maxY: b.y + b.h, minZ: b.z - b.d / 2, maxZ: b.z + b.d / 2 });
   }
+  if (merge) for (const { mat, gs } of merge.values()) { const m = new THREE.Mesh(mergeGeos(gs), mat); m.castShadow = m.receiveShadow = true; world.add(m); }
   const leaf = new THREE.MeshLambertMaterial({ color: 0x2f5d3a }), snow = new THREE.MeshLambertMaterial({ color: 0xf4f7fa });
   for (const [x, z] of trees) {
     const c1 = new THREE.Mesh(new THREE.ConeGeometry(1.8, 3.2, 8), leaf); c1.position.set(x, 3.6, z); c1.castShadow = true; world.add(c1);
@@ -3868,15 +4212,19 @@ function zBuildWorld(M) {
     world.add(g); Wd.doors.set(d.id, { d, col, g, halves, open: false, t0: 0, done: false });
   }
   // tábuas das janelas
-  D.windows.forEach((w, i) => {
-    const planks = [], alongX = w.n[1] !== 0;
-    for (let k = 0; k < 6; k++) {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(1.75, .15, .06), woodM);
-      p.position.set(w.x + w.n[0] * .35, 1 + k * .2, w.z + w.n[1] * .35); p.rotation.y = alongX ? 0 : Math.PI / 2; p.rotation.z = rand(-.12, .12);
-      world.add(p); planks.push(p);
-    }
-    Wd.planks[i] = planks;
-  });
+  // (todas numa malha instanciada só: tábua arrancada vira escala zero)
+  if (D.windows.length) {
+    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1.75, .15, .06), woodM, D.windows.length * 6), o = new THREE.Object3D();
+    D.windows.forEach((w, i) => {
+      const alongX = w.n[1] !== 0, mx = [];
+      for (let k = 0; k < 6; k++) {
+        o.position.set(w.x + w.n[0] * .35, 1 + k * .2, w.z + w.n[1] * .35); o.rotation.set(0, alongX ? 0 : Math.PI / 2, rand(-.12, .12)); o.updateMatrix();
+        mx.push(o.matrix.clone()); im.setMatrixAt(i * 6 + k, o.matrix);
+      }
+      Wd.planks[i] = mx;
+    });
+    im.computeBoundingSphere(); world.add(im); Wd.plankIM = im;
+  }
   // armas de parede (contorno de giz)
   for (const wb of D.wall) {
     if (wb.post) { // placa de madeira em pé (mapa aberto não tem parede em todo lugar)
@@ -3939,14 +4287,18 @@ function zBuildWorld(M) {
   }
   // luzes dos cômodos (piscam até ligar a energia)
   const lamps = D.lamps || Object.entries(D.rooms).map(([room, r]) => ({ x: (r[0] + r[1]) / 2, z: (r[2] + r[3]) / 2, y: 3.9, base: room === 'C' ? 9 : 14 }));
+  // Mapa grande tem dezenas de lâmpadas: só um grupo fixo de luzes de verdade (as mais perto da câmera) acende;
+  // as outras ficam só no bulbo. Número fixo de luzes = o shader não recompila quando elas trocam de lâmpada.
+  const nL = Math.min(lamps.filter(l => l.base).length, CFG.gfx === 'baixo' ? 5 : 8);
+  Wd.pool = []; Wd.poolT = 0; Wd.poolTk = 0;
+  for (let k = 0; k < nL; k++) { const L = new THREE.PointLight(0xffc98a, 0, 22, 1.3); world.add(L); Wd.pool.push({ L, l: null }); }
   for (const lp of lamps) { // lâmpada sem 'base' = só o bulbo aceso (poste decorativo)
-    const L = lp.base ? new THREE.PointLight(lp.c ?? 0xffc98a, 0, lp.dist ?? 22, 1.3) : null;
-    if (L) { L.position.set(lp.x, lp.y, lp.z); world.add(L); }
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(lp.base ? .12 : .16, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffe2b0 })); bulb.userData.own = true; bulb.position.set(lp.x, lp.y, lp.z); world.add(bulb);
-    Wd.lights.push({ L, bulb, base: lp.base || 0, ph: Math.random() * 10, c: lp.c ?? 0xffe2b0, fire: !!lp.fire });
+    Wd.lights.push({ bulb, x: lp.x, y: lp.y, z: lp.z, dist: lp.dist ?? 22, lc: lp.c ?? 0xffc98a, base: lp.base || 0, ph: Math.random() * 10, c: lp.c ?? 0xffe2b0, fire: !!lp.fire, f: 0, tk: 0 });
   }
 }
-function zBoardsVis(i) { const pl = ZC.world?.planks[i]; if (pl) pl.forEach((p, k) => p.visible = k < ZC.boards[i]); }
+const ZERO_M4 = new THREE.Matrix4().makeScale(0, 0, 0);
+function zBoardsVis(i) { const Wd = ZC.world, pl = Wd?.planks[i]; if (!pl) return; pl.forEach((m, k) => Wd.plankIM.setMatrixAt(i * 6 + k, k < ZC.boards[i] ? m : ZERO_M4)); Wd.plankIM.instanceMatrix.needsUpdate = true; }
 function zDoorOpen(id) {
   const o = ZC.world?.doors.get(id); if (!o || o.open) return false;
   o.open = true; o.t0 = now; ZC.doors.add(id);
@@ -3990,9 +4342,18 @@ function zUpdateWorld(dt) {
   for (const l of Wd.lights) {
     let f = 1; if (l.fire) f = .8 + Math.sin(now * 11 + l.ph) * .1 + Math.sin(now * 23) * .08; // fogo: sempre aceso, tremulando
     else if (!ZC.power) { const n = Math.sin(now * 13 + l.ph) + Math.sin(now * 7.3 + l.ph * 2); f = n > 1.4 ? .12 : .5; }
-    if (l.L) l.L.intensity = l.base * f;
-    l.bulb.material.color.set(l.c).multiplyScalar(f > .4 ? 3 : .45);
+    l.f = f; l.bulb.material.color.set(l.c).multiplyScalar(f > .4 ? 3 : .45);
   }
+  if (now >= Wd.poolT) { // 4x por segundo: as luzes vão para as lâmpadas mais perto da câmera
+    Wd.poolT = now + .25; const cp = camera.position, tk = ++Wd.poolTk;
+    for (const P of Wd.pool) {
+      let best = null, bd = Infinity;
+      for (const l of Wd.lights) { if (!l.base || l.tk === tk) continue; const d = (l.x - cp.x) ** 2 + (l.z - cp.z) ** 2 - l.dist * l.dist; if (d < bd) { bd = d; best = l; } }
+      P.l = best; if (!best) continue; best.tk = tk;
+      P.L.position.set(best.x, best.y, best.z); P.L.distance = best.dist; P.L.color.set(best.lc);
+    }
+  }
+  for (const P of Wd.pool) P.L.intensity = P.l ? P.l.base * P.l.f : 0;
   // caixa
   const b = Wd.box, st = ZC.box.st, age = now - ZC.box.t0;
   b.g.visible = st !== 'gone';
@@ -4048,7 +4409,7 @@ function zOnSnap(m) {
       const w = ZD.windows[i], p = new V3(w.x, 1.4, w.z);
       if (m.b[i] < old) { play('crack', p); puff(p, 0x6b4a2e, .6, .5, .2); } else play('hammer', p);
     }
-    ZC.boards[i] = m.b[i]; zBoardsVis(i);
+    if (old !== m.b[i]) { ZC.boards[i] = m.b[i]; zBoardsVis(i); }
   }
   ZC.insta = m.ins ? now + m.ins : 0; ZC.dbl = m.dbl ? now + m.dbl : 0;
 }
@@ -4321,7 +4682,7 @@ function footFreeR(x, z, r) {
 }
 // raio .45: grade/cerca fina (.3) entre dois centros de célula bloqueia as duas, senão o caminho "vaza" pela cerca
 function zBuildWalk() { // pinta cada colisor na grade (bem mais rápido que testar célula por célula no mapa grande)
-  const r = .45, W_ = FF.walk, nx = FF.nx, nz = FF.nz; W_.fill(1);
+  const r = .45, W_ = FF.walk, nx = FF.nx, nz = FF.nz; W_.fill(1); FS.busy = false; // grade mudou: o campo em andamento recomeça
   for (const b of COL) {
     if (b.maxY <= .05 || b.minY >= 1.7) continue;
     const i0 = Math.max(0, Math.floor(b.minX - r - FF.x0 - .5) + 1), i1 = Math.min(nx - 1, Math.ceil(b.maxX + r - FF.x0 - .5) - 1);
@@ -4330,39 +4691,53 @@ function zBuildWalk() { // pinta cada colisor na grade (bem mais rápido que tes
   }
 }
 const ffCell = (x, z) => { const i = Math.floor(x - FF.x0), j = Math.floor(z - FF.z0); return i < 0 || j < 0 || i >= FF.nx || j >= FF.nz ? -1 : i * FF.nz + j; };
-let FHK = new Float32Array(0), FHV = new Int32Array(0); // heap binário em arrays tipados (sem criar objeto por passo)
-function zFlow(srcs) {
-  const D = FF.dist, nz = FF.nz, cap = FF.nx * nz * 4;
-  if (FHK.length < cap) { FHK = new Float32Array(cap); FHV = new Int32Array(cap); }
-  const hk = FHK, hv = FHV; let n = 0;
-  const push = (k, v) => {
-    if (n >= cap) return; let i = n++;
-    while (i > 0) { const p = (i - 1) >> 1; if (hk[p] <= k) break; hk[i] = hk[p]; hv[i] = hv[p]; i = p; }
-    hk[i] = k; hv[i] = v;
-  };
+// Dijkstra com fila de baldes (custo inteiro: reto 5, diagonal 7 ~ 1,4): sem heap, O(células), nunca perde item.
+// Cada balde guarda um só custo por vez e cada célula entra no máximo uma vez por custo: N posições por balde bastam.
+// Roda em fatias (zFlowStep) num buffer de trás (FF.back) e só troca com FF.dist quando termina: mapa grande sem engasgo.
+let FQ = new Int32Array(0); const FQN = new Int32Array(8), FS = { busy: false, cur: 0, pend: 0 };
+function zFlowStart(srcs) {
+  const nx = FF.nx, nz = FF.nz, N = nx * nz, Wk = FF.walk;
+  if (FQ.length < N * 8) FQ = new Int32Array(N * 8);
+  if (!FF.back || FF.back.length !== N) FF.back = new Float32Array(N);
+  const D = FF.back, q = FQ, qn = FQN; qn.fill(0); let pend = 0;
   D.fill(Infinity);
   for (const [x, z] of srcs) {
     let c = ffCell(x, z); if (c < 0) continue;
-    if (!FF.walk[c]) { const i0 = (c / nz) | 0, j0 = c % nz; c = -1; let bd = 9; for (let di = -2; di <= 2; di++) for (let dj = -2; dj <= 2; dj++) { const ii = i0 + di, jj = j0 + dj; if (ii < 0 || jj < 0 || ii >= FF.nx || jj >= nz || !FF.walk[ii * nz + jj]) continue; const d = di * di + dj * dj; if (d < bd) { bd = d; c = ii * nz + jj; } } }
-    if (c >= 0 && D[c] > 0) { D[c] = 0; push(0, c); }
+    if (!Wk[c]) { const i0 = (c / nz) | 0, j0 = c % nz; c = -1; let bd = 9; for (let di = -2; di <= 2; di++) for (let dj = -2; dj <= 2; dj++) { const ii = i0 + di, jj = j0 + dj; if (ii < 0 || jj < 0 || ii >= nx || jj >= nz || !Wk[ii * nz + jj]) continue; const d = di * di + dj * dj; if (d < bd) { bd = d; c = ii * nz + jj; } } }
+    if (c >= 0 && D[c] > 0) { D[c] = 0; q[qn[0]++] = c; pend++; }
   }
-  while (n > 0) {
-    const cost = hk[0], c = hv[0]; n--;
-    if (n > 0) { // desce o último elemento a partir da raiz
-      const k = hk[n], v = hv[n]; let i = 0;
-      for (;;) { let m = 2 * i + 1; if (m >= n) break; if (m + 1 < n && hk[m + 1] < hk[m]) m++; if (hk[m] >= k) break; hk[i] = hk[m]; hv[i] = hv[m]; i = m; }
-      hk[i] = k; hv[i] = v;
-    }
-    if (cost > D[c]) continue;
-    const i = (c / nz) | 0, j = c % nz;
-    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
-      if (!di && !dj) continue; const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= FF.nx || jj >= nz) continue;
-      const nb = ii * nz + jj; if (!FF.walk[nb]) continue;
-      if (di && dj && (!FF.walk[ii * nz + j] || !FF.walk[i * nz + jj])) continue; // não corta quina
-      const nc = cost + (di && dj ? 1.414 : 1); if (nc < D[nb]) { D[nb] = nc; push(nc, nb); }
-    }
-  }
+  FS.busy = true; FS.cur = 0; FS.pend = pend;
 }
+function zFlowStep(budget) { // processa até 'budget' células; true quando o campo novo entrou em uso
+  if (!FS.busy) return false;
+  const D = FF.back, Wk = FF.walk, nx = FF.nx, nz = FF.nz, N = nx * nz, q = FQ, qn = FQN;
+  let cur = FS.cur, pend = FS.pend;
+  while (pend > 0 && budget > 0) {
+    const b = cur & 7, off = b * N;
+    while (qn[b] > 0 && budget > 0) {
+      const c = q[off + --qn[b]]; pend--;
+      if (D[c] !== cur) continue; // entrada velha (a célula já saiu mais barata)
+      budget--;
+      const i = (c / nz) | 0, j = c - i * nz;
+      const wl = i > 0 && Wk[c - nz], wr = i < nx - 1 && Wk[c + nz], wd = j > 0 && Wk[c - 1], wu = j < nz - 1 && Wk[c + 1];
+      let nb, nc = cur + 5, bb = nc & 7;
+      if (wl && nc < D[nb = c - nz]) { D[nb] = nc; q[bb * N + qn[bb]++] = nb; pend++; }
+      if (wr && nc < D[nb = c + nz]) { D[nb] = nc; q[bb * N + qn[bb]++] = nb; pend++; }
+      if (wd && nc < D[nb = c - 1]) { D[nb] = nc; q[bb * N + qn[bb]++] = nb; pend++; }
+      if (wu && nc < D[nb = c + 1]) { D[nb] = nc; q[bb * N + qn[bb]++] = nb; pend++; }
+      nc = cur + 7; bb = nc & 7; // diagonal só com os dois lados livres (não corta quina)
+      if (wl && wd && Wk[nb = c - nz - 1] && nc < D[nb]) { D[nb] = nc; q[bb * N + qn[bb]++] = nb; pend++; }
+      if (wl && wu && Wk[nb = c - nz + 1] && nc < D[nb]) { D[nb] = nc; q[bb * N + qn[bb]++] = nb; pend++; }
+      if (wr && wd && Wk[nb = c + nz - 1] && nc < D[nb]) { D[nb] = nc; q[bb * N + qn[bb]++] = nb; pend++; }
+      if (wr && wu && Wk[nb = c + nz + 1] && nc < D[nb]) { D[nb] = nc; q[bb * N + qn[bb]++] = nb; pend++; }
+    }
+    if (!qn[b]) cur++; // balde vazio: próximo custo (senão parou no meio por causa do orçamento)
+  }
+  FS.cur = cur; FS.pend = pend;
+  if (pend > 0) return false;
+  FS.busy = false; const t = FF.dist; FF.dist = FF.back; FF.back = t; return true;
+}
+function zFlow(srcs) { zFlowStart(srcs); zFlowStep(Infinity); } // campo inteiro de uma vez
 function zFlowDir(x, z) {
   const c = ffCell(x, z); if (c < 0) return null;
   const nz = FF.nz, i = (c / nz) | 0, j = c % nz; let best = FF.walk[c] ? FF.dist[c] : Infinity, bi = -1, bj = -1;
@@ -4422,7 +4797,8 @@ function zTick(dt) {
   }
   zTickPlayers(dt);
   if (S.phase === 'over') return;
-  if (now >= Z.ffT) { Z.ffT = now + .3; zFlow(Z.lure ? [Z.lure] : [...S.players.values()].filter(p => p.alive && !p.downed).map(p => [p.pos[0], p.pos[2]])); }
+  if (now >= Z.ffT && !FS.busy) { Z.ffT = now + .3; zFlowStart(Z.lure ? [Z.lure] : [...S.players.values()].filter(p => p.alive && !p.downed).map(p => [p.pos[0], p.pos[2]])); }
+  if (FS.busy) zFlowStep(Math.max(4000, FF.nx * FF.nz / 6)); // fatia por tick (o campo inteiro leva poucos ticks)
   zTickZombies(dt);
   zTickObjects();
   Z.zsT -= dt; if (Z.zsT <= 0) { Z.zsT = Math.max(0, Z.zsT + 1 / 20); zSnap(); }
@@ -4493,7 +4869,7 @@ function zSpawnOne() {
     ZD.risers.forEach(rz => { if (act.has(rz[2])) cands.push({ i: -1, x: rz[0], z: rz[1] }); });
     if (!cands.length) return false;
     let tot = 0;
-    for (const c of cands) { let md = 40; for (const q of tg) md = Math.min(md, Math.hypot(q.pos[0] - c.x, q.pos[2] - c.z)); c.wt = (c.i < 0 && md < 4 ? .03 : 1) / (1 + (md / 10) ** 2); tot += c.wt; } // prefere perto dos jogadores (mas não sai do chão no pé de ninguém)
+    for (const c of cands) { let md = 200; for (const q of tg) md = Math.min(md, Math.hypot(q.pos[0] - c.x, q.pos[2] - c.z)); c.wt = (c.i < 0 && md < 4 ? .03 : md > 80 ? .1 : 1) / (1 + (md / 10) ** 2); tot += c.wt; } // prefere perto dos jogadores (mas não sai do chão no pé de ninguém; longe demais quase nunca, nos mapas grandes)
     let pick = Math.random() * tot, c = cands[cands.length - 1]; for (const cc of cands) { pick -= cc.wt; if (pick <= 0) { c = cc; break; } }
     const D = zDf(); z.hp = Math.round(zHp(r) * D.hp); const v = r * 8 + rand(-12, 12) + D.run; z.sc = v < 35 ? 0 : v < 70 ? 1 : 2; z.speed = [rand(1.3, 1.8), rand(3.6, 4.3), rand(5, 5.5)][z.sc] * D.spd;
     if (c.i >= 0) { const w = ZD.windows[c.i], d = rand(4, 7), t = rand(-2, 2); z.st = 'out'; z.win = c.i; P.set(w.x + w.n[0] * d + w.tx * t, 0, w.z + w.n[1] * d + w.tz * t); z.yaw = Math.atan2(w.n[0], w.n[1]); }

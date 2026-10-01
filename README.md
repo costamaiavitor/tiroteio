@@ -24,8 +24,8 @@ Como a conexão funciona: posições (30 por segundo), bots e zumbis (20 por seg
 
 Dois mapas:
 
-- **Vila** (aberto, ~170 m de lado): dois anéis de área em volta de uma praça com chafariz, onde vocês começam. No anel de dentro, portões de ferro levam à Igreja (norte), à Fazenda (leste), ao Cemitério (oeste) e ao Lago (sul). Portões no muro do meio (1500) levam ao anel de fora, que tem 4 áreas ligadas por portas nas sebes: Pedreira (nordeste, com o gerador de energia), Estação de trem (sudeste), Acampamento com fogueira (sudoeste) e Castelo em ruínas (noroeste, com o Pack-a-Punch no pátio). Grades de ferro deixam a bala passar, mas ninguém atravessa. Os zumbis pulam os muros pelas janelas de tábua ou saem do chão no meio das áreas.
-- **Sanatório** (fechado): seis cômodos com portas e janelas. Vocês começam na Recepção.
+- **Vila** (aberta e gigante, ~300 m de lado, 17 áreas): três anéis em volta de uma praça com chafariz, onde vocês começam. No anel de dentro, portões de ferro levam à Igreja (norte), à Fazenda (leste), ao Cemitério (oeste) e ao Lago (sul). Portões no muro do meio (1500) levam ao anel do meio, que tem 4 áreas ligadas por portas nas sebes (1250): Pedreira (nordeste, com o gerador de energia), Estação de trem (sudeste), Acampamento com fogueira (sudoeste) e Castelo em ruínas (noroeste, com o Pack-a-Punch no pátio). Do anel do meio, corredores com portão (2000) atravessam o muro externo até oito distritos de fora, dois em cada lado, separados por uma porta (1500): Hospital de campanha e Mina (norte), Fábrica e Ferrovia (leste), Porto e Farol (sul), Floresta e Serraria (oeste). Grades de ferro deixam a bala passar, mas ninguém atravessa. Os zumbis pulam os muros pelas janelas de tábua ou saem do chão no meio das áreas.
+- **Sanatório** (fechado e enorme, ~125 x 100 m, 15 alas): vocês começam na Recepção. O núcleo antigo (Enfermaria, Pátio, Laboratório, Teatro e Capela) leva às alas novas: a oeste Refeitório, Biblioteca, Cozinha e Caldeiras (com o gerador de energia); ao norte Necrotério e Ala Psiquiátrica; a leste o Jardim com chafariz, a Estufa e a Torre d'água (com o Pack-a-Punch embaixo dela). Portas de 750 a 1500. Zumbis saem do chão no Pátio, no Jardim e na Torre d'água.
 
 Todo mundo começa com uma M1911.
 
@@ -45,13 +45,13 @@ A dificuldade aparece no canto de cima, junto com o nome do mapa.
 
 - **Rodadas infinitas.** A vida dos zumbis segue a fórmula do CoD (150 na rodada 1, +100 por rodada até a 9, depois ×1,1). A quantidade cresce a cada rodada. Os zumbis começam andando e passam a correr e disparar nas rodadas altas.
 - **Pontos:** 10 por acerto; ao matar, 60 (corpo), 50 (pernas ou explosão), 100 (headshot) ou 130 (faca). Consertar janela dá 10 por tábua (até 500 por rodada).
-- **Janelas:** os zumbis vêm de fora, arrancam as tábuas e pulam para dentro. Segure F perto da janela para pregar as tábuas de volta. Na Vila (e no Pátio do Sanatório) eles também saem do chão.
-- **Portões, portas e entulho** (750 a 1500) liberam novas áreas, com mais armas e mais janelas.
-- **Armas de parede** (contorno de giz, na parede ou em placas de madeira): M14, Olympia, MP40, MP5K, AK-74u, Stakeout, granadas e Faca Bowie; no anel de fora da Vila também Dragunov, Galil, SPAS-12 e FAL. Se você já tem a arma, compra munição pela metade do preço (arma com Pack-a-Punch: 4500).
+- **Janelas:** os zumbis vêm de fora, arrancam as tábuas e pulam para dentro. Segure F perto da janela para pregar as tábuas de volta. Na Vila (e nos lugares abertos do Sanatório) eles também saem do chão.
+- **Portões, portas e entulho** (750 a 2000) liberam novas áreas, com mais armas e mais janelas.
+- **Armas de parede** (contorno de giz, na parede ou em placas de madeira): M14, Olympia, MP40, MP5K, AK-74u, Stakeout, granadas e Faca Bowie; nas alas novas do Sanatório e nos anéis de fora da Vila também Dragunov, Galil, SPAS-12, FAL, Commando, HK21 e RPK. Se você já tem a arma, compra munição pela metade do preço (arma com Pack-a-Punch: 4500).
 - **Caixa Misteriosa (950):** arma aleatória: Ray Gun, Arma Trovão, Galil, Commando, FAL, RPK, HK21, SPAS-12, Python, CZ75, Dragunov, China Lake ou Macacos com Pratos. Às vezes sai o ursinho: você recebe os pontos de volta e a caixa muda de lugar.
-- **Energia:** fica no gerador da Pedreira (Vila) ou no Laboratório (Sanatório). Ligue para ativar as bebidas e o Pack-a-Punch.
+- **Energia:** fica no gerador da Pedreira (Vila) ou nas Caldeiras (Sanatório). Ligue para ativar as bebidas e o Pack-a-Punch.
 - **Bebidas** (máximo de 4): Juggernog (vida vai a 250: 2,5 vezes mais golpes), Speed Cola (recarrega na metade do tempo), Double Tap (atira 33% mais rápido), Quick Revive (reanima rápido; sozinho, te levanta até 3 vezes) e Stamin-Up (corre mais).
-- **Pack-a-Punch (5000):** fica no pátio do Castelo (Vila) ou no Teatro (Sanatório). Dobra o dano, aumenta o pente e dá nome e camuflagem novos à arma (a M1911 vira a explosiva Mustang & Sally).
+- **Pack-a-Punch (5000):** fica no pátio do Castelo (Vila) ou embaixo da Torre d'água (Sanatório). Dobra o dano, aumenta o pente e dá nome e camuflagem novos à arma (a M1911 vira a explosiva Mustang & Sally).
 - **Power-ups:** caem dos zumbis e duram 26s no chão. São eles: Munição Máxima, Insta-Kill, Pontos em Dobro, Nuke (+400) e Carpinteiro (+200).
 - **Cães do inferno:** uma rodada especial de tempos em tempos. O último cão sempre solta Munição Máxima.
 - **Vida:** a barra no centro de baixo da tela mostra a vida (com Juggernog vai até 250). Toda rodada nova começa com a vida cheia.
