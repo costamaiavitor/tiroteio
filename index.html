@@ -251,6 +251,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.42) 100%)}
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>window.Peer || document.write('<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"><\/script>')</script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
@@ -408,6 +409,7 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const lerp = (a, b, t) => a + (b - a) * t;
 const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 const r3 = v => Math.round(v * 1000) / 1000;
+const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function save(k, v) { try { localStorage.setItem('tiroteio.' + k, JSON.stringify(v)); } catch (e) { } }
 function load(k, d) { try { const v = localStorage.getItem('tiroteio.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
@@ -3087,11 +3089,11 @@ function updateMe(dt) {
 }
 let posT = 0;
 function sendPos(dt) {
-  posT -= dt; if (posT > 0 || !me.alive) return; posT = 1 / 30;
-  sendToHostFast({ t: 'pos', p: [r3(me.pos.x), r3(me.pos.y), r3(me.pos.z)], y: r3(me.yaw), pi: r3(me.pitch), c: me.crouch ? 1 : 0, w: G.cur, ts: r3(now) });
+  posT -= dt; if (posT > 0 || !me.alive) return; posT = Math.max(0, posT + 1 / 30); // guarda o resto: 30 Hz de verdade
+  sendToHostFast({ t: 'pos', p: [r2(me.pos.x), r2(me.pos.y), r2(me.pos.z)], y: r3(wrapA(me.yaw)), pi: r3(me.pitch), c: me.crouch ? 1 : 0, w: G.cur, ts: r3(now), sq: me.sq });
 }
 function localSpawn(m) {
-  me.pos.set(m.p[0], m.p[1], m.p[2]); me.vel.set(0, 0, 0); me.yaw = m.y; me.pitch = 0;
+  me.sq = m.sq; me.pos.set(m.p[0], m.p[1], m.p[2]); me.vel.set(0, 0, 0); me.yaw = m.y; me.pitch = 0;
   me.alive = true; me.hp = 100; me.armor = m.ar; me.helmet = !!m.hm; me.crouch = false; me.h = H_STAND; me.onGround = false; me.suicided = false; me.stepOff = 0;
   me.downed = false; ZC.selfRev = false; me.sprinting = false; me.stamina = 4;
   G.punchP = G.punchY = 0; G.trigger = false; C.spec = null;
@@ -3129,7 +3131,7 @@ function updateRemotes(dt) {
       let a = null, b = null;
       for (let i = buf.length - 1; i >= 0; i--) if (buf[i].t <= rt) { a = buf[i]; b = buf[i + 1] || null; break; }
       if (!a) a = buf[0];
-      if (b) { const k = clamp((rt - a.t) / Math.max(1e-3, b.t - a.t), 0, 1); rp.pos.set(lerp(a.p[0], b.p[0], k), lerp(a.p[1], b.p[1], k), lerp(a.p[2], b.p[2], k)); rp.yaw = a.y + angDiff(a.y, b.y) * k; rp.pitch = lerp(a.pi, b.pi, k); rp.crouch = b.c; }
+      if (b) { const k = clamp((rt - a.t) / Math.max(1e-3, b.t - a.t), 0, 1); rp.pos.set(lerp(a.p[0], b.p[0], k), lerp(a.p[1], b.p[1], k), lerp(a.p[2], b.p[2], k)); rp.yaw = a.y + angDiff(a.y, b.y) * k; rp.pitch = lerp(a.pi, b.pi, k); rp.crouch = k < .5 ? a.c : b.c; }
       else { // sem dado novo ainda: segue a última velocidade por até 150 ms em vez de parar e dar um pulo
         const pv = buf.length > 1 && a === buf[buf.length - 1] ? buf[buf.length - 2] : null, e = pv ? clamp(rt - a.t, 0, .15) / Math.max(.02, a.t - pv.t) : 0;
         rp.pos.set(a.p[0] + (pv ? (a.p[0] - pv.p[0]) * e : 0), a.p[1], a.p[2] + (pv ? (a.p[2] - pv.p[2]) * e : 0)); rp.yaw = a.y; rp.pitch = a.pi; rp.crouch = a.c;
@@ -3233,12 +3235,13 @@ function startSmoke(n) {
 // ================================================================
 // Rede (PeerJS / WebRTC)
 // ================================================================
+// Poucos servidores: cada um a mais atrasa a coleta de candidatos (o Firefox avisa a partir de 5).
+// O TURN também devolve o IP público, então dois STUN bastam.
 const ICE = { iceServers: [
-  { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' },
-  { urls: 'stun:stun.relay.metered.ca:80' },
-  // TURN da Metered (plano grátis): repassa o tráfego quando a ligação direta é bloqueada
-  ...['turn:global.relay.metered.ca:80', 'turn:global.relay.metered.ca:80?transport=tcp', 'turn:global.relay.metered.ca:443', 'turns:global.relay.metered.ca:443?transport=tcp']
-    .map(urls => ({ urls, username: '7e5e8e438db7850a900283eb', credential: 'lsm3R6Mx0fBbhLeX' })),
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  // TURN da Metered (plano grátis): repassa o tráfego quando a ligação direta é bloqueada (UDP, TCP e TLS na 443)
+  { urls: ['turn:global.relay.metered.ca:80', 'turn:global.relay.metered.ca:80?transport=tcp', 'turn:global.relay.metered.ca:443', 'turns:global.relay.metered.ca:443?transport=tcp'],
+    username: '7e5e8e438db7850a900283eb', credential: 'lsm3R6Mx0fBbhLeX' },
 ] };
 const NET = { peer: null, isHost: false, code: null, conns: new Map(), hostConn: null, online: false };
 // Canal rápido: posições e zumbis vão num canal WebRTC sem retransmissão e sem ordem. No canal confiável,
@@ -3250,17 +3253,18 @@ function attachFast(conn, onData) {
   try {
     const dc = conn.peerConnection.createDataChannel('rapido', { negotiated: true, id: FAST_ID, ordered: false, maxRetransmits: 0 });
     conn.fast = dc;
-    dc.onmessage = e => { conn.fastOk = true; let m; try { m = JSON.parse(e.data); } catch (err) { return; } if (m.t !== 'ping') onData(m); };
+    dc.onmessage = e => { conn.fastOk = true; let m; try { m = JSON.parse(e.data); } catch (err) { return; } if (m.t !== 'ping' || m.c) onData(m); };
     dc.onopen = () => { let n = 0; const iv = setInterval(() => { if (dc.readyState !== 'open' || n++ > 20) return clearInterval(iv); try { dc.send('{"t":"ping"}'); } catch (e) { } if (conn.fastOk && n > 3) clearInterval(iv); }, 500); };
   } catch (e) { console.warn('canal rápido indisponível', e); }
 }
-function sendFastTo(conn, m) {
+function sendFastTo(conn, m, json) {
   const f = conn.fast;
-  if (conn.fastOk && f?.readyState === 'open') { if (f.bufferedAmount < 32000) try { f.send(JSON.stringify(m)); } catch (e) { } return; } // congestionado: descarta, vem outro já já
+  if (conn.fastOk && f?.readyState === 'open') { if (f.bufferedAmount < 32000) try { f.send(json ?? JSON.stringify(m)); } catch (e) { } return; } // congestionado: descarta, vem outro já já
   if (conn.open) try { conn.send(m); } catch (e) { }
 }
 function broadcastFast(m, except) {
-  for (const [pid, conn] of NET.conns) if (pid !== except && conn.open) sendFastTo(conn, m);
+  let json; // um JSON.stringify só, não um por jogador
+  for (const [pid, conn] of NET.conns) if (pid !== except && conn.open) sendFastTo(conn, m, json ??= JSON.stringify(m));
   if (except !== C.myId) onMsg(m);
 }
 function sendToHostFast(m) {
@@ -3271,15 +3275,19 @@ function sendToHostFast(m) {
 // (offset) e uso ts + offset como hora de chegada "sem tremida"; a tremida medida define quanto atraso
 // de interpolação usar (80 a 300 ms). Assim uma rede irregular não vira movimento aos trancos.
 const NCLK = new Map();
+// O atraso também cobre o maior intervalo recente entre duas fotos (gap): zumbis e bots vão a 20 Hz,
+// e um pacote perdido abre um buraco de 100 ms que um atraso fixo de 80 ms não cobria.
 function netTime(src, ts) {
   if (!(ts > 0)) return now;
-  const o = now - ts; let c = NCLK.get(src);
-  if (!c || Math.abs(o - c.off) > 5) { c = { off: o, jit: .03 }; NCLK.set(src, c); }
+  const arr = window.__simLock ? now : performance.now() / 1000; // hora em que chegou de fato (now é a do último quadro: +0–33 ms de tremida falsa)
+  const o = arr - ts; let c = NCLK.get(src);
+  if (!c || Math.abs(o - c.off) > 5) { c = { off: o, jit: .03, gap: .05, lastTs: 0 }; NCLK.set(src, c); }
   if (o < c.off) c.off = o; else c.off += (o - c.off) * .003;
   c.jit += (Math.min(o - c.off, .5) - c.jit) * (o - c.off > c.jit ? .2 : .02); // sobe rápido, desce devagar
+  if (ts > c.lastTs) { const g = ts - c.lastTs; if (c.lastTs && g < .25) c.gap = Math.max(g, c.gap * .98); c.lastTs = ts; } // pausa longa (morto, entre rodadas) não conta
   return ts + c.off;
 }
-const netDelay = src => { const c = NCLK.get(src); return c ? clamp(.06 + c.jit * 2, .08, .3) : .1; };
+const netDelay = src => { const c = NCLK.get(src); return c ? clamp(c.gap * 1.5 + .02 + c.jit * 2, .08, .3) : .12; };
 const genCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
 function sendToHost(m) {
   if (NET.isHost) srvHandle(C.myId, m);
@@ -3305,31 +3313,45 @@ function startHost(st) {
   const tryOpen = attempt => {
     const code = genCode();
     const peer = new Peer(PEER_PREFIX + code, { config: ICE, debug: 1 });
-    peer.on('open', () => { NET.peer = peer; NET.code = code; NET.online = true; updateRoomInfo(); toast('Sala criada! Código: ' + code, 5); });
+    let rc = 0; // tentativas de voltar ao servidor de pareamento
+    peer.on('open', () => {
+      const back = NET.online; rc = 0; NET.peer = peer; NET.code = code; NET.online = true; updateRoomInfo();
+      toast(back ? 'Sala de volta no servidor de pareamento' : 'Sala criada! Código: ' + code, back ? 3 : 5);
+    });
     peer.on('error', err => {
-      if (err.type === 'unavailable-id' && attempt < 4) { peer.destroy(); tryOpen(attempt + 1); }
+      // código já usado: só troca de código antes de a sala abrir. Depois, "unavailable-id" vem da reconexão
+      // (o servidor ainda segura o socket velho) e destruir o peer derrubaria todos os jogadores.
+      if (err.type === 'unavailable-id' && !NET.online && attempt < 4) { peer.destroy(); tryOpen(attempt + 1); }
       else if (!NET.online) { toast('Não deu pra abrir a sala online (' + err.type + '). Jogando offline.', 6); }
       else console.warn('peer error', err);
     });
-    peer.on('disconnected', () => { setTimeout(() => { if (!peer.destroyed) try { peer.reconnect(); } catch (e) { } }, 1500); });
+    // sem o servidor de pareamento a partida continua (as conexões são diretas), só ninguém novo entra
+    peer.on('disconnected', () => {
+      if (NET.online && rc === 0) toast('Servidor de pareamento caiu: a partida continua, reconectando a sala...', 4);
+      setTimeout(() => { if (!peer.destroyed && peer.disconnected) try { peer.reconnect(); } catch (e) { } }, Math.min(30000, 1500 * 2 ** rc++));
+    });
     peer.on('connection', conn => {
       conn.on('open', () => attachFast(conn, d => srvOnData(conn, d)));
       conn.on('data', d => srvOnData(conn, d));
       conn.on('close', () => srvDrop(conn));
-      conn.on('error', () => srvDrop(conn));
+      // "message-too-big"/"not-open-yet" são de uma mensagem só: não derrubam o jogador
+      conn.on('error', err => { if (err?.type === 'message-too-big' || err?.type === 'not-open-yet') console.warn('conn', err); else srvDrop(conn); });
     });
   };
   tryOpen(0);
 }
 function joinRoom(code) {
   const status = $('#joinStatus');
+  if (NET.joining) return; // Enter + clique (ou dois cliques) abriam duas conexões e um jogador fantasma
   if (!peerAvailable()) { status.textContent = 'PeerJS não carregou (sem internet?)'; status.className = 'status err'; return; }
-  code = code.trim().toUpperCase(); if (!code) { status.textContent = 'Digite o código'; status.className = 'status err'; return; }
+  code = code.replace(/.*sala=/i, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5); // aceita o link inteiro colado
+  if (!code) { status.textContent = 'Digite o código'; status.className = 'status err'; return; }
   status.textContent = 'Conectando...'; status.className = 'status';
-  NET.isHost = false;
+  NET.isHost = false; NET.joining = true; $('#btnJoin').disabled = true;
+  try { NET.peer?.destroy(); } catch (e) { }
   const peer = new Peer({ config: ICE, debug: 1 }); NET.peer = peer;
   let welcomed = false, stage = 'server';
-  const fail = txt => { if (welcomed) return; status.textContent = txt; status.className = 'status err'; try { peer.destroy(); } catch (e) { } };
+  const fail = txt => { if (welcomed) return; clearTimeout(timer); NET.joining = false; $('#btnJoin').disabled = false; status.textContent = txt; status.className = 'status err'; try { peer.destroy(); } catch (e) { } };
   const timer = setTimeout(() => fail(
     stage === 'server' ? 'Tempo esgotado: não deu pra falar com o servidor de pareamento. Confere a internet.'
     : stage === 'linking' ? 'Tempo esgotado: a sala existe, mas a rede bloqueou a ligação com o host (firewall, VPN ou Wi-Fi com isolamento).'
@@ -3338,19 +3360,23 @@ function joinRoom(code) {
     stage = 'linking';
     const conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
     NET.hostConn = conn;
-    conn.on('open', () => { stage = 'waiting'; attachFast(conn, m => { NET.lastHost = performance.now(); onMsg(m); }); conn.send({ t: 'join', name: CFG.name, sk: cleanSk(PROF.data?.equipped) }); });
-    conn.on('data', m => { NET.lastHost = performance.now(); if (m.t === 'welcome') { welcomed = true; clearTimeout(timer); NET.code = code; NET.online = true; status.textContent = ''; } onMsg(m); });
+    // v: 2 = entende "state" sem as skins repetidas (o host manda a versão completa para quem não manda v)
+    conn.on('open', () => { stage = 'waiting'; attachFast(conn, m => { NET.lastHost = performance.now(); if (welcomed) onMsg(m); }); conn.send({ t: 'join', v: 2, name: CFG.name, sk: cleanSk(PROF.data?.equipped) }); });
+    conn.on('data', m => { NET.lastHost = performance.now(); if (m.t === 'welcome') { welcomed = true; NET.joining = false; clearTimeout(timer); NET.code = code; NET.online = true; status.textContent = ''; } onMsg(m); });
     conn.on('close', () => { if (welcomed) lostConnection(); else fail('Conexão recusada'); });
-    conn.on('error', () => { if (welcomed) lostConnection(); });
+    conn.on('error', err => { if (err?.type === 'message-too-big' || err?.type === 'not-open-yet') console.warn('conn', err); else if (welcomed) lostConnection(); });
   });
   peer.on('error', err => { clearTimeout(timer); if (err.type === 'peer-unavailable') fail('Sala não encontrada: ' + code); else if (welcomed) console.warn(err); else fail('Erro de conexão: ' + err.type); });
 }
-// cliente: "estou vivo" a cada 2s; e se o host sumir por 12s, avisa
-setInterval(() => {
-  if (NET.isHost || !NET.hostConn?.open || !inGame) return;
-  try { NET.hostConn.send({ t: 'ping' }); } catch (e) { }
+// cliente: "estou vivo" a cada 1 s (com a hora, para medir o ping); se o host sumir por 12 s, avisa.
+// Roda no tick (que o worker mantém em aba escondida): no setInterval o Chrome passa a 1 vez por minuto
+// depois de 5 min escondido, e o host derrubava quem estava morto/assistindo com a aba em segundo plano.
+function clientHeartbeat(dt) {
+  if (NET.isHost || !NET.hostConn?.open) return;
+  NET.pingT = (NET.pingT || 0) - dt; if (NET.pingT > 0) return; NET.pingT = 1;
+  sendToHostFast({ t: 'ping', c: Math.round(performance.now()) });
   if (NET.lastHost && performance.now() - NET.lastHost > 12000) lostConnection();
-}, 2000);
+}
 function lostConnection() {
   if (!inGame || NET.lost) return;
   NET.lost = true;
@@ -3377,9 +3403,9 @@ function srvAddPlayer(id, name, isBot) {
 function srvOnData(conn, d) {
   if (!d || typeof d !== 'object') return;
   conn.lastSeen = performance.now();
-  if (d.t === 'ping') return;
+  if (d.t === 'ping') { if (d.c > 0) sendFastTo(conn, { t: 'pong', c: d.c }); return; }
   if (d.t === 'join' && !conn.pid) {
-    const id = 'p' + (S.nextId++); conn.pid = id; NET.conns.set(id, conn);
+    const id = 'p' + (S.nextId++); conn.pid = id; conn.v = +d.v || 1; NET.conns.set(id, conn); S.skDirty = true;
     const name = String(d.name || 'Jogador').replace(/[<>]/g, '').slice(0, 16) || 'Jogador';
     const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk);
     conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code });
@@ -3394,30 +3420,40 @@ function srvDrop(conn) {
   const id = conn.pid; if (!id || !S.players.has(id)) return;
   const name = S.players.get(id).name;
   S.players.delete(id); NET.conns.delete(id);
+  try { conn.close(); } catch (e) { } // derrubado por erro: fecha de verdade, senão o cliente fica 12 s num jogo que não anda
   broadcast({ t: 'bye', id }); broadcast({ t: 'info', txt: name + ' saiu' });
   if (S.st.mode === 'zombies' && Z.on) zCheckOver();
 }
+// o host repassa o que chega para todo mundo: número fora do lugar (NaN, texto, lista gigante) quebrava os
+// outros clientes, e mensagem acima de 16 KB fazia o PeerJS dar erro e o host derrubar jogadores inocentes
+const vec3 = a => Array.isArray(a) && a.length === 3 && a.every(x => typeof x === 'number' && Number.isFinite(x) && Math.abs(x) < 1e4);
+const finN = v => typeof v === 'number' && Number.isFinite(v);
 function srvHandle(pid, m) {
   const p = S.players.get(pid); if (!p || !m) return;
   switch (m.t) {
     case 'pos':
-      if (!p.alive || !Array.isArray(m.p)) return;
+      if (!p.alive || !vec3(m.p) || !finN(m.y) || !finN(m.pi)) return;
+      if (m.sq !== undefined && p.sq && m.sq !== p.sq) return; // posição de antes do último spawn (desfazia o teleporte do começo da rodada)
       if (m.ts && m.ts < (p.posTs || 0)) return; p.posTs = m.ts || 0; // canal sem ordem: ignora posição velha
-      p.pos = m.p; p.yaw = m.y; p.pitch = m.pi; p.crouch = m.c; p.w = m.w;
-      broadcastFast({ t: 'pos', id: pid, p: m.p, y: m.y, pi: m.pi, c: m.c, w: m.w, d: p.downed ? 1 : 0, ts: m.ts }, pid); break;
-    case 'shot': broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e: (m.e || []).slice(0, 12) }, pid); break;
+      p.pos = m.p; p.yaw = m.y; p.pitch = m.pi; p.crouch = m.c ? 1 : 0; p.w = W[m.w] ? m.w : p.w;
+      broadcastFast({ t: 'pos', id: pid, p: m.p, y: m.y, pi: m.pi, c: p.crouch, w: p.w, d: p.downed ? 1 : 0, ts: finN(m.ts) ? m.ts : 0, sq: p.sq }, pid); break;
+    case 'shot': {
+      if (!vec3(m.o) || !W[m.w]) return;
+      const e = (Array.isArray(m.e) ? m.e : []).slice(0, 12).filter(vec3);
+      broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e }, pid); break;
+    }
     case 'zhit': if (S.st.mode === 'zombies' && Z.on && p.alive) zHit(p, +m.v, +m.dmg || 0, m.z, W[m.w] ? m.w : 'm1911', !!m.sp); break;
     case 'use': if (S.st.mode === 'zombies' && Z.on) srvZUse(p, m); break;
     case 'hold': if (S.st.mode === 'zombies' && Z.on) srvZHold(p, m); break;
     case 'selfdmg': if (S.st.mode === 'zombies' && Z.on) zHurt(p, clamp(+m.d || 0, 0, 100), null); break;
     case 'hit':
       if (S.st.mode === 'zombies') return; // sem fogo amigo no cooperativo
-      if (!p.alive && now - p.diedAt > .3) return;
+      if (!p.alive && now - p.diedAt > .6) return; // tiro dado antes de saber que morreu (com TURN o ping passa de 300 ms)
       if (S.phase === 'freeze' || m.v === pid) return;
       srvDamage(m.v, pid, clamp(+m.dmg || 0, 0, 500), m.z, W[m.w] ? m.w : 'glock'); break;
     case 'buy': srvBuy(p, m.it); break;
-    case 'skins': p.skins = cleanSk(m.sk); break;
-    case 'nade': if (!p.alive || !(p.inv[m.k] > 0)) return; p.inv[m.k]--; broadcast({ t: 'nade', id: pid, k: m.k, p: m.p, v: m.v }, pid); break;
+    case 'skins': p.skins = cleanSk(m.sk); S.skDirty = true; break;
+    case 'nade': if (!p.alive || !W[m.k] || W[m.k].slot !== 'nade' || !vec3(m.p) || !vec3(m.v) || !(p.inv[m.k] > 0)) return; p.inv[m.k]--; broadcast({ t: 'nade', id: pid, k: m.k, p: m.p, v: m.v }, pid); break;
     case 'chat': broadcast({ t: 'chat', id: pid, txt: String(m.txt || '').slice(0, 120) }); break;
     case 'suicide': if (p.alive) srvKill(p, null, 'world', false); break;
   }
@@ -3450,10 +3486,10 @@ function pickSpawn(side, taken) {
   return best;
 }
 function srvSpawn(p, s, refill, yawSet) {
-  p.alive = true; p.hp = 100; p.pos = [s[0], s[1], s[2]];
+  p.alive = true; p.hp = 100; p.pos = [s[0], s[1], s[2]]; p.sq = (p.sq | 0) + 1; p.posTs = 0;
   const yaw = yawSet ?? Math.atan2(s[0], s[2]); p.yaw = yaw;
   if (p.isBot) { const b = p.bot; b.body.pos.set(s[0], s[1], s[2]); b.body.vel.set(0, 0, 0); b.yaw = yaw; b.pitch = 0; b.path = []; b.target = null; b.lastSeen = null; b.mag = 0; b.magW = null; b.reloadEnd = 0; }
-  broadcast({ t: 'spawn', id: p.id, p: p.pos, y: yaw, inv: p.inv, ar: p.armor, hm: p.helmet ? 1 : 0, refill: refill ? 1 : 0 });
+  broadcast({ t: 'spawn', id: p.id, p: p.pos, y: yaw, inv: p.inv, ar: p.armor, hm: p.helmet ? 1 : 0, refill: refill ? 1 : 0, sq: p.sq });
 }
 function srvSpawnDM(p) {
   const pr = p.pref;
@@ -3542,9 +3578,14 @@ function srvState() {
       rv: p.downed && p.revBy ? r2(p.revProg / (S.players.get(p.revBy)?.perks.includes('qr') ? 2 : 4)) : 0, mh: p.maxHp, bw: p.bowie ? 1 : 0 });
     pl.push(o);
   }
-  const msg = { t: 'state', ph: S.phase, tl: Math.max(0, S.phaseEnd - now), r: S.round, pl, win: S.winner, pre: S.pre ? Math.max(0, S.pre - now) : 0, st: (S.stN = (S.stN || 0) + 1) % 8 === 1 ? S.st : undefined };
+  const full = (S.stN = (S.stN || 0) + 1) % 8 === 1;
+  const msg = { t: 'state', ph: S.phase, tl: r2(Math.max(0, S.phaseEnd - now)), r: S.round, pl, win: S.winner, pre: S.pre ? r2(Math.max(0, S.pre - now)) : 0, st: full ? S.st : undefined };
   if (zmode && Z.on) msg.z = zWorldState();
-  broadcast(msg);
+  // as skins eram ~60% do "state" (4 por segundo); agora só vão quando alguém troca, e a cada ~2 s por garantia
+  const lean = full || S.skDirty ? msg : { ...msg, pl: pl.map(({ sk, ...o }) => o) };
+  S.skDirty = false;
+  for (const conn of NET.conns.values()) if (conn.open) try { conn.send(conn.v >= 2 ? lean : msg); } catch (e) { }
+  onMsg(lean);
 }
 // quem fechou a aba sem avisar (o WebRTC às vezes demora pra perceber) sai depois de 12s sem mandar nada
 let dropCheckT = 0;
@@ -3642,7 +3683,7 @@ function botThink(p, dt) {
   if (pos.y < -25) { srvKill(p, null, 'world', false); return; }
   p.pos = [pos.x, pos.y, pos.z]; p.yaw = b.yaw; p.pitch = b.pitch; p.w = wid;
   b.sendT -= dt;
-  if (b.sendT <= 0) { b.sendT = 1 / 20; broadcastFast({ t: 'pos', id: p.id, p: [r3(pos.x), r3(pos.y), r3(pos.z)], y: r3(b.yaw), pi: r3(b.pitch), c: 0, w: wid, ts: r3(now) }); }
+  if (b.sendT <= 0) { b.sendT = Math.max(0, b.sendT + 1 / 20); broadcastFast({ t: 'pos', id: p.id, p: [r2(pos.x), r2(pos.y), r2(pos.z)], y: r3(wrapA(b.yaw)), pi: r3(b.pitch), c: 0, w: wid, ts: r3(now), sq: p.sq }); }
 }
 function botShoot(p, tgt, D, wid, eye, dist) {
   const w = W[wid], b = p.bot;
@@ -4368,7 +4409,7 @@ function zTick(dt) {
   if (now >= Z.ffT) { Z.ffT = now + .3; zFlow(Z.lure ? [Z.lure] : [...S.players.values()].filter(p => p.alive && !p.downed).map(p => [p.pos[0], p.pos[2]])); }
   zTickZombies(dt);
   zTickObjects();
-  Z.zsT -= dt; if (Z.zsT <= 0) { Z.zsT = 1 / 20; zSnap(); }
+  Z.zsT -= dt; if (Z.zsT <= 0) { Z.zsT = Math.max(0, Z.zsT + 1 / 20); zSnap(); }
 }
 function zTickPlayers(dt) {
   for (const p of S.players.values()) {
@@ -4673,9 +4714,10 @@ function zSnap() {
   const a = [];
   for (const z of Z.zs.values()) {
     const P = z.body.pos, f = z.sc | (z.atkWind ? 4 : 0) | (z.crawler ? 8 : 0) | (z.dog ? 16 : 0) | (z.st === 'out' || z.st === 'tear' || z.st === 'climb' ? 32 : 0) | (z.st === 'rise' ? 64 : 0);
-    a.push(z.id, r2(P.x), r2(P.y), r2(P.z), r2(z.yaw), f);
+    a.push(z.id, r2(P.x), r2(P.y), r2(P.z), r2(wrapA(z.yaw)), f);
   }
-  broadcastFast({ t: 'zs', ts: r3(now), z: a, b: Z.boards.slice(), ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0 });
+  const bk = Z.boards.join(), sendB = bk !== Z.lastB || (Z.snapN = (Z.snapN || 0) + 1) % 10 === 0; Z.lastB = bk;
+  broadcastFast({ t: 'zs', ts: r3(now), z: a, b: sendB ? Z.boards.slice() : undefined, ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0 });
 }
 function zWorldState() {
   return { r: Z.round, ph: Z.phase, pw: Z.power ? 1 : 0, d: [...Z.doors], box: [Z.box.loc, Z.box.st, Z.box.user, Z.box.st === 'offer' ? Z.box.w : null], pap: [Z.pap.st, Z.pap.user, Z.pap.st === 'ready' ? Z.pap.w : null],
@@ -4708,7 +4750,7 @@ function onMsg(m) {
       if (m.st) { if (C.st && C.st.map !== m.st.map) buildMap(m.st.map); C.st = m.st; }
       const zmode = C.st?.mode === 'zombies', ids = new Set();
       for (const pl of m.pl) {
-        ids.add(pl.id); C.players.set(pl.id, pl);
+        ids.add(pl.id); if (!pl.sk) pl.sk = C.players.get(pl.id)?.sk; C.players.set(pl.id, pl);
         if (pl.id === C.myId) {
           me.hp = pl.hp; me.armor = pl.ar; me.helmet = !!pl.hm; me.money = pl.m; if (!pl.al && me.alive) { me.alive = false; me.downed = false; C.deadAt = now; }
           if (zmode) { if (me.alive && pl.al && !!pl.dn !== me.downed) zSetDowned(!!pl.dn); ZC.perks = pl.pk || []; ZC.bowie = !!pl.bw; if (pl.dn && pl.bl) ZC.bleedEnd = now + pl.bl; }
@@ -4719,9 +4761,12 @@ function onMsg(m) {
       if (m.z) zSyncWorld(m.z);
       break;
     }
+    case 'pong': { const rtt = performance.now() - m.c; if (rtt >= 0 && rtt < 1e4) NET.rtt = NET.rtt ? NET.rtt * .7 + rtt * .3 : rtt; break; }
     case 'pos': {
       if (m.id === C.myId) break;
-      const rp = getRemote(m.id), t = netTime(m.id, m.ts), lb = rp.buf[rp.buf.length - 1];
+      const rp = getRemote(m.id);
+      if (m.sq && rp.sq && m.sq < rp.sq) break; // de antes do spawn
+      const t = netTime(m.id, m.ts), lb = rp.buf[rp.buf.length - 1];
       if (lb && t <= lb.t) break; // chegou fora de ordem
       rp.buf.push({ t, p: m.p, y: m.y, pi: m.pi, c: m.c }); if (rp.buf.length > 40) rp.buf.shift();
       rp.delay = netDelay(m.id);
@@ -4731,7 +4776,7 @@ function onMsg(m) {
     }
     case 'spawn':
       if (m.id === C.myId) localSpawn(m);
-      else { const rp = getRemote(m.id); rp.alive = true; rp.dead = false; rp.downed = false; rp.buf = [{ t: now - .2, p: m.p, y: m.y, pi: 0, c: 0 }]; rp.pos.set(m.p[0], m.p[1], m.p[2]); rp.last.copy(rp.pos); }
+      else { const rp = getRemote(m.id); rp.sq = m.sq; rp.alive = true; rp.dead = false; rp.downed = false; rp.buf = [{ t: now - .2, p: m.p, y: m.y, pi: 0, c: 0 }]; rp.pos.set(m.p[0], m.p[1], m.p[2]); rp.last.copy(rp.pos); }
       break;
     // ----- modo zumbis -----
     case 'zreset':
@@ -4934,7 +4979,7 @@ function updateHud(dt) {
       rows.map(p => `<tr class="${p.id === C.myId ? 'me' : ''} ${p.al ? '' : 'dead'}"><td><span style="color:${esc(p.c)}">■</span> ${esc(p.n)}${p.b ? ' <small>(bot)</small>' : ''}</td>${st.mode === 'rounds' ? `<td>${p.rw}</td>` : ''}<td>${p.k}</td><td>${p.d}</td>${st.mode === 'rounds' ? `<td>${p.id === C.myId || p.b ? '$' + p.m : '-'}</td>` : ''}</tr>`).join('') + '</table>');
   }
   fpsN++; fpsT += dt; if (fpsT >= .5) { fps = Math.round(fpsN / fpsT); fpsN = 0; fpsT = 0; }
-  const net = `${fps} FPS` + (NET.isHost ? ` · host · ${S.players.size} jogador(es)` : '');
+  const net = `${fps} FPS` + (NET.isHost ? ` · host · ${S.players.size} jogador(es)` : NET.rtt ? ` · ping ${Math.round(NET.rtt)} ms` : '');
   if ($('#net').textContent !== net) $('#net').textContent = net;
 }
 // ---------- loja estilo Valorant: tela por cima do jogo, colunas por categoria, clica e compra ----------
@@ -5237,7 +5282,7 @@ function equipItem(it, on) {
 function skinsChanged() {
   const sk = cleanSk(PROF.data?.equipped);
   if (inGame) {
-    if (NET.isHost) { const p = S.players.get('h'); if (p) p.skins = sk; } else sendToHost({ t: 'skins', sk });
+    if (NET.isHost) { const p = S.players.get('h'); if (p) { p.skins = sk; S.skDirty = true; } } else sendToHost({ t: 'skins', sk });
     if (G.cur) vmSetWeapon(G.cur);
   }
 }
@@ -5495,6 +5540,7 @@ function tick(dt) {
   updateMe(dt);
   updateWeapon(dt);
   sendPos(dt);
+  clientHeartbeat(dt);
   if (!me.alive) {
     if (C.spec && !R.get(C.spec)?.alive) C.spec = null;
     if (!C.spec && now - C.deadAt > 2.5) cycleSpec();
