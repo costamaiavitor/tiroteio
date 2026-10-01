@@ -2852,7 +2852,12 @@ function fpBuild(id, ud) {
         }
         act.stop(); mixer.clipAction(clips.idle).reset().play(); mixer.update(0); root.updateMatrixWorld(true);
       }
-      if (b2 && d2) F2 = { a: a2, b: b2, d: d2, tiny, g: gm, hl: hl2, hr: P.hr, ghost: true };
+      if (b2 && d2) {
+        F2 = { a: a2, b: b2, d: d2, tiny, g: gm, hl: hl2, hr: P.hr, ghost: true, main: fm, rest: fm.rest, st: 0 };
+        // na mão (longe do encaixe), o centro do carregador do modelo vai para o centro do carregador novo do pacote
+        const cA2 = fpBoneCenter(root, a2, m => !fpArm(m)), cB2 = fpBoneCenter(ms, fm.b, m => m.visible);
+        if (cA2 && cB2) { F2.t0 = new V3().setFromMatrixPosition(d2); F2.t1 = cA2.clone().sub(cB2.applyMatrix3(new THREE.Matrix3().setFromMatrix4(d2))); }
+      }
     }
     // mão esquerda: no pacote ela segura o guarda-mão da arma dele; no modelo vai para o guarda-mão do modelo (mesma folga embaixo dele)
     const hl = fpBone(root, 'Hand_L');
@@ -2869,7 +2874,7 @@ function fpBuild(id, ud) {
   }
   // braços: IK de dois ossos nos dois lados, com os ombros recuados (P.sh: para fora, para cima, para trás, em metros do jogo) para o corte
   // das mangas ficar fora da tela; as mãos ficam onde a animação põe (a esquerda vai para o guarda-mão do modelo)
-  const arm = sd => ({ cl: fpBone(root, 'Arm_' + sd), ua: fpBone(root, 'UpArm_' + sd), fa: fpBone(root, 'Forearm_' + sd), wr: fpBone(root, 'BoneTwist_01' + sd + '_end'), sd: sd === 'L' ? -1 : 1 });
+  const arm = sd => ({ cl: fpBone(root, 'Arm_' + sd), ua: fpBone(root, 'UpArm_' + sd), fa: fpBone(root, 'Forearm_' + sd), wr: fpBone(root, 'BoneTwist_01' + sd + '_end'), hand: fpBone(root, 'Hand_' + sd), sd: sd === 'L' ? -1 : 1 });
   const arms = [arm('L'), arm('R')];
   if (arms.every(a => a.cl && a.ua && a.fa && a.wr) && (lh || P.sh)) ik = { arms, ...lh, sh: P.sh || [0, 0, 0], Cb: new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A), body };
   root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; if (o.material) { o.material = o.material.clone(); o.material.envMapIntensity = .8; } } });
@@ -2981,17 +2986,24 @@ function fpBoneCenter(root, b, filt) { // (filt decide as malhas; as escondidas 
 // peça do modelo copia a do pacote; o carregador, quando sai da arma, passa a ter o centro no centro do carregador do pacote
 function fpFollow(F, f) {
   let w = 0;
-  if (f.ghost) { // segundo carregador: só aparece quando está na mão esquerda
-    const near = _fv.setFromMatrixPosition(f.a.matrixWorld).distanceTo(_fv2.setFromMatrixPosition(f.hl.matrixWorld)) < .14 * f.hr;
-    f.g.visible = near; if (!near) return; w = 1;
-    for (const o of f.tiny) o.scale.setScalar(1e-4);
-  } else if (f.rest) {
+  if (f.rest) { // carregador: quanto saiu do encaixe (0 encaixado, 1 fora)
     _fm2.copy(F.body.matrixWorld).invert().multiply(f.a.matrixWorld);
     w = clamp((_fv.setFromMatrixPosition(_fm2).distanceTo(_fv2.setFromMatrixPosition(f.rest)) - .015 * f.hr) / (.05 * f.hr), 0, 1);
+    if (!f.ghost) f.w = w;
+  }
+  if (f.ghost) { // segundo carregador: aparece na mão esquerda desde que ela o pega até o velho voltar ao lugar (aí ele já é o da arma)
+    if (F.cur !== 'reload' && F.cur !== 'reloadE') f.st = 0;
+    else if (f.st === 0 && f.main.w > .99) f.st = 1;
+    else if (f.st === 1 && f.main.w < .01) f.st = 2;
+    const near = _fv.setFromMatrixPosition(f.a.matrixWorld).distanceTo(_fv2.setFromMatrixPosition(f.hl.matrixWorld)) < .14 * f.hr;
+    f.g.visible = near && f.st < 2; if (!f.g.visible) return;
+    for (const o of f.tiny) o.scale.setScalar(1e-4);
   }
   _fm2.copy(f.d); if (f.t1) _fm2.setPosition(_fv.copy(f.t0).lerp(f.t1, w));
   if (f.ghost) f.g.updateMatrixWorld(true);
-  _fm.copy(f.b.parent.matrixWorld).invert().multiply(_fm2.premultiply(f.a.matrixWorld)); _fm.decompose(f.b.position, f.b.quaternion, f.b.scale);
+  _fm2.premultiply(f.a.matrixWorld);
+  const pl = F.ik?.pushL; if (pl && f.rest) { _fv.setFromMatrixPosition(_fm2).addScaledVector(pl, f.ghost ? 1 : w); _fm2.setPosition(_fv); } // fora da arma, o carregador vai junto com a mão desviada
+  _fm.copy(f.b.parent.matrixWorld).invert().multiply(_fm2); _fm.decompose(f.b.position, f.b.quaternion, f.b.scale);
 }
 function fpUpdate(ud, dt) {
   const F = ud.fps2, hs = Math.hypot(me.vel.x, me.vel.z);
@@ -2999,14 +3011,14 @@ function fpUpdate(ud, dt) {
   if (!G.reloadEnd) F.reloading = false;
   if (F.until && now >= F.until) F.until = 0;
   if (!F.until && !F.reloading) fpPlay(ud, me.sprinting && F.clips.run ? 'run' : hs > 1.5 && me.onGround && F.clips.walk ? 'walk' : 'idle');
-  if (F.ik?.sv) { F.ik.arms.forEach((a, i) => { const v = F.ik.sv[i]; a.cl.position.copy(v[0]); a.ua.quaternion.copy(v[1]); a.fa.quaternion.copy(v[2]); }); if (F.ik.hp) F.ik.hl.position.copy(F.ik.hp); } // desfaz o IK do quadro anterior (ossos sem chave na animação)
+  if (F.ik?.sv) { F.ik.arms.forEach((a, i) => { const v = F.ik.sv[i]; a.cl.position.copy(v[0]); a.ua.quaternion.copy(v[1]); a.fa.quaternion.copy(v[2]); if (a.hand) a.hand.position.copy(v[3]); }); if (F.ik.hp) F.ik.hl.position.copy(F.ik.hp); } // desfaz o IK do quadro anterior (ossos sem chave na animação)
   F.mixer.update(dt);
   if (F.kn) knRetarget(F, dt);
+  if (F.ik) fpIK(F); // braços antes das peças: o carregador na mão esquerda acompanha o desvio da mão (pushL)
   if (F.follow.length) { // peças móveis do modelo copiam o movimento das peças do pacote
     F.root.updateMatrixWorld(true);
     for (const f of F.follow) fpFollow(F, f);
   }
-  if (F.ik) fpIK(F);
 }
 // IK dos braços: recua os ombros, leva a mão esquerda ao guarda-mão do modelo e gira braço e antebraço (dois ossos, cotovelo no mesmo
 // plano de antes) até cada pulso chegar ao alvo
@@ -3018,7 +3030,7 @@ function fpRot(bone, from, to) { // gira o osso (no mundo) levando a direção f
 }
 function fpIK(F) {
   const K = F.ik, I = _ik; F.root.updateMatrixWorld(true);
-  K.sv = K.arms.map(a => [a.cl.position.clone(), a.ua.quaternion.clone(), a.fa.quaternion.clone()]); K.hp = K.hl ? K.hl.position.clone() : null;
+  K.sv = K.arms.map(a => [a.cl.position.clone(), a.ua.quaternion.clone(), a.fa.quaternion.clone(), a.hand ? a.hand.position.clone() : null]); K.hp = K.hl ? K.hl.position.clone() : null;
   I.dl.set(0, 0, 0);
   if (K.d) { // mão esquerda no guarda-mão do modelo
     I.G.copy(K.body.matrixWorld).multiply(K.Cb); I.Gi.copy(I.G).invert();
@@ -3031,6 +3043,15 @@ function fpIK(F) {
     }
   }
   for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.sd < 0) a.tw.add(I.dl); }
+  // mão que vem para perto do olho (pegar carregador no colete): desce e vai para a frente, senão o braço passa colado na câmera
+  // (a câmera fica na origem, olhando para -Z)
+  K.pushL = null;
+  for (const a of K.arms) {
+    const s = clamp((a.tw.z + .25) / .15, 0, 1); if (!s || !a.hand) continue;
+    if (a.sd < 0) K.pushL = new V3(0, -.16 * s, -.1 * s);
+    I.c.set(0, -.16 * s, -.1 * s); a.tw.add(I.c);
+    I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true);
+  }
   if (K.sh[0] || K.sh[1] || K.sh[2]) for (const a of K.arms) { // ombros para fora/baixo/trás (no espaço da câmera)
     I.c.setFromMatrixPosition(a.cl.matrixWorld).add(I.a.set(K.sh[0] * a.sd, K.sh[1], K.sh[2]));
     a.cl.position.copy(a.cl.parent.worldToLocal(I.c)); a.cl.updateMatrixWorld(true);
@@ -3050,7 +3071,7 @@ function fpIK(F) {
 // entra no lugar da faca do pacote, presa ao mesmo nó: o referencial "knife" do pacote tem o cabo no eixo Y (lâmina para +Y, saindo pelo
 // lado do indicador), o fio para +Z (para onde apontam os nós dos dedos) e as unidades em centímetros. O pacote tem uma animação só,
 // cortada em clipes (quadros a 30 fps). A câmera do jogo fica em eye olhando para look (espaço do pacote).
-const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 12, -34], look: [0, -2, 30], sh: [.28, -.15, .1],
+const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 12, -34], look: [0, -2, 30], sh: [.3, -.2, .16],
   clips: { idle: [0, 42], inspect: [43, 66], stab: [66, 87], slash: [87, 112], slash2: [112, 138], draw: [138, 153] },
   // ponto de encaixe do modelo (FPKN: guarda da KA-BAR / centro do anel da karambit) vai para Q no pacote,
   // fwd/up: para onde vão o cano (lâmina) e o dorso do modelo; len: comprimento total (cm)
