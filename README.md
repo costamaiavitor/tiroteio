@@ -48,7 +48,15 @@ A dificuldade aparece no canto de cima, junto com o nome do mapa.
 - **Janelas:** os zumbis vêm de fora, arrancam as tábuas e pulam para dentro. Segure F perto da janela para pregar as tábuas de volta. Na Vila (e no Pátio do Sanatório) eles também saem do chão.
 - **Portões, portas e entulho** (750 a 1500) liberam novas áreas, com mais armas e mais janelas.
 - **Armas de parede** (contorno de giz, na parede ou em placas de madeira): M14, Olympia, MP40, MP5K, AK-74u, Stakeout, granadas e Faca Bowie; no anel de fora da Vila também Dragunov, Galil, SPAS-12 e FAL. Se você já tem a arma, compra munição pela metade do preço (arma com Pack-a-Punch: 4500).
-- **Caixa Misteriosa (950):** arma aleatória: Ray Gun, Arma Trovão, Galil, Commando, FAL, RPK, HK21, SPAS-12, Python, CZ75, Dragunov, China Lake ou Macacos com Pratos. Às vezes sai o ursinho: você recebe os pontos de volta e a caixa muda de lugar.
+- **Caixa Misteriosa (950):** arma aleatória entre mais de 40:
+  - Pistolas: CZ75, Python, Five-seven, B23R (rajada de 3) e Mauser C96.
+  - Submetralhadoras: PPSh-41 (tambor de 71), Thompson, Spectre, Kiparis, Uzi e PM63.
+  - Fuzis: Galil, Commando, FN FAL, STG-44, M16 (rajada de 3), AUG, Famas, G11 (rajada de 3, bem rápida) e Enfield.
+  - Metralhadoras: RPK, HK21, MG42 e Stoner63. Escopetas: SPAS-12, Trench Gun, HS10 e KS-23.
+  - Precisão: Dragunov, Kar98k (ferrolho, mira de ferro), L96A1 e PSG1. Explosivos: China Lake, M72 LAW e Besta (virote explosivo).
+  - Armas maravilha (raras): Ray Gun, Ray Gun Mark II (rajada de 3), Arma Trovão, Wunderwaffe DG-2 (o raio pula de zumbi em zumbi, até 8; com Pack-a-Punch vira a DG-3 JZ, até 14) e Winter's Howl (cone de gelo de curto alcance: mata quem está perto e deixa lento quem sobrevive).
+  - Macacos com Pratos. Às vezes sai o ursinho: você recebe os pontos de volta e a caixa muda de lugar.
+  - Toda arma da caixa tem versão Pack-a-Punch com nome próprio (PPSh-41 vira The Reaper, Kar98k vira Armageddon, MG42 vira Barracuda FU-A11...).
 - **Energia:** fica no gerador da Pedreira (Vila) ou no Laboratório (Sanatório). Ligue para ativar as bebidas e o Pack-a-Punch.
 - **Bebidas** (máximo de 4): Juggernog (vida vai a 250: 2,5 vezes mais golpes), Speed Cola (recarrega na metade do tempo), Double Tap (atira 33% mais rápido), Quick Revive (reanima rápido; sozinho, te levanta até 3 vezes) e Stamin-Up (corre mais).
 - **Pack-a-Punch (5000):** fica no pátio do Castelo (Vila) ou no Teatro (Sanatório). Dobra o dano, aumenta o pente e dá nome e camuflagem novos à arma (a M1911 vira a explosiva Mustang & Sally).
@@ -69,7 +77,7 @@ Aba **Skins** no menu.
   - Fim de partida: 40 (vitória: 150)
   - Fim de jogo nos zumbis: 30 + 8 por rodada
 - **Abrir caixa:** roleta no estilo CS. Raridades: Comum 60%, Incomum 25%, Rara 10%, Épica 4%, Lendária 1%. Faca só sai em Épica ou Lendária. Skin repetida vira 60 XP.
-- **Acabamentos:** Floresta, Deserto, Urbano, Grafite, Areia, Oceano, Cereja, Carbono, Ártico, Tigre, Colmeia, Crepúsculo, Damasco, Neon, Lava, Asiimov, Esmeralda, Ouro, Dragão e Galáxia (Neon, Lava, Dragão e Galáxia brilham). Servem para todas as armas, menos Ray Gun e Arma Trovão. Com Pack-a-Punch vale a camuflagem do Pack-a-Punch.
+- **Acabamentos:** Floresta, Deserto, Urbano, Grafite, Areia, Oceano, Cereja, Carbono, Ártico, Tigre, Colmeia, Crepúsculo, Damasco, Neon, Lava, Asiimov, Esmeralda, Ouro, Dragão e Galáxia (Neon, Lava, Dragão e Galáxia brilham). Servem para todas as armas, menos as armas maravilha (Ray Gun, Ray Gun Mark II, Arma Trovão, Wunderwaffe DG-2 e Winter's Howl). Com Pack-a-Punch vale a camuflagem do Pack-a-Punch.
 - **Coleção (estilo Valorant):** todas as armas aparecem ao mesmo tempo, em colunas por categoria (pistolas; SMGs e escopetas; rifles; precisão, pesadas e faca), cada uma desenhada com a skin que está equipada. Clique numa arma para abrir a tela dela: à esquerda as skins que você tem (e a Padrão), no centro a arma em 3D (arraste para girar), e o botão **Equipar**. Os outros jogadores veem a sua skin.
 - **Conta:** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
 
