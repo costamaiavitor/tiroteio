@@ -2532,7 +2532,7 @@ const GRIP = { gripAt: .62, tilt: -.3, r: [0, 0, 0], l: [0, -.01, 0], lroll: .5,
 const ARMS = { holder: null, root: null, mixer: null, clips: {}, cur: null, knife: null };
 // cada faca tem a sua pose de mão: karambit a partir do quadro 0, faca a partir do 1000
 const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] }, ARMS_OFF = { karambit: 0, knife: 1000 };
-const ARMS_VER = location.hostname === 'localhost' ? Date.now() : 5; // subir a cada nova exportação do Blender (o navegador guarda o arquivo em cache)
+const ARMS_VER = location.hostname === 'localhost' ? Date.now() : 6; // subir a cada nova exportação do Blender (o navegador guarda o arquivo em cache)
 function loadArms() {
   new GLTFLoader().load('assets/arms.glb?v=' + ARMS_VER, g => {
     const root = g.scene; root.updateMatrixWorld(true);
