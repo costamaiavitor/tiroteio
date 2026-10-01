@@ -2503,7 +2503,7 @@ function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo,
 // ---------- braços de primeira pessoa feitos no Blender (humano do MPFB, licença CC0) com as animações das facas ----------
 // assets/arms.glb traz os dois braços com esqueleto, a câmera usada para posar e dois soquetes na mão direita
 // (Spin_karambit / Spin_knife) onde a faca do jogo é pendurada. Uma linha do tempo só, cortada em clipes (30 fps).
-const GRIP = { gripAt: .62, tilt: -.3, r: [0, 0, 0], l: [0, -.01, 0], lroll: -.6, shr: [.32, -.28, .12], shl: [-.25, -.38, .05], elr: [.15, -.3, .05], ell: [-.3, -.25, 0], lift: [-.06, .06, .04], liftP: [0, 0, 0], pl: [-.03, 0, -.012], yaw: .45 }; // alvos das mãos; ombro (sh) e cotovelo (el) em relação à mão, espaço da câmera; lift sobe a arma para as mãos aparecerem
+const GRIP = { gripAt: .62, tilt: -.3, r: [0, 0, 0], l: [0, -.01, 0], lroll: -.6, shr: [.18, -.35, .2], shl: [.06, -.42, .18], elr: [.25, -.2, 0], ell: [-.1, -.2, .05], lift: [-.06, .06, .04], liftP: [0, 0, 0], pl: [-.03, 0, -.012], yaw: .08 }; // alvos das mãos; ombro (sh) e cotovelo (el) em relação à mão, espaço da câmera; lift sobe a arma para as mãos aparecerem
 const ARMS = { holder: null, root: null, mixer: null, clips: {}, cur: null, knife: null };
 // cada faca tem a sua pose de mão: karambit a partir do quadro 0, faca a partir do 1000
 const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] }, ARMS_OFF = { karambit: 0, knife: 1000 };
@@ -2617,11 +2617,14 @@ function armsIK(ud) {
     armIK(s, t.matrixWorld, _v4.copy(T).add(_v1.fromArray(GRIP['sh' + s])).add(_v2.fromArray(GRIP['el' + s]))); // cotovelo para baixo e para fora
   }
 }
-// Enquadramento no estilo do CS: cada arma tem um comprimento, então em vez de um deslocamento fixo procura o
+// Enquadramento no estilo do CS (pose parada, não a de inspecionar): cada arma tem um comprimento, então em vez de um deslocamento fixo procura o
 // deslocamento (ud.vm) que põe a boca do cano e as duas mãos nos mesmos pontos da tela (16:9, 0..1) para todas.
 const FRAME = {
-  primary: { muzzle: [.41, .59, 1.5], lh: [.47, .68, 1], rh: [.70, .87, 1] },
-  pistol: { muzzle: [.56, .56, 1.5], rh: [.63, .86, 1], lh: [.6, .88, .5] },
+  // segurando de verdade (CS parado): arma no canto inferior direito apontando para a frente; a mão esquerda no guarda-mão
+  // com o antebraço subindo de baixo, a mão do gatilho quase toda fora da tela
+  primary: { muzzle: [.62, .6, 1.5], lh: [.68, .74, 1], rh: [.86, 1.04, 1], lo: [-.04, -.06, -.04], hi: [.14, .08, .2] },
+  pistol: { muzzle: [.63, .62, 1.5], rh: [.68, .9, 1], lh: [.64, .92, .5], lo: [-.04, -.06, -.04], hi: [.14, .08, .12] },
+  model: { p90: { hi: [.14, .08, -.02] }, thunder: { lo: [-.04, -.06, -.12], hi: [.14, .08, -.08] } }, // armas grossas: não chegam tão perto da câmera
 };
 function frameArms(ud, F) {
   const vo = ud.vm || [0, 0, 0], cam = vmCam.clone(); cam.aspect = 16 / 9; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
@@ -2632,10 +2635,10 @@ function frameArms(ud, F) {
   const pts = { muzzle: tip, lh: ud.armsGun.lt.getWorldPosition(new V3()), rh: ud.armsGun.rt.getWorldPosition(new V3()) };
   const v = new V3(); let best = null;
   // limites do deslocamento final (armas curtas/grossas, como P90 e Thundergun, não podem vir para cima da câmera)
-  const lo = [-.09, -.02, -.06], hi = [.0, .08, .1], st = .01;
+  const lo = F.lo || [-.09, -.02, -.06], hi = F.hi || [.0, .08, .1], st = .01;
   for (let dz = lo[2] - vo[2]; dz <= hi[2] - vo[2] + 1e-6; dz += st) for (let dx = lo[0] - vo[0]; dx <= hi[0] - vo[0] + 1e-6; dx += st) for (let dy = lo[1] - vo[1]; dy <= hi[1] - vo[1] + 1e-6; dy += st) {
     let e = 0;
-    for (const k in F) { v.copy(pts[k]); v.x += dx; v.y += dy; v.z += dz; v.project(cam); const sx = (v.x + 1) / 2 - F[k][0], sy = (1 - v.y) / 2 - F[k][1]; e += (sx * sx + sy * sy) * F[k][2]; }
+    for (const k in pts) { if (!F[k]) continue; v.copy(pts[k]); v.x += dx; v.y += dy; v.z += dz; v.project(cam); const sx = (v.x + 1) / 2 - F[k][0], sy = (1 - v.y) / 2 - F[k][1]; e += (sx * sx + sy * sy) * F[k][2]; }
     if (!best || e < best.e) best = { e, d: [dx, dy, dz] };
   }
   ud.vm = vo.map((x, i) => x + best.d[i]);
@@ -2692,7 +2695,7 @@ function vmSetWeapon(id) {
   }
   vmGun.scale.setScalar(1.18); ud.baseYaw = vmGun.rotation.y = ud.armsGun && W[mid]?.slot === 'primary' ? GRIP.yaw : .05; // arma maior e virada para dentro (com os braços, bem mais, como no CS: guarda-mão à esquerda da mão do gatilho)
   vmRoot.add(vmGun);
-  if (ud.armsGun) frameArms(ud, W[mid]?.slot === 'primary' ? FRAME.primary : FRAME.pistol);
+  if (ud.armsGun) frameArms(ud, { ...(W[mid]?.slot === 'primary' ? FRAME.primary : FRAME.pistol), ...FRAME.model[m] });
 }
 // ---------- animações da arma (tiro, bomba, ferrolho, recargas) ----------
 const smooth = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
