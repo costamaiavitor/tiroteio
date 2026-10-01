@@ -1098,7 +1098,10 @@ MAPS.vila = {
 // ---------- Vila: cenário que não é caixa alinhada (diagonais, telhados, árvores, chão pintado) ----------
 let MAP_ANIM = []; // animações do cenário (moinho), rodam todo frame
 const VG = 180; // lado do chão pintado da Vila (m)
+let VGC = null; // a pintura do chão da Vila fica guardada: reiniciar / voltar à Vila não pinta de novo (~200 ms)
 function vilaGround() {
+  const tex = c => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; t.userData.tmp = true; return t; };
+  if (VGC) return tex(VGC);
   const S = 2048, K = S / VG, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
   const P = (x, z) => [(x + VG / 2) * K, (z + VG / 2) * K];
   g.fillStyle = '#5b6a3a'; g.fillRect(0, 0, S, S);
@@ -1145,7 +1148,7 @@ function vilaGround() {
   const img = g.getImageData(0, 0, S, S), d = img.data;
   for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - .5) * 22; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
   g.putImageData(img, 0, 0);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; t.userData.tmp = true; return t;
+  return tex(VGC = c);
 }
 function buildVila() {
   const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), E3 = new THREE.Euler(), SC = new V3(), PO = new V3();
@@ -1678,6 +1681,8 @@ const SOFT = softTex();
 
 // ---------- construção do mapa ----------
 let COL = [], curMapId = null, curMap = null;
+const CG = { arr: null, len: -1, last: null, x0: 0, z0: 0, nx: 0, nz: 0, start: null, items: null, mark: new Int32Array(0), stamp: 0, q1: [], q2: [] }, CGS = 4; // grade dos colisores (colGrid)
+const cgCmp = (a, b) => a - b, AXES = ['x', 'z'];
 const SPAWNS = { a: [], b: [] };
 function disposeGroup(gr) {
   gr.traverse(o => {
@@ -1698,6 +1703,106 @@ function mergeGeos(gs) {
   const m = new THREE.BufferGeometry();
   m.setAttribute('position', new THREE.BufferAttribute(pos, 3)); m.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); m.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   m.setIndex(new THREE.BufferAttribute(idx, 1)); m.computeBoundingSphere(); return m;
+}
+// ---------- junção de malhas (menos chamadas de desenho, mesmo desenho) ----------
+// Assinatura do material: dois materiais com os mesmos parâmetros desenham igual e podem virar uma malha só.
+// Material liso (Lambert/Basic sem textura, só com cor) vira cor por vértice: aí cores diferentes também juntam.
+const VC = { L: new THREE.MeshLambertMaterial({ vertexColors: true }), B: new THREE.MeshBasicMaterial({ vertexColors: true }) };
+const SIG_SKIP = new Set(['uuid', 'id', 'name', 'version', 'userData', '_listeners']);
+function matSig(m, noColor) {
+  let s = m.type;
+  for (const k of Object.keys(m).sort()) {
+    if (SIG_SKIP.has(k) || (noColor && k === 'color')) continue;
+    const v = m[k]; s += '|' + k + ':';
+    if (v === null || typeof v !== 'object') s += typeof v === 'function' ? v.toString() : String(v);
+    else if (v.isColor) s += v.r + ',' + v.g + ',' + v.b;
+    else if (v.isTexture) s += v.uuid;
+    else if (v.isVector2) s += v.x + ',' + v.y;
+    else s += JSON.stringify(v);
+  }
+  return s;
+}
+const VC_SIG = { L: matSig(new THREE.MeshLambertMaterial(), true), B: matSig(new THREE.MeshBasicMaterial(), true) };
+const SIGC = new WeakMap(); // assinatura em cache por material (o material não muda durante a montagem)
+function matKey(m) { // 'L' / 'B' = vira cor por vértice; senão a assinatura completa
+  let k = SIGC.get(m);
+  if (k === undefined) { const sc = matSig(m, true); k = sc === VC_SIG.L ? 'L' : sc === VC_SIG.B ? 'B' : matSig(m); SIGC.set(m, k); }
+  return k;
+}
+const _mv = new V3(), _nm = new THREE.Matrix3();
+// junta as geometrias (cada uma com a sua matriz) numa só; com cor = cor do material em cada vértice
+function mergeMeshes(list, mx, color, uvs) {
+  let nv = 0, ni = 0; for (const o of list) { const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = uvs ? new Float32Array(nv * 2) : null, col = color ? new Float32Array(nv * 3) : null, idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+  let ov = 0, oi = 0;
+  list.forEach((o, j) => {
+    let g = o.geometry; if (!g.attributes.normal) { g = g.clone(); g.computeVertexNormals(); }
+    const A = g.attributes, n = A.position.count, M = mx[j]; _nm.getNormalMatrix(M);
+    for (let i = 0; i < n; i++) { // mesmas contas do BufferGeometry.applyMatrix4, sem clonar a geometria
+      _mv.fromBufferAttribute(A.position, i).applyMatrix4(M); pos[(ov + i) * 3] = _mv.x; pos[(ov + i) * 3 + 1] = _mv.y; pos[(ov + i) * 3 + 2] = _mv.z;
+      _mv.fromBufferAttribute(A.normal, i).applyMatrix3(_nm).normalize(); nor[(ov + i) * 3] = _mv.x; nor[(ov + i) * 3 + 1] = _mv.y; nor[(ov + i) * 3 + 2] = _mv.z;
+    }
+    if (uv && A.uv) uv.set(A.uv.array, ov * 2);
+    if (col) { const c = o.material.color; for (let i = ov * 3, e = (ov + n) * 3; i < e; i += 3) { col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b; } }
+    if (g.index) { const I = g.index.array; for (let k = 0; k < I.length; k++) idx[oi + k] = I[k] + ov; oi += I.length; } else { for (let k = 0; k < n; k++) idx[oi + k] = k + ov; oi += n; }
+    ov += n; if (g !== o.geometry) g.dispose();
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  if (uv) geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); if (col) geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.computeBoundingSphere(); return geo;
+}
+const mergeable = o => o.isMesh && !o.isInstancedMesh && !o.isSkinnedMesh && !o.children.length && o.visible && !o.renderOrder && !Array.isArray(o.material) && !o.material.transparent && !o.material.vertexColors
+  && o.geometry.attributes.position && !o.geometry.morphAttributes.position && o.onBeforeRender === THREE.Object3D.prototype.onBeforeRender;
+// peças que se mexem juntas (perna do zumbi, folha do portão...): junta os filhos diretos de cada grupo, que só usam material liso.
+// cache = mapa para guardar a geometria pela receita da peça (zumbis: as mesmas peças se repetem muito; nunca é descartada)
+function mergeParts(root, skip, cache) {
+  const nodes = []; root.traverse(o => { if (!o.isMesh || o.children.length) nodes.push(o); });
+  for (const par of nodes) {
+    const grp = new Map();
+    for (const m of par.children) {
+      if (!mergeable(m) || skip?.has(m)) continue; const t = matKey(m.material); if (t !== 'L' && t !== 'B') continue;
+      const k = t + (+m.castShadow) + (+m.receiveShadow); let e = grp.get(k); if (!e) grp.set(k, e = []); e.push(m);
+    }
+    for (const [k, ps] of grp) {
+      if (ps.length < 2) continue;
+      let geo = null, key = null;
+      if (cache) { key = k; for (const m of ps) { const p = m.position, r = m.rotation, s = m.scale; key += '|' + m.geometry.id + ':' + m.material.id + ':' + p.x + ',' + p.y + ',' + p.z + ',' + r.x + ',' + r.y + ',' + r.z + ',' + r.order + ',' + s.x + ',' + s.y + ',' + s.z; } geo = cache.get(key); }
+      if (!geo) { for (const m of ps) m.updateMatrix(); geo = mergeMeshes(ps, ps.map(m => m.matrix), true, false); if (cache) { geo.userData.keep = true; cache.set(key, geo); } }
+      for (const m of ps) { par.remove(m); if (!m.geometry.userData.keep) m.geometry.dispose(); }
+      const mm = new THREE.Mesh(geo, VC[k[0]]); mm.castShadow = ps[0].castShadow; mm.receiveShadow = ps[0].receiveShadow; par.add(mm);
+    }
+  }
+}
+// mapas zumbis: as peças paradas do cenário (postes, telhados, casas, carroças...) do mesmo material e do mesmo
+// bloco de 48 m viram uma malha só, já na posição do mundo. Menos chamadas de desenho (também na sombra do Alto).
+// Fica de fora o que se mexe (testado rodando MAP_ANIM uma vez), o transparente, o instanciado e o espelhado.
+function mergeStatic() {
+  const all = []; world.updateMatrixWorld(true); world.traverse(o => all.push(o));
+  const st = all.map(o => [o.position.clone(), o.quaternion.clone(), o.scale.clone(), o.visible]), now0 = now;
+  const rnd = Math.random; Math.random = () => .5; // o teste não gasta sorteios
+  try { now += 1.3; for (const f of MAP_ANIM) f(.37); } finally { now = now0; Math.random = rnd; }
+  world.updateMatrixWorld(true);
+  const moving = new Set();
+  all.forEach((o, i) => { const [p, q, sc, v] = st[i]; if (!o.position.equals(p) || !o.quaternion.equals(q) || !o.scale.equals(sc) || o.visible !== v) o.traverse(c => moving.add(c)); o.position.copy(p); o.quaternion.copy(q); o.scale.copy(sc); o.visible = v; });
+  world.updateMatrixWorld(true);
+  const grp = new Map(), _c = new V3();
+  for (const o of all) {
+    if (!mergeable(o) || moving.has(o) || o.matrixWorld.determinant() <= 0) continue;
+    let hid = false; for (let a = o.parent; a; a = a.parent) if (!a.visible) hid = true; if (hid) continue;
+    const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
+    _c.copy(g.boundingSphere.center).applyMatrix4(o.matrixWorld);
+    const t = matKey(o.material), k = t + '|' + (+o.castShadow) + (+o.receiveShadow) + '|' + Math.floor(_c.x / 48) + ',' + Math.floor(_c.z / 48);
+    let e = grp.get(k); if (!e) grp.set(k, e = { t, os: [] }); e.os.push(o);
+  }
+  for (const { t, os } of grp.values()) {
+    if (os.length < 2) continue;
+    const vc = t === 'L' || t === 'B', geo = mergeMeshes(os, os.map(o => o.matrixWorld), vc, !vc);
+    const mm = new THREE.Mesh(geo, vc ? VC[t] : os[0].material); mm.castShadow = os[0].castShadow; mm.receiveShadow = os[0].receiveShadow; mm.userData.own = !vc && os.some(o => o.userData.own); world.add(mm);
+    for (const o of os) o.parent.remove(o);
+  }
+  const used = new Set(); world.traverse(o => { if (o.geometry) used.add(o.geometry); });
+  for (const o of all) if (o.geometry && !used.has(o.geometry)) { used.add(o.geometry); o.geometry.dispose(); }
 }
 function buildMap(id) {
   const M = MAPS[id] || MAPS.arena; curMapId = MAPS[id] ? id : 'arena'; curMap = M;
@@ -1744,6 +1849,7 @@ function buildMap(id) {
     const c3 = new THREE.Mesh(new THREE.ConeGeometry(.7, 1.2, 8), snow); c3.position.set(x, 6.3, z); world.add(c3);
   }
   if (M.build) M.build(M);
+  if (M.zombie) mergeStatic();
   SPAWNS.a = M.spawns.map(([x, z]) => [x, 0, z]);
   SPAWNS.b = M.spawns.map(([x, z]) => [-x, 0, -z]);
   if (M.zombie) zBuildWorld(M);
@@ -1769,7 +1875,8 @@ function buildMap(id) {
 // ---------- navegação dos bots (grade automática) ----------
 let NAV = null;
 function footFree(x, z) {
-  for (const b of COL) { if (b.maxY <= .05) continue; if (x + .45 > b.minX && x - .45 < b.maxX && z + .45 > b.minZ && z - .45 < b.maxZ && b.minY < 1.8) return false; }
+  const L = colQuery(x - .45, x + .45, z - .45, z + .45, CG.q2);
+  for (let k = 0; k < L.length; k++) { const b = COL[L[k]]; if (b.maxY <= .05) continue; if (x + .45 > b.minX && x - .45 < b.maxX && z + .45 > b.minZ && z - .45 < b.maxZ && b.minY < 1.8) return false; }
   return true;
 }
 function segClear(ax, az, bx, bz) {
@@ -1816,28 +1923,68 @@ function navPath(ax, az, bx, bz) {
 // Física
 // ================================================================
 function overlapBox(px, py, pz, h, b) { return px + PR > b.minX && px - PR < b.maxX && pz + PR > b.minZ && pz - PR < b.maxZ && py + h > b.minY && py < b.maxY; }
-function blockedAt(px, py, pz, h) { for (const b of COL) if (overlapBox(px, py, pz, h, b)) return true; return false; }
+// grade dos colisores (células de 4 m, refeita quando o COL muda): as consultas olham só as caixas perto,
+// sempre na ordem do COL. Mapa zumbi grande tem ~1500 caixas; antes cada passo de zumbi testava todas.
+function colGrid() {
+  if (CG.arr === COL && CG.len === COL.length && CG.last === COL[COL.length - 1]) return CG;
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const b of COL) { if (b.minX < x0) x0 = b.minX; if (b.maxX > x1) x1 = b.maxX; if (b.minZ < z0) z0 = b.minZ; if (b.maxZ > z1) z1 = b.maxZ; }
+  if (!COL.length) x0 = x1 = z0 = z1 = 0;
+  const nx = Math.floor((x1 - x0) / CGS) + 1, nz = Math.floor((z1 - z0) / CGS) + 1, cnt = new Int32Array(nx * nz + 1), N = COL.length, rg = new Int32Array(N * 4);
+  for (let k = 0; k < N; k++) { const b = COL[k]; rg[k * 4] = Math.floor((b.minX - x0) / CGS); rg[k * 4 + 1] = Math.floor((b.maxX - x0) / CGS); rg[k * 4 + 2] = Math.floor((b.minZ - z0) / CGS); rg[k * 4 + 3] = Math.floor((b.maxZ - z0) / CGS);
+    for (let i = rg[k * 4]; i <= rg[k * 4 + 1]; i++) for (let j = rg[k * 4 + 2]; j <= rg[k * 4 + 3]; j++) cnt[i * nz + j + 1]++; }
+  for (let c = 0; c < nx * nz; c++) cnt[c + 1] += cnt[c];
+  const items = new Int32Array(cnt[nx * nz]), fill = cnt.slice(0, nx * nz);
+  for (let k = 0; k < N; k++) for (let i = rg[k * 4]; i <= rg[k * 4 + 1]; i++) for (let j = rg[k * 4 + 2]; j <= rg[k * 4 + 3]; j++) items[fill[i * nz + j]++] = k; // índices crescentes dentro de cada célula
+  Object.assign(CG, { arr: COL, len: COL.length, last: COL[COL.length - 1], x0, z0, nx, nz, start: cnt, items });
+  if (CG.mark.length < COL.length) CG.mark = new Int32Array(COL.length * 2);
+  return CG;
+}
+// índices (em ordem) das caixas cujo retângulo XZ pode encostar em [ax0,ax1]x[az0,az1]
+function colQuery(ax0, ax1, az0, az1, out) {
+  const G = colGrid(); out.length = 0;
+  if (!(ax1 >= G.x0 && az1 >= G.z0)) return out;
+  const i0 = Math.max(0, Math.floor((ax0 - G.x0) / CGS)), i1 = Math.min(G.nx - 1, Math.floor((ax1 - G.x0) / CGS)), j0 = Math.max(0, Math.floor((az0 - G.z0) / CGS)), j1 = Math.min(G.nz - 1, Math.floor((az1 - G.z0) / CGS));
+  if (i0 > i1 || j0 > j1) return out;
+  if (G.stamp > 2e9) { G.stamp = 0; G.mark.fill(0); } // a marca é Int32
+  const st = ++G.stamp, mk = G.mark, S0 = G.start, IT = G.items;
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const c = i * G.nz + j; for (let q = S0[c], e = S0[c + 1]; q < e; q++) { const k = IT[q]; if (mk[k] !== st) { mk[k] = st; out.push(k); } } }
+  if ((i1 > i0 || j1 > j0) && out.length > 1) out.sort(cgCmp);
+  return out;
+}
+function blockedAt(px, py, pz, h) { const L = colQuery(px - PR, px + PR, pz - PR, pz + PR, CG.q2); for (let k = 0; k < L.length; k++) if (overlapBox(px, py, pz, h, COL[L[k]])) return true; return false; }
+// mesmo resultado do laço por todo o COL: enquanto o corpo fica dentro da região consultada, as caixas de fora
+// não encostam nele; se um empurrão o tirar da região, o resto da volta segue pelo COL inteiro, na mesma ordem
 function moveBody(o, dt) {
   const p = o.pos, v = o.vel, wasGround = o.onGround; o.stepUp = 0;
-  for (const ax of ['x', 'z']) {
+  const mx = Math.abs(v.x * dt) + PR + .5, mz = Math.abs(v.z * dt) + PR + .5, rx0 = p.x - mx, rx1 = p.x + mx, rz0 = p.z - mz, rz1 = p.z + mz;
+  const L = colQuery(rx0, rx1, rz0, rz1, CG.q1), n = L.length, N = COL.length;
+  const inR = () => p.x - PR > rx0 && p.x + PR < rx1 && p.z - PR > rz0 && p.z + PR < rz1;
+  for (const ax of AXES) {
     const d = v[ax] * dt; if (!d) continue; p[ax] += d;
-    for (const b of COL) {
+    let lin = !inR();
+    for (let k = 0, i = -1; ;) {
+      if (lin) { if (++i >= N) break; } else { if (k >= n) break; i = L[k++]; }
+      const b = COL[i];
       if (!overlapBox(p.x, p.y, p.z, o.h, b)) continue;
       const sh = b.maxY - p.y;
       if (wasGround && sh > 0 && sh <= STEP && !blockedAt(p.x, b.maxY + .001, p.z, o.h)) { o.stepUp += sh; p.y = b.maxY + .001; continue; }
       if (ax === 'x') p.x = d > 0 ? b.minX - PR - 1e-4 : b.maxX + PR + 1e-4; else p.z = d > 0 ? b.minZ - PR - 1e-4 : b.maxZ + PR + 1e-4;
       v[ax] = 0;
+      if (!lin && !inR()) lin = true;
     }
   }
   v.y -= GRAV * dt; p.y += v.y * dt; o.onGround = false;
-  for (const b of COL) {
+  const lin = !inR();
+  for (let k = 0, m = lin ? N : n; k < m; k++) {
+    const b = COL[lin ? k : L[k]];
     if (!overlapBox(p.x, p.y, p.z, o.h, b)) continue;
     if (v.y <= 0) { p.y = b.maxY; o.onGround = true; } else p.y = b.minY - o.h;
     v.y = 0;
   }
   if (!o.onGround && wasGround && v.y <= 0) { // gruda no chão ao descer degraus
     let best = -Infinity;
-    for (const b of COL) if (p.x + PR > b.minX && p.x - PR < b.maxX && p.z + PR > b.minZ && p.z - PR < b.maxZ && b.maxY <= p.y + 1e-3 && b.maxY >= p.y - STEP - .05) best = Math.max(best, b.maxY);
+    for (let k = 0, m = lin ? N : n; k < m; k++) { const b = COL[lin ? k : L[k]]; if (p.x + PR > b.minX && p.x - PR < b.maxX && p.z + PR > b.minZ && p.z - PR < b.maxZ && b.maxY <= p.y + 1e-3 && b.maxY >= p.y - STEP - .05) best = Math.max(best, b.maxY); }
     if (best > -Infinity) { p.y = best; o.onGround = true; v.y = 0; }
   }
 }
@@ -4425,7 +4572,35 @@ function zbx(g, w, h, d, x, y, z, m) { // caixa com geometria em cache (não é 
 const zSeed = id => { let s = (id * 2654435761) >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }; // mesmo id = mesmo visual em todos os clientes
 const zSize = (kind, id) => kind ? ZKIND[kind].sz : .92 + ((id * 7919) % 17) * .01; // comuns: 0,92 a 1,08
 let ZRING = null;
+// sorteios do visual (mesma ordem de antes: pele, roupa, calça, pé descalço, cabelo); o mesmo id dá o mesmo zumbi em todos
+function zLook(kind, id) {
+  const R = zSeed(id), pick = a => Math.floor(R() * a.length), s = pick(ZSKIN), c = pick(ZCLOTH), p = pick(ZPANTS), bare = R() < .5, hair = !!kind || R() < .75;
+  return { s, c, p, bare, hair, key: kind + ',' + s + ',' + c + ',' + p + ',' + (+bare) + (+hair) };
+}
+// cada visual é montado (e juntado) uma vez só; os outros zumbis iguais são cópias leves do molde
+const ZTPL = new Map(), ZMG = new Map(); // moldes por visual; peças já juntadas (pela receita), nunca descartadas
 function zombieModel(dog, kind = 0, id = (Math.random() * 1e6) | 0) {
+  const L = dog ? null : zLook(kind, id), key = dog ? 'cão' : L.key;
+  let t = ZTPL.get(key);
+  if (!t) {
+    const m = zBuildModel(dog, kind, L), ud = m.userData, list = []; m.userData = {}; m.traverse(o => list.push(o));
+    const map = {}; for (const [k, v] of Object.entries(ud)) map[k] = Array.isArray(v) ? v.map(o => list.indexOf(o)) : v?.isObject3D ? list.indexOf(v) : { v };
+    t = { list, par: list.map(o => list.indexOf(o.parent)), map }; ZTPL.set(key, t);
+  }
+  // cópia na mão (o clone() do three cria material e geometria padrão para cada malha e joga fora)
+  const list = t.list.map((s, i) => {
+    const o = s.isMesh ? new THREE.Mesh(s.geometry, s.material) : new THREE.Group();
+    o.position.copy(s.position); o.rotation.order = s.rotation.order; o.quaternion.copy(s.quaternion); o.scale.copy(s.scale); o.visible = s.visible;
+    if (s.userData.noShadow) o.userData.noShadow = true;
+    return o;
+  });
+  for (let i = 1; i < list.length; i++) list[t.par[i]].add(list[i]);
+  const g = list[0], ud = {};
+  for (const [k, v] of Object.entries(t.map)) ud[k] = Array.isArray(v) ? v.map(i => list[i]) : typeof v === 'number' ? list[v] : v.v;
+  g.userData = ud; if (!dog) g.scale.setScalar(zSize(kind, id));
+  return g;
+}
+function zBuildModel(dog, kind, L) {
   const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner); g.rotation.order = 'YXZ';
   if (dog) {
     const fur = mc(0x2b1a14), glow = zGlow(0xff6a1a, 3), head = new THREE.Group();
@@ -4438,11 +4613,10 @@ function zombieModel(dog, kind = 0, id = (Math.random() * 1e6) | 0) {
     for (const [x, z] of [[.12, -.35], [-.12, -.35], [.12, .35], [-.12, .35]]) { const L = new THREE.Group(); L.position.set(x, .45, z); zbx(L, .1, .45, .1, 0, -.22, 0, fur); inner.add(L); legs.push(L); }
     zbx(inner, .06, .06, .35, 0, .75, .6, fur).rotation.x = .5;
     zbx(inner, .36, .04, .6, 0, .81, 0, glow); // brasa nas costas
-    g.userData = { inner, legs, head, dog: 1 };
+    g.userData = { inner, legs, head, dog: 1 }; mergeParts(g, null, ZMG);
     return g;
   }
-  const R = zSeed(id), pick = a => a[Math.floor(R() * a.length)];
-  let skin = mc(pick(ZSKIN)), cloth = mc(pick(ZCLOTH)), pants = mc(pick(ZPANTS)), eye = zGlow(0xffc21a, 4);
+  let skin = mc(ZSKIN[L.s]), cloth = mc(ZCLOTH[L.c]), pants = mc(ZPANTS[L.p]), eye = zGlow(0xffc21a, 4);
   if (kind === 1) { skin = mc(0x6a7458); cloth = mc(0x3a2a22); eye = zGlow(0xff7a1a, 4); }
   else if (kind === 2) { skin = mc(0x9c9a68); cloth = mc(0x5a4a30); eye = zGlow(0xffa020, 5); }
   else if (kind === 3) { skin = mc(0x8a8f86); cloth = mc(0x24262a); eye = zGlow(0xff2a1a, 5); }
@@ -4452,7 +4626,7 @@ function zombieModel(dog, kind = 0, id = (Math.random() * 1e6) | 0) {
   const legL = new THREE.Group(), legR = new THREE.Group(); legL.position.set(-.13, .85, 0); legR.position.set(.13, .85, 0);
   const blood = mc(0x3e0808), dark = mc(0x14100e), shoe = mc(0x1c1a18);
   zbx(legL, .22, .85, .26, 0, -.42, 0, pants); zbx(legR, .22, .85, .26, 0, -.42, 0, pants);
-  zbx(legL, .24, .1, .3, 0, -.82, -.03, shoe); if (R() < .5) zbx(legR, .23, .3, .27, 0, -.7, 0, skin); else zbx(legR, .24, .1, .3, 0, -.82, -.03, shoe); // calça rasgada / pé descalço
+  zbx(legL, .24, .1, .3, 0, -.82, -.03, shoe); if (L.bare) zbx(legR, .23, .3, .27, 0, -.7, 0, skin); else zbx(legR, .24, .1, .3, 0, -.82, -.03, shoe); // calça rasgada / pé descalço
   inner.add(legL, legR);
   const torso = new THREE.Group(); torso.position.set(0, .85, 0); inner.add(torso);
   zbx(torso, .54, .62, .3, 0, .31, 0, cloth); zbx(torso, .3, .2, .02, .08, .2, -.16, skin); // camisa rasgada
@@ -4460,7 +4634,7 @@ function zombieModel(dog, kind = 0, id = (Math.random() * 1e6) | 0) {
   const head = new THREE.Group(); head.position.set(0, .65, -.02); torso.add(head);
   zbx(head, .3, .3, .3, 0, .14, 0, skin); zbx(head, .06, .045, .02, .07, .17, -.155, eye); zbx(head, .06, .045, .02, -.07, .17, -.155, eye);
   zbx(head, .18, .07, .02, 0, .04, -.155, dark); zbx(head, .12, .03, .02, 0, .07, -.157, mc(0xd8d0b0)); // boca aberta com dentes
-  zbx(head, .1, .08, .02, .1, .24, -.155, blood); if (kind || R() < .75) zbx(head, .32, .06, .32, 0, .3, .01, dark); // ferida e cabelo (alguns carecas)
+  zbx(head, .1, .08, .02, .1, .24, -.155, blood); if (L.hair) zbx(head, .32, .06, .32, 0, .3, .01, dark); // ferida e cabelo (alguns carecas)
   const armL = new THREE.Group(), armR = new THREE.Group(); armL.position.set(-.33, .55, 0); armR.position.set(.33, .55, 0); torso.add(armL, armR);
   for (const A of [armL, armR]) { zbx(A, .12, .12, .3, 0, 0, -.14, cloth); zbx(A, .1, .1, .28, 0, 0, -.42, skin); zbx(A, .1, .1, .1, 0, -.02, -.6, skin); } // manga curta, antebraço à mostra
   const ud = { inner, legL, legR, torso, head, armL, armR };
@@ -4482,8 +4656,7 @@ function zombieModel(dog, kind = 0, id = (Math.random() * 1e6) | 0) {
     if (!ZRING) { ZRING = new THREE.Mesh(new THREE.RingGeometry(1.45, 1.81, 40), new THREE.MeshBasicMaterial({ color: 0xff2a10, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide })); ZRING.geometry.userData.keep = true; }
     const ring = new THREE.Mesh(ZRING.geometry, ZRING.material); ring.rotation.x = -Math.PI / 2; ring.position.y = .04; ring.visible = false; ring.userData.noShadow = true; g.add(ring); ud.ring = ring; // raio 1,81 × escala 1,6 = 2,9 m (alcance do golpe)
   }
-  g.scale.setScalar(zSize(kind, id));
-  g.userData = ud;
+  g.userData = ud; mergeParts(g, new Set(Object.values(ud)), ZMG);
   return g;
 }
 function teddyModel() {
@@ -4544,6 +4717,7 @@ function zBuildWorld(M) {
       for (const y of [.6, 2.6]) bx(g, 3.8, .15, .3, 0, y, 0, mc(0x4a3220));
       bx(g, .25, .08, .3, .7, 1.4, 0, mc(0xb89a4a));
     }
+    mergeParts(g); // as peças de cada folha / porta / entulho se mexem juntas
     world.add(g); Wd.doors.set(d.id, { d, col, g, halves, open: false, t0: 0, done: false });
   }
   // tábuas das janelas
@@ -4566,7 +4740,7 @@ function zBuildWorld(M) {
       const g = new THREE.Group(); g.position.set(wb.x - wb.n[0] * .08, 0, wb.z - wb.n[1] * .08); face(g, wb.n);
       bx(g, 2.1, 1.2, .08, 0, 1.6, 0, mc(0x3e2c1e)).castShadow = true; bx(g, 2.2, .1, .14, 0, 2.25, 0, mc(0x2e2016));
       for (const s of [-1, 1]) bx(g, .12, 2.3, .12, s * .95, 1.15, -.1, mc(0x2e2016)).castShadow = true;
-      world.add(g); COL.push(aabb(g.position.x, g.position.z, wb.n, 2.1, .3, 2.3));
+      mergeParts(g); world.add(g); COL.push(aabb(g.position.x, g.position.z, wb.n, 2.1, .3, 2.3));
     }
     const name = wb.w === 'he' ? 'Granadas' : wb.w === 'bowie' ? 'Faca Bowie' : W[wb.w].name;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1.8, .9), new THREE.MeshBasicMaterial({ map: chalkTex(name, String(wb.cost)), transparent: true, depthWrite: false, color: 0xbbbbbb, toneMapped: false }));
@@ -5182,7 +5356,8 @@ const zInv = () => ({ primary: 'm1911', secondary: null, third: null, he: 0, smo
 const FF = { x0: -27, z0: -8, nx: 54, nz: 32 };
 FF.walk = new Uint8Array(FF.nx * FF.nz); FF.dist = new Float32Array(FF.nx * FF.nz);
 function footFreeR(x, z, r) {
-  for (const b of COL) { if (b.maxY <= .05 || b.minY >= 1.7) continue; if (x + r > b.minX && x - r < b.maxX && z + r > b.minZ && z - r < b.maxZ) return false; }
+  const L = colQuery(x - r, x + r, z - r, z + r, CG.q2);
+  for (let k = 0; k < L.length; k++) { const b = COL[L[k]]; if (b.maxY <= .05 || b.minY >= 1.7) continue; if (x + r > b.minX && x - r < b.maxX && z + r > b.minZ && z - r < b.maxZ) return false; }
   return true;
 }
 // raio .45: grade/cerca fina (.3) entre dois centros de célula bloqueia as duas, senão o caminho "vaza" pela cerca
