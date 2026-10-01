@@ -4212,16 +4212,12 @@ function refreshRemoteInfo(rp) {
 }
 function updateRemotes(dt) {
   for (const rp of R.values()) {
-    const ud = rp.model.userData, buf = rp.buf, rt = now - (rp.delay || .1);
-    if (buf.length) {
-      let a = null, b = null;
-      for (let i = buf.length - 1; i >= 0; i--) if (buf[i].t <= rt) { a = buf[i]; b = buf[i + 1] || null; break; }
-      if (!a) a = buf[0];
-      if (b) { const k = clamp((rt - a.t) / Math.max(1e-3, b.t - a.t), 0, 1); rp.pos.set(lerp(a.p[0], b.p[0], k), lerp(a.p[1], b.p[1], k), lerp(a.p[2], b.p[2], k)); rp.yaw = a.y + angDiff(a.y, b.y) * k; rp.pitch = lerp(a.pi, b.pi, k); rp.crouch = k < .5 ? a.c : b.c; }
-      else { // sem dado novo ainda: segue a última velocidade por até 150 ms em vez de parar e dar um pulo
-        const pv = buf.length > 1 && a === buf[buf.length - 1] ? buf[buf.length - 2] : null, e = pv ? clamp(rt - a.t, 0, .15) / Math.max(.02, a.t - pv.t) : 0;
-        rp.pos.set(a.p[0] + (pv ? (a.p[0] - pv.p[0]) * e : 0), a.p[1], a.p[2] + (pv ? (a.p[2] - pv.p[2]) * e : 0)); rp.yaw = a.y; rp.pitch = a.pi; rp.crouch = a.c;
-      }
+    const ud = rp.model.userData, buf = rp.buf, rt = now - netDelay(rp.id);
+    if (buf.length) { // interpola; sem dado novo ainda, segue a última velocidade por até 200 ms (netPick)
+      const s = netPick(buf, rt, .2, 15), a = s.a, b = s.b, k = s.k; netEo(rp.eo ||= new V3(), dt);
+      rp.rx = s.x; rp.rz = s.z; rp.rt = rt; rp.xt = s.ext;
+      rp.pos.set(s.x + rp.eo.x, b ? lerp(a.p[1], b.p[1], k) : a.p[1], s.z + rp.eo.z);
+      if (b) { rp.yaw = a.y + angDiff(a.y, b.y) * k; rp.pitch = lerp(a.pi, b.pi, k); rp.crouch = k < .5 ? a.c : b.c; } else { rp.yaw = a.y; rp.pitch = a.pi; rp.crouch = a.c; }
       while (buf.length > 2 && buf[1].t < rt) buf.shift();
     }
     const sp = Math.hypot(rp.pos.x - rp.last.x, rp.pos.z - rp.last.z) / Math.max(dt, 1e-3), vy = Math.abs(rp.pos.y - rp.last.y) / Math.max(dt, 1e-3);
@@ -4374,22 +4370,56 @@ function sendToHostFast(m) {
   else if (NET.hostConn?.open) sendFastTo(NET.hostConn, m);
 }
 // Relógio: mensagens rápidas levam a hora de quem mandou (ts). Por remetente, guardo o menor atraso visto
-// (offset) e uso ts + offset como hora de chegada "sem tremida"; a tremida medida define quanto atraso
-// de interpolação usar (80 a 300 ms). Assim uma rede irregular não vira movimento aos trancos.
-const NCLK = new Map();
-// O atraso também cobre o maior intervalo recente entre duas fotos (gap): zumbis e bots vão a 20 Hz,
-// e um pacote perdido abre um buraco de 100 ms que um atraso fixo de 80 ms não cobria.
+// (offset, sobe devagar se o relógio derivar) e uso ts + offset como hora de chegada "sem tremida".
+// O atraso de interpolação vem das últimas 64 fotos: intervalo entre fotos (p90) + atraso extra da rede (p95)
+// + folga. Percentil e não máximo: um pacote perdido ou muito atrasado é coberto pela extrapolação (netPick),
+// não por deixar todo mundo 300 ms no passado. O atraso usado anda devagar até o alvo (sem pulo no tempo).
+const NCLK = new Map(), NRING = 64, _nsrt = new Float32Array(NRING);
 function netTime(src, ts) {
   if (!(ts > 0)) return now;
   const arr = window.__simLock ? now : performance.now() / 1000; // hora em que chegou de fato (now é a do último quadro: +0–33 ms de tremida falsa)
   const o = arr - ts; let c = NCLK.get(src);
-  if (!c || Math.abs(o - c.off) > 5) { c = { off: o, jit: .03, gap: .05, lastTs: 0 }; NCLK.set(src, c); }
-  if (o < c.off) c.off = o; else c.off += (o - c.off) * .003;
-  c.jit += (Math.min(o - c.off, .5) - c.jit) * (o - c.off > c.jit ? .2 : .02); // sobe rápido, desce devagar
-  if (ts > c.lastTs) { const g = ts - c.lastTs; if (c.lastTs && g < .25) c.gap = Math.max(g, c.gap * .98); c.lastTs = ts; } // pausa longa (morto, entre rodadas) não conta
+  if (!c || Math.abs(o - c.off) > 5) { c = { off: o, lastTs: 0, os: new Float32Array(NRING), gs: new Float32Array(NRING), oi: 0, on: 0, gi: 0, gn: 0, d: 0, tgt: .12, at: 0, calcT: 0 }; NCLK.set(src, c); }
+  if (o < c.off) c.off = o; else c.off += (o - c.off) * .002;
+  c.os[c.oi] = o; c.oi = (c.oi + 1) % NRING; if (c.on < NRING) c.on++;
+  if (ts > c.lastTs) { const g = ts - c.lastTs; if (c.lastTs && g < .25) { c.gs[c.gi] = g; c.gi = (c.gi + 1) % NRING; if (c.gn < NRING) c.gn++; } c.lastTs = ts; } // pausa longa (morto, entre rodadas) não conta
   return ts + c.off;
 }
-const netDelay = src => { const c = NCLK.get(src); return c ? clamp(c.gap * 1.5 + .02 + c.jit * 2, .08, .3) : .12; };
+function netPct(a, n, q) { for (let i = 0; i < n; i++) _nsrt[i] = a[i]; const v = _nsrt.subarray(0, n).sort(); return v[Math.min(n - 1, Math.floor(n * q))]; }
+function netDelay(src) {
+  const c = NCLK.get(src); if (!c) return .12;
+  if ((now >= c.calcT || c.calcT - now > 1) && c.on >= 8 && c.gn >= 4) { c.calcT = now + .25; c.tgt = clamp(netPct(c.gs, c.gn, .9) + Math.max(0, netPct(c.os, c.on, .95) - c.off) + .015, .05, .3); }
+  if (!c.d) c.d = c.tgt; else { const dt = clamp(now - c.at, 0, .1), e = c.tgt - c.d; c.d += clamp(e, -.04 * dt, .25 * dt); } // desce devagar (relógio 4% mais lento), sobe rápido
+  c.at = now; return c.d;
+}
+// Amostra de um buffer de fotos [{t, p:[x,y,z], ...}] no tempo rt: interpola entre as duas fotos em volta;
+// sem a próxima ainda, extrapola x/z pela última velocidade até xmax. Salto acima de vmax (teleporte:
+// renascer, ser reciclado) não é interpolado nem extrapolado: troca de uma vez, sem atravessar parede.
+const NS = { a: null, b: null, k: 0, x: 0, z: 0, ext: false };
+function netPick(buf, rt, xmax, vmax) {
+  let a = null, b = null;
+  for (let i = buf.length - 1; i >= 0; i--) if (buf[i].t <= rt) { a = buf[i]; b = buf[i + 1] || null; break; }
+  if (!a) a = buf[0];
+  NS.a = a; NS.b = b; NS.k = 0; NS.ext = false; NS.x = a.p[0]; NS.z = a.p[2];
+  if (b) {
+    const dt = Math.max(1e-3, b.t - a.t); let k = clamp((rt - a.t) / dt, 0, 1);
+    if (Math.hypot(b.p[0] - a.p[0], b.p[2] - a.p[2]) > vmax * Math.max(dt, .05) + .3) k = k < 1 ? 0 : 1;
+    NS.k = k; NS.x = lerp(a.p[0], b.p[0], k); NS.z = lerp(a.p[2], b.p[2], k);
+  } else if (a === buf[buf.length - 1] && buf.length > 1 && rt > a.t) {
+    const pv = buf[buf.length - 2], gd = Math.max(.02, a.t - pv.t), vx = (a.p[0] - pv.p[0]) / gd, vz = (a.p[2] - pv.p[2]) / gd;
+    if (Math.hypot(vx, vz) <= vmax) { const e = Math.min(rt - a.t, xmax); NS.x += vx * e; NS.z += vz * e; NS.ext = true; }
+  }
+  return NS;
+}
+// Erro de extrapolação: quando a foto atrasada chega, a diferença entre o que estava na tela e o caminho certo
+// vira um desvio (eo) que some em ~0,1 s, em vez de um tranco para trás. Desvio grande (teleporte) é largado.
+function netFix(o, buf, xmax, vmax) {
+  if (!o.xt) return; o.xt = false;
+  const s = netPick(buf, o.rt, xmax, vmax), ex = o.rx - s.x, ez = o.rz - s.z;
+  if (Math.hypot(o.eo.x + ex, o.eo.z + ez) < 1.5) { o.eo.x += ex; o.eo.z += ez; } else o.eo.set(0, 0, 0);
+  o.rx = s.x; o.rz = s.z;
+}
+function netEo(e, dt) { const k = Math.exp(-dt * 10); e.x *= k; e.z *= k; if (Math.abs(e.x) + Math.abs(e.z) < 1e-3) e.x = e.z = 0; }
 const genCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
 function sendToHost(m) {
   if (NET.isHost) srvHandle(C.myId, m);
@@ -4513,7 +4543,7 @@ function srvOnData(conn, d) {
     conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code });
     broadcast({ t: 'info', txt: name + ' entrou na sala' });
     if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') { zResetPlayer(np); np.money = zDf().pts; srvSpawn(np, zSpawnPoint(S.players.size - 1), true, Math.PI); } // entra já jogando, com os pontos da dificuldade
-    srvState();
+    S.zKey = null; srvState(); // quem entrou recebe o mundo dos zumbis já
     return;
   }
   if (conn.pid) srvHandle(conn.pid, d);
@@ -4707,7 +4737,10 @@ function srvState() {
   }
   const full = (S.stN = (S.stN || 0) + 1) % 8 === 1;
   const msg = { t: 'state', ph: S.phase, tl: r2(Math.max(0, S.phaseEnd - now)), r: S.round, pl, win: S.winner, pre: S.pre ? r2(Math.max(0, S.pre - now)) : 0, st: full ? S.st : undefined };
-  if (zmode && Z.on) msg.z = zWorldState();
+  if (zmode && Z.on) { // mundo dos zumbis: só quando muda algo (ou 1 vez por segundo, por garantia); portas e compras já vão como evento
+    const z = zWorldState(), k = [z.r, z.ph, z.pw, z.d.length, z.box[0], z.box[1], z.box[2], z.pap[0], z.pap[1], z.qr, z.dog, z.dr.map(d => d[0]).join(), z.tr.map(t => t[0]).join(), z.cm.map(c => c[0]).join()].join('|');
+    if (full || k !== S.zKey || S.stN % 4 === 1) msg.z = z; S.zKey = k;
+  }
   // as skins eram ~60% do "state" (4 por segundo); agora só vão quando alguém troca, e a cada ~2 s por garantia
   const lean = full || S.skDirty ? msg : { ...msg, pl: pl.map(({ sk, ...o }) => o) };
   S.skDirty = false;
@@ -5382,10 +5415,11 @@ function zUpdateWorld(dt) {
 }
 
 // ---------- zumbis no cliente (só desenho + interpolação) ----------
+const ZVMAX = 16; // m/s: mais rápido que isso entre duas fotos é teleporte (zumbi mais rápido ~11 com grito)
 function zNewClientZombie(id, f) {
   const dog = !!(f & 16), kind = dog ? 0 : ((f >> 7) & 7) % ZKIND.length, model = zombieModel(dog, kind, id); zGroup.add(model); // o tipo vem nos bits 128-512 e não muda
   if (CFG.gfx === 'alto') model.traverse(o => { if (o.isMesh && !o.userData.noShadow) o.castShadow = true; });
-  const zc = { id, sid: 'z' + id, model, buf: [], pos: new V3(), last: new V3(), yaw: 0, f, dog, kind, sz: dog ? 1 : zSize(kind, id), dead: false, deadT: 0, anim: Math.random() * 6, spd: 0, groanT: rand(1, 6), lastSeen: now, atk: false, atk0: 0, fling: null };
+  const zc = { id, sid: 'z' + id, model, buf: [], pos: new V3(), last: new V3(), yaw: 0, f, dog, kind, sz: dog ? 1 : zSize(kind, id), dead: false, deadT: 0, anim: Math.random() * 6, spd: 0, groanT: rand(1, 6), lastSeen: now, atk: false, atk0: 0, fling: null, eo: new V3(), rx: 0, rz: 0, rt: 0, xt: false };
   zAnimInit(zc); ZC.zs.set(id, zc); return zc;
 }
 function zRemoveClient(zc) { zGroup.remove(zc.model); zc.model.userData.skel?.dispose(); zc.model.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); ZC.zs.delete(zc.id); }
@@ -5397,6 +5431,7 @@ function zOnSnap(m) {
     if (!zc) { if (ZC.gone.has(id)) continue; zc = zNewClientZombie(id, a[i + 5]); fresh = true; } // não ressuscita zumbi que já morreu
     if (zc.dead) continue;
     zc.buf.push({ t, p: [a[i + 1], a[i + 2], a[i + 3]], y: a[i + 4] }); if (zc.buf.length > 30) zc.buf.shift();
+    netFix(zc, zc.buf, .2, ZVMAX);
     zc.f = a[i + 5]; zc.lastSeen = now;
     if (fresh) { zc.pos.set(a[i + 1], a[i + 2], a[i + 3]); zc.last.copy(zc.pos); zc.yaw = a[i + 4]; zc.model.position.copy(zc.pos); if (zc.dog || zc.kind === 6) zLightning(zc.pos); if (zc.f & 64) { _zv.set(zc.pos.x, .05, zc.pos.z); puff(_zv, 0x4a3a28, 2, .9, .4); play('crack', _zv); } }
   }
@@ -5669,12 +5704,11 @@ function updateZombies(dt) {
     if (zc.dead) { if (zAnimDead(zc, ud, dt)) zRemoveClient(zc); continue; }
     if (now - zc.lastSeen > 2.5) { zRemoveClient(zc); continue; } // folga para picos de rede (antes sumiam e voltavam)
     const buf = zc.buf;
-    if (buf.length) {
-      let A = null, Bq = null;
-      for (let i = buf.length - 1; i >= 0; i--) if (buf[i].t <= rt) { A = buf[i]; Bq = buf[i + 1] || null; break; }
-      if (!A) A = buf[0];
-      if (Bq) { const k = clamp((rt - A.t) / Math.max(1e-3, Bq.t - A.t), 0, 1); zc.pos.set(lerp(A.p[0], Bq.p[0], k), lerp(A.p[1], Bq.p[1], k), lerp(A.p[2], Bq.p[2], k)); zc.yaw = A.y + angDiff(A.y, Bq.y) * k; }
-      else { const pv = buf.length > 1 && A === buf[buf.length - 1] ? buf[buf.length - 2] : null, e = pv ? clamp(rt - A.t, 0, .12) / Math.max(.02, A.t - pv.t) : 0; zc.pos.set(A.p[0] + (pv ? (A.p[0] - pv.p[0]) * e : 0), A.p[1], A.p[2] + (pv ? (A.p[2] - pv.p[2]) * e : 0)); zc.yaw = A.y; }
+    if (buf.length) { // interpola; foto atrasada: extrapola até 200 ms e o erro some aos poucos (netFix); teleporte não atravessa parede
+      const s = netPick(buf, rt, .2, ZVMAX), A = s.a, Bq = s.b, k = s.k; netEo(zc.eo, dt);
+      zc.rx = s.x; zc.rz = s.z; zc.rt = rt; zc.xt = s.ext;
+      zc.pos.set(s.x + zc.eo.x, Bq ? lerp(A.p[1], Bq.p[1], k) : A.p[1], s.z + zc.eo.z);
+      zc.yaw = Bq ? A.y + angDiff(A.y, Bq.y) * k : A.y;
       while (buf.length > 2 && buf[1].t < rt) buf.shift();
     }
     const sp = Math.hypot(zc.pos.x - zc.last.x, zc.pos.z - zc.last.z) / Math.max(dt, 1e-3); zc.last.copy(zc.pos); zc.spd = lerp(zc.spd, Math.min(sp, 9), .2);
@@ -6201,7 +6235,7 @@ function zTick(dt) {
   zTickObjects();
   if (Z.clays.length) zTickClays();
   if (Z.vult.length) zTickVult();
-  Z.zsT -= dt; if (Z.zsT <= 0) { Z.zsT = Math.max(0, Z.zsT + 1 / 20); zSnap(); }
+  Z.zsT -= dt; if (Z.zsT <= 0) { Z.zsT = Math.max(-1 / 20, Z.zsT) + 1 / 20; zSnap(); } // quadro atrasado: a próxima foto sai já no seguinte (20 Hz de média, não menos)
 }
 function zTickPlayers(dt) {
   for (const p of S.players.values()) {
@@ -6225,7 +6259,7 @@ function zHurt(p, dmg, from) {
   let dw = false;
   if (dmg >= p.hp && p.perks.includes('dying') && now >= (p.dwCd || 0)) { dw = true; dmg = Math.max(0, p.hp - 1); p.dwEnd = now + ZPK.dwInv; p.dwCd = now + ZPK.dwCd; } // golpe fatal: fica com 1 de vida
   p.hp = Math.max(0, p.hp - dmg); p.lastHurt = now;
-  broadcast({ t: 'dmg', v: p.id, a: null, hp: Math.round(p.hp), ar: 0, d: dmg, ap: from ? [from.x, from.z] : null });
+  sendTo(p.id, { t: 'dmg', v: p.id, a: null, hp: Math.round(p.hp), ar: 0, d: Math.round(dmg), ap: from ? [r2(from.x), r2(from.z)] : null }); // só a vítima: os outros veem a vida no 'state' (era ~40% das mensagens do canal confiável)
   if (dw) broadcast({ t: 'zfx', k: 'dw', id: p.id });
   if (p.hp <= 0) zDown(p);
 }
@@ -6790,14 +6824,14 @@ function onMsg(m) {
       const t = netTime(m.id, m.ts), lb = rp.buf[rp.buf.length - 1];
       if (lb && t <= lb.t) break; // chegou fora de ordem
       rp.buf.push({ t, p: m.p, y: m.y, pi: m.pi, c: m.c }); if (rp.buf.length > 40) rp.buf.shift();
-      rp.delay = netDelay(m.id);
+      if (rp.eo) netFix(rp, rp.buf, .2, 15);
       if (m.d !== undefined) rp.downed = !!m.d;
       setRemoteGun(rp, m.w);
       break;
     }
     case 'spawn':
       if (m.id === C.myId) localSpawn(m);
-      else { const rp = getRemote(m.id); rp.sq = m.sq; rp.alive = true; rp.dead = false; rp.downed = false; rp.buf = [{ t: now - .2, p: m.p, y: m.y, pi: 0, c: 0 }]; rp.pos.set(m.p[0], m.p[1], m.p[2]); rp.last.copy(rp.pos); }
+      else { const rp = getRemote(m.id); rp.sq = m.sq; rp.alive = true; rp.dead = false; rp.downed = false; rp.buf = [{ t: now - .2, p: m.p, y: m.y, pi: 0, c: 0 }]; rp.pos.set(m.p[0], m.p[1], m.p[2]); rp.xt = false; rp.eo?.set(0, 0, 0); rp.last.copy(rp.pos); }
       break;
     // ----- modo zumbis -----
     case 'zreset':
