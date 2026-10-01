@@ -2503,7 +2503,7 @@ function leftHand(A) { // mão de apoio por baixo do guarda-mão: palma embaixo,
 // ---------- braços de primeira pessoa feitos no Blender (humano do MPFB, licença CC0) com as animações das facas ----------
 // assets/arms.glb traz os dois braços com esqueleto, a câmera usada para posar e dois soquetes na mão direita
 // (Spin_karambit / Spin_knife) onde a faca do jogo é pendurada. Uma linha do tempo só, cortada em clipes (30 fps).
-const GRIP = { gripAt: .62, tilt: -.3, r: [0, 0, 0], l: [0, -.01, 0], lroll: -.6, shr: [.18, -.35, .2], shl: [.06, -.42, .18], elr: [.25, -.2, 0], ell: [-.1, -.2, .05], lift: [-.06, .06, .04], liftP: [0, 0, 0], pl: [-.03, 0, -.012], yaw: .08 }; // alvos das mãos; ombro (sh) e cotovelo (el) em relação à mão, espaço da câmera; lift sobe a arma para as mãos aparecerem
+const GRIP = { gripAt: .62, tilt: -.3, r: [0, 0, 0], l: [0, -.01, 0], lroll: .5, shr: [.18, -.35, .2], shl: [.06, -.42, .18], elr: [.25, -.2, 0], ell: [-.1, -.2, .05], lift: [-.06, .06, .04], liftP: [0, 0, 0], pl: [-.03, 0, -.012], yaw: .08 }; // alvos das mãos; ombro (sh) e cotovelo (el) em relação à mão, espaço da câmera; lift sobe a arma para as mãos aparecerem
 const ARMS = { holder: null, root: null, mixer: null, clips: {}, cur: null, knife: null };
 // cada faca tem a sua pose de mão: karambit a partir do quadro 0, faca a partir do 1000
 const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] }, ARMS_OFF = { karambit: 0, knife: 1000 };
@@ -2567,6 +2567,7 @@ function armsGunBase() {
     k.loAx = H.clone().sub(E).normalize().applyQuaternion(ql); k.loN = n.clone().applyQuaternion(ql);
     const qh = k.hand.getWorldQuaternion(new THREE.Quaternion());
     k.twist0 = twistAbout(ql.clone().multiply(qh), k.loAx); // torção natural antebraço→mão
+    k.foreH = E.clone().sub(H).normalize().applyQuaternion(qh.clone().invert()); // direção pulso→cotovelo vista pela mão (pulso reto)
   }
 }
 function twistAbout(q, axis) { // parte da rotação q em volta do eixo (decomposição swing-twist)
@@ -2593,7 +2594,11 @@ function armIK(s, target, pole) {
   const a = k.L1, b = k.L2;
   // Como nos FPS, o ombro não fica preso ao corpo: ele é posto fora da tela, atrás e abaixo de cada mão, para o
   // antebraço entrar na diagonal pelo canto (esquerdo por baixo do guarda-mão, direito pelo canto inferior direito).
-  const S = T.clone().add(_v1.fromArray(GRIP['sh' + s]));
+  // Pulso reto: o cotovelo vai exatamente na direção natural do antebraço vista pela mão, e o ombro fica além dele,
+  // puxado para o lado de GRIP.sh (fora da tela). Assim a mão nunca dobra no pulso ("munheca quebrada").
+  const E0 = T.clone().addScaledVector(k.foreH.clone().applyQuaternion(qT), b);
+  const S = E0.clone().addScaledVector(_v1.fromArray(GRIP['sh' + s]).normalize(), a * .97);
+  pole = E0;
   k.up.parent.worldToLocal(_v2.copy(S)); k.up.position.copy(_v2); k.up.updateMatrixWorld(true);
   let D = T.clone().sub(S), d = D.length();
   d = Math.max(Math.abs(a - b) + 1e-3, Math.min(d, a + b - 1e-4));
