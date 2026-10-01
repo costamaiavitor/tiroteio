@@ -2834,7 +2834,11 @@ function fpBuild(id, ud) {
   if (arms.every(a => a.cl && a.ua && a.fa && a.wr) && (lh || P.sh)) ik = { arms, ...lh, sh: P.sh || [0, 0, 0], Cb: new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A), body };
   root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; if (o.material) { o.material = o.material.clone(); o.material.envMapIntensity = .8; } } });
   const sk = SKIN_BY[skinOf(id)], pap = !!W[id]?.pap;
-  if (D && (sk || pap)) { const M = gunMats(pap, true, skinOf(id)); fpSkin(model.children[0], { a: M.metal, b: M.polymer }, tips.L, D.lens); }
+  if (sk || pap) { // skin: no modelo baixado ou, nas armas do próprio pacote (AK-47, Nova), nas peças da arma do pacote (cartucho fica)
+    const M = gunMats(pap, true, skinOf(id)), mats = { a: M.metal, b: M.polymer };
+    if (D) fpSkin(model.children[0], mats, tips.L, D.lens);
+    else fpSkin(root, mats, tips.L, ['12ge'], false, m => !fpArm(m));
+  }
   if (D?.lens) model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) Object.assign(o.material, { roughness: .08, metalness: .4 }).color.set(0x14232c); }); // vidro da luneta
   const mz = new THREE.Object3D(); mz.position.copy(tips.muzzle).applyMatrix4(C); body.add(mz);
   // pacote → tela: o gatilho da arma vai para o mesmo ponto da tela em todas as armas (FPV), com o cano no mesmo giro; os braços vêm junto
@@ -2872,11 +2876,11 @@ function fpMeshScale(o, Ri) {
   const w = (i, v) => { v.fromBufferAttribute(p, i); if (o.isSkinnedMesh) o.applyBoneTransform(i, v); return v.applyMatrix4(o.matrixWorld).applyMatrix4(Ri); };
   return w(0, A).distanceTo(w(j, B)) / Math.sqrt(best);
 }
-function fpSkin(root, mats, L, keep = [], all = false) { // all: pinta também as peças que brilham (facas: o KA-BAR usa mapa de emissão)
+function fpSkin(root, mats, L, keep = [], all = false, filt = null) { // all: pinta também as peças que brilham (facas: o KA-BAR usa mapa de emissão)
   root.updateMatrixWorld(true);
   const Ri = root.matrixWorld.clone().invert(), cache = {};
   root.traverse(o => {
-    if (!o.isMesh || keep.includes(o.material.name) || (!all && o.material.emissive?.getHex())) return;
+    if (!o.isMesh || (filt && !filt(o)) || keep.includes(o.material.name) || (!all && o.material.emissive?.getHex())) return;
     const c = o.material.color, wood = c.r > c.b * 1.6 && c.r > .08; // madeira / marrom
     const sc = +(2.5 / L * fpMeshScale(o, Ri)).toPrecision(3), k = (wood ? 'b' : 'a') + sc; // a malha pode ter escala própria
     o.material = cache[k] || (cache[k] = triMat(wood ? mats.b || mats.a : mats.a, sc));
