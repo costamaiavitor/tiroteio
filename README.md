@@ -172,7 +172,7 @@ Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Mé
 | Mouse / clique esquerdo | Mirar / atirar |
 | Clique direito (segurar) | Mirar: a arma encosta no rosto e a mira dela fica no centro da tela (pistolas com 3 pontos luminosos, fuzis com anel de abertura e massa, M4/P90 com holográfica de anel e ponto, escopetas com conta). Zoom leve e mais precisão. Na sniper, luneta; na faca, golpe forte; na granada, rasteira |
 | Espaço | Pular (morto: troca quem você assiste) |
-| C | Agachar. Ctrl também agacha, mas só na tela cheia do menu (Esc → Tela cheia), onde o jogo segura o teclado; fora dela o navegador não deixa o jogo impedir que Ctrl+W feche a aba, então o Ctrl não agacha |
+| Ctrl ou C | Agachar. Ao clicar para jogar, o jogo entra em tela cheia e segura as teclas do jogo (Chrome/Edge, opção "Tela cheia ao jogar" nas Configurações, ligada por padrão): assim o Ctrl+W vira andar agachado e não fecha a aba. O Esc continua abrindo a pausa e saindo da tela cheia. Em navegadores sem esse recurso, o Ctrl+W mostra o aviso "Sair do site?": cancele e o jogo volta parado, na pausa |
 | Shift | Andar em silêncio |
 | R | Recarregar |
 | 1 2 3 4 | Primária, pistola, faca, granadas |

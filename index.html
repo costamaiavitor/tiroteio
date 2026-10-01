@@ -378,7 +378,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
         <b>Mouse</b><span>Mirar / clique esquerdo atira</span>
         <b>Clique direito</b><span>Mira da sniper / facada forte / granada rasteira</span>
         <b>Espaço</b><span>Pular (morto: trocar quem assiste)</span>
-        <b>C</b><span>Agachar (Ctrl só na tela cheia: fora dela Ctrl+W fecharia a aba)</span>
+        <b>Ctrl / C</b><span>Agachar (com "Tela cheia ao jogar" o Ctrl+W não fecha a aba)</span>
         <b>Shift</b><span>Andar em silêncio</span>
         <b>R</b><span>Recarregar</span>
         <b>1 2 3 4</b><span>Primária, pistola, faca, granadas</span>
@@ -444,7 +444,7 @@ let now = performance.now() / 1000;
 const CFG = {
   name: load('name', 'Jogador' + Math.floor(rand(100, 999))),
   sens: load('sens', 1), fov: load('fov', 85), vol: load('vol', 0.6), shadows: load('shadows', true), gfx: load('gfx', null),
-  bright: load('bright', 1), zmarks: load('zmarks', true), lant: load('lant', false),
+  bright: load('bright', 1), zmarks: load('zmarks', true), lant: load('lant', false), autofull: load('autofull', true),
 };
 
 // ================================================================
@@ -4135,7 +4135,7 @@ function updateMe(dt) {
   let fw = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), st = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
   if (C.chatOpen || frozen) fw = st = 0;
   const wish = f.multiplyScalar(fw).add(r.multiplyScalar(st)); if (wish.lengthSq()) wish.normalize();
-  const crouchKey = me.downed || me.slideEnd > now || (!C.chatOpen && (keys.KeyC || (NET.kbLock && document.fullscreenElement && keys.ControlLeft))); // Ctrl só com o teclado preso (tela cheia): fora dela Ctrl+W fecha a aba
+  const crouchKey = me.downed || me.slideEnd > now || (!C.chatOpen && (keys.KeyC || keys.ControlLeft || keys.ControlRight)); // Ctrl só com o teclado preso (tela cheia): fora dela Ctrl+W fecha a aba
   if (ZC.on && crouchKey && !me.crouch && me.sprinting && me.onGround && !me.downed) { // Zumbis: agachar correndo = deslizar (com PhD Flopper, explode no fim)
     const hv = Math.hypot(me.vel.x, me.vel.z) || 1; me.slideX = me.vel.x / hv; me.slideZ = me.vel.z / hv; me.slideEnd = now + .6; me.slidePhd = zPerk('phd'); me.sprinting = false; play('dive');
   }
@@ -7064,7 +7064,7 @@ addEventListener('keydown', e => {
   if (['Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code) || e.ctrlKey) e.preventDefault();
   keys[e.code] = true;
   // fora da tela cheia o navegador não deixa o jogo segurar o Ctrl+W (fecha a aba): avisa uma vez por partida
-  if ((e.code === 'ControlLeft' || e.code === 'ControlRight') && !(NET.kbLock && document.fullscreenElement) && !C.ctrlTip) { C.ctrlTip = true; toast('Agache com C. Fora da tela cheia o Ctrl não agacha: Ctrl+W fecharia a aba (Esc → Tela cheia libera o Ctrl)', 6); }
+  if ((e.code === 'ControlLeft' || e.code === 'ControlRight') && !(NET.kbLock && document.fullscreenElement) && !C.ctrlTip) { C.ctrlTip = true; toast(navigator.keyboard?.lock ? 'Ctrl agacha. Para o Ctrl+W nunca fechar a aba, ligue "Tela cheia ao jogar" (Esc → Configurações)' : 'Ctrl agacha. Neste navegador o Ctrl+W pede para sair: cancele e o jogo volta parado na pausa (ou agache com C)', 6); }
   if (e.repeat) return;
   if (me.downed && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ', 'KeyV', 'KeyF'].includes(e.code)) return; // caído: só a pistola
   if (G.cur === 'dmach' && hasW('dmach') && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ'].includes(e.code)) return; // Máquina da Morte: não troca até acabar
@@ -7119,8 +7119,17 @@ addEventListener('mousemove', e => {
 addEventListener('wheel', e => { if (locked() && me.alive && !C.buyOpen) cycleWeapon(e.deltaY > 0 ? 1 : -1); });
 function openChat() { C.chatOpen = true; const i = $('#chatin'); i.classList.remove('hidden'); i.value = ''; setTimeout(() => i.focus(), 0); for (const k in keys) keys[k] = false; }
 function closeChat() { C.chatOpen = false; const i = $('#chatin'); i.blur(); i.classList.add('hidden'); if (!locked()) $('#click').classList.remove('hidden'); }
+// Ctrl+W: em tela cheia, a Keyboard Lock API (Chrome/Edge) deixa o jogo segurar as teclas do jogo, e o atalho
+// do navegador vira só "andar agachado". O Esc fica de fora: continua abrindo a pausa e saindo da tela cheia.
+// Sem a API (Firefox/Safari) o "Sair do site?" segura a aba e o jogo solta as teclas (releaseInput).
+const LOCK_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyR', 'KeyF', 'KeyT', 'KeyN', 'KeyC', 'KeyV', 'KeyB', 'KeyL', 'KeyY', 'Tab', 'Space', 'Enter', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'];
+async function lockKeyboard() {
+  if (!navigator.keyboard?.lock || !document.fullscreenEnabled) return false;
+  try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); await navigator.keyboard.lock(LOCK_KEYS); NET.kbLock = true; return true; } catch (e) { return false; }
+}
 function requestLock() {
   audioInit();
+  if (CFG.autofull && inGame) lockKeyboard(); // mesmo clique: tela cheia + teclado preso (a trava do mouse vem logo abaixo)
   const retry = () => toast('Clique de novo para travar o mouse', 2);
   const plain = () => { try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(retry); } catch (e) { } };
   // unadjustedMovement = movimento cru do mouse (sem aceleração do Windows e sem os saltos do Chrome)
@@ -7192,7 +7201,8 @@ function settingsForm(el) {
     <label>Brilho <span class="v" data-v="bright"></span><input type="range" data-k="bright" min="0.6" max="1.8" step="0.05"></label>
     <label>Gráficos <select data-k="gfx"><option value="baixo">Baixo (notebook fraco)</option><option value="medio">Médio</option><option value="alto">Alto (brilho, sombras de tudo, resolução cheia)</option></select></label>
     <label class="chk"><input type="checkbox" data-k="shadows"> Sombras (desligue se travar)</label>
-    <label class="chk"><input type="checkbox" data-k="zmarks"> Zumbis: marcar energia, caixa e Pack-a-Punch na tela</label>`;
+    <label class="chk"><input type="checkbox" data-k="zmarks"> Zumbis: marcar energia, caixa e Pack-a-Punch na tela</label>
+    <label class="chk"><input type="checkbox" data-k="autofull"> Tela cheia ao jogar (Chrome/Edge: o Ctrl agacha e o Ctrl+W não fecha a aba; Esc sai)</label>`;
   const gq = el.querySelector('[data-k="gfx"]'); gq.value = CFG.gfx;
   gq.onchange = () => { CFG.gfx = gq.value; save('gfx', CFG.gfx); applySettings(); };
   for (const k of ['sens', 'fov', 'vol', 'bright']) {
@@ -7204,6 +7214,8 @@ function settingsForm(el) {
   sh.onchange = () => { CFG.shadows = sh.checked; save('shadows', CFG.shadows); applySettings(); };
   const zm = el.querySelector('[data-k="zmarks"]'); zm.checked = CFG.zmarks;
   zm.onchange = () => { CFG.zmarks = zm.checked; save('zmarks', CFG.zmarks); };
+  const af = el.querySelector('[data-k="autofull"]'); af.checked = CFG.autofull;
+  af.onchange = () => { CFG.autofull = af.checked; save('autofull', CFG.autofull); if (!af.checked && NET.kbLock) { try { navigator.keyboard.unlock(); } catch (e) { } NET.kbLock = false; } };
 }
 // ================================================================
 // Conta, progresso e skins
@@ -7537,7 +7549,7 @@ $('#btnResume').onclick = () => requestLock();
 $('#click').onclick = () => requestLock();
 $('#btnLeave').onclick = () => leaveGame();
 $('#btnFull').onclick = async () => {
-  try { await document.documentElement.requestFullscreen(); if (navigator.keyboard?.lock) { await navigator.keyboard.lock(); NET.kbLock = true; } toast(NET.kbLock ? 'Tela cheia (Ctrl liberado para agachar)' : 'Tela cheia', 3); } catch (e) { toast('Tela cheia não disponível', 2); }
+  try { if (!(await lockKeyboard())) await document.documentElement.requestFullscreen(); toast(NET.kbLock ? 'Tela cheia (Ctrl liberado para agachar)' : 'Tela cheia', 3); } catch (e) { toast('Tela cheia não disponível', 2); }
 };
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) NET.kbLock = false; }); // saiu da tela cheia: o teclado deixa de estar preso
 let getPauseForm = null;
