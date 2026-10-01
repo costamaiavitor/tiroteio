@@ -1869,7 +1869,7 @@ function buildMap(id) {
   renderer.compile(vmScene, vmCam);
   scene.remove(warm); vmScene.remove(vmWarm);
   vmWarm.traverse(o => o.geometry?.dispose());
-  warm.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); if (o.material?.map && o.material.map !== SOFT && !Object.values(GTX || {}).includes(o.material.map)) o.material.map.dispose(); });
+  warm.traverse(o => { o.skeleton?.dispose(); if (!o.geometry?.userData.keep) o.geometry?.dispose(); if (o.material?.map && o.material.map !== SOFT && !Object.values(GTX || {}).includes(o.material.map)) o.material.map.dispose(); });
 }
 
 // ---------- navegação dos bots (grade automática) ----------
@@ -2092,6 +2092,7 @@ const SND = {
   groan: o => vox(o, rand(75, 110), rand(.7, 1.2), rand(.6, 1.1), .3),
   snarl: o => { vox(o, rand(140, 190), 1.4, .35, .45); nz(o, .3, 1400, 500, .2, 'bandpass', 3); },
   dog: o => { vox(o, rand(220, 300), .6, .25, .4); nz(o, .2, 1800, 600, .2, 'bandpass', 3); },
+  howl: o => { vox(o, rand(380, 440), 1.35, 1.3, .3); vox(o, rand(560, 620), 1.2, 1.1, .15); },
   groan2: o => vox(o, rand(55, 80), rand(.6, .9), rand(.8, 1.3), .32),
   groan3: o => { vox(o, rand(120, 160), rand(.8, 1.3), rand(.4, .7), .25); nz(o, .3, 900, 400, .1, 'bandpass', 4); },
   brute: o => { vox(o, rand(42, 58), .7, 1.1, .5); nz(o, .6, 300, 80, .3, 'lowpass', 1); },
@@ -3715,7 +3716,7 @@ function shoot() {
     }
     let hs = false;
     for (const [id, h] of dmgBy) {
-      if (zmode) sendToHost({ t: 'zhit', v: +id.slice(1), dmg: Math.round(h.dmg), z: h.zone, w: G.cur, sp: h.sp ? 1 : 0 });
+      if (zmode) { sendToHost({ t: 'zhit', v: +id.slice(1), dmg: Math.round(h.dmg), z: h.zone, w: G.cur, sp: h.sp ? 1 : 0 }); zFlinch(ZC.zs.get(+id.slice(1)), h.zone, h.sp ? .95 : clamp(.3 + h.dmg / 500, .3, 1), me.pos); }
       else sendToHost({ t: 'hit', v: id, dmg: Math.round(h.dmg), z: h.zone, w: G.cur });
       if (h.zone === 'head' && !h.sp) hs = true;
     }
@@ -3734,7 +3735,7 @@ function knifeAttack(heavy) {
   if (ZC.on) { // zumbis: 150 de dano (mata na rodada 1 com uma facada), Bowie 1000
     const res = trace(o, d, 3.4, zCands()); // bote da faca: zumbi até 3,4 m à frente puxa você para o golpe
     if (res.id && res.t > w.range) { if (!me.onGround || me.downed) res.id = null; else { const hl = Math.hypot(d.x, d.z) || 1, k = (res.t - w.range + .3) / .18; me.lungeX = d.x / hl * k; me.lungeZ = d.z / hl * k; me.lungeEnd = now + .18; play('dive'); } }
-    if (res.id) { sendToHost({ t: 'zhit', v: +res.id.slice(1), dmg: ZC.bowie ? 1000 : 150, z: 'body', w: 'knife' }); showHitmarker(false); play('stab'); puff(res.p, 0x6a0000, .35, .3, 0); }
+    if (res.id) { sendToHost({ t: 'zhit', v: +res.id.slice(1), dmg: ZC.bowie ? 1000 : 150, z: 'body', w: 'knife' }); zFlinch(ZC.zs.get(+res.id.slice(1)), 'body', .75, me.pos); showHitmarker(false); play('stab'); puff(res.p, 0x6a0000, .35, .3, 0); }
     else { play('knife'); if (res.t < w.range) impact(res.p, res.n); }
     return;
   }
@@ -3922,6 +3923,7 @@ function remoteShot(m) {
     else if (w?.pellets) m.e.forEach(e => puff(new V3(e[0], e[1], e[2]), 0xbbb5a8, .3, .3, .3)); else m.e.forEach(e => impact(new V3(e[0], e[1], e[2]), null));
   }
   play(w?.snd || 'pistol', o); muzzleFlash(o, true);
+  if (ZC.on && !w?.thunder && !w?.frost) zShotReact(o, m.e);
   if (rp) setRemoteGun(rp, m.w);
 }
 
@@ -4569,53 +4571,99 @@ function zbx(g, w, h, d, x, y, z, m) { // caixa com geometria em cache (não é 
   const k = w + ',' + h + ',' + d; let geo = ZGEO[k]; if (!geo) { geo = ZGEO[k] = new THREE.BoxGeometry(w, h, d); geo.userData.keep = true; }
   const b = new THREE.Mesh(geo, m); b.position.set(x, y, z); g.add(b); return b;
 }
+function zcy(g, rt, rb, h, x, y, z, m) { // cilindro afinando (coxa, canela, braço, pescoço)
+  const k = 'c' + rt + ',' + rb + ',' + h; let geo = ZGEO[k]; if (!geo) { geo = ZGEO[k] = new THREE.CylinderGeometry(rt, rb, h, 7); geo.userData.keep = true; }
+  const b = new THREE.Mesh(geo, m); b.position.set(x, y, z); g.add(b); return b;
+}
+function zsp(g, rx, ry, rz, x, y, z, m) { // esfera achatada (crânio, barriga, pústulas, músculos)
+  let geo = ZGEO.s; if (!geo) { geo = ZGEO.s = new THREE.SphereGeometry(1, 8, 6); geo.userData.keep = true; }
+  const b = new THREE.Mesh(geo, m); b.position.set(x, y, z); b.scale.set(rx, ry, rz); g.add(b); return b;
+}
+const zbone = (par, x, y, z) => { const b = new THREE.Bone(); b.position.set(x, y, z); par.add(b); return b; };
 const zSeed = id => { let s = (id * 2654435761) >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }; // mesmo id = mesmo visual em todos os clientes
 const zSize = (kind, id) => kind ? ZKIND[kind].sz : .92 + ((id * 7919) % 17) * .01; // comuns: 0,92 a 1,08
 let ZRING = null;
-// sorteios do visual (mesma ordem de antes: pele, roupa, calça, pé descalço, cabelo); o mesmo id dá o mesmo zumbi em todos
+// sorteios do visual (pele, roupa, calça, pé descalço, cabelo, ferida...); o mesmo id dá o mesmo zumbi em todos.
+// Só as cores mudam o molde; cabelo, pé, costelas, braço sem mão e mandíbula são ossos ligados/desligados na cópia
 function zLook(kind, id) {
-  const R = zSeed(id), pick = a => Math.floor(R() * a.length), s = pick(ZSKIN), c = pick(ZCLOTH), p = pick(ZPANTS), bare = R() < .5, hair = !!kind || R() < .75;
-  return { s, c, p, bare, hair, key: kind ? kind + ',' + (kind === 6 ? 0 : p) + ',' + (+bare) : kind + ',' + s + ',' + c + ',' + p + ',' + (+bare) + (+hair) }; // especiais: pele e roupa vêm do tipo (no Carniceiro a calça também), então só calça/pé mudam o molde
+  const R = zSeed(id), pick = a => Math.floor(R() * a.length), s = pick(ZSKIN), c = pick(ZCLOTH), p = pick(ZPANTS), bare = R() < .5, hair = (!!kind || R() < .75) ? 1 + (R() < .5 ? 1 : 0) : 0;
+  const wound = R() < .3, stump = !kind && R() < .1, nojaw = !kind && R() < .08;
+  return { s, c, p, bare, hair, wound, stump, nojaw, key: kind ? kind + ',' + (kind === 6 ? 0 : p) : '0,' + s + ',' + c + ',' + p };
 }
-// cada visual é montado (e juntado) uma vez só; os outros zumbis iguais são cópias leves do molde
-const ZTPL = new Map(), ZMG = new Map(); // moldes por visual; peças já juntadas (pela receita), nunca descartadas
+// cada visual é montado uma vez só e vira UMA malha com ossos (+1 com o que brilha): 2 chamadas de desenho por zumbi.
+// As cópias só criam os ossos; geometria e materiais são de todos (nunca mude o material de um zumbi só)
+const ZTPL = new Map(), ZVC = { L: new THREE.MeshLambertMaterial({ vertexColors: true }), B: new THREE.MeshBasicMaterial({ vertexColors: true }) };
+const ZID4 = new THREE.Matrix4(), ZBS = [new THREE.Sphere(new V3(0, .9, 0), 2.4), new THREE.Sphere(new V3(0, .6, 0), 1.7)]; // esfera fixa para o recorte da câmera (a malha com ossos não recalcula)
+function zSkinGeo(g, bones) { // junta as peças de cada osso numa geometria só, cada vértice preso (peso 1) ao osso da sua peça
+  g.updateMatrixWorld(true);
+  const parts = { L: [], B: [] }, out = {};
+  bones.forEach((b, bi) => { for (const m of [...b.children]) if (m.isMesh && !m.material.transparent) { const t = matKey(m.material); if (t === 'L' || t === 'B') { parts[t].push([m, bi]); b.remove(m); } } });
+  for (const t of ['L', 'B']) {
+    const ps = parts[t]; if (!ps.length) continue;
+    const geo = mergeMeshes(ps.map(p => p[0]), ps.map(p => p[0].matrixWorld), true, false), n = geo.attributes.position.count, si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+    let o = 0; for (const [m, bi] of ps) for (let i = 0, c = m.geometry.attributes.position.count; i < c; i++, o++) { si[o * 4] = bi; sw[o * 4] = 1; }
+    if (t === 'L') { // pele manchada e sujeira subindo do chão: cor varia um pouco por vértice
+      const col = geo.attributes.color.array, pos = geo.attributes.position.array;
+      for (let i = 0; i < n; i++) { const h = Math.sin(i * 12.9898 + pos[i * 3] * 78.233) * 43758.5453, f = (.86 + .22 * (h - Math.floor(h))) * (pos[i * 3 + 1] < .35 ? .8 : 1); col[i * 3] *= f; col[i * 3 + 1] *= f; col[i * 3 + 2] *= f; }
+    }
+    geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+    geo.userData.keep = true; out[t] = geo;
+  }
+  for (const b of bones) for (const m of [...b.children]) if (m.isMesh) b.remove(m); // nada fica solto nos ossos
+  return out;
+}
+const zHide = (b, h) => b && b.scale.setScalar(h ? 1e-4 : 1);
 function zombieModel(dog, kind = 0, id = (Math.random() * 1e6) | 0) {
   const L = dog ? null : zLook(kind, id), key = dog ? 'cão' : L.key;
   let t = ZTPL.get(key);
   if (!t) {
-    const m = zBuildModel(dog, kind, L), ud = m.userData, list = []; m.userData = {}; m.traverse(o => list.push(o));
-    const map = {}; for (const [k, v] of Object.entries(ud)) map[k] = Array.isArray(v) ? v.map(o => list.indexOf(o)) : v?.isObject3D ? list.indexOf(v) : { v };
-    t = { list, par: list.map(o => list.indexOf(o.parent)), map }; ZTPL.set(key, t);
+    const m = zBuildModel(dog, kind, L), ud = m.userData, bones = []; m.userData = {};
+    m.traverse(o => { if (o.isBone) bones.push(o); });
+    const geo = zSkinGeo(m, bones), inv = bones.map(b => b.matrixWorld.clone().invert()), extra = m.children.filter(o => !o.isBone);
+    const map = {}; for (const [k, v] of Object.entries(ud)) map[k] = Array.isArray(v) ? v.map(o => bones.indexOf(o)) : v?.isBone ? bones.indexOf(v) : v?.isObject3D ? { e: extra.indexOf(v) } : { v };
+    t = { geo, inv, extra, map, bones: bones.map(b => [b.position.clone(), b.quaternion.clone(), b.scale.clone(), bones.indexOf(b.parent)]) }; ZTPL.set(key, t);
   }
-  // cópia na mão (o clone() do three cria material e geometria padrão para cada malha e joga fora)
-  const list = t.list.map((s, i) => {
-    const o = s.isMesh ? new THREE.Mesh(s.geometry, s.material) : new THREE.Group();
-    o.position.copy(s.position); o.rotation.order = s.rotation.order; o.quaternion.copy(s.quaternion); o.scale.copy(s.scale); o.visible = s.visible;
-    if (s.userData.noShadow) o.userData.noShadow = true;
-    return o;
-  });
-  for (let i = 1; i < list.length; i++) list[t.par[i]].add(list[i]);
-  const g = list[0], ud = {};
-  for (const [k, v] of Object.entries(t.map)) ud[k] = Array.isArray(v) ? v.map(i => list[i]) : typeof v === 'number' ? list[v] : v.v;
-  g.userData = ud; if (!dog) g.scale.setScalar(zSize(kind, id));
+  const g = new THREE.Group(); g.rotation.order = 'YXZ';
+  const bones = t.bones.map(([p, q, s]) => { const b = new THREE.Bone(); b.position.copy(p); b.quaternion.copy(q); b.scale.copy(s); return b; });
+  t.bones.forEach((b, i) => (b[3] < 0 ? g : bones[b[3]]).add(bones[i]));
+  const skel = new THREE.Skeleton(bones, t.inv);
+  for (const k of ['L', 'B']) if (t.geo[k]) { const sm = new THREE.SkinnedMesh(t.geo[k], ZVC[k]); sm.bind(skel, ZID4); sm.boundingSphere = ZBS[dog ? 1 : 0]; if (k === 'B') sm.userData.noShadow = true; g.add(sm); }
+  const ex = t.extra.map(s => { const o = new THREE.Mesh(s.geometry, s.material); o.position.copy(s.position); o.quaternion.copy(s.quaternion); o.scale.copy(s.scale); o.visible = s.visible; o.userData.noShadow = true; g.add(o); return o; });
+  const ud = { skel }; for (const [k, v] of Object.entries(t.map)) ud[k] = Array.isArray(v) ? v.map(i => bones[i]) : typeof v === 'number' ? bones[v] : v.e !== undefined ? ex[v.e] : v.v;
+  g.userData = ud;
+  if (!dog) { // variações do mesmo molde
+    const hr = kind === 1 || kind === 6 ? 0 : kind === 3 ? 2 : L.hair; zHide(ud.hairS, hr !== 1); zHide(ud.hairL, hr !== 2); // Brutamonte careca, Carniceiro de capacete zHide(ud.shoeR, L.bare); zHide(ud.bareR, !L.bare); zHide(ud.ribs, !(L.wound || kind === 3));
+    zHide(ud.foreL, L.stump); zHide(ud.stumpL, !L.stump); zHide(ud.jaw, L.nojaw); zHide(ud.neckB, 1); zHide(ud.kneeL, 1); zHide(ud.kneeR, 1);
+    g.scale.setScalar(zSize(kind, id));
+  }
+  return g;
+}
+function zBuildDog(g, I) { // cão do inferno: peito fundo, cintura fina, focinho comprido, patas com junta
+  const fur = mc(0x2b1a14), fur2 = mc(0x3a2418), raw = mc(0x6a1a12), bone = mc(0xcfc6a8), dark = mc(0x0c0806), glow = zGlow(0xff6a1a, 3), eye = zGlow(0xffa01a, 4);
+  zsp(I, .15, .21, .26, 0, .7, -.2, fur); zsp(I, .1, .11, .24, 0, .71, .14, fur2); zsp(I, .12, .13, .14, 0, .73, .36, fur); // peito fundo, cintura fina, quadril
+  for (let i = 0; i < 4; i++) zbx(I, .31, .022, .04, 0, .66 - i * .01, -.3 + i * .08, raw); // costelas em carne viva
+  zbx(I, .05, .05, .62, 0, .9, .02, glow); zsp(I, .06, .08, .06, .1, .78, .3, raw); // brasa na espinha, ferida
+  zcy(I, .07, .1, .32, 0, .82, -.44, fur).rotation.x = -1.15; // pescoço esticado para a frente
+  const head = zbone(I, 0, .86, -.6), jaw = zbone(head, 0, -.05, -.08), tail = zbone(I, 0, .8, .48);
+  zsp(head, .105, .1, .13, 0, .01, 0, fur); zbx(head, .1, .085, .27, 0, -.02, -.21, fur); zbx(head, .055, .045, .04, 0, .0, -.35, dark); // crânio, focinho comprido, nariz
+  zbx(head, .085, .025, .22, 0, -.065, -.22, bone); zbx(head, .035, .025, .02, .055, .035, -.11, eye); zbx(head, .035, .025, .02, -.055, .035, -.11, eye);
+  for (const sx of [-1, 1]) zbx(head, .035, .12, .06, .06 * sx, .1, .06, fur).rotation.x = .9; // orelhas deitadas para trás
+  zbx(jaw, .08, .035, .25, 0, -.03, -.14, fur); zbx(jaw, .07, .02, .2, 0, -.005, -.15, bone); zbx(jaw, .05, .01, .14, 0, -.01, -.1, raw);
+  zcy(tail, .012, .028, .42, 0, .2, 0, fur); tail.rotation.x = 2.2;
+  const legs = [], lows = [];
+  for (const [x, z] of [[.09, -.3], [-.09, -.3], [.09, .36], [-.09, .36]]) {
+    const L = zbone(I, x, .6, z), W = zbone(L, 0, -.28, 0), back = z > 0;
+    if (back) zsp(L, .065, .14, .09, 0, -.04, .01, fur); else zsp(L, .055, .1, .07, 0, -.02, 0, fur);
+    zcy(L, .045, .035, .28, 0, -.14, 0, fur); zcy(W, .032, .026, .28, 0, -.14, 0, fur); zbx(W, .065, .04, .11, 0, -.29, -.03, dark);
+    legs.push(L); lows.push(W);
+  }
+  g.userData = { inner: I, legs, lows, head, jaw, tail, dog: 1 };
   return g;
 }
 function zBuildModel(dog, kind, L) {
-  const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner); g.rotation.order = 'YXZ';
-  if (dog) {
-    const fur = mc(0x2b1a14), glow = zGlow(0xff6a1a, 3), head = new THREE.Group();
-    zbx(inner, .34, .36, .95, 0, .62, 0, fur);
-    head.position.set(0, .82, -.52); inner.add(head);
-    zbx(head, .28, .26, .32, 0, 0, 0, fur); zbx(head, .18, .13, .2, 0, -.05, -.22, fur);
-    zbx(head, .05, .04, .02, .08, .05, -.165, glow); zbx(head, .05, .04, .02, -.08, .05, -.165, glow);
-    zbx(head, .06, .1, .06, .09, .16, .05, fur); zbx(head, .06, .1, .06, -.09, .16, .05, fur);
-    const legs = [];
-    for (const [x, z] of [[.12, -.35], [-.12, -.35], [.12, .35], [-.12, .35]]) { const L = new THREE.Group(); L.position.set(x, .45, z); zbx(L, .1, .45, .1, 0, -.22, 0, fur); inner.add(L); legs.push(L); }
-    zbx(inner, .06, .06, .35, 0, .75, .6, fur).rotation.x = .5;
-    zbx(inner, .36, .04, .6, 0, .81, 0, glow); // brasa nas costas
-    g.userData = { inner, legs, head, dog: 1 }; mergeParts(g, null, ZMG);
-    return g;
-  }
+  const g = new THREE.Group(); g.rotation.order = 'YXZ';
+  const inner = zbone(g, 0, 0, 0);
+  if (dog) return zBuildDog(g, inner);
   let skin = mc(ZSKIN[L.s]), cloth = mc(ZCLOTH[L.c]), pants = mc(ZPANTS[L.p]), eye = zGlow(0xffc21a, 4);
   if (kind === 1) { skin = mc(0x6a7458); cloth = mc(0x3a2a22); eye = zGlow(0xff7a1a, 4); }
   else if (kind === 2) { skin = mc(0x9c9a68); cloth = mc(0x5a4a30); eye = zGlow(0xffa020, 5); }
@@ -4623,40 +4671,88 @@ function zBuildModel(dog, kind, L) {
   else if (kind === 4) { skin = mc(0x6aa04a); cloth = mc(0x34402a); eye = zGlow(0x7aff3a, 5); }
   else if (kind === 5) { skin = mc(0xb8b4aa); cloth = mc(0x4a3a4a); eye = zGlow(0xd0f0ff, 5); }
   else if (kind === 6) { skin = mc(0x7a6a5a); cloth = mc(0x2a2624); pants = mc(0x1e1c1a); eye = zGlow(0xff1a0a, 6); }
-  const legL = new THREE.Group(), legR = new THREE.Group(); legL.position.set(-.13, .85, 0); legR.position.set(.13, .85, 0);
-  const blood = mc(0x3e0808), dark = mc(0x14100e), shoe = mc(0x1c1a18);
-  zbx(legL, .22, .85, .26, 0, -.42, 0, pants); zbx(legR, .22, .85, .26, 0, -.42, 0, pants);
-  zbx(legL, .24, .1, .3, 0, -.82, -.03, shoe); if (L.bare) zbx(legR, .23, .3, .27, 0, -.7, 0, skin); else zbx(legR, .24, .1, .3, 0, -.82, -.03, shoe); // calça rasgada / pé descalço
-  inner.add(legL, legR);
-  const torso = new THREE.Group(); torso.position.set(0, .85, 0); inner.add(torso);
-  zbx(torso, .54, .62, .3, 0, .31, 0, cloth); zbx(torso, .3, .2, .02, .08, .2, -.16, skin); // camisa rasgada
-  zbx(torso, .16, .12, .02, -.14, .42, -.161, blood); zbx(torso, .1, .18, .02, .18, .12, -.161, blood); zbx(torso, .5, .06, .31, 0, .02, 0, dark); // manchas e cinto
-  const head = new THREE.Group(); head.position.set(0, .65, -.02); torso.add(head);
-  zbx(head, .3, .3, .3, 0, .14, 0, skin); zbx(head, .06, .045, .02, .07, .17, -.155, eye); zbx(head, .06, .045, .02, -.07, .17, -.155, eye);
-  zbx(head, .18, .07, .02, 0, .04, -.155, dark); zbx(head, .12, .03, .02, 0, .07, -.157, mc(0xd8d0b0)); // boca aberta com dentes
-  zbx(head, .1, .08, .02, .1, .24, -.155, blood); if (L.hair) zbx(head, .32, .06, .32, 0, .3, .01, dark); // ferida e cabelo (alguns carecas)
-  const armL = new THREE.Group(), armR = new THREE.Group(); armL.position.set(-.33, .55, 0); armR.position.set(.33, .55, 0); torso.add(armL, armR);
-  for (const A of [armL, armR]) { zbx(A, .12, .12, .3, 0, 0, -.14, cloth); zbx(A, .1, .1, .28, 0, 0, -.42, skin); zbx(A, .1, .1, .1, 0, -.02, -.6, skin); } // manga curta, antebraço à mostra
-  const ud = { inner, legL, legR, torso, head, armL, armR };
-  if (kind === 1) { // Brutamonte: ombreiras de ferro e punhos grandes
-    const iron = mc(0x3a3a3c); zbx(torso, .74, .14, .4, 0, .6, 0, iron); zbx(torso, .56, .3, .32, 0, .3, .01, mc(0x4a3a2c));
-    for (const A of [armL, armR]) zbx(A, .17, .17, .17, 0, -.02, -.62, skin);
-  } else if (kind === 2) { // Explosivo: barriga inchada com bolhas que brilham
-    const bl = zGlow(0xffa020, 2.5); ud.belly = zbx(torso, .6, .5, .5, 0, .24, -.07, skin);
-    zbx(ud.belly, .12, .12, .04, .12, .06, -.25, bl); zbx(ud.belly, .1, .1, .04, -.15, -.08, -.25, bl); zbx(ud.belly, .08, .08, .04, .05, -.16, -.25, bl); zbx(ud.belly, .04, .1, .1, .3, .04, -.05, bl);
-  } else if (kind === 3) inner.scale.set(.8, 1, .8); // Veloz: magro
-  else if (kind === 4) { // Tóxico: pústulas verdes
-    const gl = zGlow(0x5aff2a, 2.2); zbx(torso, .1, .1, .04, -.12, .25, -.17, gl); zbx(torso, .08, .08, .04, .16, .45, -.17, gl); zbx(head, .07, .07, .03, -.1, .25, -.16, gl); zbx(torso, .04, .1, .1, -.28, .35, 0, gl);
-  } else if (kind === 5) { // Gritador: cabeça comprida, boca que brilha
-    head.scale.y = 1.25; zbx(head, .14, .12, .02, 0, .03, -.158, zGlow(0xd0f0ff, 2));
-  } else if (kind === 6) { // Carniceiro: armadura, capacete com visor e cutelo
-    const metal = mc(0x4a4c50), rust = mc(0x5a3a28);
-    zbx(torso, .62, .5, .36, 0, .36, 0, metal); zbx(torso, .78, .14, .42, 0, .6, 0, rust); zbx(head, .36, .26, .36, 0, .2, .01, metal); zbx(head, .26, .04, .02, 0, .18, -.19, zGlow(0xff2a0a, 5));
-    zbx(armR, .06, .06, .3, 0, -.02, -.72, dark); zbx(armR, .04, .34, .44, 0, -.18, -1, mc(0x9a9a9e)); zbx(armR, .045, .05, .44, 0, -.36, -1, blood); // cutelo
-    if (!ZRING) { ZRING = new THREE.Mesh(new THREE.RingGeometry(1.45, 1.81, 40), new THREE.MeshBasicMaterial({ color: 0xff2a10, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide })); ZRING.geometry.userData.keep = true; }
-    const ring = new THREE.Mesh(ZRING.geometry, ZRING.material); ring.rotation.x = -Math.PI / 2; ring.position.y = .04; ring.visible = false; ring.userData.noShadow = true; g.add(ring); ud.ring = ring; // raio 1,81 × escala 1,6 = 2,9 m (alcance do golpe)
+  const blood = mc(0x4a0a0a), gore = mc(0x6e1410), dark = mc(0x14100e), shoe = mc(0x1c1a18), bone = mc(0xcfc6a8), sock = mc(0x0a0606), hairC = mc(kind === 5 ? 0x8a8a84 : 0x1a1510);
+  // proporções: membros, largura e fundura do peito, braços, cabeça, comprimento do braço, dedos
+  const [lw, cw, cd, aw, hk, al, fl] = kind === 1 ? [1.35, 1.4, 1.25, 1.5, .9, 1.05, 1.1] : kind === 2 ? [.85, 1.02, 1, .8, .92, 1, 1] : kind === 3 ? [.72, .8, .82, .74, .95, 1.12, 1.3]
+    : kind === 5 ? [.8, .88, .9, .82, 1, 1.12, 1.5] : kind === 6 ? [1.3, 1.35, 1.3, 1.35, .95, 1.05, 1.1] : [1, 1, 1, 1, 1, 1, 1];
+  const ud = { inner };
+  // pernas: coxa e canela afinando, joelho com osso próprio; o pé direito pode estar descalço (osso ligado/desligado)
+  for (const sx of [-1, 1]) {
+    const leg = zbone(inner, .11 * sx, .88, 0), shin = zbone(leg, 0, -.44, 0), R = sx > 0;
+    zcy(leg, .088 * lw, .066 * lw, .46, 0, -.21, 0, pants); zcy(shin, .066 * lw, .052 * lw, .3, 0, -.13, 0, pants); zcy(shin, .046 * lw, .04 * lw, .16, 0, -.33, 0, skin);
+    if (!R) zbx(leg, .1 * lw, .14, .02, .02, -.36, -.075 * lw, pants).rotation.z = .3; // calça rasgada no joelho
+    else zbx(leg, .06, .1, .01, -.02, -.12, -.09 * lw, blood);
+    const foot = R ? zbone(shin, 0, -.42, 0) : shin, fy = R ? 0 : -.42;
+    zbx(foot, .11 * lw, .08, .26, 0, fy - .02, -.05, shoe);
+    if (R) { ud.shoeR = foot; const bare = zbone(shin, 0, -.42, 0); ud.bareR = bare; zbx(bare, .09 * lw, .06, .2, 0, -.02, -.04, skin); zbx(bare, .08 * lw, .04, .05, 0, -.03, -.16, blood); }
+    const kn = zbone(leg, 0, -.44, 0); zsp(kn, .07 * lw, .05, .07 * lw, 0, -.01, 0, gore); zbx(kn, .03, .06, .03, 0, -.04, 0, bone); // coto (pernas arrancadas)
+    ud[R ? 'legR' : 'legL'] = leg; ud[R ? 'shinR' : 'shinL'] = shin; ud[R ? 'kneeR' : 'kneeL'] = kn;
   }
-  g.userData = ud; mergeParts(g, new Set(Object.values(ud)), ZMG);
+  zsp(inner, .17 * cw, .1, .12 * cd, 0, .88, 0, pants); zbx(inner, .34 * cw, .05, .25 * cd, 0, .94, 0, dark); // quadril e cinto
+  // tronco curvado: barriga, peito em V, ombros; camisa rasgada com abas, manchas de sangue
+  const torso = zbone(inner, 0, .85, 0); ud.torso = torso; const zc_ = .72 * cd / cw;
+  zcy(torso, .16 * cw, .15 * cw, .27, 0, .12, 0, cloth).scale.z = zc_; zcy(torso, .21 * cw, .165 * cw, .36, 0, .42, 0, cloth).scale.z = zc_;
+  zsp(torso, .25 * cw, .075, .13 * cd, 0, .57, 0, cloth); zcy(torso, .055 * aw, .065 * aw, .14, 0, .63, -.01, skin);
+  zbx(torso, .15, .12, .02, 0, .53, -.14 * cd, skin); // gola rasgada
+  for (let i = 0; i < 3; i++) { const fl_ = zbx(torso, .09, .17, .015, (-.1 + i * .1) * cw, -.06 - (i % 2) * .03, -.11 * cd, cloth); fl_.rotation.set(.12, 0, (i - 1) * .18); } // abas da camisa
+  zbx(torso, .13, .1, .012, -.08 * cw, .46, -.155 * cd, blood); zbx(torso, .06, .22, .012, .1 * cw, .3, -.15 * cd, blood); zbx(torso, .1, .08, .012, .05, .5, .148 * cd, blood);
+  const ribs = zbone(torso, .03, .36, -.15 * cd); ud.ribs = ribs; zbx(ribs, .17, .2, .02, 0, 0, 0, gore); // ferida com costelas
+  for (let i = 0; i < 4; i++) zbx(ribs, .16 - i * .01, .018, .02, 0, .07 - i * .045, -.012, bone);
+  const nb = zbone(torso, 0, .7, -.01); ud.neckB = nb; zsp(nb, .07, .03, .07, 0, 0, 0, gore); // pescoço sem cabeça (tiro de misericórdia)
+  // cabeça: crânio arredondado, olhos fundos que brilham, nariz podre, orelhas, dentes; mandíbula com osso (abre e morde)
+  const head = zbone(torso, 0, .65, -.02), hy = kind === 5 ? 1.3 : 1; ud.head = head;
+  zsp(head, .112 * hk, .13 * hk * hy, .125 * hk, 0, .15 + (hy - 1) * .06, .01, skin); zbx(head, .17 * hk, .09, .16 * hk, 0, .08, -.015, skin);
+  zbx(head, .2 * hk, .035, .05, 0, .19, -.1 * hk, skin); zbx(head, .035, .055, .04, 0, .12, -.128 * hk, skin);
+  for (const sx of [-1, 1]) { zbx(head, .055, .04, .02, .048 * sx, .155, -.118 * hk, sock); zbx(head, .028, .022, .012, .048 * sx, .155, -.126 * hk, eye); zbx(head, .025, .06, .045, .118 * hk * sx, .14, 0, skin); }
+  zbx(head, .1, .05, .06, 0, .06, -.085 * hk, sock); zbx(head, .1, .022, .02, 0, .068, -.112 * hk, bone); zbx(head, .06, .05, .012, .06, .24 + (hy - 1) * .1, -.1 * hk, blood);
+  const jaw = zbone(head, 0, .085, -.01); ud.jaw = jaw;
+  zbx(jaw, .14 * hk, .05, .12 * hk, 0, -.035, -.055 * hk, skin); zbx(jaw, .09, .02, .02, 0, -.005, -.108 * hk, bone); zbx(jaw, .05, .03, .01, .02, -.05, -.112 * hk, blood);
+  const hS = zbone(head, 0, .15, 0), hL = zbone(head, 0, .15, 0); ud.hairS = hS; ud.hairL = hL;
+  zbx(hS, .235 * hk, .07, .25 * hk, 0, .12 * hy, .02, hairC); zbx(hS, .23 * hk, .14, .07, 0, .03, .1 * hk, hairC);
+  zbx(hL, .24 * hk, .08, .26 * hk, 0, .12 * hy, .015, hairC); zbx(hL, .24 * hk, .3, .07, 0, -.04, .1 * hk, hairC);
+  for (const sx of [-1, 1]) zbx(hL, .04, .26, .1, .115 * hk * sx, -.02, .02, hairC).rotation.z = .08 * sx;
+  // braços pendurados na pose de molde: manga, antebraço, mão com dedos curvados (garra)
+  for (const sx of [-1, 1]) {
+    const R = sx > 0, arm = zbone(torso, .23 * cw * sx, .53, 0), fore = zbone(arm, 0, -.3 * al, 0), hand = zbone(fore, 0, -.27 * al, 0);
+    zsp(arm, .075 * aw, .06, .075 * aw, 0, 0, 0, cloth); zcy(arm, .068 * aw, .06 * aw, .16, 0, -.07, 0, cloth); zcy(arm, .052 * aw, .045 * aw, .3 * al, 0, -.15 * al, 0, skin);
+    zcy(fore, .046 * aw, .036 * aw, .27 * al, 0, -.135 * al, 0, skin); zbx(fore, .02, .12, .03, .03 * sx, -.12, -.03, blood);
+    zbx(hand, .035 * aw, .09, .08 * aw, 0, -.045, 0, skin);
+    for (let i = 0; i < 4; i++) { const f = zbx(hand, .017 * aw, .08 * fl, .017 * aw, -.008 * sx, -.12 - .02 * (fl - 1), (-.03 + i * .02) * aw, skin); f.rotation.z = -.45 * sx; f.rotation.x = -.15; }
+    zbx(hand, .017 * aw, .06, .018 * aw, -.01 * sx, -.07, -.05 * aw, skin).rotation.x = .6; // polegar
+    ud[R ? 'armR' : 'armL'] = arm; ud[R ? 'foreR' : 'foreL'] = fore; ud[R ? 'handR' : 'handL'] = hand;
+    if (!R) { const st = zbone(arm, 0, -.3 * al, 0); ud.stumpL = st; zsp(st, .055, .04, .055, 0, 0, 0, gore); zbx(st, .025, .05, .025, 0, -.03, 0, bone); } // braço sem antebraço
+  }
+  if (kind === 1) { // Brutamonte: ombreiras de ferro com cravos, placa no peito, correntes, punhos enormes
+    const iron = mc(0x3a3a3c), rust = mc(0x5a3a28);
+    for (const A of [ud.armL, ud.armR]) { zbx(A, .22, .08, .24, 0, .04, 0, iron); zbx(A, .04, .08, .04, 0, .11, 0, rust); zsp(A, .07, .06, .07, 0, -.1, 0, skin); }
+    zbx(torso, .42, .26, .04, 0, .42, -.17 * cd, iron); zbx(torso, .12, .1, .045, .1, .48, -.175 * cd, rust); zbx(torso, .5, .04, .4, 0, .2, 0, rust);
+    for (const H of [ud.handL, ud.handR]) zsp(H, .07, .07, .08, 0, -.07, 0, skin);
+    zbx(head, .2, .03, .02, 0, .21, -.105, blood); zbx(ud.jaw, .15, .04, .03, 0, -.02, -.11, bone); // cicatriz e queixo para frente
+  } else if (kind === 2) { // Explosivo: barriga enorme com bolhas que brilham e veias
+    const bl = zGlow(0xffa020, 2.5), vein = mc(0x5a4a2a), belly = zbone(torso, 0, .24, -.06); ud.belly = belly;
+    zsp(belly, .28, .26, .27, 0, 0, -.04, skin);
+    for (const [x, y, s] of [[.12, .06, .045], [-.15, -.08, .04], [.05, -.16, .035], [-.05, .14, .03], [.22, -.06, .03]]) zsp(belly, s, s, s * .6, x, y, -.04 - Math.sqrt(Math.max(0, .075 - x * x - y * y)) * .95, bl);
+    zbx(belly, .01, .2, .01, -.09, .02, -.27, vein); zbx(belly, .16, .01, .01, .04, -.1, -.27, vein); zsp(belly, .05, .04, .05, .28, .04, -.05, bl);
+  } else if (kind === 3) { // Veloz: magro, sem camisa no peito (costelas), unhas compridas
+    zbx(torso, .3, .1, .02, 0, .2, -.12, skin);
+  } else if (kind === 4) { // Tóxico: pústulas verdes, papo inchado no pescoço, baba que brilha
+    const gl = zGlow(0x5aff2a, 2.2), sac = mc(0x4a7a30);
+    for (const [x, y] of [[-.12, .25], [.16, .45], [.02, .1], [-.18, .5]]) zsp(torso, .045, .045, .025, x, y, -.155, gl);
+    zsp(torso, .03, .04, .03, -.27, .35, 0, gl); zsp(head, .03, .03, .02, -.1, .25, -.08, gl); zsp(ud.armR, .03, .03, .03, .05, -.2, 0, gl);
+    zsp(torso, .09, .07, .08, .05, .62, -.05, sac); zbx(ud.jaw, .02, .1, .02, .02, -.09, -.1, gl);
+  } else if (kind === 5) { // Gritador: cabeça comprida, boca enorme que brilha
+    const gl = zGlow(0xd0f0ff, 2); zbx(head, .1, .07, .02, 0, .065, -.1, gl); zbx(ud.jaw, .1, .06, .02, 0, -.03, -.1, gl);
+  } else if (kind === 6) { // Carniceiro: couraça, capacete com visor, avental de couro e cutelo na mão direita
+    const metal = mc(0x4a4c50), rust = mc(0x5a3a28), leather = mc(0x3a2618), steel = mc(0x9a9a9e);
+    zcy(torso, .23 * cw, .19 * cw, .34, 0, .42, 0, metal).scale.z = .8; zbx(torso, .78, .14, .42, 0, .6, 0, rust);
+    zsp(head, .135, .12, .14, 0, .2, .01, metal); zbx(head, .2, .03, .02, 0, .17, -.14, zGlow(0xff2a0a, 5));
+    zbx(torso, .42, .62, .02, 0, -.2, -.17 * cd, leather); zbx(torso, .12, .2, .022, .08, -.1, -.172 * cd, blood);
+    for (const A of [ud.armL, ud.armR]) zbx(A, .2, .1, .22, 0, .03, 0, rust);
+    zbx(ud.handR, .035, .18, .035, 0, -.1, 0, dark); zbx(ud.handR, .025, .32, .26, 0, -.32, -.1, steel); zbx(ud.handR, .03, .3, .03, 0, -.32, -.23, blood); // cutelo
+    if (!ZRING) { ZRING = new THREE.Mesh(new THREE.RingGeometry(1.45, 1.81, 40), new THREE.MeshBasicMaterial({ color: 0xff2a10, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide })); ZRING.geometry.userData.keep = true; }
+    const ring = new THREE.Mesh(ZRING.geometry, ZRING.material); ring.rotation.x = -Math.PI / 2; ring.position.y = .04; ring.visible = false; g.add(ring); ud.ring = ring; // raio 1,81 × escala 1,6 = 2,9 m (alcance do golpe)
+  }
+  g.userData = ud;
   return g;
 }
 function teddyModel() {
@@ -4669,7 +4765,7 @@ function teddyModel() {
 
 // ---------- mundo do mapa zumbi (cliente e host usam o mesmo) ----------
 function zClearDynamic() {
-  for (const zc of ZC.zs.values()) { zGroup.remove(zc.model); zc.model.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); }
+  for (const zc of ZC.zs.values()) { zGroup.remove(zc.model); zc.model.userData.skel?.dispose(); zc.model.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); }
   ZC.zs.clear(); ZC.bo = 0;
   for (const c of ZC.clouds.values()) { zGroup.remove(c.g); c.mat.dispose(); } ZC.clouds.clear();
   for (const d of ZC.drops.values()) { zGroup.remove(d.g); d.g.children.forEach(s => s.material.dispose()); }
@@ -4939,9 +5035,9 @@ function zNewClientZombie(id, f) {
   const dog = !!(f & 16), kind = dog ? 0 : ((f >> 7) & 7) % ZKIND.length, model = zombieModel(dog, kind, id); zGroup.add(model); // o tipo vem nos bits 128-512 e não muda
   if (CFG.gfx === 'alto') model.traverse(o => { if (o.isMesh && !o.userData.noShadow) o.castShadow = true; });
   const zc = { id, sid: 'z' + id, model, buf: [], pos: new V3(), last: new V3(), yaw: 0, f, dog, kind, sz: dog ? 1 : zSize(kind, id), dead: false, deadT: 0, anim: Math.random() * 6, spd: 0, groanT: rand(1, 6), lastSeen: now, atk: false, atk0: 0, fling: null };
-  ZC.zs.set(id, zc); return zc;
+  zAnimInit(zc); ZC.zs.set(id, zc); return zc;
 }
-function zRemoveClient(zc) { zGroup.remove(zc.model); zc.model.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); ZC.zs.delete(zc.id); }
+function zRemoveClient(zc) { zGroup.remove(zc.model); zc.model.userData.skel?.dispose(); zc.model.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); ZC.zs.delete(zc.id); }
 function zOnSnap(m) {
   if (m.ts) { if (m.ts <= (ZC.snapTs || 0)) return; ZC.snapTs = m.ts; } // canal sem ordem: foto velha é descartada
   const a = m.z, t = netTime('z', m.ts);
@@ -4951,7 +5047,7 @@ function zOnSnap(m) {
     if (zc.dead) continue;
     zc.buf.push({ t, p: [a[i + 1], a[i + 2], a[i + 3]], y: a[i + 4] }); if (zc.buf.length > 30) zc.buf.shift();
     zc.f = a[i + 5]; zc.lastSeen = now;
-    if (fresh) { zc.pos.set(a[i + 1], a[i + 2], a[i + 3]); zc.last.copy(zc.pos); zc.yaw = a[i + 4]; zc.model.position.copy(zc.pos); if (zc.dog || zc.kind === 6) zLightning(zc.pos); }
+    if (fresh) { zc.pos.set(a[i + 1], a[i + 2], a[i + 3]); zc.last.copy(zc.pos); zc.yaw = a[i + 4]; zc.model.position.copy(zc.pos); if (zc.dog || zc.kind === 6) zLightning(zc.pos); if (zc.f & 64) { _zv.set(zc.pos.x, .05, zc.pos.z); puff(_zv, 0x4a3a28, 2, .9, .4); play('crack', _zv); } }
   }
   if (typeof m.b === 'string') m.b = Array.from(m.b, c => c.charCodeAt(0) - 48); // tábuas vêm como texto ("6606...")
   if (m.b) for (let i = 0; i < m.b.length; i++) {
@@ -4990,29 +5086,236 @@ function zShock(p, r, col) { // raios em volta de um ponto (Electric Cherry / Ph
   m.position.copy(p); m.position.y += .9; addFx(m, .3, (k, o) => { o.scale.setScalar(1 + k * r * 2); o.material.opacity = .5 * (1 - k); });
   flashLight.position.set(p.x, p.y + 1.2, p.z); flashLight.intensity = 40;
 }
+// ---------- animação dos zumbis (só no cliente, procedural, em camadas; nada aloca por quadro) ----------
+// Cada zumbi tem um jeito sorteado pelo id (igual em todos os clientes): andar, correr, golpe, rastejar e queda.
+// Camadas: passada -> estilo do tipo -> golpe -> especial (grito, tosse, rugido, uivo) -> reação ao tiro -> tique.
+// As caixas de acerto (zBoxes) leem a inclinação e a altura que a pose deixou (zc.ho/hd/hx/oy).
+const zEase = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+const zBump = (u, a, b) => u <= 0 || u >= 1 ? 0 : Math.min(1, u / a, (1 - u) / b); // sobe em a, segura, desce em b (frações)
+function zR(o, x, y, z, k) { const r = o.rotation; r.x += (x - r.x) * k; r.y += (y - r.y) * k; r.z += (z - r.z) * k; }
+const _zv = new V3(), ZLEAN = [.08, .25, .38, .38];
+function zAnimInit(zc) {
+  const R = zSeed(zc.id * 7 + 3), K = zc.kind;
+  zc.ws = (R() * 5) | 0; zc.rs = (R() * 3) | 0; zc.side = R() < .5 ? -1 : 1; zc.hunch = R() * .12; zc.cv = (R() * 3) | 0; zc.av = (R() * 3) | 0; zc.dv = (R() * 4) | 0; zc.ph = R() * 6.3;
+  if (K === 3) zc.rs = 2; else if (K === 5) zc.ws = 4; else if (K === 4 && zc.ws > 3) zc.ws = 0; // Veloz corre com os braços para trás; Gritador anda curvado
+  zc.twT = now + 1 + R() * 4; zc.tw0 = -9; zc.twY = 0; zc.twZ = 0; zc.stT = now + 6 + R() * 14; zc.st0 = -9; zc.lpT = now + 1.5 + R() * 3; zc.lp0 = -9;
+  zc.spT = now + 3 + R() * 5; zc.sp0 = -9; zc.spK = 0; zc.spN = 0; zc.hitT = -9; zc.hitK = 0; zc.hitS = 0; zc.hitB = 1; zc.hitZ = 0;
+  zc.atk0 = -9; zc.atkE = -9; zc.atkN = 0; zc.atkFx = 1; zc.legs = 1; zc.dk = 0; zc.ho = zc.dog ? 0 : Math.sin(ZLEAN[zc.f & 3]) * .8; zc.hd = 0; zc.hx = 0; zc.oy = 0;
+  if (K === 6 || zc.dog) { zc.sp0 = now; zc.spK = zc.dog ? 4 : 2; zc.spN = 0; } // Carniceiro ruge e o cão uiva ao surgir
+}
+function zFlinch(zc, zone, K, from) { // reação ao tiro: tranco para trás/para o lado, cabeça que estala, joelho que dobra
+  if (!zc || zc.dead) return;
+  const dx = zc.pos.x - from.x, dz = zc.pos.z - from.z, d = Math.hypot(dx, dz) || 1, s = Math.sin(zc.yaw), c = Math.cos(zc.yaw);
+  zc.hitK = Math.max(K, now - zc.hitT < .15 ? zc.hitK : 0); zc.hitT = now; zc.hitZ = zone === 'head' ? 1 : zone === 'legs' ? 2 : 0;
+  zc.hitB = (dx * s + dz * c) / d; zc.hitS = (dx * c - dz * s) / d; // atrás/frente e lado em relação a quem levou
+}
+function zShotReact(o, ends) { // tiro de outro jogador que terminou num zumbi: ele também reage
+  for (const e of ends) for (const zc of ZC.zs.values()) {
+    if (zc.dead) continue; const y = e[1] - zc.pos.y;
+    if (y > -.1 && y < (zc.dog ? 1.1 : 2) * zc.sz && Math.hypot(e[0] - zc.pos.x, e[2] - zc.pos.z) < .55 * zc.sz) { zFlinch(zc, y > 1.45 * zc.sz ? 'head' : y < .8 * zc.sz ? 'legs' : 'body', .45, o); break; }
+  }
+}
+function zMouth(ud, f) { return ud.head.localToWorld(_zv.set(0, .07, -.16 - f)); } // matriz do quadro anterior basta para fumaça
+function zShockRing(p, col, r, life) {
+  const m = new THREE.Mesh(new THREE.RingGeometry(.85, 1, 36), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .6, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  m.rotation.x = -Math.PI / 2; m.position.copy(p); addFx(m, life, (k, o) => { o.scale.setScalar(.4 + k * r); o.material.opacity = .6 * (1 - k); });
+}
+function zAnimHuman(zc, ud, dt) {
+  const f = zc.f, sc = f & 3, atk = !!(f & 4), crawl = !!(f & 8), win = !!(f & 32), rise = !!(f & 64), K = zc.kind, t = now, spd = zc.spd, side = zc.side;
+  const k = 1 - Math.exp(-dt * 16), run = sc >= 2 || (K === 6 && sc >= 1), mv = clamp(spd / (run ? 2.5 : 1), 0, 1), heavy = K === 1 || K === 6;
+  zc.anim += dt * (spd / ((.9 + spd * .25) * zc.sz) * 6.283 * (K === 2 ? 1.3 : 1) + .4); // a fase anda com a distância: o pé não escorrega
+  const a = zc.anim, s = Math.sin(a), c = Math.cos(a), ph = zc.ph;
+  let L0 = ZLEAN[sc] + zc.hunch + (K === 1 ? .08 : K === 5 ? .1 : K === 2 ? -.06 : K === 6 && sc ? .2 : 0);
+  let ix = 0, iz = 0, iy = 0, iry = 0, tx = 0, ty = 0, tz = 0, hx = 0, hy = 0, hz = 0, jx = -.1 - .08 * Math.sin(t * 1.7 + ph);
+  let lLx = 0, lLy = 0, lLz = 0, lRx = 0, lRy = 0, lRz = 0, sLx = -.1, sRx = -.1, aLx = .12, aRx = .12, oL = .06, oR = .06, fLx = .2, fRx = .2, hLx = 0, hRx = 0;
+  if (crawl) { // rastejando (sem as pernas): puxa o corpo com os braços
+    if (zc.legs) { zc.legs = 0; zHide(ud.shinL, 1); zHide(ud.shinR, 1); zHide(ud.kneeL, 0); zHide(ud.kneeR, 0); _zv.copy(zc.pos); _zv.y += .4; puff(_zv, 0x8a0000, .8, .5, 0); }
+    ix = -1.35; iy = .22; L0 = 0; hx = 1.05; lLx = -.15 + .12 * s; lRx = -.15 - .12 * s;
+    const p = Math.sin(a * .8);
+    if (zc.cv === 0) { aLx = 2.3 + .75 * p; aRx = 2.3 - .75 * p; fLx = .5 + .5 * Math.max(0, -p); fRx = .5 + .5 * Math.max(0, p); tz = .1 * p; }
+    else if (zc.cv === 1) { if (side > 0) { aRx = .4; oR = .3; aLx = 2.4 + .9 * p; fLx = .3 + .6 * Math.max(0, -p); } else { aLx = .4; oL = .3; aRx = 2.4 + .9 * p; fRx = .3 + .6 * Math.max(0, -p); } iz = .14 * p; }
+    else { aLx = aRx = 2.2 + .7 * p; fLx = fRx = .4 + .4 * Math.max(0, -p); tz = .25 * Math.sin(a * .4); hz = -.2 * Math.sin(a * .4); }
+    if (atk) { const q = zEase((t - zc.atk0) / .3); aLx = aRx = 2.9 * q + aLx * (1 - q); hx = 1.25; jx = -.6 * q; }
+  } else if (rise) { // saindo do chão: arranha para cima, depois empurra a terra
+    const u = clamp((zc.pos.y + 1.8) / 1.8, 0, 1), cl = Math.sin(t * 7 + ph);
+    aLx = 2.8 - 1.9 * u * u + .35 * cl; aRx = 2.8 - 1.9 * u * u - .35 * Math.sin(t * 7 + ph + 1.3); fLx = .5 + .45 * cl; fRx = .5 - .45 * cl; oL = oR = .22;
+    hx = .55 - .8 * u; jx = -.45; L0 = .15 + .45 * u; iz = .1 * Math.sin(t * 3); lLx = .8 * (1 - u); sLx = -1.2 * (1 - u); lRx = .3; sRx = -.6;
+    if (t > zc.dk && zc.pos.y < -.05) { zc.dk = t + .3; _zv.set(zc.pos.x + rand(-.4, .4), .05, zc.pos.z + rand(-.4, .4)); puff(_zv, 0x4a3a28, .9, .7, .3); }
+  } else if (win && zc.pos.y > .05) { // pulando a janela: corpo sobre o batente, perna dobrada
+    L0 = .8; lLx = 1.3; sLx = -1.6; lRx = .35; sRx = -.7; aLx = aRx = 1.05; fLx = fRx = .9; hx = .45; oL = oR = .15;
+  } else if (win && spd < .3 && !atk) { // arrancando as tábuas: braço por braço, puxões
+    const q = Math.sin(t * 5 + ph); aLx = 1.7 + .6 * q; aRx = 1.7 - .6 * q; fLx = .6 - .5 * q; fRx = .6 + .5 * q; L0 += .15 + .1 * Math.sin(t * 10 + ph); hx = .25; jx = -.3 - .2 * Math.sin(t * 3); iz = .05 * q;
+  } else { // andando / correndo
+    const A = (run ? .8 : sc ? .55 : .42) * mv * (heavy ? .85 : 1), knee = (run ? 1.3 : .6) * mv;
+    lLx = A * s; lRx = -A * s; sLx = -.08 - knee * Math.max(0, c); sRx = -.08 - knee * Math.max(0, -c);
+    iy = (run ? .03 * Math.abs(c) - .015 : -.025 * s * s) * mv; tz = .05 * s * mv; ty = .1 * s * mv;
+    if (K === 2) { // Explosivo: gingado de pato, pernas abertas, braços para fora por causa da barriga
+      lLz = -.12; lRz = .12; iz = .11 * s * mv; aLx = aRx = .4 + .15 * s; oL = oR = .38; fLx = fRx = .3; hz = -.08 * s;
+    } else if (heavy) { // Brutamonte / Carniceiro: pisada pesada, ombros que balançam, braços em pêndulo
+      iz = .07 * s * mv; ty = .2 * s * mv; tz = .1 * s * mv; aLx = .2 - .45 * s * mv; aRx = .2 + .45 * s * mv; oL = oR = .25; fLx = fRx = .45; hx = .25;
+      if (run) { aLx = .3 - .9 * s; aRx = .3 + .9 * s; oL = oR = .4; hx = .45; } // investida / fúria
+      if (K === 6) { aRx = .35 + aRx * .4; fRx = .6; } // o cutelo pesa
+    } else if (run) {
+      if (zc.rs === 0) { aLx = 1.4 + .5 * s; aRx = 1.4 - .5 * s; fLx = fRx = .4; oL = oR = .15; hx = .2; } // braços esticados para a frente
+      else if (zc.rs === 1) { aLx = .3 - .9 * s; aRx = .3 + .9 * s; fLx = fRx = 1.4; } // braços bombeando
+      else { aLx = aRx = -1 + .15 * s; oL = oR = .22; fLx = fRx = .15; hx = .4; L0 += .12; } // braços para trás
+    } else if (zc.ws === 0) { aLx = 1.3 + .08 * Math.sin(a * .5 + side) + .1 * s; aRx = 1.3 + .08 * Math.cos(a * .5) - .1 * s; fLx = fRx = .25; oL = oR = 0; hx = -.1; } // braços à frente
+    else if (zc.ws === 1) { // manco: a perna ruim mal dobra e o corpo afunda sobre ela
+      if (side > 0) { lRx *= .4; sRx = -.05; } else { lLx *= .4; sLx = -.05; }
+      iy -= .05 * mv * Math.max(0, -s * side); tz += .09 * side * mv * Math.max(0, -s * side); aLx = .15 - .3 * s * mv; aRx = .15 + .3 * s * mv;
+    } else if (zc.ws === 2) { // arrasta a perna (pé torto), um braço estendido
+      if (side > 0) { lRx = -.3 + .12 * s; sRx = -.05; lRy = .45; lLx *= 1.25; aRx = 1.1; aLx = .2 + .3 * s; } else { lLx = -.3 + .12 * s; sLx = -.05; lLy = -.45; lRx *= 1.25; aLx = 1.1; aRx = .2 - .3 * s; }
+      tz -= .1 * side;
+    } else if (zc.ws === 3) { tz = .2 * s * mv + .04 * side; iz = .05 * s * mv; hz = -.22 * s; aLx = .3 + .5 * s; aRx = .3 - .5 * s; oL = oR = .25; } // cambaleando
+    else { L0 += .22; hx = .4; aLx = (L0 + .22) * .9 + .2 * s * mv; aRx = (L0 + .22) * .9 - .2 * s * mv; fLx = fRx = .1; } // curvado, braços pendurados
+    const idle = 1 - mv; // parado: balança o peso e a cabeça pende
+    iz += .04 * Math.sin(t * .9 + ph) * idle; hz += .14 * Math.sin(t * .5 + ph) * idle; hx -= .15 * idle;
+    // tropeção de vez em quando: o corpo vai para a frente e os braços aparam
+    if (!atk && !run && mv > .5 && t > zc.stT) { zc.st0 = t; zc.stT = t + 9 + Math.random() * 16; }
+    const st = zBump((t - zc.st0) / .9, .3, .5);
+    if (st) { L0 += .5 * st; hx += .3 * st; aLx += (1.6 - aLx) * st; aRx += (1.4 - aRx) * st; iy -= .06 * st; if (side > 0) lRx += .6 * st; else lLx += .6 * st; }
+    if (K === 3 && run && mv > .7 && t > zc.lpT) { zc.lp0 = t; zc.lpT = t + 2.5 + Math.random() * 4; } // Veloz: salto
+    const lp = Math.sin(clamp((t - zc.lp0) / .5, 0, 1) * Math.PI);
+    if (lp > 0) { iy += .32 * lp; lLx += (1 - lLx) * lp; sLx += (-1.6 - sLx) * lp; lRx += (-.5 - lRx) * lp; sRx += (-1 - sRx) * lp; aLx += (-1.4 - aLx) * lp; aRx += (-1.4 - aRx) * lp; }
+  }
+  // golpe: preparo (bit 4 ligado) e batida (logo que desliga); variação muda a cada golpe
+  if (!crawl && !rise) {
+    const q = atk ? zEase((t - zc.atk0) / (K === 6 ? .9 : .4)) : 0, e = 1 - clamp((t - zc.atkE) / .4, 0, 1), sk = e * e;
+    if (q || sk) {
+      if (K === 1) { // Brutamonte: soco no chão com as duas mãos
+        aLx = aRx = 2.9 * q + .3 * sk + aLx * (1 - Math.max(q, sk)); oL = oR = -.18 * q; L0 += -.25 * q + .6 * sk; hx += .2 * q; iy -= .1 * sk; sLx -= .5 * sk; sRx -= .5 * sk;
+        if (sk && !zc.atkFx) { zc.atkFx = 1; const d = 1.1 * zc.sz; _zv.set(zc.pos.x - Math.sin(zc.yaw) * d, zc.pos.y + .1, zc.pos.z - Math.cos(zc.yaw) * d); puff(_zv, 0x6b5a48, 1.8, .5, .2); }
+      } else if (K === 6) { // Carniceiro: ergue o cutelo (anel cresce) e desce de uma vez
+        aRx = 2.95 * q + .5 * sk + aRx * (1 - Math.max(q, sk)); oR = .1 * q; fRx = .3 * q; aLx = .9 * q + aLx * (1 - q); oL = .3 * q; L0 += -.28 * q + .55 * sk; hx += .25 * q; jx = -.5 * q - .3 * sk; iy -= .12 * sk; sLx -= .6 * sk; sRx -= .6 * sk;
+      } else if (K === 2) { // Explosivo: incha e treme antes do bote
+        aLx = aRx = .9 * q + 1.5 * sk + aLx * (1 - Math.max(q, sk)); oL = oR = .5 * q; jx = -.5 * q; hx += .3 * q; ix += .03 * Math.sin(t * 53) * q; iz += .04 * Math.sin(t * 47) * q;
+      } else {
+        const v = (zc.av + zc.atkN) % 3;
+        if (v === 0) { aLx = aRx = 2.4 * q + .5 * sk + aLx * (1 - Math.max(q, sk)); fLx = fRx = .7 * q + .2; oL = oR = .15; L0 += -.15 * q + .35 * sk; jx = -.35 * q; } // patada com as duas mãos
+        else if (v === 1) { // garra de um braço só, com o tronco torcendo
+          const A = 2.1 * q + 1.2 * sk; if (side > 0) { aRx = A + aRx * (1 - Math.max(q, sk)); oR = .6 * q - .3 * sk; } else { aLx = A + aLx * (1 - Math.max(q, sk)); oL = .6 * q - .3 * sk; }
+          ty += (-.45 * q + .45 * sk) * side; jx = -.3 * q;
+        } else { aLx = aRx = 1.5 * Math.max(q, sk) + aLx * (1 - Math.max(q, sk)); fLx = fRx = .5; iy -= .05 * q; sLx -= .4 * q; sRx -= .4 * q; hx += .35 * q - .3 * sk; jx = -.55 * q; L0 += .55 * sk; } // bote com mordida
+      }
+    }
+  }
+  // especiais: grito (Gritador), rugido (Carniceiro), tosse com vômito (Tóxico), fumaça da fúria
+  if (K === 4 && !atk && !crawl && t > zc.spT) { zc.spK = 3; zc.sp0 = t; zc.spN = 0; zc.spT = t + 6 + Math.random() * 6; if (zc.pos.distanceTo(camera.position) < 22) play('gurgle', zc.pos); }
+  if (zc.spK) {
+    const D = zc.spK === 1 ? 1.4 : zc.spK === 2 ? 1.8 : 1.3, u = (t - zc.sp0) / D, w = zBump(u, .12, .25);
+    if (u >= 1) zc.spK = 0;
+    else if (zc.spK === 1 || zc.spK === 2) { // cabeça para trás, boca escancarada, braços abertos, tremendo
+      hx += .85 * w; jx = -.75 * w; L0 -= .3 * w; aLx += (.5 - aLx) * w; aRx += (.5 - aRx) * w; oL += 1.1 * w; oR += 1.1 * w; fLx += .3 * w; fRx += .3 * w; hz += .07 * Math.sin(t * 60) * w;
+    } else if (zc.spK === 3) { // tosse: trancos para a frente e jato verde da boca
+      const p = Math.max(0, Math.sin(u * Math.PI * 3)) * w; L0 += .4 * p; hx -= .25 * p; jx = -.55 * w; aLx += (1.9 - aLx) * w; fLx += (2 - fLx) * w;
+      if (u > .22 + .25 * zc.spN && zc.spN < 3) { zc.spN++; puff(zMouth(ud, .15 * zc.spN), 0x7aff3a, .45 + .15 * zc.spN, .7, .1); }
+    }
+  }
+  if (K === 6 && sc && t > zc.dk) { zc.dk = t + .5; if (zc.pos.distanceTo(camera.position) < 30) puff(zMouth(ud, 0), 0x9a9a9a, .5, .6, .8); } // Carniceiro furioso: bufa
+  // reação ao tiro: tranco que some rápido (forte = cambaleia)
+  const hu = t - zc.hitT;
+  if (hu < .7 && !crawl && !rise) {
+    const e = Math.min(1, hu / .06) * Math.exp(-hu * (zc.hitK > .6 ? 4 : 7)) * zc.hitK;
+    if (zc.hitZ === 1) { hx += .75 * e * zc.hitB; hz -= .3 * e * zc.hitS; L0 -= .1 * e * zc.hitB; }
+    else if (zc.hitZ === 2) { iy -= .07 * e; if (zc.hitS > 0) sRx -= .9 * e; else sLx -= .9 * e; tz -= .12 * e * zc.hitS; L0 += .15 * e; }
+    else { L0 -= .45 * e * zc.hitB; tz -= .25 * e * zc.hitS; aLx -= .5 * e; aRx -= .5 * e; oL += .3 * e; oR += .3 * e; hx += .25 * e; if (zc.hitK > .6) ix += .1 * e * zc.hitB; }
+  }
+  // tique: a cabeça estala para um lado
+  if (t > zc.twT) { zc.tw0 = t; zc.twY = (Math.random() - .5) * 1.2; zc.twZ = (Math.random() - .5) * .9; zc.twT = t + .8 + Math.random() * 4.5; }
+  const tw = Math.max(0, 1 - (t - zc.tw0) / .2); hy += zc.twY * tw; hz += zc.twZ * tw;
+  // aplica (suavizado: troca de estado sem salto)
+  const I = ud.inner; zR(I, ix, iry, iz, k); I.position.y += (iy - I.position.y) * k;
+  zR(ud.torso, -L0 + tx, ty, tz, k); zR(ud.head, hx, hy, hz, Math.min(1, k * 1.6)); zR(ud.jaw, jx, 0, 0, k);
+  zR(ud.legL, lLx, lLy, lLz, k); zR(ud.legR, lRx, lRy, lRz, k); zR(ud.shinL, sLx, 0, 0, k); zR(ud.shinR, sRx, 0, 0, k);
+  zR(ud.armL, aLx, 0, -oL, k); zR(ud.armR, aRx, 0, oR, k); zR(ud.foreL, fLx, 0, 0, k); zR(ud.foreR, fRx, 0, 0, k); zR(ud.handL, hLx, 0, 0, k); zR(ud.handR, hRx, 0, 0, k);
+  if (ud.belly) ud.belly.scale.setScalar(1 + .05 * Math.sin(t * 4 + zc.id) + .04 * Math.abs(s) * mv + (atk ? .28 * zEase((t - zc.atk0) / .4) : 0)); // Explosivo pulsa e incha no bote
+  // caixas de acerto seguem a pose: cabeça à frente (ho), descida (hd), lado (hx)
+  const Lt = -ud.torso.rotation.x, b = -I.rotation.x;
+  zc.ho = clamp(Math.sin(Lt) * .8 + Math.sin(b) * 1.64, -.6, .95); zc.hd = clamp((1 - Math.cos(Lt)) * .8 + (1 - Math.cos(b)) * 1.64 - I.position.y, -.4, .5);
+  zc.hx = -(Math.sin(ud.torso.rotation.z) * .8 + Math.sin(I.rotation.z) * 1.64);
+}
+function zAnimDog(zc, ud, dt) {
+  const atk = !!(zc.f & 4), t = now, spd = zc.spd, k = 1 - Math.exp(-dt * 16), I = ud.inner, gal = spd > 4.2, mv = clamp(spd / 3, 0, 1), L = ud.legs, W = ud.lows;
+  zc.anim += dt * (spd / (gal ? 2.3 : 1.15) * 6.283 + .3);
+  const a = zc.anim, s = Math.sin(a), c = Math.cos(a);
+  let ix = 0, iy = 0, iz2 = 0, lz = 0, hx = 0, hy = .2 * Math.sin(t * 1.3 + zc.ph) * (1 - mv), jx = .08 + .05 * Math.sin(t * 9), tx = 2.2 + .15 * Math.sin(t * 8) * (1 - mv), tz = .3 * Math.sin(a);
+  let l0, l1, l2, l3, w0, w1, w2, w3;
+  if (gal) { // galope: as da frente juntas, as de trás juntas, o corpo ondula
+    l0 = .9 * s; l1 = .9 * Math.sin(a + .35); l2 = .3 + .85 * Math.sin(a + 2.6); l3 = .3 + .85 * Math.sin(a + 2.95);
+    w0 = -1 * Math.max(0, Math.cos(a)); w1 = -1 * Math.max(0, Math.cos(a + .35)); w2 = -.45 - .5 * Math.max(0, -Math.cos(a + 2.6)); w3 = -.45 - .5 * Math.max(0, -Math.cos(a + 2.95));
+    ix = .12 * Math.sin(a + 1.3); iy = .06 * Math.abs(Math.sin(a + 1.3)); hx = -.12 - .15 * Math.sin(a + 1.3); jx = .3; tx = 2.6;
+  } else { // trote: diagonais (frente direita com trás esquerda)
+    const A = .55 * mv; l0 = A * s; l3 = .3 + A * s; l1 = -A * s; l2 = .3 - A * s;
+    w0 = -.7 * mv * Math.max(0, c); w3 = -.45 - .5 * mv * Math.max(0, c); w1 = -.7 * mv * Math.max(0, -c); w2 = -.45 - .5 * mv * Math.max(0, -c);
+    iy = .025 * Math.abs(s) * mv; hx = .05 * Math.sin(2 * a) * mv; iz2 = .04 * s * mv;
+  }
+  // bote: agacha no preparo e salta na batida
+  const q = atk ? zEase((t - zc.atk0) / .25) : 0, p = clamp((t - zc.atkE) / .45, 0, 1), w = p < 1 ? Math.sin(p * Math.PI) : 0;
+  if (q) { iy -= .1 * q; ix -= .1 * q; l0 += (-.4 - l0) * q; l1 += (-.4 - l1) * q; w2 += -.8 * q; w3 += -.8 * q; jx = .5 * q; hx -= .2 * q; }
+  if (w) { iy += .35 * w; lz = .45 * w; ix += .25 * w; l0 = l1 = 1.3 * w; w0 = w1 = -.2; l2 = l3 = -.9 * w; jx = p < .8 ? .6 : .05; hx += .25 * w; }
+  // uivo: ao surgir e às vezes parado (senta, cabeça para cima)
+  if (spd < .5 && !atk && t > zc.spT) { zc.spK = 4; zc.sp0 = t; zc.spN = 0; zc.spT = t + 6 + Math.random() * 8; }
+  if (zc.spK === 4) {
+    const u = (t - zc.sp0) / 1.4, h = zBump(u, .15, .25), sit = h * (1 - mv);
+    if (u >= 1) zc.spK = 0;
+    if (!zc.spN && u > .1) { zc.spN = 1; if (zc.pos.distanceTo(camera.position) < 35) play('howl', zc.pos); }
+    hx += 1 * h; jx += .45 * h; ix += .45 * sit; iy -= .12 * sit; l2 += 1.1 * sit; l3 += 1.1 * sit; w2 += -1.8 * sit; w3 += -1.8 * sit;
+  }
+  const hu = t - zc.hitT; if (hu < .5) { const e = Math.min(1, hu / .06) * Math.exp(-hu * 7) * zc.hitK; ix += .2 * e * zc.hitB; iz2 -= .2 * e * zc.hitS; hx += .3 * e; }
+  zR(I, ix, 0, iz2, k); I.position.y += (iy - I.position.y) * k; I.position.z += (-lz - I.position.z) * k;
+  zR(L[0], l0, 0, 0, k); zR(L[1], l1, 0, 0, k); zR(L[2], l2, 0, 0, k); zR(L[3], l3, 0, 0, k);
+  zR(W[0], w0, 0, 0, k); zR(W[1], w1, 0, 0, k); zR(W[2], w2, 0, 0, k); zR(W[3], w3, 0, 0, k);
+  zR(ud.head, hx, hy, 0, k); zR(ud.jaw, jx, 0, 0, k); zR(ud.tail, tx, 0, tz, k);
+  const b = I.rotation.x; zc.oy = I.position.y; zc.ho = .6 * Math.cos(b) - .86 * Math.sin(b) - .6 - I.position.z; zc.hd = .86 * Math.cos(b) + .6 * Math.sin(b) - .86 + I.position.y; // cabeça do cão (sobe no uivo, avança no bote)
+}
+// quedas: de costas, de cara, girando, de joelhos, tiro na cabeça, rastejante, Carniceiro; cão rola e esperneia
+function zAnimDead(zc, ud, dt) {
+  const k = now - zc.deadT, M_ = zc.model, I = ud.inner, K = Math.min(1, dt * 12), sd = zc.side;
+  if (zc.fling) { // Arma Trovão: voa girando, braços e pernas soltos
+    zc.fling.y -= 18 * dt; M_.position.addScaledVector(zc.fling, dt);
+    if (M_.position.y <= 0 && zc.fling.y < 0) { M_.position.y = 0; zc.fling.set(0, 0, 0); } else M_.rotation.x -= dt * 8;
+    if (!zc.dog) { const q = Math.sin(k * 22); zR(ud.armL, 2.6 + q, 0, -.8, K); zR(ud.armR, 2.6 - q, 0, .8, K); zR(ud.legL, .6 - q * .5, 0, -.3, K); zR(ud.legR, .6 + q * .5, 0, .3, K); }
+  } else if (zc.dog) {
+    const e = zEase(k / .4), kick = Math.max(0, 1 - k / 1.3);
+    zR(I, 0, 0, sd * 1.45 * e, 1); I.position.y = .1 * e; I.position.z = 0;
+    for (let i = 0; i < 4; i++) { zR(ud.legs[i], .4 * Math.sin(k * 18 + i * 1.7) * kick + .3, 0, 0, K); zR(ud.lows[i], -.6 - .4 * Math.sin(k * 18 + i) * kick, 0, 0, K); }
+    zR(ud.head, -.3 * e, 0, 0, K); zR(ud.jaw, .5, 0, 0, K); zR(ud.tail, 1.6, 0, 0, K);
+  } else {
+    const dv = zc.dv; let ix = 0, iz = 0, iry = 0, iy = 0, tx = 0, hx = 0, hy = 0, jx = -.4, aLx = .3, aRx = .3, oL = .3, oR = .3, lLx = 0, lRx = 0, sLx = -.2, sRx = -.2;
+    if (dv === 0) { const e = zEase(k / .6); ix = 1.45 * e; aLx = aRx = .35 * e; oL = oR = 1.25 * e; lLx = .35 * e; sLx = -.5 * e; hx = .5 * e; } // de costas
+    else if (dv === 1) { const b = zEase(k / .25), e = zEase((k - .15) / .55); iy = -.12 * b * (1 - e); sLx = sRx = -.6 * b; ix = -1.45 * e; aLx = aRx = 2.6 * b * (1 - e) + .7 * e; oL = oR = .5 * e; hy = .9 * e; } // de cara no chão
+    else if (dv === 2) { const e = zEase(k / .7); iry = sd * 2.4 * e; iz = sd * 1.45 * zEase((k - .15) / .6); oL = oR = 1.2 * (1 - e) + .4; aLx = aRx = .6; hx = -.4 * e; } // girando
+    else if (dv === 3) { const b = zEase(k / .45), e = zEase((k - .5) / .5); iy = -.42 * b + .3 * e; lLx = lRx = .1; sLx = sRx = -1.5 * b; tx = -.4 * b; ix = -1.4 * e; aLx = aRx = .2 + 1.4 * e; hx = -.4 * b; } // cai de joelhos
+    else if (dv === 4) { const w = zEase(k / .12), e = zEase((k - .1) / .5); tx = .6 * w * (1 - e); ix = 1.45 * e; aLx = aRx = .5 - .2 * e; oL = oR = 1.3 * e; lLx = .4 * e; sRx = -.7 * e; } // tiro na cabeça: estala e desaba
+    else if (dv === 5) { const e = zEase(k / .4); ix = -1.35 - .2 * e; iy = .22 - .12 * e; aLx = aRx = 1.6; oL = oR = .8 * e; hx = -.2 * e; } // rastejante esparrama
+    else { const b = zEase(k / .9), e = zEase((k - 1) / .8); iy = -.5 * b + .35 * e; sLx = sRx = -1.5 * b; tx = -.3 * b; ix = -1.45 * e; aLx = .2; aRx = -.2 * b; oR = .5 * b; hx = -.5 * b; } // Carniceiro: joelhos, depois de cara
+    zR(I, ix, iry, iz, dv === 2 ? 1 : K); if (dv !== 2) I.rotation.x = ix; I.position.y += (iy - I.position.y) * K;
+    zR(ud.torso, tx, 0, 0, K); zR(ud.head, hx, hy, 0, K); zR(ud.jaw, jx, 0, 0, K);
+    zR(ud.armL, aLx, 0, -oL, K); zR(ud.armR, aRx, 0, oR, K); zR(ud.foreL, .3, 0, 0, K); zR(ud.foreR, .3, 0, 0, K);
+    zR(ud.legL, lLx, 0, 0, K); zR(ud.legR, lRx, 0, 0, K); zR(ud.shinL, sLx, 0, 0, K); zR(ud.shinR, sRx, 0, 0, K);
+  }
+  const end = zc.kind === 6 ? 3.4 : 2.2;
+  if (k > end - .7 && !zc.fling?.lengthSq()) M_.position.y = zc.pos.y - (k - end + .7) * .55; // afunda no chão antes de sumir
+  if (ud.ring) ud.ring.visible = false;
+  return k > end;
+}
 // as caixas seguem o desenho: f = metros à frente do pé (para onde o zumbi olha). Antes ficavam todas
 // em cima do pé: na cabeça do corredor (inclinado) quase nunca pegava, e no rastejante o tiro no corpo errava
 function zBoxes(zc) {
   const p = zc.pos, fx = -Math.sin(zc.yaw), fz = -Math.cos(zc.yaw), s = zc.sz || 1, k = zc.kind | 0; // s = escala do modelo (Brutamonte, Carniceiro, variação dos comuns)
-  const bb = (f, r, y0, y1) => { const x = p.x + fx * f * s, z = p.z + fz * f * s; r *= s; return { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, minY: p.y + y0 * s, maxY: p.y + y1 * s }; };
-  if (zc.dog) return [['head', bb(.5, .2, .62, 1)], ['body', bb(0, .45, .15, .85)]];
+  const bb = (f, r, y0, y1, sd = 0) => { const x = p.x + (fx * f - fz * sd) * s, z = p.z + (fz * f + fx * sd) * s; r *= s; return { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, minY: p.y + y0 * s, maxY: p.y + y1 * s }; };
+  if (zc.dog) { const o = zc.ho || 0, h = zc.hd || 0, y = zc.oy || 0; return [['head', bb(.5 + o, .2, .62 + h, 1 + h)], ['body', bb(o * .5, .45, .15 + y, .85 + y)]]; } // bote do cão sobe e avança, no uivo a cabeça sobe
   if (zc.f & 8) return [['head', bb(1.5, .22, .3, .85)], ['body', bb(.85, .45, 0, .55)], ['legs', bb(.2, .3, 0, .35)]]; // rastejando (deitado para a frente)
-  const L = [.08, .25, .38, .38][zc.f & 3], o = Math.sin(L) * .8, dy = (1 - Math.cos(L)) * .8; // inclinação do tronco de quem anda/corre
-  return [['head', bb(o, k === 6 ? .23 : .19, 1.44 - dy, 1.84 - dy)], ['body', bb(o * .4, k === 2 ? .44 : k === 3 ? .27 : .32, .85, 1.44 - dy)], ['legs', bb(0, .27, 0, .85)]]; // Explosivo: barriga larga; Veloz: magro
+  let o, dy, sd = 0; // cabeça à frente/abaixo/ao lado como a pose deixou (inclinação, bote, tropeção, grito...)
+  if (zc.ho !== undefined) { o = zc.ho; dy = zc.hd; sd = zc.hx; } else { const L = ZLEAN[zc.f & 3]; o = Math.sin(L) * .8; dy = (1 - Math.cos(L)) * .8; }
+  return [['head', bb(o, k === 6 ? .23 : .19, 1.44 - dy, 1.84 - dy, sd)], ['body', bb(o * .4, k === 2 ? .44 : k === 3 ? .27 : .32, .85, Math.max(1.1, 1.44 - dy), sd * .5)], ['legs', bb(0, .27, 0, .85)]]; // Explosivo: barriga larga; Veloz: magro
 }
 function zCands() { const out = []; for (const zc of ZC.zs.values()) if (!zc.dead) out.push({ id: zc.sid, pos: zc.pos, boxes: zBoxes(zc) }); return out; }
 function updateZombies(dt) {
   const rt = now - netDelay('z');
   for (const zc of [...ZC.zs.values()]) {
     const ud = zc.model.userData, M_ = zc.model;
-    if (zc.dead) {
-      const k = now - zc.deadT;
-      if (zc.fling) { zc.fling.y -= 18 * dt; M_.position.addScaledVector(zc.fling, dt); if (M_.position.y <= 0 && zc.fling.y < 0) { M_.position.y = 0; zc.fling.set(0, 0, 0); } else M_.rotation.x -= dt * 8; }
-      else { const a = clamp(k / .45, 0, 1); if (zc.dog) M_.rotation.z = a * Math.PI / 2; else M_.rotation.x = a * Math.PI / 2 * .95; }
-      if (ud.ring) ud.ring.visible = false;
-      if (k > 2.2) zRemoveClient(zc);
-      continue;
-    }
+    if (zc.dead) { if (zAnimDead(zc, ud, dt)) zRemoveClient(zc); continue; }
     if (now - zc.lastSeen > 2.5) { zRemoveClient(zc); continue; } // folga para picos de rede (antes sumiam e voltavam)
     const buf = zc.buf;
     if (buf.length) {
@@ -5025,27 +5328,15 @@ function updateZombies(dt) {
     }
     const sp = Math.hypot(zc.pos.x - zc.last.x, zc.pos.z - zc.last.z) / Math.max(dt, 1e-3); zc.last.copy(zc.pos); zc.spd = lerp(zc.spd, Math.min(sp, 9), .2);
     M_.position.copy(zc.pos); M_.rotation.y = zc.yaw;
-    const f = zc.f, sc = f & 3, atk = !!(f & 4), crawl = !!(f & 8);
-    zc.anim += dt * (2 + zc.spd * 1.8);
-    if (zc.dog) {
-      const s = Math.sin(zc.anim * 1.4) * .7 * Math.min(1, zc.spd / 3);
-      ud.legs[0].rotation.x = s; ud.legs[3].rotation.x = s; ud.legs[1].rotation.x = -s; ud.legs[2].rotation.x = -s; ud.head.rotation.x = atk ? -.4 : Math.sin(zc.anim) * .05;
-    } else {
-      const sw = Math.sin(zc.anim) * .55 * Math.min(1, zc.spd / 3 + .2);
-      ud.legL.rotation.x = crawl ? -.2 : sw; ud.legR.rotation.x = crawl ? .2 : -sw;
-      ud.inner.rotation.x = crawl ? -1.35 : 0; ud.inner.position.y = crawl ? .22 : 0;
-      ud.torso.rotation.x = crawl ? 0 : -[.08, .25, .38, .38][sc];
-      const swing = atk ? Math.sin(now * 14) * .9 : Math.sin(zc.anim * .5) * .12;
-      ud.armL.rotation.x = swing; ud.armR.rotation.x = atk ? swing : -swing;
-      ud.head.rotation.z = Math.sin(zc.anim * .3) * .15;
-      if (ud.belly) ud.belly.scale.setScalar(1 + Math.sin(now * 4 + zc.id) * .05); // Explosivo pulsa
-      if (ud.ring) { // Carniceiro: golpe no chão anunciado (braços sobem com o cutelo e o anel vermelho cresce)
-        if (atk) { if (!zc.atk) zc.atk0 = now; const q = clamp((now - zc.atk0) / .95, 0, 1); ud.armL.rotation.x = ud.armR.rotation.x = 1.5 * q; ud.torso.rotation.x = .25 * q; ud.ring.visible = true; ud.ring.scale.setScalar(.35 + .65 * q); ud.ring.material.opacity = .25 + .5 * q; }
-        else ud.ring.visible = false;
-      }
-    }
-    if (atk && !zc.atk) play(zc.dog ? 'dog' : zc.kind === 6 || zc.kind === 1 ? 'brute' : 'snarl', zc.pos);
+    const f = zc.f, atk = !!(f & 4);
+    if (atk && !zc.atk) { zc.atk0 = now; zc.atkN++; zc.atkFx = 0; play(zc.dog ? 'dog' : zc.kind === 6 || zc.kind === 1 ? 'brute' : 'snarl', zc.pos); }
+    else if (!atk && zc.atk) zc.atkE = now; // a batida é quando o preparo acaba
     zc.atk = atk;
+    if (zc.dog) zAnimDog(zc, ud, dt); else zAnimHuman(zc, ud, dt);
+    if (ud.ring) { // Carniceiro: golpe no chão anunciado (o anel vermelho cresce enquanto o cutelo sobe)
+      if (atk) { const q = clamp((now - zc.atk0) / .95, 0, 1); ud.ring.visible = true; ud.ring.scale.setScalar(.35 + .65 * q); ud.ring.material.opacity = .25 + .5 * q; }
+      else ud.ring.visible = false;
+    }
     zc.groanT -= dt;
     if (zc.groanT <= 0) { zc.groanT = rand(3, 8); if (ZC.groanN < 3 && zc.pos.distanceTo(camera.position) < 28) { ZC.groanN++; play(zc.dog ? 'dog' : ZGROAN[zc.kind] || ZGROAN[7 + zc.id % 3], zc.pos); } }
   }
@@ -6034,10 +6325,11 @@ function onMsg(m) {
       if (Array.isArray(m.ex) && m.ex.length === 3) zBloatFx(m.ex);
       if (m.k === 6) { ZC.bo = 0; play('win'); centerMsg('CARNICEIRO DERROTADO', m.by ? 'abatido por ' + nameOf(m.by) : '', 3.5); }
       const zc = ZC.zs.get(m.id); if (!zc || zc.dead) break;
-      zc.dead = true; zc.deadT = now;
+      zc.dead = true; zc.deadT = now; zc.dv = zc.f & 8 ? 5 : m.hs && !zc.dog ? 4 : zc.kind === 6 ? 6 : zc.kind === 1 ? 3 : now - zc.hitT < .4 && zc.hitK > .6 ? 0 : zc.dv; // queda: rastejante, tiro na cabeça, chefe, joelhos, tranco forte cai de costas, senão a do id
       const hp = zc.pos.clone(); hp.y += zc.dog ? .7 : 1.5;
       if (m.ic) { for (let i = 0; i < 4; i++) puff(hp.clone().add(new V3(rand(-.3, .3), rand(-.9, .2), rand(-.3, .3))), 0xd8f4ff, .7, .6, .2); play('crack', hp); } // estilhaça congelado
-      else if (m.hs && !zc.dog) { zc.model.userData.head.visible = false; puff(hp, 0x8a0000, .7, .5, 0); } else puff(hp, 0x8a0000, .45, .35, 0);
+      else if (m.hs && !zc.dog) { const U = zc.model.userData; zHide(U.head, 1); zHide(U.neckB, 0); puff(hp, 0x8a0000, .7, .5, 0); puff(hp, 0x5a0000, .4, .9, 1.2); } else puff(hp, 0x8a0000, .45, .35, 0);
+      if (m.ic || (Array.isArray(m.ex) && m.ex.length === 3)) zc.model.visible = false; // estilhaçou / estourou: não sobra corpo
       if (m.fl) { const src = m.by === C.myId ? me.pos : (R.get(m.by)?.pos || zc.pos); const d = zc.pos.clone().sub(src); d.y = 0; if (d.lengthSq() < 1e-6) d.set(0, 0, 1); d.normalize(); zc.fling = d.multiplyScalar(14); zc.fling.y = 7; }
       break;
     }
@@ -6045,8 +6337,9 @@ function onMsg(m) {
     case 'zgone': { ZC.gone.add(m.id); const zc = ZC.zs.get(m.id); if (zc) zRemoveClient(zc); break; }
     case 'zround': ZC.round = m.r; ZC.dog = !!m.dog; ZC.phase = 'round'; zRoundFx(m.r, m.dog); if (m.bo) centerMsg('RODADA ' + m.r, 'Algo grande está vindo...', 3); break;
     case 'zboss': play('boss'); centerMsg('O CARNICEIRO CHEGOU', 'Quando ele erguer o cutelo, saia do anel vermelho', 4); break;
-    case 'zslam': { if (!finN(m.x) || !finN(m.z)) break; const p = new V3(m.x, .2, m.z); play('slam', p); puff(p, 0x6b5a48, 4, .6, .2); puff(p, 0xff4a20, 2, .3, 0); break; }
-    case 'zscr': { const zc = ZC.zs.get(m.id); if (zc && !zc.dead) { const p = zc.pos.clone(); p.y += 1.9; play('scream', p); puff(p, 0xd8f0ff, 3, .5, 0); } break; }
+    case 'zslam': { if (!finN(m.x) || !finN(m.z)) break; const p = new V3(m.x, .2, m.z); play('slam', p); puff(p, 0x6b5a48, 4, .6, .2); puff(p, 0xff4a20, 2, .3, 0); zShockRing(p, 0xff5a20, 3.2, .45);
+      for (const zc of ZC.zs.values()) if (zc.kind === 6 && !zc.dead && Math.hypot(zc.pos.x - m.x, zc.pos.z - m.z) < 1) zc.atkE = now; break; } // o cutelo desce junto com o estrondo
+    case 'zscr': { const zc = ZC.zs.get(m.id); if (zc && !zc.dead) { const p = zc.pos.clone(); p.y += 1.9; play('scream', p); puff(p, 0xd8f0ff, 3, .5, 0); zc.spK = 1; zc.sp0 = now; p.y = zc.pos.y + .1; zShockRing(p, 0xbfe8ff, 9, .6); p.y += 1.8; zShockRing(p, 0xd8f0ff, 4, .4); } break; } // grito: cabeça para trás e onda de choque
     case 'zrend': if (me.alive && !me.downed) grantXP(25); ZC.phase = 'break'; play('zend'); centerMsg('Rodada ' + m.r + ' concluída', 'Próxima rodada em 10 segundos', 4); zFogDog(false); break;
     case 'zdoor': if (zDoorOpen(m.id)) { const d = ZD.doors.find(x => x.id === m.id); play('door', d ? new V3(d.x, 1.5, d.z) : null); } break;
     case 'zpower': zPowerOn(); play('power'); centerMsg('ENERGIA LIGADA', 'Bebidas e Pack-a-Punch funcionando', 3); break;
