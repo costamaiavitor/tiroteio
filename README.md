@@ -73,7 +73,7 @@ Aba **Skins** no menu.
 - **Coleção (estilo Valorant):** todas as armas aparecem ao mesmo tempo, em colunas por categoria (pistolas; SMGs e escopetas; rifles; precisão, pesadas e faca), cada uma desenhada com a skin que está equipada. Clique numa arma para abrir a tela dela: à esquerda as skins que você tem (e a Padrão), no centro a arma em 3D (arraste para girar), e o botão **Equipar**. Os outros jogadores veem a sua skin.
 - **Conta:** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
 
-- **Facas:** além da Faca, tem o **Karambit** (lâmina em garra, com anel). Os braços de primeira pessoa das facas foram feitos no Blender (`assets/arms.glb`) a partir de um humano do [MPFB/MakeHuman](https://static.makehumancommunity.org/mpfb.html) (licença CC0), com animações no estilo do CS2: parado, saque (a karambit gira no dedo), cortes alternando o lado, estocada no botão direito e inspeção no F. Nas armas de fogo os mesmos braços seguram a arma por IK: a mão direita fecha no punho com o indicador no gatilho e a esquerda fica por baixo do guarda-mão, acompanhando as recargas. Os scripts que geram o arquivo ficam em `tools/blender/` (`pipeline.sh` refaz tudo com o Blender em segundo plano). Na Coleção, abra a arma e clique em **Usar esta faca**; equipar uma skin de karambit também já troca a faca.
+- **Facas:** além da Faca (KA-BAR), tem a **Butterfly**. As duas usam os mesmos braços das armas: a mão direita segue uma animação de faca pronta (parado, saque, cortes alternando o lado, estocada no botão direito e inspeção no F) e fecha no cabo. Na Coleção, abra a arma e clique em **Usar esta faca**; equipar uma skin da butterfly também já troca a faca.
 
 ### Configurar as contas (Firebase, uma vez só)
 
@@ -154,7 +154,7 @@ Braços e animações (um pacote por classe de arma):
 - braços de fuzil: [Animated FPS hands (rifle animation pack)](https://sketchfab.com/3d-models/animated-fps-hands-rifle-animation-pack-5f2d0ed780a94724b36ab505f7564057), de [Cransh](https://sketchfab.com/ccransh)
 - braços de rifle de precisão: [FPS animations sniper rifle](https://sketchfab.com/3d-models/fps-animations-sniper-rifle-c15ae8393d824f5b929e3f69691cdd31), de [Cransh](https://sketchfab.com/ccransh)
 - braços + Remington (Nova): [FPS Arms remington (shotgun)](https://sketchfab.com/3d-models/fps-arms-remington-shotgun-e68ef617fe8a48cca8610d016ffd5881), de [Cransh](https://sketchfab.com/ccransh)
-- braços das facas (a faca do jogo entra na mão deles): [Knife animated](https://sketchfab.com/3d-models/knife-animated-5f83f0bd4b2c429aa14aa46461efe404), de [DJMaesen](https://sketchfab.com/bumstrum)
+- animação das facas (a mão dos braços das armas segue o punho desta animação): [Knife animated](https://sketchfab.com/3d-models/knife-animated-5f83f0bd4b2c429aa14aa46461efe404), de [DJMaesen](https://sketchfab.com/bumstrum)
 
 Armas e facas:
 
@@ -171,7 +171,7 @@ Armas e facas:
 - Galil: [Low-Poly IMI Galil](https://sketchfab.com/3d-models/low-poly-imi-galil-4bc3146c48d34171ab0ea879757000b7), de [TastyTony](https://sketchfab.com/TastyTony)
 - Glock-18: [glock 17](https://sketchfab.com/3d-models/glock-17-ccf58223a7804de8b15d1d35b7d0b587), de [Friendly](https://sketchfab.com/Friendly1)
 - HK21: [Low-Poly M240B](https://sketchfab.com/3d-models/low-poly-m240b-657a3b8ce0194aae9c7c9036c18c54b9), de [TastyTony](https://sketchfab.com/TastyTony)
-- Karambit: [Karambit](https://sketchfab.com/3d-models/karambit-dfd7606f189a413681305a39b8841ce8), de [Diamonddogkz](https://sketchfab.com/Diamonddogkz)
+- Butterfly: [Butterfly Knife - Vanilla](https://sketchfab.com/3d-models/butterfly-knife-vanilla-514edc772445441083b3cd611fd4e65c), de [DjJaba](https://sketchfab.com/djjaba)
 - M14: [Low-Poly M14](https://sketchfab.com/3d-models/low-poly-m14-30e47673a17b434386e9c3af54670bed), de [TastyTony](https://sketchfab.com/TastyTony)
 - M1911: [Low-Poly M1911](https://sketchfab.com/3d-models/low-poly-m1911-117f542d21954ae0a59afaedadcff338), de [TastyTony](https://sketchfab.com/TastyTony)
 - M4A4: [Low-Poly M4a1](https://sketchfab.com/3d-models/low-poly-m4a1-8cab1cbeb82c4396a154f9fc8771417b), de [TastyTony](https://sketchfab.com/TastyTony)

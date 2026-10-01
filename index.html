@@ -2891,7 +2891,7 @@ function fpSkin(root, mats, L, keep = [], all = false, filt = null) { // all: pi
 // facas baixadas: entram no lugar das procedurais, no mesmo referencial (lâmina para -Z, topo +Y), então a mão, o soquete dos braços do
 // Blender e as animações continuam valendo. A: ponto de encaixe no modelo (guarda da faca / centro do anel da karambit) e P: o mesmo
 // ponto na faca procedural; L: comprimento total da procedural.
-const FPKN = { knife: { A: [null, -.036, .161], fwd: '-z', up: '+y', P: [0, .009, -.013], L: .337 }, karambit: { A: [-.2, null, -.8], fwd: '-x', up: '+z', P: [0, .006, -.005], L: .22 } }; // karambit = butterfly (ponto: base da lâmina, entre os cabos)
+const FPKN = { knife: { A: [null, -.036, .161], fwd: '-z', up: '+y', P: [0, .009, -.013], L: .337 }, karambit: { A: [-.2, null, -.8], fwd: '-x', up: '+z', P: [0, .006, -.005], L: .26 } }; // karambit = butterfly (ponto: base da lâmina, entre os cabos)
 function knifeSwap(g, kind, skin) {
   const K = FPKN[kind], key = 'm:' + kind;
   if (!fpReady(key)) { if (!FPC[key]) fpLoad(key).then(() => { if (vmGun && W[G.cur]?.slot === 'knife') vmSetWeapon(G.cur); }); return; }
@@ -2990,7 +2990,7 @@ const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 12, -34],
   clips: { idle: [0, 42], inspect: [43, 66], stab: [66, 87], slash: [87, 112], slash2: [112, 138], draw: [138, 153] },
   // ponto de encaixe do modelo (FPKN: guarda da KA-BAR / centro do anel da karambit) vai para Q no pacote,
   // fwd/up: para onde vão o cano (lâmina) e o dorso do modelo; len: comprimento total (cm)
-  fit: { knife: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 30 }, karambit: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 22 } } }; // butterfly: cabos fechados no punho, lâmina saindo pelo lado do indicador
+  fit: { knife: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 30 }, karambit: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 26 } } }; // butterfly: cabos fechados no punho, lâmina saindo pelo lado do indicador
 function knBuild(kind, ud, skin) {
   const key = 'k:pack', mk = 'm:' + kind, bp = 'p:pistol', ap = 'p:rifle';
   if (!FPC[key]) FPC[key] = new GLTFLoader().loadAsync(FPKNIFE.url).then(g => (FPC[key] = g), e => { console.warn('faca', e); delete FPC[key]; });
