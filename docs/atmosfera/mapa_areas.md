@@ -1,6 +1,6 @@
 # Mapa das áreas do modo Zumbis (Fase 0: reconhecimento)
 
-Levantado em 02/10/2026 sobre a `main` no commit `5ee0def`; as linhas citadas são de `index.html`.
+Levantado em 02/10/2026 sobre a `main` no commit `5ee0def`; as linhas citadas são de `index.html` e foram conferidas de novo no mesmo dia, depois das fichas da bíblia (arquivo com 8.630 linhas).
 
 Os dados de cada área (área em m², janelas, objetos) foram extraídos do jogo carregado num navegador automático (Playwright). O script, `areas.mjs`, fica fora do repositório, em `C:\dev\tiroteio-notas\work\inventario\`.
 
@@ -8,20 +8,20 @@ Os dados de cada área (área em m², janelas, objetos) foram extraídos do jogo
 
 | Peça | Como é feita hoje | Onde |
 |---|---|---|
-| Engine | three.js r160 (CDN, importmap), tudo num único `index.html`, sem build | 273, 417–423 |
+| Engine | three.js r160 (CDN, importmap), tudo num único `index.html`, sem build | importmap 276; imports 420–431 |
 | Cenário com colisão | caixas `B(x,z,w,d,h,mat,y,c)`, que viram malha + colisor (`COL`). Nos mapas zumbi, as caixas do mesmo material são juntadas por bloco de 48 m | 563, `buildMap` 2155 |
-| Paredes | `zWall`, com janelas (`zWin`) e vãos de porta (`zGap`) | 620–634 |
+| Paredes | `zWall`, com janelas (`zWin`) e vãos de porta (`zGap`) | `zWall` 657–670; `zWin`/`zGap` 671 |
 | Cenário só visual | função `build` de cada mapa (`buildVila` 1464, `buildSanatorio` 887): cilindros, telhados, instâncias (árvores, livros, lápides…) e grupos girados por distrito | |
-| Áreas geradas | `zGen`, com um tema por região e semente fixa (temas listados abaixo); decoração em `zGenDeco` (árvores, água, pontes) | 645–819; `SAN_GEN` 821, `VILA_GEN` 1171 |
-| Texturas | geradas em canvas (`genTex`), com bump | ~1900–1990 |
+| Áreas geradas | `zGen`, com um tema por região e semente fixa (temas listados abaixo); decoração em `zGenDeco` (árvores, água, pontes) | `zGen` 682–836 (temas no `switch`, 762–827); `zGenZone`/`zGenJoin` 837–841; `zGenDeco` 843–856; `SAN_GEN` 858; `VILA_GEN` 1208–1233 |
+| Texturas | geradas em canvas (`genTex`), com bump | `genTex` 1919; tabelas `BUMP`/`TEXS` 1986–1989 |
 | Materiais | `worldMat`: Lambert no gráfico Baixo, Standard (PBR) no Médio e no Alto; o parâmetro `ao` escurece a base do que encosta no chão | 2001 |
-| Luz | sol e hemisférica por mapa; lâmpadas do mundo zumbi num pool de 5 ou 8 `PointLight` reais (as demais são só o bulbo); luz de preenchimento e lanterna presas na câmera | `zBuildWorld`, `VIS` ~1767 |
+| Luz | sol e hemisférica por mapa; lâmpadas do mundo zumbi num pool de 5 ou 8 `PointLight` reais (as demais são só o bulbo); luz de preenchimento e lanterna presas na câmera | `zBuildWorld` 5968, `VIS` 1807 |
 | Névoa | `THREE.Fog` por mapa, ajustada por `visMap`; fica vermelha na rodada de cães (`zFogDog`) | 1818, 2165 |
-| Pós-processamento | bloom (só no gráfico Alto) e `gradePass`: aberração cromática leve, contraste, tons quente/frio e granulação | 1880–1895 |
+| Pós-processamento | bloom (só no gráfico Alto) e `gradePass`: aberração cromática leve, contraste, tons quente/frio e granulação | `bloomPass` 1880, `gradePass` 1882–1895 |
 | Partículas e efeitos | `puff` (sprites) e `addFx`; o fogo da fogueira; os raios da armadilha | 2563, 2598 |
 | Animação do cenário | lista `MAP_ANIM`, que roda a cada quadro: fogueira, moinho, bandeira e farol | 1410 |
 | Som | totalmente sintetizado (`SND` com osciladores, `vox` para os zumbis); não há arquivos de áudio nem som ambiente por área | 2458 |
-| Recorte | `zCull`: o que fica além da névoa não é desenhado | ~2120 |
+| Recorte | `zCull`: o que fica além da névoa não é desenhado | `zCull` 2122 |
 
 **Temas do `zGen`:**
 - abertos: `graves`, `forest`, `rocks`, `mine`, `ruins`, `military`, `swamp`, `river`, `island`, `field`, `junk`, `parking`, `yard`;
@@ -34,6 +34,9 @@ Os dados de cada área (área em m², janelas, objetos) foram extraídos do jogo
 - **Rede:** janelas, armas de parede e lugares da Caixa viajam pela rede pelo índice. Não reordenar essas listas.
 - **Determinismo:** o cenário é montado igual em todas as máquinas. Sorteio visual precisa de semente (`mkRand`); colisão nunca pode ser sorteada com `Math.random`.
 - **Desempenho:** a Vila já tem cerca de 2.800 colisores e 488 × 488 células de navegação.
+- **Sorteio compartilhado do `zGen`:** o sorteador `rr()` (linha 683) é um só para todas as regiões, na ordem em que são geradas. Mudar quantos sorteios uma região faz (tirar ou pôr um `put`, um `scatter`, um `rn`) desloca a arma de parede, a Caixa, as lâmpadas e os risers de todas as regiões seguintes. Variação por área deve trocar só cor ou material depois do sorteio, ou usar um `mkRand` próprio fora do `zGen`.
+- **Paleta por área:** o `gradePass` (1882–1895) só tem os uniforms `time` e `sc`. Tom quente ou frio, saturação, vinheta ou paleta por área exigem uniforms novos no shader.
+- **Água das regiões geradas:** em `zGenDeco` (852–853) toda a água é um material único (`MeshPhongMaterial` 0x1d3440). Água diferente por área (preta, oleosa, parada, com correnteza) exige guardar a região em `deco.water` e criar um material por região.
 
 ## 2. Ordem de desbloqueio e áreas
 
@@ -61,21 +64,21 @@ Os dados de cada área (área em m², janelas, objetos) foram extraídos do jogo
 | 3 | Porto (N) | 4500 | 3 | GN | 3220 | 5 / 4 | doca (água), caixotes |
 | 3 | Serraria (Q) | 4500 | 3 | IQ | 3220 | 5 / 5 | toras, bancada, máquina |
 | 4 | Base militar (c0) | 6750 | 4 | Jc0 | 6204 | 6 / 6 | tema `military`: contêineres, sacos de areia, barracas, torre |
-| 4 | Vinhedo (c2) | 6750 | 4 | Oc2 | 6204 | 6 / 6 | tema `field`: 59 fileiras de sebe, celeiro, árvores |
-| 4 | Pântano (c1) | 7000 | 4 | Mc1 | 6204 | 6 / 6 | tema `swamp`: poças, árvores secas, cabana |
+| 4 | Vinhedo (c2) | 6750 | 4 | Oc2 | 6204 | 6 / 6 | tema `field`: 59 fileiras de sebe, árvores (o celeiro do tema não aparece) |
+| 4 | Pântano (c1) | 7000 | 4 | Mc1 | 6204 | 6 / 6 | tema `swamp`: poças, árvores secas (a cabana do tema não aparece) |
 | 4 | Ruínas da cidade (c3) | 7000 | 4 | Qc3 | 6204 | 6 / 6 | tema `ruins`: 51 pedaços de muro de tijolo, entulho, chaminé |
 | 4 | Margem do rio (b10) | 7250 | 4 | Lb10 | 10440 | 6 / 6 | tema `river`: rio com 2 pontes, caixotes |
 | 4 | Bairro queimado (b30) | 7250 | 4 | Pb30 | 10440 | 6 / 6 | tema `ruins` (igual às Ruínas da cidade, com 87 muros) |
 | 4 | Encosta (b00) | 7500 | 4 | Kb00 | 10440 | 6 / 6 | tema `rocks`: 40 pedras, pilar alto |
 | 4 | Cais (b20) | 7500 | 4 | Nb20 | 10440 | 6 / 6 | tema `yard`: caixotes, contêineres, galpão, mastros |
-| 5 | Pico da montanha (b02) | 9750 | 5 | c0b02 | 11240 | 6 / 6 | tema `rocks` (igual à Encosta) |
+| 5 | Pico da montanha (b02) | 9750 | 5 | c0b02 | 11240 | 6 / 6 | tema `rocks`: pedras como as da Encosta, sem o pilar alto (o pilar do tema não aparece) |
 | 5 | Estaleiro (b22) | 9750 | 5 | c2b22 | 11240 | 6 / 6 | tema `yard` (igual ao Cais) |
-| 5 | Bosque (b12) | 10000 | 5 | c1b12 | 11240 | 6 / 6 | tema `forest`: 132 árvores, tronco, toras |
-| 5 | Brejo negro (b32) | 10000 | 5 | c3b32 | 11240 | 6 / 6 | tema `swamp` (igual ao Pântano) |
+| 5 | Bosque (b12) | 10000 | 5 | c1b12 | 11240 | 6 / 6 | tema `forest`: 132 árvores, 6 toras (a tora central do tema não aparece) |
+| 5 | Brejo negro (b32) | 10000 | 5 | c3b32 | 11240 | 6 / 6 | tema `swamp`: poças e árvores secas, como o Pântano (a cabana do tema não aparece) |
 | 5 | Ponte velha (b11) | 10750 | 5 | b10b11 | 10400 | 6 / 6 | tema `river` (igual à Margem do rio) |
 | 5 | Quartel (b31) | 10750 | 5 | b30b31 | 10400 | 6 / 6 | tema `military` (igual à Base militar) |
 | 5 | Mina velha (b01) | 11000 | 5 | b00b01 | 10400 | 6 / 6 | tema `mine`: pedras, escoras de madeira, vagonetas |
-| 5 | Ilha do porto (b21) | 11000 | 5 | b20b21 | 10400 | 6 / 6 | tema `island`: água em volta, píer, torre de pedra, cabana, caixotes |
+| 5 | Ilha do porto (b21) | 11000 | 5 | b20b21 | 10400 | 6 / 6 | tema `island`: água em volta, píer, torre de pedra, caixotes (a cabana do tema não aparece) |
 
 **Itens por área**
 
@@ -110,20 +113,20 @@ Todas as áreas têm uma arma de parede e um lugar da Caixa.
 | 3 | Estufa (L) | 3250 | 3 | KL | 720 | 2 / 0 | 4 canteiros com plantas, armação de vidro |
 | 3 | Torre d'água (M) | 3750 | 3 | KM | 1008 | 3 / 5 | torre de madeira com caixa d'água, escada, caixotes; Pack-a-Punch |
 | 4 | Caldeiras (P) | 4500 | 4 | HP | 720 | 3 / 0 | 2 caldeiras com brilho de fornalha, canos no alto, tanque; energia |
-| 4 | Cemitério (r1) | 5000 | 4 | Nr1 | 2196 | 3 / 6 | tema `graves`: 46 lápides, 2 mausoléus, árvores |
+| 4 | Cemitério (r1) | 5000 | 4 | Nr1 | 2196 | 3 / 6 | tema `graves`: 46 lápides, 1 árvore seca (os 2 mausoléus do tema não aparecem) |
 | 4 | Túneis de serviço (r5) | 5250 | 4 | Nr5 | 2920 | 5 / 3 | tema `tunnels`: paredes formando corredores, canos no chão |
-| 4 | Brejo (r13) | 5250 | 4 | Ir13 | 2040 | 3 / 6 | tema `swamp` |
-| 4 | Pedreira (r3) | 5750 | 4 | Mr3 | 2196 | 3 / 6 | tema `rocks` |
-| 4 | Pomar (r10) | 5750 | 4 | Lr10 | 2440 | 4 / 6 | tema `field`: sebes, celeiro |
+| 4 | Brejo (r13) | 5250 | 4 | Ir13 | 2040 | 3 / 6 | tema `swamp`: 2 poças, 7 árvores secas (a cabana do tema não aparece) |
+| 4 | Pedreira (r3) | 5750 | 4 | Mr3 | 2196 | 3 / 6 | tema `rocks`: 5 pedras grandes e o pilar de 12 m (a laje de metal do tema não aparece) |
+| 4 | Pomar (r10) | 5750 | 4 | Lr10 | 2440 | 4 / 6 | tema `field`: 11 sebes, 2 árvores (o celeiro do tema não aparece) |
 | 4 | Lavanderia (r9) | 6000 | 4 | Mr9 | 2920 | 5 / 3 | tema `laundry`: 68 máquinas em fileiras |
 | 5 | Ferro-velho (r12) | 7000 | 5 | Pr12 | 2000 | 3 / 6 | tema `junk`: carros, contêineres |
 | 5 | Portaria (r2) | 7500 | 5 | r1r2 | 2112 | 4 / 6 | tema `parking`: carros nas vagas |
 | 5 | Anexo do asilo (r6) | 7750 | 5 | r5r6 | 2400 | 4 / 3 | tema `cells`: celas dos dois lados de um corredor, camas |
-| 5 | Ruínas do convento (r4) | 8000 | 5 | r1r4 | 2112 | 4 / 6 | tema `ruins` |
-| 5 | Ilha do lago (r14) | 8250 | 5 | r13r14 | 1960 | 4 / 6 | tema `island` |
-| 5 | Floresta (r8) | 8750 | 5 | r3r8 | 2112 | 4 / 6 | tema `forest` |
+| 5 | Ruínas do convento (r4) | 8000 | 5 | r1r4 | 2112 | 4 / 6 | tema `ruins`: 18 muros de tijolo, 10 pedras (o pilar central do tema não aparece) |
+| 5 | Ilha do lago (r14) | 8250 | 5 | r13r14 | 1960 | 4 / 6 | tema `island`: água em volta e píer (a torre e a cabana do tema não aparecem) |
+| 5 | Floresta (r8) | 8750 | 5 | r3r8 | 2112 | 4 / 6 | tema `forest`: 21 árvores, 6 toras (o bloco central do tema não aparece) |
 | 5 | Estábulo (r11) | 8750 | 5 | r10r11 | 2400 | 4 / 3 | tema `stables`: baias, feno |
-| 6 | Crematório (r7) | 11000 | 6 | r12r7 | 2400 | 4 / 3 | tema `ovens`: fornos em fila, caixões, 2 chaminés |
+| 6 | Crematório (r7) | 11000 | 6 | r12r7 | 2400 | 4 / 3 | tema `ovens`: 4 fornos em fila (2 dos 6 do tema não aparecem), 10 caixões, 2 chaminés |
 
 **Itens por área**
 
@@ -163,7 +166,12 @@ Todas as áreas têm uma arma de parede e um lugar da Caixa.
 6. **Luz igual em todo canto.** As lâmpadas são as mesmas em toda área, e o color grading é um só para o mapa inteiro, sem paleta por área.
 7. **Sem som ambiente.** Só existem sons de ação; o terror sonoro precisa ser sintetizado do zero.
 8. **Nenhuma escalada de tensão.** A primeira área e a última têm o mesmo tom visual.
-9. **Limites técnicos para as próximas fases:**
+9. **Peças prometidas pelo tema que não aparecem.** O `put` do `zGen` só coloca uma peça quando acha espaço livre; quando não acha, ela some sem aviso. Ficaram de fora:
+   - **Vila:** a cabana do Pântano e a do Brejo negro, o celeiro do Vinhedo, a tora central do Bosque, a cabana da Ilha do porto e o pilar do Pico da montanha;
+   - **Sanatório:** os 2 mausoléus do Cemitério, a cabana do Brejo, a torre e a cabana da Ilha do lago, o celeiro do Pomar, o pilar central das Ruínas do convento, o bloco central da Floresta, a laje de metal da Pedreira e 2 dos 6 fornos do Crematório.
+
+   As fichas da bíblia já contam com essa ausência; quem quiser essas peças precisa abrir espaço no tema sem mudar a quantidade de sorteios (ver as restrições da seção 1).
+10. **Limites técnicos para as próximas fases:**
    - luz real a mais pesa no shader: luz nova deve entrar no pool ou ser emissiva/sprite;
    - objeto com colisão muda a navegação e a regra de escalada dos zumbis;
    - a Vila é enorme: cenário novo deve usar instâncias e o recorte por distância (`cullAdd`/`zCull`).
