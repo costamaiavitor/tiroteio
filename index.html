@@ -2711,7 +2711,7 @@ const FPM = {
   mp5: { T: [.018, -.02, null], fwd: '+x', up: '+y', L: .70 },
   mp5k: { T: [.15, -.17, null], fwd: '+x', up: '+y', L: .325 },
   mp40: { T: [-33.4, 2, null], fwd: '+x', up: '+y', L: .833 },
-  p90: { T: [12.5, -17.3, null], fwd: '+x', up: '+y', L: .50, vo: [.03, -.04, -.22], ve: [.5, .05, .1] }, // bullpup alto: mais longe e virada para mostrar o lado
+  p90: { T: [12.5, -17.3, null], fwd: '+x', up: '+y', L: .50, vo: [.03, -.03, -.14], ve: [.22, -.05, .05], lhf: .38 }, // bullpup alto: mais longe e virada para mostrar o lado
   ak74u: { T: [-115, 23, null], fwd: '+x', up: '+y', L: .73 },
   galil: { T: [-130, 39, null], fwd: '+x', up: '+y', L: .98 },
   rpk: { T: [-116, 20, null], fwd: '+x', up: '+y', L: 1.04 },
@@ -2864,7 +2864,7 @@ function fpBuild(id, ud) {
     if (P.view !== 'pistol' && hl) {
       const L0 = new V3().setFromMatrixPosition(hl.matrixWorld).applyMatrix4(Ai), mc = mp.map(p => p.multiplyScalar(s)), dep = .09 * FPG * P.hr;
       const bottom = (c, z, lim) => { let y = 1e9; for (const p of c) if (Math.abs(p.z - z) < .015 * P.hr && p.y > lim && p.y < y) y = p.y; return y; };
-      const zT = Math.min(L0.z, tips.muzzle.z * s * .62), yp = bottom(pc, L0.z, ptips.muzzle.y - dep), ym = bottom(mc, zT, tips.muzzle.y * s - dep);
+      const zT = Math.min(L0.z, tips.muzzle.z * s * (D.lhf || .62)), yp = bottom(pc, L0.z, ptips.muzzle.y - dep), ym = bottom(mc, zT, tips.muzzle.y * s - dep);
       if (yp < 1e8 && ym < 1e8) lh = { hl, L0, d: new V3(0, ym - yp, zT - L0.z) };
     }
     if (F2) follow.push(F2);
@@ -2934,7 +2934,7 @@ function fpSkin(root, mats, L, keep = [], all = false, filt = null) { // all: pi
 // facas baixadas: entram no lugar das procedurais, no mesmo referencial (lâmina para -Z, topo +Y), então a mão, o soquete dos braços do
 // Blender e as animações continuam valendo. A: ponto de encaixe no modelo (guarda da faca / centro do anel da karambit) e P: o mesmo
 // ponto na faca procedural; L: comprimento total da procedural.
-const FPKN = { knife: { A: [null, -.036, .161], fwd: '-z', up: '+y', P: [0, .009, -.013], L: .337 }, karambit: { A: [-.2, null, -.8], fwd: '-x', up: '+z', P: [0, .006, -.005], L: .26 } }; // karambit = butterfly (ponto: base da lâmina, entre os cabos)
+const FPKN = { knife: { A: [null, -.036, .161], fwd: '-z', up: '+y', P: [0, .009, -.013], L: .337 }, karambit: { A: [-.2, null, -.8], fwd: '-x', up: '+z', P: [0, .006, -.005], L: .26, dim: .5 } }; // karambit = butterfly (ponto: base da lâmina, entre os cabos)
 function knifeSwap(g, kind, skin) {
   const K = FPKN[kind], key = 'm:' + kind;
   if (!fpReady(key)) { if (!FPC[key]) fpLoad(key).then(() => { if (vmGun && W[G.cur]?.slot === 'knife') vmSetWeapon(G.cur); }); return; }
@@ -2945,6 +2945,7 @@ function knifeSwap(g, kind, skin) {
   h.matrix.copy(fpFrame(new V3(...K.P), new V3(0, 0, -1), new V3(0, 1, 0))).multiply(new THREE.Matrix4().makeScale(sc, sc, sc)).multiply(Mi);
   g.traverse(o => { if (o.isMesh) o.visible = false; });
   ms.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); o.material.envMapIntensity = .8; } });
+  if (K.dim) ms.traverse(o => { if (o.isMesh) { o.material.color.multiplyScalar(K.dim); o.material.roughness = Math.max(o.material.roughness, .45); } });
   if (skin) fpSkin(ms, skin, z1 - z0, [], true);
   h.add(ms); g.add(h); g.userData.dl = true;
 }
@@ -3092,6 +3093,7 @@ function knBuild(kind, ud, skin) {
   const sc = F.len / (z1 - z0), h = new THREE.Group(); h.matrixAutoUpdate = false;
   h.matrix.copy(fpFrame(new V3(...F.Q), new V3(...F.fwd), new V3(...F.up))).multiply(new THREE.Matrix4().makeScale(sc, sc, sc)).multiply(Mi);
   ms.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; } });
+  if (D.dim) ms.traverse(o => { if (o.isMesh) { o.material.color.multiplyScalar(D.dim); o.material.roughness = Math.max(o.material.roughness, .45); } }); // modelo claro demais
   if (skin) fpSkin(ms, skin, z1 - z0, [], true);
   h.add(ms); node.add(h);
   // câmera do pacote → câmera do jogo
@@ -3131,8 +3133,9 @@ function knArmsTex(src) {
   for (let i = 0, j = 0; i < d.length; i += 4, j++) {
     const r = reg[j], l = lum(d, i) / (sum[r] || 1);
     // luva no tom das luvas das armas; manga e pele no tecido camuflado; mistura suave na borda
-    const lg = lum(d, i) / (sum[2] || 1), fg = Math.min(1.6, Math.max(.45, lg)), fc = Math.min(1.5, Math.max(.55, Math.pow(l, .6))), w = wg[j];
-    for (let k = 0; k < 3; k++) d[i + k] = Math.min(255, w * rg[k] * 1.25 * fg + (1 - w) * R[i + k] * fc);
+    const lg = lum(d, i) / (sum[2] || 1), fg = Math.min(1.35, Math.max(.7, Math.pow(lg, .7))), fc = Math.min(1.3, Math.max(.7, Math.pow(l, .5))), w = wg[j];
+    // luva e manga lisas no tom médio dos braços das armas (menos saturado), com o relevo suavizado (a manga das armas é lisa)
+    for (let k = 0; k < 3; k++) { const g0 = (rg[0] + rg[1] + rg[2]) / 3, base = g0 + (rg[k] - g0) * .75; d[i + k] = Math.min(255, base * (w * 1.25 * fg + (1 - w) * 1.15 * fc)); }
   }
   g.putImageData(id, 0, 0);
   const t = new THREE.CanvasTexture(c); t.colorSpace = src.colorSpace; t.flipY = src.flipY; t.wrapS = src.wrapS; t.wrapT = src.wrapT; t.anisotropy = 4;
