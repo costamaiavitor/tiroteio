@@ -7812,7 +7812,7 @@ function updateHud(dt) {
   let score = '';
   if (st.mode === 'rounds') {
     const sc = C.sc || { t: 0, ct: 0 }, my = C.players.get(C.myId)?.tm;
-    score = `<span style="color:${TEAMC.t}">ATAQUE ${sc.t}</span> x <span style="color:${TEAMC.ct}">${sc.ct} DEFESA</span> · Rodada ${C.round}` + (my ? ` · você: <b style="color:${TEAMC[my]}">${TEAMN[my]}</b>` : '');
+    score = `<span style="color:${TEAMC.t}">ATAQUE ${sc.t}</span> x <span style="color:${TEAMC.ct}">${sc.ct} DEFESA</span> · Rodada ${C.round}` + (my ? ` · <b style="color:${TEAMC[my]}">${my === 't' ? 'Você ataca' : 'Você defende'}</b>` : '');
   } else if (st.mode === 'dm') {
     const lead = ps.slice().sort((a, b) => b.k - a.k)[0]; score = `Mata-mata até ${st.frags}` + (lead ? ` · líder: <span style="color:${esc(lead.c)}">${esc(lead.n)}</span> ${lead.k}` : '');
   }
