@@ -62,6 +62,64 @@ button.card.on{border-color:var(--acc);background:rgba(255,176,32,.1);box-shadow
 .optrow{display:flex;gap:6px 22px;flex-wrap:wrap}
 .zdesc{color:#bbb;font-size:15px;margin-top:8px;min-height:38px;line-height:1.25}
 .zdesc b{color:var(--acc)}
+/* ===== menu principal ===== */
+#menu{display:block;padding:0;overflow:hidden;background:
+  radial-gradient(900px 520px at 78% 0%,rgba(255,176,32,.13),transparent 62%),
+  radial-gradient(900px 700px at 0% 100%,rgba(60,110,190,.16),transparent 60%),
+  repeating-linear-gradient(115deg,rgba(255,255,255,.018) 0 2px,transparent 2px 22px),
+  linear-gradient(160deg,#151a24,#07080b 72%)}
+#menu.hidden{display:none!important}
+.mshell{height:100%;display:flex;flex-direction:column}
+.mtop{display:flex;align-items:center;gap:28px;padding:0 28px;height:68px;flex:none;background:linear-gradient(180deg,rgba(8,10,14,.92),rgba(8,10,14,.7));border-bottom:1px solid rgba(255,255,255,.07);box-shadow:0 8px 30px rgba(0,0,0,.35)}
+.mlogo{font-size:27px;font-weight:700;letter-spacing:4px;color:#fff;white-space:nowrap;text-shadow:0 0 18px rgba(255,176,32,.35)}
+.mlogo i{font-style:normal;color:var(--acc);font-size:17px;letter-spacing:2px;margin:0 2px;vertical-align:3px}
+#menu .tabs{flex:1;margin:0;border:0;height:100%;align-items:stretch;gap:0}
+#menu .tabs button{font-size:16px;text-transform:uppercase;letter-spacing:2.5px;padding:0 18px;border-bottom:3px solid transparent;color:#7f8996}
+#menu .tabs button:hover{color:#e8e8e8}
+#menu .tabs button.on{color:#fff;border-bottom-color:var(--acc);background:linear-gradient(0deg,rgba(255,176,32,.14),transparent 70%)}
+.mplayer{display:flex;align-items:center;gap:12px;padding:6px 12px 6px 6px;border:1px solid rgba(255,255,255,.08);border-radius:40px;background:rgba(255,255,255,.04);min-width:250px}
+.mav{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#1a1200;background:linear-gradient(135deg,#ffd27a,var(--acc));flex:none}
+.mpinfo{flex:1;min-width:0}
+.mpinfo input{background:none;border:0;padding:0;font-size:18px;font-weight:700;color:#fff;width:100%}
+.mpinfo input:not([readonly]):hover,.mpinfo input:focus{outline:1px dashed rgba(255,255,255,.25)}
+.mpsub{font-size:13px;color:#8b94a0;letter-spacing:.5px}.mpsub b{color:var(--acc)}
+.mpxp{height:3px;background:rgba(255,255,255,.1);border-radius:2px;margin-top:3px;overflow:hidden}.mpxp i{display:block;height:100%;background:var(--acc)}
+.mbody{flex:1;overflow:auto;padding:26px 28px 40px}
+.mbody>[data-pane]{max-width:1240px;margin:0 auto}
+#menu .box{background:linear-gradient(180deg,rgba(26,31,41,.82),rgba(16,19,26,.82));border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+#menu h3{font-size:15px;text-transform:uppercase;letter-spacing:3px;color:#cfd5dc;margin:0 0 14px;padding-left:10px;border-left:3px solid var(--acc)}
+.playgrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+@media(max-width:900px){.playgrid{grid-template-columns:1fr}.mtop{flex-wrap:wrap;height:auto;padding:8px 14px;gap:10px}.mplayer{min-width:0}}
+#hostForm{counter-reset:st}
+#hostForm>.lbl,#lbForm>.lbl{font-size:13px;letter-spacing:2.5px;color:#cfd5dc;margin:20px 0 10px;display:flex;align-items:center;gap:10px}
+#hostForm>.lbl::before{counter-increment:st;content:counter(st);width:22px;height:22px;border-radius:50%;background:rgba(255,176,32,.16);color:var(--acc);display:inline-flex;align-items:center;justify-content:center;font-size:13px;letter-spacing:0}
+#hostForm>.lbl:first-child{margin-top:4px}
+#menu .cards{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.pside{display:flex;flex-direction:column;gap:20px}
+#sideFr .lbrow{padding:8px 2px}
+#menu button.card{position:relative;padding:14px;border-radius:9px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);transition:transform .12s,border-color .12s,background .12s}
+#menu button.card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.06)}
+#menu button.card.on{border-color:var(--acc);background:linear-gradient(180deg,rgba(255,176,32,.16),rgba(255,176,32,.04));box-shadow:0 0 0 1px var(--acc),0 8px 24px rgba(255,176,32,.12)}
+.micon{display:block;width:34px;height:34px;color:#8b94a0;margin-bottom:8px}.micon svg{width:100%;height:100%}
+button.card.on .micon{color:var(--acc)}
+#menu .card b{font-size:20px;text-transform:uppercase;letter-spacing:1.5px}
+#menu .card small{font-size:14px;color:#8f99a5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#menu button.card[data-map]{padding:0;overflow:hidden}
+#menu .card[data-map] .thumb{position:relative;height:104px;margin:0;border:0;border-radius:0}
+#menu .card[data-map] .thumb::after{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100' preserveAspectRatio='none'%3E%3Cpath d='M0 100V62h22V48h18v14h14V36h26v26h12V54h20v8h16V40h30v22h14v-8h28v46z' fill='%23000' fill-opacity='.45'/%3E%3C/svg%3E") bottom/100% 70% no-repeat,linear-gradient(180deg,transparent 40%,rgba(0,0,0,.55))}
+#menu .card[data-map] b{padding:10px 12px 0}
+#menu .card[data-map] small{padding:2px 12px 0;margin-bottom:12px}
+#menu .seg{border-radius:8px;background:rgba(0,0,0,.2)}
+#menu .seg button{padding:7px 14px;font-size:16px}
+#menu .optrow{gap:10px 28px}
+#menu .optrow .lbl{margin:0 0 6px}
+.actbar{display:flex;gap:10px;margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.07)}
+#menu button.big{text-transform:uppercase;letter-spacing:2px;font-size:19px;padding:13px 18px;background:linear-gradient(180deg,#ffc24a,var(--acc));clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);box-shadow:0 6px 20px rgba(255,176,32,.2)}
+#menu button.big.alt,#menu #lbOut{background:rgba(255,255,255,.06);color:#e6e6e6;border:1px solid rgba(255,255,255,.18);box-shadow:none}
+#menu button.big.alt:hover,#menu #lbOut:hover{background:rgba(255,255,255,.12)}
+.actbar #btnHost,.actbar #lbGo{flex:2}.actbar #lbOut{flex:1}.actbar #btnHostPriv{flex:1}
+#joinBox input{font-size:24px;letter-spacing:6px;text-align:center;padding:10px;background:rgba(0,0,0,.3)}
+#menu .hint{font-size:14px}
 /* skins */
 .skhead{display:grid;grid-template-columns:1fr 1.2fr;gap:12px}
 .skbody{display:grid;grid-template-columns:1fr 1.5fr;gap:12px;margin-top:12px;align-items:start}
@@ -339,31 +397,33 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 <div id="click" class="hidden">Clique para jogar</div>
 
 <div id="menu" class="overlay">
-  <div class="panel wide">
-    <div class="mhead">
-      <div><h1>DAN OF DUTY</h1><div class="sub">FPS no navegador. x1 com os amigos ou sobrevivam juntos no modo Zumbis.</div></div>
-      <label class="mname">Seu nome <input id="inName" maxlength="16" autocomplete="off"></label>
-    </div>
-    <div class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="friends">Amigos</button><button data-tab="skins">Skins</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></div>
-    <div data-pane="play" class="cols2">
+  <div class="mshell">
+    <header class="mtop">
+      <div class="mlogo">DAN <i>OF</i> DUTY</div>
+      <nav class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="friends">Amigos</button><button data-tab="skins">Skins</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></nav>
+      <div class="mplayer"><div class="mav" id="mAv">J</div><div class="mpinfo"><input id="inName" maxlength="16" autocomplete="off" title="Seu nome"><div class="mpsub" id="mpSub"></div><div class="mpxp"><i id="mpXp"></i></div></div></div>
+    </header>
+    <main class="mbody">
+    <div data-pane="play" class="playgrid">
       <div id="invBar" style="grid-column:1/-1"></div>
       <div id="lobby" class="box hidden" style="grid-column:1/-1"></div>
       <div class="box" id="hostBox">
-        <h3>Criar sala</h3>
+        <h3>Criar partida</h3>
         <div id="hostForm"></div>
-        <button id="btnHost" class="big" style="margin-top:14px" disabled>Carregando...</button>
-        <button id="btnHostPriv" class="big" style="margin-top:8px" disabled>Criar sala só com convite</button>
+        <div class="actbar"><button id="btnHost" class="big" disabled>Carregando...</button>
+        <button id="btnHostPriv" class="big alt" disabled>Só com convite</button></div>
         <div id="hostStatus" class="status"></div>
       </div>
-      <div class="box" id="joinBox">
-        <h3>Entrar em sala</h3>
+      <div class="pside" id="pside"><div class="box" id="joinBox">
+        <h3>Entrar com código</h3>
         <label>Código da sala <input id="inCode" maxlength="8" placeholder="EX: K7P2Q" autocomplete="off" style="text-transform:uppercase;letter-spacing:4px;font-size:22px"></label>
         <button id="btnJoin" class="big" disabled>Carregando...</button>
         <div id="joinStatus" class="status"></div>
-        <div class="hint">Quem cria a sala recebe um código de 5 letras. O amigo digita aqui (ou abre o link que o host copiar no Esc). Funciona na mesma rede ou pela internet.</div>
+        <div class="hint">Peça o código de 5 letras para quem criou a sala, ou abra o link que ele copiar no Esc. Salas só com convite aparecem na aba Amigos.</div>
       </div>
+      <div class="box" id="sideFr"></div></div>
     </div>
-    <div data-pane="friends" id="friendsPane" class="hidden"><div class="box" id="frBox" style="max-width:640px"></div></div>
+    <div data-pane="friends" id="friendsPane" class="hidden"><div class="box" id="frBox" style="max-width:760px;margin:0 auto"></div></div>
     <div data-pane="skins" id="skinsPane" class="hidden">
       <div class="skhead">
         <div class="box" id="skAcct"></div>
@@ -409,11 +469,14 @@ summary{cursor:pointer;color:#fff;font-weight:700}
         <b>F</b><span>Zumbis: comprar, abrir porta, usar a caixa (segure para consertar janela / reanimar)</span>
         <b>V</b><span>Zumbis: facada rápida (bote até 3 m)</span>
         <b>L</b><span>Zumbis: lanterna</span>
+        <b>E (segurar)</b><span>Rodadas: plantar / desarmar a bomba</span>
+        <b>U</b><span>Rodadas: chat só do time</span>
         <b>Shift + W</b><span>Zumbis: correr (fôlego limitado; atirar interrompe)</span>
         <b>C correndo</b><span>Zumbis: deslizar (com PhD Flopper, explode)</span>
         <b>5</b><span>Zumbis: terceira arma (Mule Kick)</span>
       </div>
     </div>
+    </main>
   </div>
 </div>
 
@@ -707,7 +770,7 @@ MAPS.duna = gridMap([
     '###########...TTTTTT.x.#############',
     '###########............#############',
     '####################################',
-    '####################################'], 3, { areasC: [['Bomb A', 26, 33, 2, 10], ['Bomb B', 2, 10, 2, 9], ['Portas do B', 11, 13, 6, 7], ['Rampa do A', 24, 25, 3, 4], ['Base da Defesa', 14, 23, 1, 5], ['Meio da Defesa', 13, 17, 6, 13], ['Curto', 19, 25, 10, 17], ['Long', 29, 33, 11, 24], ['Portas do Long', 30, 31, 25, 25], ['Fora do Long', 22, 33, 26, 28], ['Meio', 15, 18, 14, 28], ['Base do Ataque', 11, 22, 29, 33], ['Saída do túnel', 5, 6, 10, 11], ['Túnel de baixo', 7, 14, 19, 20], ['Túnel de cima', 4, 6, 12, 26], ['Túnel de cima', 4, 10, 27, 30]], name: 'Duna', desc: 'como o Dust 2: long, curto, meio com portas e túneis até o B',
+    '####################################'], 3, { areasC: [['Bomb A', 26, 33, 2, 10], ['Bomb B', 2, 10, 2, 9], ['Portas do B', 11, 13, 6, 7], ['Rampa do A', 24, 25, 3, 4], ['Base da Defesa', 14, 23, 1, 5], ['Meio da Defesa', 13, 17, 6, 13], ['Curto', 19, 25, 10, 17], ['Long', 29, 33, 11, 24], ['Portas do Long', 30, 31, 25, 25], ['Fora do Long', 22, 33, 26, 28], ['Meio', 15, 18, 14, 28], ['Base do Ataque', 11, 22, 29, 33], ['Saída do túnel', 5, 6, 10, 11], ['Túnel de baixo', 7, 14, 19, 20], ['Túnel de cima', 4, 6, 12, 26], ['Túnel de cima', 4, 10, 27, 30]], name: 'Duna', desc: 'Long, curto, meio e túneis (Dust 2)',
   sky: 0xbcd4e6, skyTop: 0x4a86c8, fogC: 0xe6d6b4, fog: [70, 210], theme: { floor: ['sand', 0xd9c08c], wall: ['brick', 0xd8bb8c], crate: ['crate', 0xb07d45], stone: ['concrete', 0xcbb48a], roof: ['wood', 0x6b4a2e] } });
 MAPS.miragem = gridMap([
     '####################################',
@@ -745,7 +808,7 @@ MAPS.miragem = gridMap([
     '############...TTTTTT....###########',
     '############.............###########',
     '####################################',
-    '####################################'], 3, { areasC: [['Bomb A', 23, 32, 4, 11], ['Bomb B', 2, 10, 8, 15], ['Palácio', 32, 34, 8, 25], ['Rampa', 27, 29, 12, 20], ['Rampa', 25, 31, 21, 24], ['Conector', 19, 22, 10, 14], ['Mercado', 6, 9, 4, 8], ['Base da Defesa', 8, 22, 1, 3], ['Sala da janela', 14, 19, 4, 8], ['Curto do B', 11, 13, 13, 14], ['Meio', 14, 19, 9, 22], ['Apartamentos', 4, 5, 16, 25], ['Apartamentos', 2, 11, 26, 30], ['Topo do meio', 13, 24, 23, 25], ['Base do Ataque', 12, 24, 26, 33]], name: 'Miragem', desc: 'como a Mirage: palácio, rampa e conector no A; apartamentos, mercado e curto no B',
+    '####################################'], 3, { areasC: [['Bomb A', 23, 32, 4, 11], ['Bomb B', 2, 10, 8, 15], ['Palácio', 32, 34, 8, 25], ['Rampa', 27, 29, 12, 20], ['Rampa', 25, 31, 21, 24], ['Conector', 19, 22, 10, 14], ['Mercado', 6, 9, 4, 8], ['Base da Defesa', 8, 22, 1, 3], ['Sala da janela', 14, 19, 4, 8], ['Curto do B', 11, 13, 13, 14], ['Meio', 14, 19, 9, 22], ['Apartamentos', 4, 5, 16, 25], ['Apartamentos', 2, 11, 26, 30], ['Topo do meio', 13, 24, 23, 25], ['Base do Ataque', 12, 24, 26, 33]], name: 'Miragem', desc: 'Palácio, conector e mercado (Mirage)',
   sky: 0xb8d2ea, skyTop: 0x3f7cc0, fogC: 0xead8c0, fog: [70, 210], theme: { floor: ['tile', 0xc9b79a], wall: ['plaster', 0xe0c9a6], crate: ['crate', 0xb58450], stone: ['concrete', 0xbfae94], roof: ['wood', 0x7a5236] } });
 MAPS.vilarejo = gridMap([
     '####################################',
@@ -783,7 +846,7 @@ MAPS.vilarejo = gridMap([
     '####..TTTTTTTT...###################',
     '####.............###################',
     '####################################',
-    '####################################'], 3, { areasC: [['Bomb A', 24, 33, 3, 11], ['Bomb B', 2, 11, 2, 10], ['Banana', 5, 10, 11, 28], ['Arco', 22, 23, 3, 4], ['Base da Defesa', 12, 21, 1, 6], ['Curto do A', 22, 23, 11, 12], ['Segundo meio', 22, 25, 17, 19], ['Apartamentos', 26, 30, 12, 24], ['Meio', 17, 21, 12, 24], ['Saída dos apartamentos', 22, 30, 25, 27], ['Base do Ataque', 4, 21, 25, 33]], name: 'Vilarejo', desc: 'como a Inferno: banana até o B; arco, apartamentos e curto até o A',
+    '####################################'], 3, { areasC: [['Bomb A', 24, 33, 3, 11], ['Bomb B', 2, 11, 2, 10], ['Banana', 5, 10, 11, 28], ['Arco', 22, 23, 3, 4], ['Base da Defesa', 12, 21, 1, 6], ['Curto do A', 22, 23, 11, 12], ['Segundo meio', 22, 25, 17, 19], ['Apartamentos', 26, 30, 12, 24], ['Meio', 17, 21, 12, 24], ['Saída dos apartamentos', 22, 30, 25, 27], ['Base do Ataque', 4, 21, 25, 33]], name: 'Vilarejo', desc: 'Banana, arco e apartamentos (Inferno)',
   sky: 0xa9c8e4, skyTop: 0x3a78c0, fogC: 0xd9cdb8, fog: [60, 190], theme: { floor: ['asphalt', 0x8a8378], wall: ['brick', 0xb4785a], crate: ['crate', 0xa87a48], stone: ['rock', 0x9a948a], roof: ['wood', 0x5e4630] } });
 
 // ---------- mapa do modo zumbis: Sanatório ----------
@@ -8276,6 +8339,10 @@ function cycleSpec() {
 // ================================================================
 // Menus
 // ================================================================
+const MICON = { // ícones dos modos
+  rounds: '<svg viewBox="0 0 48 48"><rect x="10" y="16" width="28" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 22h6M16 28h10" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="25" r="3" fill="currentColor"/><path d="M24 16V9h8" fill="none" stroke="currentColor" stroke-width="3"/></svg>',
+  dm: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 5v11M24 32v11M5 24h11M32 24h11" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="2.5" fill="currentColor"/></svg>',
+  zombies: '<svg viewBox="0 0 48 48"><path d="M14 40V22a10 10 0 0 1 20 0v18" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="20" cy="22" r="2.5" fill="currentColor"/><circle cx="28" cy="22" r="2.5" fill="currentColor"/><path d="M18 31l3 2 3-2 3 2 3-2" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M8 14l6 4M40 14l-6 4" stroke="currentColor" stroke-width="3"/></svg>' };
 function matchForm(el, st0) {
   // escolha por cartões (modo e mapa) e botões segmentados; o modo Zumbis lembra o próprio mapa
   const st = { map: 'arena', zmap: 'vila', mode: 'rounds', rounds: 8, frags: 20, bots: 0, diff: 1, zdiff: 1, ...st0 };
@@ -8287,7 +8354,7 @@ function matchForm(el, st0) {
   st.zdiff = clamp(st.zdiff | 0, 0, ZDIFF.length - 1);
   const hex = c => '#' + (c >>> 0).toString(16).padStart(6, '0');
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, t]) => `<button type="button" data-k="${k}" data-v="${v}"${String(st[k]) === String(v) ? ' class="on"' : ''}>${t}</button>`).join('')}</div>`;
-  const MODES = [['rounds', 'Rodadas', 'Estilo CS: ataque x defesa, plantar e desarmar a bomba'], ['dm', 'Mata-mata', 'Renasce na hora, tudo grátis'], ['zombies', 'Zumbis', 'Cooperativo até 4, estilo CoD']];
+  const MODES = [['rounds', 'Rodadas', 'Ataque x defesa com bomba'], ['dm', 'Mata-mata', 'Renasce na hora, tudo grátis'], ['zombies', 'Zumbis', 'Cooperativo até 4 jogadores']];
   const render = () => {
     if (st.mode === 'rounds' && !MAPS[st.map]?.bomb) st.map = 'duna'; // rodadas: só os mapas de bomba
     if (st.mode === 'dm' && MAPS[st.map]?.bomb) st.map = 'arena'; // mata-mata: os mapas de bomba não entram
@@ -8299,10 +8366,10 @@ function matchForm(el, st0) {
         <div><div class="lbl">Bots</div>${seg('bots', [0, 1, 2, 3, 4, 5, 6, 7].map(n => [n, n]))}</div>
         <div><div class="lbl">Nível dos bots</div>${seg('diff', [[0, 'Fácil'], [1, 'Normal'], [2, 'Difícil']])}</div></div>`;
     el.innerHTML = `<div class="lbl" style="margin-top:4px">Modo</div>
-      <div class="cards">${MODES.map(([k, t, d]) => `<button type="button" class="card${st.mode === k ? ' on' : ''}" data-mode="${k}"><b>${t}</b><small>${d}</small></button>`).join('')}</div>
+      <div class="cards">${MODES.map(([k, t, d]) => `<button type="button" class="card${st.mode === k ? ' on' : ''}" data-mode="${k}"><span class="micon">${MICON[k]}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div>
       <div class="lbl">Mapa</div>
       <div class="cards">${maps.map(([k, m]) => `<button type="button" class="card${cur === k ? ' on' : ''}" data-map="${k}"><div class="thumb" style="background:linear-gradient(180deg,${hex(m.skyTop ?? m.sky)},${hex(m.fogC ?? m.sky)} 56%,${hex(m.theme.floor?.[1] ?? 0x555555)} 58%,#0c0d0b)"></div><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}</div>
-      ${opts}`;
+      <div class="lbl">Opções</div>${opts}`;
   };
   el.onclick = e => {
     const b = e.target.closest('button'); if (!b || !el.contains(b)) return;
@@ -8467,9 +8534,16 @@ async function authDo(kind) {
 }
 // ---------- usuário fixo, amigos e convites (Firestore: usernames/{usuário}, friends/{uid_uid}, invites/{de_para}) ----------
 const normUser = v => { v = String(v || '').trim().toLowerCase(); return /^[a-z0-9_]{3,16}$/.test(v) ? v : null; };
+function mpUI() { // cartão do jogador: inicial, nome, usuário/caixas e barra de XP até a próxima caixa
+  const d = PROF.data; if (!$('#mAv')) return;
+  $('#mAv').textContent = (CFG.name || '?').trim()[0]?.toUpperCase() || '?';
+  setHTMLm('mpSub', (PROF.user ? '@' + esc(PROF.user) : PROF.uid ? 'Conta sem usuário' : 'Convidado') + (d ? ` · <b>${d.cases}</b> caixa${d.cases === 1 ? '' : 's'}` : ''));
+  if (d) $('#mpXp').style.width = (d.xp / XP_CASE * 100).toFixed(1) + '%';
+}
 function nameSync() { // logado com usuário: o nome no jogo é o usuário (fixo)
   if (PROF.user) { PROF.name = PROF.user; CFG.name = PROF.user; }
-  const i = $('#inName'); if (i) { i.value = CFG.name; i.readOnly = !!PROF.user; i.title = PROF.user ? 'Nome da sua conta' : ''; }
+  const i = $('#inName'); if (i) { i.value = CFG.name; i.readOnly = !!PROF.user; i.title = PROF.user ? 'Nome da sua conta' : 'Seu nome (clique para mudar)'; }
+  mpUI();
 }
 async function claimUser(un) {
   const F = FB.F, uid = PROF.uid, ref = F.doc(FB.db, 'usernames', un);
@@ -8558,6 +8632,12 @@ function frUI() {
   const k1 = $('#frAddIn')?.value, k2 = $('#frUser')?.value; setHTMLm('frBox', h);
   if (k1 && $('#frAddIn')) $('#frAddIn').value = k1; if (k2 && $('#frUser')) $('#frUser').value = k2;
   setHTMLm('invBar', inGame || LB.on ? '' : FR.inv.map(i => `<div class="invb"><span><b>${esc(i.fromName)}</b> te chamou para ${i.priv ? 'uma sala só com convite' : 'uma sala'}${i.mode ? ' · ' + esc(i.mode) : ''}</span><span style="flex:1"></span><button data-ij="${esc(i.id)}">Entrar</button><button data-ix="${esc(i.id)}">Recusar</button></div>`).join(''));
+  // quadro lateral da tela Jogar: amigos online (com atalho para a sala deles)
+  const on = [...FR.list.values()].filter(f => f.st === 'ok' && frOnline(frOther(f).name));
+  setHTMLm('sideFr', '<h3>Amigos online</h3>' + (!PROF.uid ? '<div class="hint" style="margin:0">Entre na sua conta (aba Skins) para ver seus amigos e receber convites.</div>'
+    : !PROF.user ? '<div class="hint" style="margin:0">Escolha seu usuário na aba Amigos.</div>'
+    : on.length ? on.map(f => { const o = frOther(f), inf = FR.info[o.name] || {}; return `<div class="lbrow"><span class="dot on"></span><b>${esc(o.name)}</b>${inf.room && inf.room !== NET.code ? (inf.rp ? '<small>sala privada</small>' : `<button data-fj="${esc(inf.room)}">Entrar</button>`) : ''}</div>`; }).join('')
+    : `<div class="hint" style="margin:0">Nenhum amigo online agora.${FR.list.size ? '' : ' Adicione amigos na aba Amigos.'}</div>`));
   lobbyUI();
 }
 // ---------- lobby: antes da partida o host chama os amigos, escolhe o modo e monta os times ----------
@@ -8594,13 +8674,13 @@ function lobbyStart() {
 function lobbyUI() {
   const el = $('#lobby'); if (!el) return;
   const on = LB.on && !inGame, host = NET.isHost;
-  el.classList.toggle('hidden', !on); $('#hostBox').classList.toggle('hidden', on); $('#joinBox').classList.toggle('hidden', on);
+  el.classList.toggle('hidden', !on); $('#hostBox').classList.toggle('hidden', on); $('#pside').classList.toggle('hidden', on);
   if (!on) return;
   if (el.dataset.k !== (host ? 'h' : 'c')) { // esqueleto (o formulário do host não é redesenhado a cada mudança)
     el.dataset.k = host ? 'h' : 'c';
     el.innerHTML = `<h3 id="lbHead"></h3><div class="lbcols"><div><div class="lbl" style="margin-top:0">Jogadores</div><div id="lbPl"></div>${host ? '<div class="lbl">Convidar amigos</div><div id="lbFr"></div>' : ''}</div>
       <div>${host ? '<div id="lbForm"></div>' : '<div id="lbInfo"></div>'}</div></div>
-      <div class="row" style="margin-top:16px">${host ? '<button id="lbGo" class="big">Começar partida</button>' : ''}<button id="lbOut" class="big">${host ? 'Fechar sala' : 'Sair do lobby'}</button></div>`;
+      <div class="actbar">${host ? '<button id="lbGo" class="big">Começar partida</button>' : ''}<button id="lbOut" class="big">${host ? 'Fechar sala' : 'Sair do lobby'}</button></div>`;
     if (host) {
       LB.getForm = matchForm($('#lbForm'), S.st);
       $('#lbForm').addEventListener('click', () => setTimeout(() => { S.st = C.st = LB.getForm(); lobbySync(); }));
@@ -8671,6 +8751,7 @@ function skCard(it, extra = '') {
   return `<div class="skc${SKUI.sel === it ? ' on' : ''}" data-it="${it}" style="--rc:${RARITY[rar].css}"${extra}><div class="sw" style="background-image:url(${swatch(f)})"></div><b>${esc(wn)}</b><small>${esc(s.name)}</small>${eq ? '<i>EQUIPADA</i>' : ''}</div>`;
 }
 function skinsUI() {
+  mpUI();
   const pane = $('#skinsPane'); if (!pane || !PROF.data) return;
   const d = PROF.data;
   // conta
@@ -8857,10 +8938,12 @@ document.querySelectorAll('#menu .tabs button').forEach(b => b.onclick = () => {
 const getHostForm = matchForm($('#hostForm'), lastSt);
 settingsForm($('#menuSettings'));
 $('#inName').value = CFG.name;
-$('#inName').oninput = () => { CFG.name = $('#inName').value.replace(/[<>]/g, '').slice(0, 16) || 'Jogador'; save('name', CFG.name); };
+$('#inName').oninput = () => { CFG.name = $('#inName').value.replace(/[<>]/g, '').slice(0, 16) || 'Jogador'; save('name', CFG.name); mpUI(); };
 { const sala = new URLSearchParams(location.search).get('sala'); if (sala) { $('#inCode').value = sala.toUpperCase(); $('#joinStatus').textContent = 'Código preenchido pelo link — clique em Entrar'; } }
 $('#btnHost').disabled = $('#btnHostPriv').disabled = $('#btnJoin').disabled = false;
-$('#btnHost').textContent = 'Criar sala pública'; $('#btnJoin').textContent = 'Entrar';
+$('#btnHost').textContent = 'Criar sala pública';
+mpUI();
+frUI(); $('#btnJoin').textContent = 'Entrar';
 $('#btnHost').onclick = () => openLobby(false);
 $('#btnHostPriv').onclick = () => { if (!PROF.user) { $('#hostStatus').textContent = 'Para criar sala só com convite, entre na conta e escolha seu usuário (aba Amigos).'; return; } openLobby(true); };
 $('#frBox').onclick = e => {
@@ -8871,6 +8954,7 @@ $('#frBox').onclick = e => {
   else if (b.dataset.fd) F.deleteDoc(F.doc(FB.db, 'friends', b.dataset.fd)).catch(frErr);
   else if (b.dataset.fj) { audioInit(); document.querySelector('#menu .tabs [data-tab="play"]').click(); $('#inCode').value = b.dataset.fj; joinRoom(b.dataset.fj); }
 };
+$('#sideFr').onclick = e => { const b = e.target.closest('[data-fj]'); if (b) { audioInit(); $('#inCode').value = b.dataset.fj; joinRoom(b.dataset.fj); } };
 $('#invBar').onclick = e => {
   const b = e.target.closest('button'), i = b && FR.inv.find(x => x.id === (b.dataset.ij || b.dataset.ix)); if (!i) return;
   FB.F.deleteDoc(FB.F.doc(FB.db, 'invites', i.id)).catch(() => { }); FR.inv = FR.inv.filter(x => x !== i); frUI();
