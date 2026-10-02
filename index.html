@@ -2713,9 +2713,9 @@ const FPM = {
   mp40: { T: [-33.4, 2, null], fwd: '+x', up: '+y', L: .833 },
   p90: { T: [10, -40, null], fwd: '-x', up: '+y', L: .68, lhf: .3 }, // Modular P90 Tactical (com supressor)
   ak74u: { T: [-115, 23, null], fwd: '+x', up: '+y', L: .73 },
-  galil: { T: [-130, 39, null], fwd: '+x', up: '+y', L: .98 },
+  galil: { T: [-130, 39, null], fwd: '+x', up: '+y', L: .98, brass: ['Material.007', 'Material.008', 'Material.009'] },
   rpk: { T: [-116, 20, null], fwd: '+x', up: '+y', L: 1.04 },
-  hk21: { T: [-1.0, -.30, null], fwd: '+x', up: '+y', L: 1.02, lens: ['Material.015'] },
+  hk21: { T: [-1.0, -.30, null], fwd: '+x', up: '+y', L: 1.02, lens: ['Material.015'], lhf: .78 }, // mão esquerda à frente da caixa de munição
   dragunov: { T: [-93, -6.7, null], fwd: '+x', up: '+y', L: 1.225 },
   m4: { T: [-20, -3, null], fwd: '+x', up: '+y', L: .84 },
   commando: { T: [-44, -1, null], fwd: '+x', up: '+y', L: .85 },
@@ -2730,7 +2730,8 @@ const FPM = {
   spas: { T: [-.275, -.015, null], fwd: '+x', up: '+y', L: 1.04 },
 };
 // arma do jogo → pacote + modelo (sem modelo = a arma do próprio pacote)
-const FPW = { ak47: { pack: 'ak' }, nova: { pack: 'pump' }, m1911_ls: { pack: 'pistol', m: 'm1911' } };
+const FPW = { ak47: { pack: 'ak', vo: [.01, .005, -.07] }, // a AK do pacote é um pouco grande: mais longe do olho
+  nova: { pack: 'pump' }, m1911_ls: { pack: 'pistol', m: 'm1911' } };
 for (const [p, l] of Object.entries({ pistol: 'glock usp p250 deagle cz75 m1911 python raygun', smg: 'mp5 mp5k mp40 p90', ak: 'ak74u galil rpk hk21 dragunov',
   rifle: 'm4 commando fal m14 thundergun', sniper: 'scout awp', pump: 'stakeout olympia chinalake spas' })) for (const id of l.split(' ')) FPW[id] = { pack: p, m: id };
 const fpw = id => FPW[W[id]?.base || id]; // a versão do Pack-a-Punch usa os braços e o modelo da arma base
@@ -2884,12 +2885,13 @@ function fpBuild(id, ud) {
     if (D) { fpSkin(model.children[0], mats, tips.L, D.lens); if (F2) fpSkin(F2.g.children[0], mats, tips.L, D.lens); }
     else fpSkin(root, mats, tips.L, ['12ge'], false, m => !fpArm(m));
   }
+  if (D?.brass) model.traverse(o => { if (o.isMesh && D.brass.includes(o.material.name)) Object.assign(o.material, { metalness: .9, roughness: .35 }).color.set(0xb08d3c); }); // balas brancas sem textura viram latão
   if (D?.lens) model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) Object.assign(o.material, { roughness: .08, metalness: .4 }).color.set(0x14232c); }); // vidro da luneta
   const mz = new THREE.Object3D(); mz.position.copy(tips.muzzle).applyMatrix4(C); body.add(mz);
   // pacote → tela: o gatilho da arma vai para o mesmo ponto da tela em todas as armas (FPV), com o cano no mesmo giro; os braços vêm junto
   const V = P.v || FPV[P.view || 'long'], k = FPH / P.hr, de = D?.ve || [0, 0, 0], tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1] + de[1], Math.PI + V.e[0] + de[0], V.e[2] + de[2], 'YXZ'));
   const holder = new THREE.Group(); holder.matrixAutoUpdate = false;
-  holder.matrix.compose(new V3(...V.p).add(new V3(...(D?.vo || [0, 0, 0]))), tq, new V3(k, k, k)).multiply(A.clone().invert());
+  holder.matrix.compose(new V3(...V.p).add(new V3(...(D?.vo || W2.vo || [0, 0, 0]))), tq, new V3(k, k, k)).multiply(A.clone().invert());
   // mirar: giro e deslocamento da arma que deixam o cano reto para a frente e a mira na linha do olho
   const Gv = holder.matrix.clone().multiply(body.matrixWorld).multiply(C);
   const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)).multiply(tq.clone().invert()), sp = tips.sight.clone().applyMatrix4(Gv).applyQuaternion(aq);
