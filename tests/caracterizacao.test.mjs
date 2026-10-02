@@ -27,6 +27,10 @@ test('zumbis: a rodada 1 começa e zumbis nascem', { timeout: 60000 }, async () 
 test('zhit: dano é limitado ao teto da arma e dá 10 pontos por acerto', async () => {
   const r = await noJogo(J.page, T => {
     const p = T.S.players.get('h'), z = [...T.Z.zs.values()].find(z => !z.dead && z.hp > 200) || [...T.Z.zs.values()][0];
+    { // fase 2: o host exige linha de visão; põe o zumbi a 2,5 m do jogador numa direção sem parede
+      const V3 = T.camera.position.constructor, eye = new V3(p.pos[0], p.pos[1] + 1.62, p.pos[2]);
+      for (const [dx, dz] of [[2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]]) { const c = new V3(p.pos[0] + dx, p.pos[1] + 1.15, p.pos[2] + dz), d = c.clone().sub(eye), dist = d.length(); d.divideScalar(dist); if (T.trace(eye, d, dist, null).t >= dist - .05) { z.body.pos.set(p.pos[0] + dx, p.pos[1], p.pos[2] + dz); z.st = 'in'; z.ph = []; break; } }
+    }
     const hp0 = z.hp, m0 = p.money;
     T.sendToHost({ t: 'zhit', v: z.id, dmg: 1e9, z: 'body', w: 'm1911' });
     const W = T.W.m1911, cap = W.dmg * Math.max(W.head || 4, 1) * 1.1;
@@ -177,8 +181,13 @@ test('mata-mata: hit em bot aplica o dano e kill soma abate', { timeout: 120000 
   const r = await noJogo(J.page, T => {
     const h = T.S.players.get('h'), bot = [...T.S.players.values()].find(p => p.isBot);
     T.sim(1);
+    h.alive = true; h.hp = 100; h.pos = [T.me.pos.x, T.me.pos.y, T.me.pos.z]; h.anom = null; // os bots atiram no host durante o sim: garante o atacante vivo e no lugar
     bot.hp = 100; bot.armor = 0; bot.alive = true;
-    bot.pos = [h.pos[0] + 1.5, h.pos[1], h.pos[2]]; bot.ph = []; // desde a fase 2 o host exige linha de visão: o bot fica ao lado do host
+    { // desde a fase 2 o host exige linha de visão: o bot fica ao lado do host, numa direção sem parede
+      const V3 = T.camera.position.constructor, eye = new V3(h.pos[0], h.pos[1] + 1.62, h.pos[2]);
+      for (const [dx, dz] of [[1.5, 0], [-1.5, 0], [0, 1.5], [0, -1.5]]) { const c = new V3(h.pos[0] + dx, h.pos[1] + 1.15, h.pos[2] + dz), d = c.clone().sub(eye), dist = d.length(); d.divideScalar(dist); if (T.trace(eye, d, dist, null).t >= dist - .05) { bot.pos = [h.pos[0] + dx, h.pos[1], h.pos[2] + dz]; break; } }
+      bot.ph = [];
+    }
     T.sendToHost({ t: 'hit', v: bot.id, dmg: 30, z: 'body', w: 'ak47' }); const hp1 = bot.hp;
     T.sendToHost({ t: 'hit', v: bot.id, dmg: 1e6, z: 'body', w: 'ak47' }); const hp2 = bot.hp; // fase 2: um tiro vale no máximo o teto da arma (36 × 1,1)
     for (let i = 0; i < 3; i++) T.sendToHost({ t: 'hit', v: bot.id, dmg: 36, z: 'body', w: 'ak47' });

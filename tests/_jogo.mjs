@@ -2,8 +2,9 @@
 // O jogo expõe ganchos de depuração em window.__T (fim do index.html): estado do servidor (S, Z),
 // do cliente (C, ZC, me), srvHandle via sendToHost, e sim(seg) que avança a simulação com o tempo travado.
 //
-// Rede: o PeerJS é bloqueado (o jogo fica "offline", só o host), mas three.js e as fontes vêm da CDN,
-// então os testes precisam de internet. Sem WebGL por hardware o Chromium usa SwiftShader (lento, mas funciona).
+// Rede: o servidor de pareamento do PeerJS é bloqueado (o jogo fica "offline", só o host). three.js e PeerJS vêm de
+// ./vendor/; o Firebase e as fontes ainda vêm do Google, então os testes precisam de internet (sem ela o jogo também
+// roda, só sem contas). Sem WebGL por hardware o Chromium usa SwiftShader (lento, mas funciona).
 import { chromium } from 'playwright';
 import { iniciarServidor } from './servidor.mjs';
 
@@ -11,6 +12,8 @@ export async function abrirJogo({ bloquearPeer = true, console: log = false } = 
   const { srv, url } = await iniciarServidor(0);
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
+  // Bloqueia o próprio script do PeerJS (./vendor/peerjs…): sem window.Peer o jogo cria a sala "offline" e nunca fala com o
+  // servidor público de pareamento (o Playwright não intercepta WebSocket, então bloquear só o domínio não bastaria).
   if (bloquearPeer) await ctx.route(/peerjs/, r => r.abort());
   const page = await ctx.newPage();
   const erros = [];

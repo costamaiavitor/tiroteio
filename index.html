@@ -2,6 +2,11 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<!-- Política de segurança de conteúdo (o GitHub Pages não manda cabeçalhos, então vai no HTML): só scripts daqui e do Firebase (gstatic/Google),
+     conexões só com o pareamento do PeerJS e o Firebase; um script injetado não consegue falar com outro servidor. 'unsafe-inline' é
+     necessário pelos scripts inline (importmap e o módulo do jogo). Ao ligar o App Check, acrescentar www.google.com e firebaseappcheck.googleapis.com. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; worker-src blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: https://www.gstatic.com https://0.peerjs.com wss://0.peerjs.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com wss://firestore.googleapis.com https://www.googleapis.com https://tiroteio-237ee.firebaseapp.com; frame-src https://tiroteio-237ee.firebaseapp.com https://accounts.google.com">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dan of Duty</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='none' stroke='%23ffb020' stroke-width='10'/><circle cx='50' cy='50' r='8' fill='%23ffb020'/></svg>">
@@ -271,9 +276,9 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #zboss i{display:block;height:100%;width:100%;background:linear-gradient(#ff4a2a,#9a1206)}
 #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.42) 100%)}
 </style>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script>window.Peer || document.write('<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"><\/script>')</script>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<!-- bibliotecas servidas do próprio repositório (vendor/, mesmas versões e bytes das CDNs; hashes em vendor/HASHES.md): uma CDN comprometida não troca o código do jogo -->
+<script src="./vendor/peerjs@1.5.4/peerjs.min.js"></script>
+<script type="importmap">{"imports":{"three":"./vendor/three@0.160.0/build/three.module.js","three/addons/":"./vendor/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -3561,7 +3566,7 @@ function karambitHand(A) { // karambit (como no CS2): cabo em pé, indicador no 
 // Os ossos são independentes (hierarquia plana), então a dobra de cada falange é calculada aqui (cinemática direta).
 const HAND3D = { R: null, L: null };
 function loadHands() {
-  const base = 'https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/generic-hand/', ld = new GLTFLoader();
+  const base = './vendor/webxr-generic-hand@1.0.20/', ld = new GLTFLoader(); // versão fixa, servida do repositório (antes vinha da CDN com @1.0 flutuante)
   for (const sd of ['R', 'L']) ld.load(base + (sd === 'R' ? 'right' : 'left') + '.glb', g => {
     const bones = {}, rest = {}; let mesh = null;
     g.scene.traverse(o => { if (o.isBone) { bones[o.name] = o; rest[o.name] = { p: o.position.clone(), q: o.quaternion.clone() }; } if (o.isSkinnedMesh) { mesh = o; o.frustumCulled = false; o.geometry.userData.keep = true; } });
