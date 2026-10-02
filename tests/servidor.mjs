@@ -12,7 +12,12 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 export function iniciarServidor(porta = 0) {
   const srv = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
-    let rel = decodeURIComponent(url.pathname); if (rel.endsWith('/')) rel += 'index.html';
+    // Sequência inválida (ex.: "/%") lança URIError; sem o try/catch ela derrubaria o processo inteiro do node --test.
+    let rel; try { rel = decodeURIComponent(url.pathname); } catch { res.writeHead(400); return res.end(); }
+    if (rel.endsWith('/')) rel += 'index.html';
+    // Nada de ponto-arquivos (.git, .env) nem pastas/arquivos de desenvolvimento. tools/ continua servido:
+    // as ferramentas de dev são importadas pelo navegador em tools/*.js.
+    if (/^\/(\.[^/]*|node_modules|_sk|docs|tests|package\.json|pnpm-lock\.yaml)(\/|$)/.test(rel)) { res.writeHead(404); return res.end(); }
     const abs = path.resolve(RAIZ, '.' + rel);
     if (!abs.startsWith(RAIZ + path.sep) && abs !== RAIZ) { res.writeHead(403); return res.end(); }
     let st; try { st = statSync(abs); } catch { res.writeHead(404); return res.end('não achei ' + rel); }

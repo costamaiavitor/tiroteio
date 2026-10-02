@@ -132,23 +132,12 @@ Já configurado no projeto `tiroteio-237ee`. Os passos abaixo servem só para re
 1. Em https://console.firebase.google.com, crie um projeto (o Google Analytics pode ficar desligado).
 2. **Authentication → Vamos começar → Método de login:** ative **Google** e **E-mail/senha**.
 3. **Authentication → Configurações → Domínios autorizados:** adicione `costamaiavitor.github.io` (o `localhost` já vem).
-4. **Firestore Database → Criar banco de dados** (modo de produção, qualquer região). Na aba **Regras**, cole e publique:
-
-   ```
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /players/{uid} {
-         allow read, write: if request.auth != null && request.auth.uid == uid;
-       }
-     }
-   }
-   ```
+4. **Firestore Database → Criar banco de dados** (modo de produção, qualquer região). Na aba **Regras**, cole o conteúdo do arquivo [`firestore.rules`](firestore.rules) deste repositório e publique. Antes de publicar, use o **Simulador de regras** da própria aba com um `create` e um `update` reais (os campos que o jogo grava estão comentados no arquivo) para um uid de teste. Se a conta do dono for receber todas as skins, troque o placeholder `COLOQUE_AQUI_O_UID_DO_DONO` pelo uid dela.
 
 5. **Configurações do projeto (engrenagem) → Seus apps → Web (`</>`):** registre o app e copie o objeto `firebaseConfig`.
 6. No `index.html`, troque `const FIREBASE_CONFIG = null;` por `const FIREBASE_CONFIG = { ...o que você copiou... };`.
 
-A `apiKey` do Firebase não é segredo (ela identifica o projeto); quem protege os dados são as regras acima. Cada jogador só lê e grava o próprio inventário. Como o jogo roda no navegador, alguém que mexa no código consegue se dar skins. Para jogar entre amigos isso não importa.
+A `apiKey` do Firebase não é segredo (ela identifica o projeto); quem protege os dados são as regras acima. Cada jogador só lê e grava o próprio inventário. Como o jogo roda no navegador, alguém que mexa no código consegue se dar skins. As regras do `firestore.rules` limitam a forma do documento e o quanto ele pode mudar a cada gravação (no máximo 10 caixas e 1 skin por vez, uma gravação por segundo), mas sem um servidor o progresso continua sendo decidido pelo cliente. Para jogar entre amigos isso não importa.
 
 ## Gráficos
 
