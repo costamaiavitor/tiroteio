@@ -175,7 +175,7 @@ test('perfil local: XP vira caixa a cada 300', async () => {
 // ---------- Mata-mata com bots (host) ----------
 test('mata-mata: hit em bot aplica o dano e kill soma abate', { timeout: 120000 }, async () => {
   // mesma aba: recarrega a página (como o "Sair" do jogo faz) e cria outra sala
-  await J.page.goto(J.url, { waitUntil: 'load' });
+  await J.page.goto(J.url, { waitUntil: 'load', timeout: 120000 }); // recarga com sala aberta pode demorar em máquina ocupada
   await J.page.waitForFunction(() => window.__T && !document.querySelector('#btnHost').disabled, null, { timeout: 60000 });
   await criarSala(J.page, { mode: 'dm', map: 'arena', bots: 2 });
   const r = await noJogo(J.page, T => {

@@ -5204,9 +5204,11 @@ function startHost(st) {
     });
     peer.on('connection', conn => {
       // conexão que não vira jogador (sem 'join' em 10 s, ou acima do teto de pendentes) é fechada: cada uma custa um RTCPeerConnection
-      NET.pend = (NET.pend || 0) + 1;
-      if (NET.pend > MAX_PENDENTES) { NET.pend--; setTimeout(() => { try { conn.close(); } catch (e) { } }, 0); return; }
-      setTimeout(() => { if (!conn.pid) { NET.pend = Math.max(0, (NET.pend || 0) - 1); try { conn.close(); } catch (e) { } } }, 10000);
+      // (acima do teto, cai a pendente mais ANTIGA: quem enche a fila de propósito não consegue barrar quem chega de verdade)
+      const pend = (NET.pendL ||= []); pend.push(conn); NET.pend = pend.length;
+      while (pend.length > MAX_PENDENTES) { const velha = pend.shift(); try { velha.close(); } catch (e) { } }
+      const tira = () => { const i = pend.indexOf(conn); if (i >= 0) pend.splice(i, 1); NET.pend = pend.length; };
+      conn.on('close', tira); setTimeout(() => { tira(); if (!conn.pid) try { conn.close(); } catch (e) { } }, 10000);
       conn.on('open', () => attachFast(conn, d => srvOnData(conn, d), 4096));
       conn.on('data', d => srvOnData(conn, d));
       conn.on('close', () => srvDrop(conn));
@@ -5296,13 +5298,14 @@ function srvOnData(conn, d) {
     const recusa = txt => { try { conn.send({ t: 'err', txt }); } catch (e) { } setTimeout(() => { try { conn.close(); } catch (e) { } }, 200); };
     if ((d.pv | 0) !== PROTO) return recusa('Sua versão do jogo é diferente da do host: recarregue a página com Ctrl+F5 e tente de novo'); // tabelas de armas/mapas e mensagens precisam bater
     if ([...S.players.values()].filter(p => !p.isBot).length >= MAX_JOGADORES) return recusa('Sala cheia');
-    const id = 'p' + (S.nextId++); conn.pid = id; conn.v = +d.v || 1; NET.conns.set(id, conn); S.skDirty = true; NET.pend = Math.max(0, (NET.pend || 0) - 1);
+    const id = 'p' + (S.nextId++); conn.pid = id; conn.v = +d.v || 1; NET.conns.set(id, conn); S.skDirty = true;
+    { const pend = NET.pendL || [], i = pend.indexOf(conn); if (i >= 0) pend.splice(i, 1); NET.pend = pend.length; } // virou jogador: sai da fila de pendentes
     // nome: sem < >, sem caracteres invisíveis (homoglifos de "Vitor" com um caractere invisível no placar), até 16; repetido na sala ganha " (2)" como os bots
     let name = String(d.name || 'Jogador').normalize('NFKC').replace(INVISIVEIS, '').trim().slice(0, 16) || 'Jogador';
     const nome0 = name, rk = typeof d.rk === 'string' && /^[0-9a-f-]{8,40}$/i.test(d.rk) ? d.rk : null, chaveLeft = rk ? nome0 + '\u0000' + rk : nome0; // rk: token de reentrada (só quem tem nome E token recupera a partida)
-    if (S.banidos?.has(chaveLeft)) { conn.pid = null; NET.conns.delete(id); return recusa('Você foi removido desta sala pelo host'); }
+    if (S.banidos?.has(chaveLeft) || S.banidos?.has('nome:' + nome0)) { conn.pid = null; NET.conns.delete(id); return recusa('Você foi removido desta sala pelo host'); }
     for (let n = 2; [...S.players.values()].some(p => p.name === name); n++) name = nome0.slice(0, 12) + ' (' + n + ')';
-    const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk); np.chaveLeft = chaveLeft;
+    const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk); np.chaveLeft = chaveLeft; np.nome0 = nome0;
     conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code, hk: NET.hostKey });
     broadcast({ t: 'info', txt: name + ' entrou na sala' });
     if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') { // entra já jogando, com os pontos da dificuldade; quem caiu e voltou (até 5 min, mesmo nome e mesmo token) recupera pontos e armas,
@@ -5370,6 +5373,7 @@ const temArmaZ = (p, w) => temArma(p, w) || (W[w]?.slot === 'nade' && p.inv[w] >
 const _zv2 = new V3();
 // o jogador vê o zumbi? Pontos do corpo (cabeça, tronco, pernas e laterais; cão e rastejante mais baixos), na posição atual e nas recentes
 function veZumbi(p, z) {
+  if (p.dentroN >= 3) return false; // dentro de uma parede não se vê nada
   const o = olhoDe(p), s = (ZKIND[z.kind | 0]?.sz || 1), pts = z.dog ? [[.9, 0, 0], [.5, 0, 0], [.5, .4, 0], [.5, -.4, 0], [.5, 0, .4], [.5, 0, -.4]] : z.crawler ? [[.5, 0, 0], [.3, .5, 0], [.3, -.5, 0], [.3, 0, .5], [.3, 0, -.5]]
     : [[1.64 * s, 0, 0], [1.15 * s, 0, 0], [.42 * s, 0, 0], [1.15 * s, .35 * s, 0], [1.15 * s, -.35 * s, 0], [1.15 * s, 0, .35 * s], [1.15 * s, 0, -.35 * s]];
   const P = z.body.pos, lista = [[P.x, P.y, P.z]]; for (const h of z.ph || []) if (now - h.t <= VAL.histS) lista.push(h.p);
@@ -5385,11 +5389,11 @@ function noCone(p, z, range, cosA) {
 // limite de mensagens por conexão e por tipo: [por segundo, rajada]. Jogo normal: pos 30/s, hold 7/s, zhit até ~20/s em escopeta/Trovão
 const TAXA = { pos: [45, 70], shot: [25, 40], zhit: [60, 90], hit: [40, 60], hold: [15, 30], use: [10, 20], chat: [2, 5], skins: [1, 3], ping: [5, 10], nade: [5, 10], zclay: [5, 10], zfx: [5, 10], selfdmg: [5, 10], bomb: [10, 20], buy: [10, 20], suicide: [2, 4], '*': [20, 40] };
 function taxaOk(conn, t) {
-  const [r, B] = TAXA[t] || TAXA['*'], tb = (conn.taxa ||= {}), pn = performance.now(), b = tb[t] || (tb[t] = { n: B, t: pn });
-  b.n = Math.min(B, b.n + (pn - b.t) / 1000 * r); b.t = pn; if (b.n < 1) { conn.excesso = (conn.excesso || 0) + 1; return false; } b.n--; return true;
+  const k = Object.hasOwn(TAXA, t) ? t : '*', [r, B] = TAXA[k], tb = (conn.taxa ||= {}), pn = performance.now(), b = tb[k] || (tb[k] = { n: B, t: pn }); // tipo desconhecido cai no balde '*' (não cria um balde por nome inventado)
+  b.n = Math.min(B, b.n + (pn - b.t) / 1000 * r); b.t = pn; if (b.n < 1) { conn.excesso = (conn.excesso || 0) + 1; return false; } b.n--; if (conn.excesso) conn.excesso = Math.max(0, conn.excesso - .1); return true;
 }
-const MAX_JOGADORES = 12, MAX_PENDENTES = 16;
-const INVISIVEIS = new RegExp('[<>' + String.fromCharCode(0x200B) + '-' + String.fromCharCode(0x200F) + String.fromCharCode(0x2028) + '-' + String.fromCharCode(0x202F) + String.fromCharCode(0x2060) + '-' + String.fromCharCode(0x206F) + String.fromCharCode(0xFEFF) + ']', 'g'); // < > e caracteres invisíveis/largura zero (nomes falsos no placar) // humanos por sala; conexões abertas que ainda não mandaram 'join'
+const MAX_JOGADORES = 12, MAX_PENDENTES = 16; // humanos por sala; conexões abertas que ainda não mandaram 'join'
+const INVISIVEIS = new RegExp('[<>' + String.fromCharCode(0x200B) + '-' + String.fromCharCode(0x200F) + String.fromCharCode(0x2028) + '-' + String.fromCharCode(0x202F) + String.fromCharCode(0x2060) + '-' + String.fromCharCode(0x206F) + String.fromCharCode(0xFEFF) + ']', 'g'); // < > e caracteres invisíveis/largura zero (nomes falsos no placar)
 // teto de dano de um tiro (mesma conta que o cliente faz, com 10 % de folga): dano × zona × bagos
 function tetoDano(w, wd, zone) { if (w === 'knife') return 180; return (wd.dmg || 0) * (zone === 'head' ? Math.max(wd.head || 4, 1) : zone === 'legs' ? .75 : 1) * (wd.pellets || 1) * 1.1; }
 const olhoDe = p => new V3(p.pos[0], p.pos[1] + (p.crouch ? EYE_CROUCH : EYE_STAND), p.pos[2]);
@@ -5401,6 +5405,7 @@ function visaoLivre(a, b) { // só o cenário (a fumaça não bloqueia o tiro no
 const _vv = new V3();
 // o atacante vê a vítima? Testa cabeça, tronco, pernas e as laterais do tronco, na posição atual e nas recentes
 function veJogador(p, v) {
+  if (p.dentroN >= 3) return false; // dentro de uma parede não se vê nada (o raio que nasce dentro da caixa não a detecta)
   const o = olhoDe(p), s = v.crouch ? .69 : 1, pts = [[1.64 * s, 0, 0], [1.15 * s, 0, 0], [.42 * s, 0, 0], [1.15 * s, .3, 0], [1.15 * s, -.3, 0], [1.15 * s, 0, .3], [1.15 * s, 0, -.3]];
   const lista = [v.pos]; for (const h of v.ph || []) if (now - h.t <= VAL.histS) lista.push(h.p);
   for (const vp of lista) for (const [dy, dx, dz] of pts) if (visaoLivre(o, _vv.set(vp[0] + dx, vp[1] + dy, vp[2] + dz))) return true;
@@ -5415,8 +5420,22 @@ function posPlausivel(p, np) {
   if (dh > b.d && dh > vRef * desde) return 'pos:veloc';
   if (dv > b.v && dv > VAL.vSobe * desde) return 'pos:sobe';
   if (z && Z.on && ffCell(np[0], np[2]) < 0) return 'pos:fora'; // fora da grade do mapa zumbi
+  // dentro de uma parede (noclip): a física do cliente sobrepõe um quadro ao subir degrau ou agachar na borda; três seguidos não
+  if (blockedAt(np[0], np[1] + .3, np[2], H_CROUCH - .3)) { p.dentroN = (p.dentroN || 0) + 1; if (p.dentroN >= 3) return 'pos:dentro'; } else p.dentroN = 0;
+  // no ar sem apoio (flutuar/voar: intocável pelos zumbis): sem chão a 1,3 m abaixo dos pés, sem estar caindo, por mais de 1 s (pulo chega a 1,2 m e dura 0,66 s)
+  if (dv >= -.05 && !apoioEmbaixo(np)) { if (!p.arT) p.arT = now; else if (now - p.arT > 1) return 'pos:voo'; } else p.arT = 0;
   b.d = Math.max(0, b.d - dh); if (dv > 0) b.v = Math.max(0, b.v - dv);
   return null;
+}
+const _ad = new V3(0, -1, 0), _ao = new V3();
+function apoioEmbaixo(np) { for (const [dx, dz] of [[0, 0], [PR, 0], [-PR, 0], [0, PR], [0, -PR]]) if (trace(_ao.set(np[0] + dx, np[1] + .1, np[2] + dz), _ad, 1.4, null).t < 1.4) return true; return false; } // centro e bordas do corpo (dá para ficar com o centro fora da borda de uma caixa)
+// explosão (sp): o zumbi precisa estar perto de um zumbi acertado direto há pouco ou do ponto em que a mira do jogador bate no cenário
+const _af = new V3();
+function pertoDeImpacto(p, z, wd) {
+  const r = (wd.splash?.r || wd.chain?.r || 2.5) + 2, P = z.body.pos, u = p.ultDireto;
+  if (u && now - u.t <= .3 && Math.hypot(P.x - u.p[0], P.y - u.p[1], P.z - u.p[2]) <= r) return true;
+  const o = olhoDe(p), f = _af.set(-Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(p.yaw) * Math.cos(p.pitch)), i = trace(o, f, 250, null).p;
+  return Math.hypot(P.x - i.x, P.y + 1 - i.y, P.z - i.z) <= r + 1;
 }
 function srvHandle(pid, m) {
   const p = S.players.get(pid); if (!p || !m) return;
@@ -5449,7 +5468,8 @@ function srvHandle(pid, m) {
       if (S.st.mode !== 'zombies' || !Z.on || !p.alive || S.phase === 'over' || !isW(m.w)) return;
       const w = m.w, wd = W[w], z = Z.zs.get(+m.v); if (!z) return;
       if (!((w === 'knife' && !p.downed) || ((p.inv.primary === w || p.inv.secondary === w) && (!p.downed || wd.slot === 'secondary')) || (p.inv.third === w && !p.downed) || (w === 'm1911_ls' && p.downed) || (w === 'dmach' && !p.downed && p.dmEnd > now - .5))) return; // caído: só pistola // terceira arma (Mule Kick); Máquina da Morte com folga de rede
-      const cap = (wd.thunder ? 1e7 : w === 'knife' ? (p.bowie ? 1000 : 150) : (wd.dmg || 0) * Math.max(wd.head || 4, 1) * (wd.pellets || 1) * 1.1 + (wd.splash?.dmg || 0)) * (p.perks.includes('ds') && w !== 'knife' ? 1.5 : 1); // Deadshot: headshot +50%
+      const zona = m.z === 'head' || m.z === 'legs' ? m.z : 'body'; // o teto segue a zona informada: tiro no corpo não vale o multiplicador da cabeça
+      const cap = (wd.thunder ? 1e7 : w === 'knife' ? (p.bowie ? 1000 : 150) : (wd.dmg || 0) * (zona === 'head' ? Math.max(wd.head || 4, 1) : zona === 'legs' ? .75 : 1) * (wd.pellets || 1) * 1.1 + (wd.splash?.dmg || 0)) * (p.perks.includes('ds') && w !== 'knife' && zona === 'head' ? 1.5 : 1); // Deadshot: headshot +50%
       if (w === 'knife' && Math.hypot(z.body.pos.x - p.pos[0], z.body.pos.z - p.pos[2]) > 4.5 + Math.min(2.5, z.speed * .4)) return; // facada (com o bote) alcança uns 3,4 m, mais o que o zumbi andou desde o golpe
       // alvo plausível: não está no subsolo (nascendo), não está a mais de 260 m e, no tiro direto, está à vista; cone das armas de onda conferido aqui
       // (antes, zhit em qualquer id de Z.zs valia: zumbi atrás da parede, do outro lado do mapa ou ainda embaixo do chão)
@@ -5457,8 +5477,9 @@ function srvHandle(pid, m) {
       { const P = z.body.pos, dist = Math.hypot(P.x - p.pos[0], P.y - p.pos[1], P.z - p.pos[2]); if (dist > VAL.alcance) return srvAnom(p, 'zhit:longe');
         if (wd.thunder) { if (!noCone(p, z, wd.pap ? 18 : 14, Math.cos(wd.pap ? .8 : .62)) || !veZumbi(p, z)) return srvAnom(p, 'zhit:cone'); }
         else if (wd.frost) { if (!noCone(p, z, wd.frost.range, wd.frost.cos) || !veZumbi(p, z)) return srvAnom(p, 'zhit:cone'); }
-        else if (w !== 'knife' && !m.sp && !veZumbi(p, z)) return srvAnom(p, 'zhit:visao'); // explosão (sp) pode pegar quem está atrás da esquina: só distância
-        if (m.sp && !wd.splash && !wd.chain && !wd.frost) return srvAnom(p, 'zhit:sp'); } // "explosão" só de arma que explode
+        else if (!m.sp) { if (!veZumbi(p, z)) return srvAnom(p, 'zhit:visao'); p.ultDireto = { t: now, p: [P.x, P.y, P.z] }; } // tiro direto (faca inclusive): à vista
+        else { if (!wd.splash && !wd.chain && !wd.frost) return srvAnom(p, 'zhit:sp'); // "explosão" só de arma que explode
+          if (!veZumbi(p, z) && !pertoDeImpacto(p, z, wd)) return srvAnom(p, 'zhit:sp'); } } // explosão pode pegar quem está atrás da esquina, mas perto de onde ela estourou
       p.shotT = now; p.shotW = w; // atirou de verdade (Electric Cherry confere)
       const iv = armaIv(w, wd), gap = wd.thunder ? 0 : iv * .6; // Double Tap = 0,75 da cadência
       if (gap && !fichaOk(z.tb ||= {}, pid, gap)) return; // por zumbi; folga de 0,5 s: tiros que chegam juntos depois de um soluço da rede valem
@@ -5492,7 +5513,7 @@ function srvHandle(pid, m) {
       const zone = m.z === 'head' || m.z === 'legs' ? m.z : 'body';
       if (!fichaOk(p.hb ||= {}, w, armaIv(w, wd) * .6)) return srvAnom(p, 'hit:cadencia'); // 0,6 da cadência: Double Tap e folga de rede
       const dist = Math.hypot(v.pos[0] - p.pos[0], v.pos[1] - p.pos[1], v.pos[2] - p.pos[2]);
-      if (w === 'knife' ? dist > VAL.faca : dist > VAL.alcance || !veJogador(p, v)) return srvAnom(p, 'hit:visao');
+      if (w === 'knife' ? (dist > VAL.faca || Math.abs(v.pos[1] - p.pos[1]) > 2 || !veJogador(p, v)) : (dist > VAL.alcance || !veJogador(p, v))) return srvAnom(p, 'hit:visao'); // a facada também precisa ver a vítima (não atravessa parede nem chão)
       srvDamage(m.v, pid, clamp(+m.dmg || 0, 0, tetoDano(w, wd, zone)), zone, w); break;
     }
     case 'bomb': { // segurando E: planta (ataque, com a bomba, dentro do bomb) ou desarma (defesa, perto da bomba plantada)
@@ -7905,7 +7926,7 @@ function onMsgInner(m) {
       if (m.id === C.myId) { zSetDowned(false); me.alive = false; C.deadAt = now; C.spec = null; centerMsg('VOCÊ SANGROU', 'Você volta na próxima rodada', 3); }
       else { const rp = R.get(m.id); if (rp) { rp.downed = false; rp.alive = false; } }
       break;
-    case 'zover': grantXP(30 + 8 * (m.r || 0)); ZC.over = true; play('over'); centerMsg('FIM DE JOGO', `${C.players.size > 1 ? 'Vocês sobreviveram' : 'Você sobreviveu'} ${m.r} rodada${m.r === 1 ? '' : 's'} · recomeça em 12s`, 11); break;
+    case 'zover': grantXP(30 + 8 * clamp(m.r | 0, 0, 200)); // teto: um host editado mandava r: 1e9 e virava milhões de caixas ZC.over = true; play('over'); centerMsg('FIM DE JOGO', `${C.players.size > 1 ? 'Vocês sobreviveram' : 'Você sobreviveu'} ${m.r} rodada${m.r === 1 ? '' : 's'} · recomeça em 12s`, 11); break;
     case 'pts': me.money = +m.m || 0; zPopup(+m.n || 0); if (m.n < 0) play('kaching'); break;
     case 'ammo': if (isW(m.w)) { G.ammo[m.w] = { mag: W[m.w].mag, res: W[m.w].res }; play('kaching'); } break;
     case 'zbowie': ZC.bowie = true; play('kaching'); centerMsg('FACA BOWIE', 'Facadas muito mais fortes', 2); break;
@@ -8673,7 +8694,7 @@ function renderKick() {
 }
 function srvKick(pid) { // tira da sala e não deixa voltar (pelo nome + token de reentrada) enquanto a sala existir
   const p = S.players.get(pid), c = NET.conns.get(pid); if (!p || !c) return;
-  (S.banidos ||= new Set()).add(p.chaveLeft || p.name);
+  (S.banidos ||= new Set()).add(p.chaveLeft || p.name); S.banidos.add('nome:' + (p.nome0 || p.name)); // nem com o mesmo nome sem token
   try { c.send({ t: 'err', txt: 'Você foi removido da sala pelo host' }); } catch (e) { }
   srvDrop(c); toast(p.name + ' foi removido da sala', 3);
 }

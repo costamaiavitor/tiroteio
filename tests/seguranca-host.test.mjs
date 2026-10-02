@@ -61,9 +61,14 @@ test('V01 hit: fora da rodada (fase over) é recusado', async () => {
   assert.equal(r, 100);
 });
 
+test('V01 hit (faca): perto e à vista vale; através do chão (3 m abaixo) é recusado', async () => {
+  const r = await noJogo(J.page, T => { const { h, bot } = __prep(.5); T.sendToHost({ t: 'hit', v: bot.id, dmg: 40, z: 'body', w: 'knife' }); const hp1 = bot.hp; bot.hp = 100; bot.pos = [h.pos[0], h.pos[1] - 3, h.pos[2]]; bot.ph = []; h.anom = null; T.sendToHost({ t: 'hit', v: bot.id, dmg: 40, z: 'body', w: 'knife' }); return { hp1, hp2: bot.hp, by: h.anom?.by }; });
+  assert.equal(r.hp1, 60); assert.equal(r.hp2, 100); assert.equal(r.by?.['hit:visao'], 1);
+});
+
 test('V02 pos: andar normal (o próprio cliente do host a 30 Hz) é aceito sem anomalia', async () => {
   const r = await noJogo(J.page, T => { const { h } = __prep(.1); h.anom = null; const x0 = T.me.pos.x; for (let i = 1; i <= 30; i++) { T.me.pos.x = x0 + .2 * i; T.sim(1 / 30); } return { d: h.pos[0] - x0, anom: h.anom?.n || 0 }; });
-  assert.ok(r.d > 5 && r.d <= 6.5, `andou ${r.d}`); assert.equal(r.anom, 0);
+  assert.ok(r.d > 1 && r.d <= 6.5, `andou ${r.d}`); assert.equal(r.anom, 0); // pode parar antes dos 6 m numa parede do mapa (física do próprio cliente), nunca por anomalia
 });
 
 test('V02 pos: teleporte de 50 m numa mensagem é ignorado e conta anomalia', async () => {
@@ -94,7 +99,7 @@ test('V17 anomalias: com 5 mensagens fora do esperado o host recebe um aviso com
 
 // ---------- zumbis ----------
 test('zumbis: sala', { timeout: 120000 }, async () => {
-  await J.page.goto(J.url, { waitUntil: 'load' });
+  await J.page.goto(J.url, { waitUntil: 'load', timeout: 120000 }); // recarga com sala aberta pode demorar em máquina ocupada
   await J.page.waitForFunction(() => window.__T && !document.querySelector('#btnHost').disabled, null, { timeout: 60000 });
   await criarSala(J.page, { mode: 'zombies', map: 'sanatorio', zdiff: 1 });
 });

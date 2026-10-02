@@ -119,6 +119,71 @@ test('V03 zhit: Arma Trovão só pega quem está dentro do cone à frente', asyn
   assert.equal(r.morreu, true, JSON.stringify(r)); assert.equal(r.vivo, true); assert.equal(r.by2['zhit:cone'], 1, JSON.stringify(r));
 });
 
+test('F01 pos: ficar dentro de uma parede (3 posições seguidas) é recusado e tira a visão', async () => {
+  const r = await noJogo(J.page, T => {
+    const c = __entrar('Fantasma'), p = T.S.players.get(c.pid); for (const zz of T.Z.zs.values()) zz.atkT = 1e9;
+    const b = T.COL().find(b => !b.ns && b.maxY - b.minY >= 1.5 && b.minY <= .5 && b.maxX - b.minX >= 1 && b.maxZ - b.minZ >= 1); if (!b) throw new Error('sem caixa');
+    const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2, y = Math.max(0, b.minY); p.posAt -= 1e4; p.anom = null;
+    for (let i = 0; i < 3; i++) T.srvOnData(c, { t: 'pos', p: [cx, y, cz], y: 0, pi: 0 });
+    const r = { dentro: p.dentroN, by: { ...p.anom?.by }, pos: p.pos.slice() }; T.srvDrop(c); return r;
+  });
+  assert.equal(r.by['pos:dentro'], 1, JSON.stringify(r)); assert.ok(r.dentro >= 3);
+});
+
+test('R01 pos: flutuar sem apoio por mais de 1 s é recusado; pular não', async () => {
+  const r = await noJogo(J.page, T => {
+    const c = __entrar('Voador'), p = T.S.players.get(c.pid); for (const zz of T.Z.zs.values()) zz.atkT = 1e9;
+    T.sim(.2); const p0 = p.pos.slice(); p.anom = null;
+    T.srvOnData(c, { t: 'pos', p: [p0[0], p0[1] + 1.1, p0[2]], y: 0, pi: 0 }); T.sim(.3); T.srvOnData(c, { t: 'pos', p: [p0[0], p0[1] + .3, p0[2]], y: 0, pi: 0 }); T.sim(.3); T.srvOnData(c, { t: 'pos', p: p0, y: 0, pi: 0 }); // pulo: sobe e desce
+    const puloOk = !p.anom; p.anom = null;
+    for (let i = 0; i < 8; i++) { T.srvOnData(c, { t: 'pos', p: [p0[0], p0[1] + 1.6, p0[2]], y: 0, pi: 0 }); T.sim(.25); } // flutuando a 1,6 m por 2 s
+    const r = { puloOk, voo: p.anom?.by?.['pos:voo'] || 0, y: p.pos[1] - p0[1] }; T.srvDrop(c); return r;
+  });
+  assert.equal(r.puloOk, true); assert.ok(r.voo >= 1, JSON.stringify(r));
+});
+
+test('R03 zhit: explosão (sp) longe de qualquer impacto é recusada; perto de um zumbi acertado direto vale', async () => {
+  const r = await noJogo(J.page, T => {
+    if (T.S.phase === 'over' || T.Z.phase === 'over') T.srvStartMatch(); // os testes anteriores podem ter derrubado o host (fim de jogo): partida nova
+    if (T.Z.zs.size < 2) { if (T.Z.phase !== 'round') T.zStartRound(); T.sim(6); }
+    const p = T.S.players.get('h'), zs = [...T.Z.zs.values()]; if (zs.length < 2) throw new Error('precisa de 2 zumbis');
+    for (const zz of zs) zz.atkT = 1e9; p.alive = true; p.downed = false; p.hp = 100; const inv0 = { ...p.inv }; p.inv.primary = 'raygun';
+    const [z1, z2] = zs; T.sim(.6); __zumbiPerto(p, z1); z2.st = 'in'; z2.body.pos.set(p.pos[0] + 40, -30, p.pos[2]); z2.ph = []; p.anom = null; // sem sim depois de mover: o servidor recicla zumbi fora do mapa
+    const diag = { fase: T.S.phase, zfase: T.Z.phase, vivo: p.alive, caido: p.downed, inv: { ...p.inv }, zs: T.Z.zs.size, temZ2: T.Z.zs.has(z2.id), isW: !!T.W.raygun, pos: p.pos };
+    const hp2 = z2.hp; T.sendToHost({ t: 'zhit', v: z2.id, dmg: 100, z: 'body', w: 'raygun', sp: 1 }); const longe = { d: hp2 - z2.hp, by: { ...p.anom?.by }, diag };
+    T.sendToHost({ t: 'zhit', v: z1.id, dmg: 100, z: 'body', w: 'raygun' }); // direto, à vista
+    z2.body.pos.set(z1.body.pos.x + 1.5, 0, z1.body.pos.z); z2.ph = []; p.anom = null; const hp2b = z2.hp;
+    T.sendToHost({ t: 'zhit', v: z2.id, dmg: 100, z: 'body', w: 'raygun', sp: 1 }); const perto = { d: hp2b - z2.hp, by: { ...p.anom?.by } };
+    p.inv = inv0; return { longe, perto };
+  });
+  assert.equal(r.longe.d, 0); assert.equal(r.longe.by['zhit:sp'], 1, JSON.stringify(r));
+  assert.ok(r.perto.d > 0, JSON.stringify(r));
+});
+
+test('R06 expulsão: o expulso não volta nem com o mesmo nome sem token; outro nome entra', async () => {
+  const r = await noJogo(J.page, T => {
+    const tok = '9999abcd-4567-89ef-0123-456789abcdef', a = __entrar('Chato', { rk: tok }); window.__T.NET.conns.get(a.pid);
+    const antes = T.S.players.has(a.pid);
+    // srvKick é interno: reproduz o que o botão faz
+    const p = T.S.players.get(a.pid); (T.S.banidos ||= new Set()).add(p.chaveLeft); T.S.banidos.add('nome:' + p.nome0); T.srvDrop(a);
+    const b = __entrar('Chato'), bOk = !!b.pid, bErr = b.out.find(m => m.t === 'err')?.txt;
+    const c2 = __entrar('Chato', { rk: tok }), cOk = !!c2.pid;
+    const d = __entrar('Outro'), dOk = !!d.pid; if (dOk) T.srvDrop(d); T.S.banidos.clear();
+    return { antes, bOk, bErr, cOk, dOk };
+  });
+  assert.equal(r.antes, true); assert.equal(r.bOk, false); assert.match(r.bErr || '', /removido/); assert.equal(r.cOk, false); assert.equal(r.dOk, true);
+});
+
+test('R10 XP: fim de jogo com r absurdo mandado por um host editado dá no máximo o XP de 200 rodadas', async () => {
+  const r = await noJogo(J.page, T => { const d = T.PROF.data, c0 = d.cases, x0 = d.xp; T.onMsg({ t: 'zover', r: 1e9 }); T.ZC.over = false; return { caixas: d.cases - c0, xp: d.xp, x0 }; });
+  assert.ok(r.caixas <= 6, JSON.stringify(r));
+});
+
+test('F02 limitador: tipos de mensagem inventados caem num balde só e contam excesso', async () => {
+  const r = await noJogo(J.page, T => { const c = __entrar('Inventor'); for (let i = 0; i < 300; i++) T.srvOnData(c, { t: 'tipo' + i }); const r = { baldes: Object.keys(c.taxa).length, excesso: c.excesso }; T.srvDrop(c); return r; });
+  assert.ok(r.baldes <= 2, JSON.stringify(r)); assert.ok(r.excesso > 200);
+});
+
 test('V19 suicide: jogador caído não pula o sangramento', async () => {
   const r = await noJogo(J.page, T => { const p = T.S.players.get('h'); p.alive = true; p.downed = true; T.sendToHost({ t: 'suicide' }); const vivo = p.alive; p.downed = false; p.hp = 100; return vivo; });
   assert.equal(r, true);
