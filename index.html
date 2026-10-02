@@ -651,10 +651,11 @@ MAPS.porto = {
   },
 };
 
-// ---------- mapa do modo Rodadas (bomba): Poeira, do tamanho do Dust 2 e com as mesmas rotas e ângulos ----------
-// Planta em grade de 4 m: '#' parede, 'r' túnel com teto, 'p' passarela elevada (curto do A), 's' escada. Norte (z negativo) = defesa.
+// ---------- mapas do modo Rodadas inspirados no CS (Dust 2, Mirage, Inferno): bombs fechados, com 2 ou 3 entradas estreitas ----------
+// Planta em grade de 3 m. '#' parede, 'r' passagem com teto, 'c' caixa grande, 'k' mureta, 'x' caixa pequena,
+// A/B chão dos bombs, T/C bases do ataque e da defesa. Norte (z negativo) = defesa.
 function gridBoxes(rows, cell, x0, z0) { // junta células iguais vizinhas em retângulos (menos caixas)
-  const out = [], H = { '#': [6, 0, 'wall'], r: [.6, 3.4, 'roof'], p: [1, 0, 'plat'] }, used = rows.map(r => [...r].map(() => false));
+  const out = [], H = { '#': [6, 0, 'wall'], r: [.6, 3.4, 'roof'], c: [2.2, 0, 'crate'], k: [1.1, 0, 'stone'] }, used = rows.map(r => [...r].map(() => false));
   for (let r = 0; r < rows.length; r++) for (let c = 0; c < rows[r].length; c++) {
     const ch = rows[r][c], h = H[ch]; if (!h || used[r][c]) continue;
     let w = 1; while (rows[r][c + w] === ch && !used[r][c + w]) w++;
@@ -664,55 +665,131 @@ function gridBoxes(rows, cell, x0, z0) { // junta células iguais vizinhas em re
   }
   return out;
 }
-const POEIRA = [
-    '############################',
-    '#.......####...............#',
-    '#.......####...............#',
-    '#.......####.......#.......#',
-    '#.......####.......#.......#',
-    '#..................#.......#',
-    '#.......#..................#',
-    '#.......####...............#',
-    '##...#######....#pp###.....#',
-    '##...########..##pp###.....#',
-    '##...#######....#pp###.....#',
-    '##...#######....#pp###.....#',
-    '##...#######.....ss###.....#',
-    '##...#######.....ss###.....#',
-    '##...#######....######.....#',
-    '##...#######....######.....#',
-    '##...#######....######.....#',
-    '##rrrrrrrrrr....######.....#',
-    '##rrr#######....######.....#',
-    '##rrr#######....######.....#',
-    '##rrr#######....######.....#',
-    '##rrr#######....######.....#',
-    '##rrr#######....########.###',
-    '##rrrrrrr###....#..........#',
-    '##rrrrrrr###....#..........#',
-    '##rrrrrrr..................#',
-    '##rrrrrrr.........##########',
-    '#########.........##########',
-    '#########.........##########',
-    '############################'];
-MAPS.poeira = {
-  name: 'Poeira', desc: 'grande, no tamanho do Dust 2: long, curto, meio com portas, túneis e bombs A e B', w: 112, d: 120, sky: 0xbcd4e6, skyTop: 0x4a86c8, fogC: 0xe6d6b4, fog: [80, 230], bomb: 1,
-  theme: { floor: ['sand', 0xd9c08c], wall: ['brick', 0xd8bb8c], crate: ['crate', 0xb07d45], stone: ['concrete', 0xcbb48a], plat: ['concrete', 0xb9a47c], roof: ['wood', 0x6b4a2e], container: ['container', 0x2d6fa8], metal: ['metal', 0x7a2a20], wood: ['wood', 0x7a5a38] },
-  sites: { A: [28, 48, -52, -34], B: [-50, -28, -52, -34] },
-  boxes: () => [floor(112, 120), ...gridBoxes(POEIRA, 4, -56, -60), ...stairs(16, -5, 0, -1, 4, 1, 2, 8, 'plat'),
-    B(38, -44, 3, 3, 2.2, 'crate'), B(35.6, -42.2, 1.4, 1.4, 1.1, 'crate'), B(30, -52, 1.6, 1.6, 1.6, 'crate'), B(30, -52, 1.3, 1.3, 1.3, 'crate', 1.6), B(49, -50, 1, 8, 1.3, 'stone'), B(46, -31, 4.5, 2, 1.5, 'metal', 0, 0x2a5a8a), B(26, -40, 1.2, 4, 1.1, 'stone'), // bomb A
-    B(46, 4, 2.5, 6, 2.6, 'container'), B(36, 14, 1.6, 1.6, 1.6, 'crate'), B(48, -14, 2, 2, 2, 'crate'), B(36, -18, 4, 1, 1.2, 'stone'), B(50, 20, 1.6, 1.6, 1.1, 'crate'), // long
-    B(30, 36, 2, 2, 2, 'crate'), B(46, 36, 1.6, 1.6, 1.1, 'crate'), B(20, 42, 3, 1, 1.2, 'stone'), B(40.5, 30, .3, 4, 3, 'wood'), // fora do long e portas do long
-    B(-2, -2, 2.2, 2.2, 1.7, 'crate'), B(5, 22, 3, 1, 1.1, 'stone'), B(-6, 10, 1.4, 1.4, 1.4, 'crate'), B(-3, -21, 2, .3, 3, 'wood'), // meio (caixa do meio, portas do meio)
-    B(-14, -32, 2, 2, 2, 'crate'), B(-12.4, -30.6, 1.2, 1.2, 1.2, 'crate'), B(12, -36, 1.6, 1.6, 1.6, 'crate'), B(4, -43.5, 4, 1, 1.2, 'stone'), B(17, -54, 2, 2, 2, 'crate'), // meio da defesa e base
-    B(-38, -44, 4, 4, 2.4, 'crate'), B(-35.4, -41.6, 1.4, 1.4, 1.1, 'crate'), B(-48, -52, 6, 5, 1, 'stone'), B(-30, -34, 2, 4.5, 1.4, 'metal'), B(-46, -34, 1.6, 1.6, 1.6, 'crate'), B(-26, -52, 1.6, 1.6, 1.1, 'crate'), // bomb B
-    B(-40, 0, 1.6, 1.6, 1.6, 'crate'), B(-44, -16, 2, 2, 1.1, 'crate'), B(-30, 44, 2, 2, 2, 'crate'), B(-22, 10, 1.4, 1.4, 1.4, 'crate'), B(-44, 26, 1.4, 1.4, 1.4, 'crate'), // túneis
-    B(-12, 46, 2, 2, 2, 'crate'), B(10, 55, 3, 1, 1.2, 'stone'), B(-2, 44, 1.6, 1.6, 1.6, 'crate'), // base do ataque
-  ],
-  spawns: [[-8, 50], [-4, 50], [0, 50], [4, 50], [-6, 53], [-2, 53], [2, 53], [6, 53]],
-  spawnsB: [[0, -50], [4, -50], [8, -50], [12, -50], [2, -47], [6, -47], [10, -47], [14, -47]],
-  build: MAPS.porto.build,
-};
+function gridMap(rows, cell, meta) {
+  const n = rows.length, m = rows[0].length, w = m * cell, d = n * cell, x0 = -w / 2, z0 = -d / 2, sites = {}, sp = { T: [], C: [] }, xs = [];
+  rows.forEach((row, r) => [...row].forEach((ch, c) => {
+    const x = x0 + (c + .5) * cell, z = z0 + (r + .5) * cell;
+    if (ch === 'A' || ch === 'B') { const s = sites[ch] || (sites[ch] = [x, x, z, z]); s[0] = Math.min(s[0], x); s[1] = Math.max(s[1], x); s[2] = Math.min(s[2], z); s[3] = Math.max(s[3], z); }
+    else if (sp[ch]) sp[ch].push([x, z]);
+    else if (ch === 'x') xs.push(B(x, z, 1.5, 1.5, 1.4, 'crate'));
+  }));
+  for (const s of Object.values(sites)) { s[0] -= cell / 2; s[1] += cell / 2; s[2] -= cell / 2; s[3] += cell / 2; }
+  return { w, d, bomb: 1, sites, spawns: sp.T, spawnsB: sp.C, build: MAPS.porto.build, boxes: () => [floor(w, d), ...gridBoxes(rows, cell, x0, z0), ...xs], ...meta };
+}
+MAPS.duna = gridMap([
+    '####################################',
+    '##############..CCCCCC..############',
+    '##kkBBBBBBB###..CCCCCC..##AAAAAAAA##',
+    '##BBBBBBBxB###............AAxAAAxA##',
+    '##BBBccBBBB###......x.....AAAAAAAA##',
+    '##BBBccBBBB###..........##AAAccAAA##',
+    '##BBBBBBBBB.......########AAAccAAA##',
+    '##BBBBBBxBB.......########AAAAAAAA##',
+    '##BxBBBBBkB##.....########AxAAAAAk##',
+    '##BBBBBBBkB##.x...########AAAAAAAk##',
+    '#####..######.....####....AAAAAAAA##',
+    '#####..######.....####....#####..###',
+    '####rrr######.....####..#######..###',
+    '####rrr######.....####..#####.....##',
+    '####rrr#########..####..#####.....##',
+    '####rrr########....###..#####x....##',
+    '####rxr########.........#####.....##',
+    '####rrr########.........#####.....##',
+    '####rrr########....##########...cc##',
+    '####rrrrrrrrrrr....##########...cc##',
+    '####rrrrrrrrrrr....##########.....##',
+    '####rrr########.c..##########.....##',
+    '####rrr########....##########.x...##',
+    '####rrr########....##########.....##',
+    '####rrr########....##########.....##',
+    '####rrr########..k.###########..####',
+    '####rrr########....###............##',
+    '####rrrrrrr####....###....x.......##',
+    '####rrrrrrr####....###............##',
+    '####rrrrrrr............#############',
+    '####rrrrrrr..x.........#############',
+    '###########...TTTTTT...#############',
+    '###########...TTTTTT.x.#############',
+    '###########............#############',
+    '####################################',
+    '####################################'], 3, { name: 'Duna', desc: 'como o Dust 2: long, curto, meio com portas e túneis até o B',
+  sky: 0xbcd4e6, skyTop: 0x4a86c8, fogC: 0xe6d6b4, fog: [70, 210], theme: { floor: ['sand', 0xd9c08c], wall: ['brick', 0xd8bb8c], crate: ['crate', 0xb07d45], stone: ['concrete', 0xcbb48a], roof: ['wood', 0x6b4a2e] } });
+MAPS.miragem = gridMap([
+    '####################################',
+    '########......CCCCCC...#############',
+    '########..x...CCCCCCx..#############',
+    '########...............#############',
+    '######....######..####.AAAAAAAAAA###',
+    '######....####......##.AAAAAAAAxA###',
+    '######....####......###AAAAAAAAAA###',
+    '######....####......###AAAAccAAAA###',
+    '##kkBBBBBBB###......###AAAAccAAA.rr#',
+    '##BBBBBBxBB###......###AAAAAAAAA.rr#',
+    '##BBBBBBBBB###.........AkkAAAAxAArr#',
+    '##BBBccBBBB###.........AAAAAAAAAArr#',
+    '##BBBccBBBB###....x..######...###rr#',
+    '##BBBBBBBBB..........######...###rr#',
+    '##BxBBBBBxB..........######...###rr#',
+    '##BBBBBBBBB###......#######...###rr#',
+    '####rr########..kk..#######.x.###rr#',
+    '####rr########......#######...###rr#',
+    '####rr########......#######...###rr#',
+    '####rr########......#######...###rr#',
+    '####rr########.x....#######...###rr#',
+    '####rr########......#####.......#.##',
+    '####rr########......#####.......#.##',
+    '####rr#######..........#........#.##',
+    '####rr#######..........#..........##',
+    '####rr######...............#########',
+    '##rrrrrrrrrr.............###########',
+    '##rrrrrrrrrr.............###########',
+    '##rrrrrxrrrr.............###########',
+    '##rrrrrrrrrr.............###########',
+    '##rrrrrrrrrr...TTTTTT....###########',
+    '############...TTTTTT....###########',
+    '############...TTTTTT....###########',
+    '############.............###########',
+    '####################################',
+    '####################################'], 3, { name: 'Miragem', desc: 'como a Mirage: palácio, rampa e conector no A; apartamentos, mercado e curto no B',
+  sky: 0xb8d2ea, skyTop: 0x3f7cc0, fogC: 0xead8c0, fog: [70, 210], theme: { floor: ['tile', 0xc9b79a], wall: ['plaster', 0xe0c9a6], crate: ['crate', 0xb58450], stone: ['concrete', 0xbfae94], roof: ['wood', 0x7a5236] } });
+MAPS.vilarejo = gridMap([
+    '####################################',
+    '#############.CCCCCC..##############',
+    '##BBBBBBBBBB#.CCCCCC..##############',
+    '##BxBBBBBBBB#.....x.....AAAAAAAAAA##',
+    '##BBBBBBBxBB............AxAAAAAAAA##',
+    '##BBBBccBBBB..........##AAAAAAAAxA##',
+    '##BBBBccBBBB#.........##AAAAAAAAAA##',
+    '##BBBBBBBBBB############AAAAAccAAA##',
+    '##BBBBBBBBkk############AAAAAccAAA##',
+    '##BBxBBBBBBB############AkAAAAAAAA##',
+    '##BBBBBBBBBB############AkAxAAAAAA##',
+    '######...#############..AAAAAAAAAA##',
+    '######...########.......###..#######',
+    '######..x########.....#####..#######',
+    '######...########.....####rrrrr#####',
+    '######...########.....####rrrrr#####',
+    '######.k.########.....####rrrrr#####',
+    '######...########..x......rrrrr#####',
+    '######...########.........rrrrr#####',
+    '######...########.........rrrrr#####',
+    '######x..########.....####rrxrr#####',
+    '######...########.....####rrrrr#####',
+    '######...########...x.####rrrrr#####',
+    '######...########.....####rrrrr#####',
+    '######...########.....####rrrrr#####',
+    '#####..........................#####',
+    '#####..........x...............#####',
+    '#####..........................#####',
+    '#####.................##############',
+    '####.............###################',
+    '####.............###################',
+    '####..TTTTTTTT...###################',
+    '####..TTTTTTTT...###################',
+    '####.............###################',
+    '####################################',
+    '####################################'], 3, { name: 'Vilarejo', desc: 'como a Inferno: banana até o B; arco, apartamentos e curto até o A',
+  sky: 0xa9c8e4, skyTop: 0x3a78c0, fogC: 0xd9cdb8, fog: [60, 190], theme: { floor: ['asphalt', 0x8a8378], wall: ['brick', 0xb4785a], crate: ['crate', 0xa87a48], stone: ['rock', 0x9a948a], roof: ['wood', 0x5e4630] } });
 
 // ---------- mapa do modo zumbis: Sanatório ----------
 // Quinze alas (A = inicial): o núcleo de seis cômodos e alas novas em volta. Janelas nas paredes externas são por onde os zumbis entram.
@@ -8197,7 +8274,7 @@ function matchForm(el, st0) {
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, t]) => `<button type="button" data-k="${k}" data-v="${v}"${String(st[k]) === String(v) ? ' class="on"' : ''}>${t}</button>`).join('')}</div>`;
   const MODES = [['rounds', 'Rodadas', 'Estilo CS: ataque x defesa, plantar e desarmar a bomba'], ['dm', 'Mata-mata', 'Renasce na hora, tudo grátis'], ['zombies', 'Zumbis', 'Cooperativo até 4, estilo CoD']];
   const render = () => {
-    if (st.mode === 'rounds' && !MAPS[st.map]?.bomb) st.map = 'poeira'; // rodadas: só mapa com bombs
+    if (st.mode === 'rounds' && !MAPS[st.map]?.bomb) st.map = 'duna'; // rodadas: só mapa com bombs
     const z = st.mode === 'zombies', cur = z ? st.zmap : st.map;
     const maps = Object.entries(MAPS).filter(([, m]) => !!m.zonly === z && (st.mode !== 'rounds' || m.bomb));
     const opts = z
