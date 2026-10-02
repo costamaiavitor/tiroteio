@@ -180,7 +180,7 @@ Armas e facas:
 - MP5K: [Low-Poly HK MP5K](https://sketchfab.com/3d-models/low-poly-hk-mp5k-091b4f73c00b4605b754f5c0b3fcdd26), de [TastyTony](https://sketchfab.com/TastyTony)
 - Olympia: [Double Barrel Shotgun](https://sketchfab.com/3d-models/double-barrel-shotgun-04741a40f2224cffafc343b0236d5bbe), de [Sebastian Kansik](https://sketchfab.com/Pepego)
 - P250: [Low-Poly Sig P226](https://sketchfab.com/3d-models/low-poly-sig-p226-0d90f858e9f74c418ce3aae61cef9f4e), de [TastyTony](https://sketchfab.com/TastyTony)
-- P90: [Low-Poly FN P90](https://sketchfab.com/3d-models/low-poly-fn-p90-96b61ebbbf154843b621ebf7f48647fc), de [TastyTony](https://sketchfab.com/TastyTony)
+- P90: [Modular P90 Tactical](https://sketchfab.com/3d-models/modular-p90-tactical-080897fc0366455884b1a916684313fe), de [doomsentinel](https://sketchfab.com/doomsentinel)
 - Python: [GameReady: Colt Python Revolver](https://sketchfab.com/3d-models/gameready-colt-python-revolver-3def6e3980e64dfa832f298004ce1b94), de [HYQQM](https://sketchfab.com/HYQQM)
 - Ray Gun: [Ray Gun v1](https://sketchfab.com/3d-models/ray-gun-v1-fbbb221cb97f4e92a898e9b704e2c774), de [dev-shawn](https://sketchfab.com/dev-shawn)
 - RPK: [Low-Poly RPK](https://sketchfab.com/3d-models/low-poly-rpk-acdc6fe399514c41aa4130f8044875fb), de [TastyTony](https://sketchfab.com/TastyTony)
