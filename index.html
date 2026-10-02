@@ -2711,7 +2711,7 @@ const FPM = {
   mp5: { T: [.018, -.02, null], fwd: '+x', up: '+y', L: .70 },
   mp5k: { T: [.15, -.17, null], fwd: '+x', up: '+y', L: .325 },
   mp40: { T: [-33.4, 2, null], fwd: '+x', up: '+y', L: .833 },
-  p90: { T: [12.5, -17.3, null], fwd: '+x', up: '+y', L: .50, vo: [.03, -.03, -.14], ve: [.22, -.05, .05], lhf: .38 }, // bullpup alto: mais longe e virada para mostrar o lado
+  p90: { T: [12.5, -17.3, null], fwd: '+x', up: '+y', L: .50, vo: [.02, -.07, -.1], ve: [.1, .3, 0], lhf: .12 }, // mão esquerda no laço da frente, logo à frente do gatilho // bullpup alto: mais longe e virada para mostrar o lado
   ak74u: { T: [-115, 23, null], fwd: '+x', up: '+y', L: .73 },
   galil: { T: [-130, 39, null], fwd: '+x', up: '+y', L: .98 },
   rpk: { T: [-116, 20, null], fwd: '+x', up: '+y', L: 1.04 },
@@ -3084,7 +3084,7 @@ function knBuild(kind, ud, skin) {
   const g = FPC[key], root = SkeletonUtils.clone(g.scene), K = FPKNIFE, F = K.fit[kind], D = FPKN[kind];
   const all = g.animations[0], mixer = new THREE.AnimationMixer(root), clips = {};
   for (const [n, [a, b]] of Object.entries(K.clips)) clips[n] = THREE.AnimationUtils.subclip(all, n, a, b, 30);
-  root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; if (/arm/i.test(o.material.name)) { const tx = knArmsTex(o.material.map); if (tx) o.material.map = tx; } } });
+  root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; if (/arm/i.test(o.material.name)) { const tx = knArmsTex(o.material.map); if (tx) o.material.map = tx; Object.assign(o.material, { metalness: 0, roughness: .85 }); } } });
   // faca do jogo no nó da faca do pacote
   const node = root.getObjectByName('knife'); node.traverse(o => { if (o.isMesh) o.visible = false; });
   const ms = FPC[mk].scene.clone(true); ms.updateMatrixWorld(true);
