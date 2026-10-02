@@ -172,11 +172,13 @@ test('mata-mata: hit em bot aplica o dano e kill soma abate', { timeout: 120000 
     const h = T.S.players.get('h'), bot = [...T.S.players.values()].find(p => p.isBot);
     T.sim(1);
     bot.hp = 100; bot.armor = 0; bot.alive = true;
+    bot.pos = [h.pos[0] + 1.5, h.pos[1], h.pos[2]]; bot.ph = []; // desde a fase 2 o host exige linha de visão: o bot fica ao lado do host
     T.sendToHost({ t: 'hit', v: bot.id, dmg: 30, z: 'body', w: 'ak47' }); const hp1 = bot.hp;
-    T.sendToHost({ t: 'hit', v: bot.id, dmg: 1e6, z: 'body', w: 'ak47' });
-    return { hp1, viva: bot.alive, kills: h.kills, bots: [...T.S.players.values()].filter(p => p.isBot).length, fase: T.S.phase };
+    T.sendToHost({ t: 'hit', v: bot.id, dmg: 1e6, z: 'body', w: 'ak47' }); const hp2 = bot.hp; // fase 2: um tiro vale no máximo o teto da arma (36 × 1,1)
+    for (let i = 0; i < 3; i++) T.sendToHost({ t: 'hit', v: bot.id, dmg: 36, z: 'body', w: 'ak47' });
+    return { hp1, hp2, viva: bot.alive, kills: h.kills, bots: [...T.S.players.values()].filter(p => p.isBot).length, fase: T.S.phase };
   });
   assert.equal(r.bots, 2); assert.equal(r.fase, 'live');
-  assert.equal(r.hp1, 70); assert.equal(r.viva, false); assert.equal(r.kills, 1);
+  assert.equal(r.hp1, 70); assert.equal(r.hp2, 30); assert.equal(r.viva, false); assert.equal(r.kills, 1);
   assert.deepEqual(J.erros, []);
 });

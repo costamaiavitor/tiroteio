@@ -5280,16 +5280,76 @@ function srvDrop(conn) {
 const vec3 = a => Array.isArray(a) && a.length === 3 && a.every(x => typeof x === 'number' && Number.isFinite(x) && Math.abs(x) < 1e4);
 const finN = v => typeof v === 'number' && Number.isFinite(v);
 const isW = k => typeof k === 'string' && Object.hasOwn(W, k);
+// ---------- Conferência do que chega dos clientes (anti-trapaça) ----------
+// O cliente decide o próprio movimento e os próprios acertos; o host confere a plausibilidade com folga para a rede
+// (ping de uns 300 ms e soluços de 1,5 s passam inteiros). Mensagem implausível é ignorada em silêncio e vira um
+// ponto de anomalia do jogador (srvAnom); nada é "corrigido" (puxar a posição de volta puniria quem tem lag).
+const VAL = {
+  vRef: 10, vRefZ: 14,    // m/s médios permitidos no plano (CS: corrida 6,4; Zumbis: deslize a 9,5 e corrida com Stamin-Up a 7,9)
+  rajada: 1.5,            // segundos de movimento que podem chegar de uma vez (mensagens represadas por um soluço)
+  vSobe: 8, sobeMax: 12,  // subida: pulo chega a 1,2 m; rampas e escadas correndo ficam abaixo de 8 m/s
+  histS: .4, histN: 14,   // posições recentes da vítima que valem para a linha de visão (o atacante mira no que viu, ~100–300 ms atrás)
+  faca: 4.5, alcance: 260, // alcance da facada (com o bote e o deslocamento do alvo) e teto absoluto de um tiro (o cliente traça até 250 m)
+  anomDecai: 30, anomAviso: 5, anomJanela: 60, anomSuspeito: 20, // 1 ponto some a cada 30 s; aviso ao host com 5 (no máximo 1/min); 20 marca o jogador como suspeito
+};
+function srvAnom(p, k) {
+  const a = (p.anom ||= { n: 0, by: {}, t: now, avisoT: -1e9 });
+  a.n = Math.max(0, a.n - (now - a.t) / VAL.anomDecai); a.t = now; a.n++; a.by[k] = (a.by[k] || 0) + 1;
+  if (a.n >= VAL.anomSuspeito) p.suspeito = true;
+  if (a.n >= VAL.anomAviso && now - a.avisoT >= VAL.anomJanela) {
+    a.avisoT = now; const det = Object.entries(a.by).map(([k, n]) => k + ' ×' + n).join(', ');
+    console.info('[anti-trapaça]', p.name, det); sendTo('h', { t: 'info', txt: `${p.name}: mensagens fora do esperado (${det})` });
+  }
+}
+// balde de fichas: uma ficha a cada 'gap' s, guarda até 'tg' × max(3, 1/gap) fichas (tiros que chegam juntos depois de um soluço valem)
+function fichaOk(tb, key, gap, tg = 1) {
+  const B = tg * Math.max(3, 1 / gap), b = tb[key] || (tb[key] = { n: B, t: now });
+  b.n = Math.min(B, b.n + (now - b.t) * tg / gap); b.t = now; if (b.n < 1) return false; b.n--; return true;
+}
+const armaIv = (w, wd) => w === 'knife' ? .5 : wd.burst ? (wd.rate + (wd.burst - 1) * wd.brate) / wd.burst : (wd.rate || .1); // intervalo médio entre tiros (rajada: média da rajada + pausa)
+const temArma = (p, w) => w === 'knife' || p.inv.primary === w || p.inv.secondary === w || p.inv.third === w;
+// teto de dano de um tiro (mesma conta que o cliente faz, com 10 % de folga): dano × zona × bagos
+function tetoDano(w, wd, zone) { if (w === 'knife') return 180; return (wd.dmg || 0) * (zone === 'head' ? Math.max(wd.head || 4, 1) : zone === 'legs' ? .75 : 1) * (wd.pellets || 1) * 1.1; }
+const olhoDe = p => new V3(p.pos[0], p.pos[1] + (p.crouch ? EYE_CROUCH : EYE_STAND), p.pos[2]);
+function visaoLivre(a, b) { // só o cenário (a fumaça não bloqueia o tiro no cliente, então não bloqueia aqui)
+  const d = b.clone().sub(a), dist = d.length(); if (dist < .01) return true; d.divideScalar(dist);
+  for (const bx of COL) { if (bx.ns) continue; const h = rayBox(a, d, bx, dist); if (h && h.t < dist - .05) return false; }
+  return true;
+}
+const _vv = new V3();
+// o atacante vê a vítima? Testa cabeça, tronco, pernas e as laterais do tronco, na posição atual e nas recentes
+function veJogador(p, v) {
+  const o = olhoDe(p), s = v.crouch ? .69 : 1, pts = [[1.64 * s, 0, 0], [1.15 * s, 0, 0], [.42 * s, 0, 0], [1.15 * s, .3, 0], [1.15 * s, -.3, 0], [1.15 * s, 0, .3], [1.15 * s, 0, -.3]];
+  const lista = [v.pos]; for (const h of v.ph || []) if (now - h.t <= VAL.histS) lista.push(h.p);
+  for (const vp of lista) for (const [dy, dx, dz] of pts) if (visaoLivre(o, _vv.set(vp[0] + dx, vp[1] + dy, vp[2] + dz))) return true;
+  return false;
+}
+// posição nova plausível? Balde de distância no relógio do host (rajadas) ou velocidade média desde a última aceita (soluço longo)
+function posPlausivel(p, np) {
+  const z = S.st.mode === 'zombies', vRef = z ? VAL.vRefZ : VAL.vRef, cap = vRef * VAL.rajada;
+  const b = (p.pb ||= { d: cap, v: VAL.sobeMax, t: now }), dt = Math.max(0, now - b.t), desde = Math.max(0, now - (p.posAt ?? now)); b.t = now;
+  b.d = Math.min(cap, b.d + vRef * dt); b.v = Math.min(VAL.sobeMax, b.v + VAL.vSobe * dt);
+  const dh = Math.hypot(np[0] - p.pos[0], np[2] - p.pos[2]), dv = np[1] - p.pos[1];
+  if (dh > b.d && dh > vRef * desde) return 'pos:veloc';
+  if (dv > b.v && dv > VAL.vSobe * desde) return 'pos:sobe';
+  if (z && Z.on && ffCell(np[0], np[2]) < 0) return 'pos:fora'; // fora da grade do mapa zumbi
+  b.d = Math.max(0, b.d - dh); if (dv > 0) b.v = Math.max(0, b.v - dv);
+  return null;
+}
 function srvHandle(pid, m) {
   const p = S.players.get(pid); if (!p || !m) return;
   switch (m.t) {
-    case 'pos':
+    case 'pos': {
       if (!p.alive || !vec3(m.p) || !finN(m.y) || !finN(m.pi)) return;
       if (m.sq !== undefined && p.sq && m.sq !== p.sq) return; // posição de antes do último spawn (desfazia o teleporte do começo da rodada)
-      if (m.ts && m.ts < (p.posTs || 0)) return; const ts0 = p.posTs || 0; p.posTs = m.ts || 0; // canal sem ordem: ignora posição velha
-      { const dt = finN(m.ts) && ts0 > 0 ? m.ts - ts0 : now - (p.posAt || now); if (dt > 0 && Math.hypot(m.p[0] - p.pos[0], m.p[2] - p.pos[2]) / Math.max(.02, dt) > 3.5) p.fastT = now; p.posAt = now; } // última vez que andou rápido (o PhD confere o deslize), no relógio de quem mandou: rede com soluços não engana
+      const ts = finN(m.ts) && m.ts > 0 ? m.ts : 0; if (ts && ts < (p.posTs || 0)) return; const ts0 = p.posTs || 0; // canal sem ordem: ignora posição velha (ts inválido conta como 0)
+      const motivo = posPlausivel(p, m.p); if (motivo) { srvAnom(p, motivo); return; } // teleporte, voo ou fora do mapa: ignora (ver VAL)
+      p.posTs = ts;
+      { const real = now - (p.posAt ?? now), dt = ts && ts0 > 0 ? Math.min(ts - ts0, real * 1.5 + .05) : real; if (dt > 0 && Math.hypot(m.p[0] - p.pos[0], m.p[2] - p.pos[2]) / Math.max(.02, dt) > 3.5) p.fastT = now; p.posAt = now; } // última vez que andou rápido (o PhD confere o deslize), no relógio de quem mandou (rede com soluços não engana), preso a 1,5× o tempo real (relógio esticado não esconde velocidade)
+      (p.ph ||= []).push({ t: now, p: p.pos }); if (p.ph.length > VAL.histN) p.ph.shift(); // posições recentes (linha de visão dos tiros dos outros)
       p.pos = m.p; p.yaw = m.y; p.pitch = m.pi; p.crouch = m.c ? 1 : 0; p.w = isW(m.w) ? m.w : p.w;
-      broadcastFast({ t: 'pos', id: pid, p: m.p, y: m.y, pi: m.pi, c: p.crouch, w: p.w, d: p.downed ? 1 : 0, ts: finN(m.ts) ? m.ts : 0, sq: p.sq }, pid); break;
+      broadcastFast({ t: 'pos', id: pid, p: m.p, y: m.y, pi: m.pi, c: p.crouch, w: p.w, d: p.downed ? 1 : 0, ts, sq: p.sq }, pid); break;
+    }
     case 'shot': {
       if (!vec3(m.o) || !isW(m.w)) return;
       const e = (Array.isArray(m.e) ? m.e : []).slice(0, 12).filter(vec3);
@@ -5304,12 +5364,11 @@ function srvHandle(pid, m) {
       const cap = (wd.thunder ? 1e7 : w === 'knife' ? (p.bowie ? 1000 : 150) : (wd.dmg || 0) * Math.max(wd.head || 4, 1) * (wd.pellets || 1) * 1.1 + (wd.splash?.dmg || 0)) * (p.perks.includes('ds') && w !== 'knife' ? 1.5 : 1); // Deadshot: headshot +50%
       if (w === 'knife' && Math.hypot(z.body.pos.x - p.pos[0], z.body.pos.z - p.pos[2]) > 4.5 + Math.min(2.5, z.speed * .4)) return; // facada (com o bote) alcança uns 3,4 m, mais o que o zumbi andou desde o golpe
       p.shotT = now; // atirou de verdade (Electric Cherry confere)
-      const iv = w === 'knife' ? .5 : wd.burst ? (wd.rate + (wd.burst - 1) * wd.brate) / wd.burst : (wd.rate || .1); // intervalo médio entre tiros (rajada: média da rajada + pausa)
-      const gap = wd.thunder ? 0 : iv * .6; // Double Tap = 0,75 da cadência
-      if (gap) { const B = Math.max(3, 1 / gap), tb = (z.tb ||= {}), b = tb[pid] || (tb[pid] = { n: B, t: now }); b.n = Math.min(B, b.n + (now - b.t) / gap); b.t = now; if (b.n < 1) return; b.n--; } // folga de 0,5 s: tiros que chegam juntos depois de um soluço da rede valem
+      const iv = armaIv(w, wd), gap = wd.thunder ? 0 : iv * .6; // Double Tap = 0,75 da cadência
+      if (gap && !fichaOk(z.tb ||= {}, pid, gap)) return; // por zumbi; folga de 0,5 s: tiros que chegam juntos depois de um soluço da rede valem
       { // limite de alvos por tiro, somando todos os zumbis: cada arma acerta no máximo tg zumbis por disparo (bala 1, escopeta 1 por bago, explosão/cone mais)
-        const tg = wd.thunder ? 48 : wd.frost ? wd.frost.n : (wd.pellets || 1) + (wd.splash ? 24 : 0), g2 = iv * .6, B = tg * Math.max(3, 1 / g2), wb = (p.wb ||= {}), b = wb[w] || (wb[w] = { n: B, t: now });
-        b.n = Math.min(B, b.n + (now - b.t) * tg / g2); b.t = now; if (b.n < 1) return; b.n--;
+        const tg = wd.thunder ? 48 : wd.frost ? wd.frost.n : (wd.pellets || 1) + (wd.splash ? 24 : 0);
+        if (!fichaOk(p.wb ||= {}, w, iv * .6, tg)) return;
       }
       zHit(p, z.id, clamp(+m.dmg || 0, 0, cap), m.z === 'head' || m.z === 'legs' ? m.z : 'body', w, !!m.sp);
       if (wd.frost && +m.dmg > 0 && Z.zs.has(z.id)) zFreeze(z, wd); // sobreviveu ao gelo: fica lento
@@ -5321,11 +5380,20 @@ function srvHandle(pid, m) {
     case 'selfdmg': if (S.st.mode === 'zombies' && Z.on && !p.perks.includes('phd')) zHurt(p, clamp(+m.d || 0, 0, 100), null); break; // PhD Flopper: explosão não machuca
     case 'zfx': if (S.st.mode === 'zombies' && Z.on) srvZFx(p, m); break;
     case 'zclay': if (S.st.mode === 'zombies' && Z.on) srvZClay(p, m); break;
-    case 'hit':
+    case 'hit': {
       if (S.st.mode === 'zombies') return; // sem fogo amigo no cooperativo
       if (!p.alive && now - p.diedAt > .6) return; // tiro dado antes de saber que morreu (com TURN o ping passa de 300 ms)
-      if (S.phase === 'freeze' || m.v === pid) return;
-      srvDamage(m.v, pid, clamp(+m.dmg || 0, 0, 500), m.z, isW(m.w) ? m.w : 'glock'); break;
+      if (S.phase === 'freeze' || S.phase === 'end' || S.phase === 'over' || m.v === pid) return; // fora da rodada as armas não disparam
+      // o cliente decide o acerto, mas o host confere: arma que ele tem, teto de dano da arma, cadência e linha de visão
+      // (antes, {dmg:500, z:'head'} em qualquer jogador do mapa, a cada mensagem, matava a sala inteira sem apontar)
+      const w = isW(m.w) && temArma(p, m.w) ? m.w : null; if (!w) return srvAnom(p, 'hit:arma');
+      const wd = W[w], v = S.players.get(m.v); if (!v || !v.alive) return;
+      const zone = m.z === 'head' || m.z === 'legs' ? m.z : 'body';
+      if (!fichaOk(p.hb ||= {}, w, armaIv(w, wd) * .6)) return srvAnom(p, 'hit:cadencia'); // 0,6 da cadência: Double Tap e folga de rede
+      const dist = Math.hypot(v.pos[0] - p.pos[0], v.pos[1] - p.pos[1], v.pos[2] - p.pos[2]);
+      if (w === 'knife' ? dist > VAL.faca : dist > VAL.alcance || !veJogador(p, v)) return srvAnom(p, 'hit:visao');
+      srvDamage(m.v, pid, clamp(+m.dmg || 0, 0, tetoDano(w, wd, zone)), zone, w); break;
+    }
     case 'bomb': { // segurando E: planta (ataque, com a bomba, dentro do bomb) ou desarma (defesa, perto da bomba plantada)
       if (!isR() || !p.alive || S.phase !== 'live' || !S.bomb) return;
       if (!m.on) { p.act = null; return; }
@@ -5373,7 +5441,7 @@ function pickSpawn(side, taken) {
   return best;
 }
 function srvSpawn(p, s, refill, yawSet) {
-  p.alive = true; p.hp = 100; p.pos = [s[0], s[1], s[2]]; p.sq = (p.sq | 0) + 1; p.posTs = 0;
+  p.alive = true; p.hp = 100; p.pos = [s[0], s[1], s[2]]; p.sq = (p.sq | 0) + 1; p.posTs = 0; p.posAt = now; p.pb = null; p.ph = []; // renasceu: o balde de movimento e o histórico recomeçam
   const yaw = yawSet ?? Math.atan2(s[0], s[2]); p.yaw = yaw;
   if (p.isBot) { const b = p.bot; b.body.pos.set(s[0], s[1], s[2]); b.body.vel.set(0, 0, 0); b.yaw = yaw; b.pitch = 0; b.path = []; b.target = null; b.lastSeen = null; b.mag = 0; b.magW = null; b.reloadEnd = 0; }
   broadcast({ t: 'spawn', id: p.id, p: p.pos, y: yaw, inv: p.inv, ar: p.armor, hm: p.helmet ? 1 : 0, refill: refill ? 1 : 0, sq: p.sq });
