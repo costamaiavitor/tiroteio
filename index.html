@@ -2934,7 +2934,7 @@ function fpSkin(root, mats, L, keep = [], all = false, filt = null) { // all: pi
 // facas baixadas: entram no lugar das procedurais, no mesmo referencial (lâmina para -Z, topo +Y), então a mão, o soquete dos braços do
 // Blender e as animações continuam valendo. A: ponto de encaixe no modelo (guarda da faca / centro do anel da karambit) e P: o mesmo
 // ponto na faca procedural; L: comprimento total da procedural.
-const FPKN = { knife: { A: [null, -.036, .161], fwd: '-z', up: '+y', P: [0, .009, -.013], L: .337 }, karambit: { A: [-.2, null, -.8], fwd: '-x', up: '+z', P: [0, .006, -.005], L: .26, dim: .5 } }; // karambit = butterfly (ponto: base da lâmina, entre os cabos)
+const FPKN = { knife: { A: [null, -.036, .161], fwd: '-z', up: '+y', P: [0, .009, -.013], L: .337 }, karambit: { A: [-.2, null, -.8], fwd: '-x', up: '+z', P: [0, .006, -.005], L: .26, dim: .38 } }; // karambit = butterfly (ponto: base da lâmina, entre os cabos)
 function knifeSwap(g, kind, skin) {
   const K = FPKN[kind], key = 'm:' + kind;
   if (!fpReady(key)) { if (!FPC[key]) fpLoad(key).then(() => { if (vmGun && W[G.cur]?.slot === 'knife') vmSetWeapon(G.cur); }); return; }
@@ -3081,7 +3081,7 @@ const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 8, -22], 
   clips: { idle: [0, 42], inspect: [43, 66], stab: [66, 87], slash: [87, 112], slash2: [112, 138], draw: [138, 153] },
   // ponto de encaixe do modelo (FPKN: guarda da KA-BAR / centro do anel da karambit) vai para Q no pacote,
   // fwd/up: para onde vão o cano (lâmina) e o dorso do modelo; len: comprimento total (cm)
-  fit: { knife: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 30 }, karambit: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 26 } } }; // butterfly: cabos fechados no punho, lâmina saindo pelo lado do indicador
+  fit: { knife: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 30 }, karambit: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 28 } } }; // butterfly: cabos fechados no punho, lâmina saindo pelo lado do indicador
 function knBuild(kind, ud, skin) {
   const key = 'k:pack', mk = 'm:' + kind;
   if (!FPC[key]) FPC[key] = new GLTFLoader().loadAsync(FPKNIFE.url).then(g => (FPC[key] = g), e => { console.warn('faca', e); delete FPC[key]; });
@@ -3089,7 +3089,7 @@ function knBuild(kind, ud, skin) {
   const g = FPC[key], root = SkeletonUtils.clone(g.scene), K = FPKNIFE, F = K.fit[kind], D = FPKN[kind];
   const all = g.animations[0], mixer = new THREE.AnimationMixer(root), clips = {};
   for (const [n, [a, b]] of Object.entries(K.clips)) clips[n] = THREE.AnimationUtils.subclip(all, n, a, b, 30);
-  root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; if (/arm/i.test(o.material.name)) { const tx = knArmsTex(o.material.map); if (tx) o.material.map = tx; Object.assign(o.material, { metalness: 0, roughness: .9 }); o.material.color.multiplyScalar(1.3); } } });
+  root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; if (/arm/i.test(o.material.name)) { const tx = knArmsTex(o.material.map); if (tx) o.material.map = tx; Object.assign(o.material, { metalness: 0, roughness: .9 }); o.material.color.multiplyScalar(1.15); } } });
   // faca do jogo no nó da faca do pacote
   const node = root.getObjectByName('knife'); node.traverse(o => { if (o.isMesh) o.visible = false; });
   const ms = FPC[mk].scene.clone(true); ms.updateMatrixWorld(true);
@@ -3100,7 +3100,13 @@ function knBuild(kind, ud, skin) {
   ms.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; } });
   if (D.dim) ms.traverse(o => { if (o.isMesh) { o.material.color.multiplyScalar(D.dim); o.material.roughness = Math.max(o.material.roughness, .45); } }); // modelo claro demais
   if (skin) fpSkin(ms, skin, z1 - z0, [], true);
-  h.add(ms); node.add(h);
+  h.add(ms);
+  // a faca do jogo vai presa ao osso do pulso, não ao nó da faca do pacote (filho do alvo do IK): nos golpes rápidos o osso fica para trás
+  // do alvo e a faca escorregava pelo punho. A posição relativa é a do primeiro quadro parado, em que mão e faca coincidem
+  mixer.clipAction(clips.idle).play(); mixer.update(0); root.updateMatrixWorld(true);
+  let wrist = null; root.traverse(o => { if (!wrist && o.isBone && /^R_wrist_\d+$/.test(o.name)) wrist = o; });
+  if (wrist) { h.matrix.copy(wrist.matrixWorld.clone().invert().multiply(node.matrixWorld).multiply(h.matrix)); wrist.add(h); } else node.add(h);
+  mixer.stopAllAction();
   // câmera do pacote → câmera do jogo
   const C = new THREE.Matrix4().lookAt(new V3(...K.eye), new V3(...K.look), new V3(0, 1, 0)).setPosition(new V3(...K.eye));
   const holder = new THREE.Group(); holder.matrixAutoUpdate = false; holder.matrix.makeScale(K.k, K.k, K.k).multiply(C.invert()); holder.add(root);
@@ -3415,7 +3421,7 @@ function knifeAnim(o, ud) {
 }
 function knifeInspect() {
   if (vmGun?.userData.armsKnife) { if (ARMS.cur === 'idle') armsPlay('inspect'); return; }
-  if (vmGun?.userData.fps2?.knife) { if (vmGun.userData.fps2.cur === 'idle') fpPlay(vmGun.userData, 'inspect'); return; }
+  if (vmGun?.userData.fps2?.knife) { if (vmGun.userData.fps2.cur === 'idle') fpPlay(vmGun.userData, 'inspect', 1.6); return; } // o clipe do pacote é curto (0,8 s): mais devagar
   if (!['knife', 'karambit'].includes(W[G.cur]?.model) || G.kan || now < G.switchEnd) return;
   G.kan = { type: 'inspect', t0: now };
 }
