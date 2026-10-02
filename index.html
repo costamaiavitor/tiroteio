@@ -124,6 +124,11 @@ button.card.on{border-color:var(--acc);background:rgba(255,176,32,.1);box-shadow
 #zinfo b{color:#ff8a6a}
 .box{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:8px;padding:14px}
 .status{min-height:22px;margin-top:8px;color:var(--acc)}
+.lbrow{display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--line)}.lbrow b{flex:1}.lbrow button{padding:4px 10px;font-size:14px}
+.tpill{font-size:13px;font-weight:700;padding:2px 9px;border-radius:10px;color:#111}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#555}.dot.on{background:#3c3}
+.invb{display:flex;align-items:center;gap:10px;background:rgba(255,176,32,.12);border:1px solid var(--acc);border-radius:8px;padding:10px 14px;margin-bottom:8px}
+.lbcols{display:grid;grid-template-columns:1fr 1.4fr;gap:18px;margin-top:8px}@media(max-width:760px){.lbcols{grid-template-columns:1fr}}
 .status.err{color:var(--red)}
 details{margin-top:14px;color:#bbb}
 summary{cursor:pointer;color:#fff;font-weight:700}
@@ -334,15 +339,18 @@ summary{cursor:pointer;color:#fff;font-weight:700}
       <div><h1>DAN OF DUTY</h1><div class="sub">FPS no navegador. x1 com os amigos ou sobrevivam juntos no modo Zumbis.</div></div>
       <label class="mname">Seu nome <input id="inName" maxlength="16" autocomplete="off"></label>
     </div>
-    <div class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="skins">Skins</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></div>
+    <div class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="friends">Amigos</button><button data-tab="skins">Skins</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></div>
     <div data-pane="play" class="cols2">
-      <div class="box">
+      <div id="invBar" style="grid-column:1/-1"></div>
+      <div id="lobby" class="box hidden" style="grid-column:1/-1"></div>
+      <div class="box" id="hostBox">
         <h3>Criar sala</h3>
         <div id="hostForm"></div>
         <button id="btnHost" class="big" style="margin-top:14px" disabled>Carregando...</button>
+        <button id="btnHostPriv" class="big" style="margin-top:8px" disabled>Criar sala só com convite</button>
         <div id="hostStatus" class="status"></div>
       </div>
-      <div class="box">
+      <div class="box" id="joinBox">
         <h3>Entrar em sala</h3>
         <label>Código da sala <input id="inCode" maxlength="8" placeholder="EX: K7P2Q" autocomplete="off" style="text-transform:uppercase;letter-spacing:4px;font-size:22px"></label>
         <button id="btnJoin" class="big" disabled>Carregando...</button>
@@ -350,6 +358,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
         <div class="hint">Quem cria a sala recebe um código de 5 letras. O amigo digita aqui (ou abre o link que o host copiar no Esc). Funciona na mesma rede ou pela internet.</div>
       </div>
     </div>
+    <div data-pane="friends" id="friendsPane" class="hidden"><div class="box" id="frBox" style="max-width:640px"></div></div>
     <div data-pane="skins" id="skinsPane" class="hidden">
       <div class="skhead">
         <div class="box" id="skAcct"></div>
@@ -5274,7 +5283,7 @@ function netFix(o, buf, xmax, vmax) {
   o.rx = s.x; o.rz = s.z;
 }
 function netEo(e, dt) { const k = Math.exp(-dt * 10); e.x *= k; e.z *= k; if (Math.abs(e.x) + Math.abs(e.z) < 1e-3) e.x = e.z = 0; }
-const genCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+const genCode = (n = 5) => Array.from({ length: n }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
 function sendToHost(m) {
   if (NET.isHost) srvHandle(C.myId, m);
   else if (NET.hostConn?.open) { try { NET.hostConn.send(m); } catch (e) { } }
@@ -5295,13 +5304,16 @@ function startHost(st) {
   srvAddPlayer('h', CFG.name, false).skins = cleanSk(PROF.data?.equipped);
   enterGame();
   srvStartMatch();
+  hostOpenPeer(5);
+}
+function hostOpenPeer(len) { // abre a sala no servidor de pareamento (len: 5 letras na pública, 10 na só com convite)
   if (!peerAvailable()) { toast('Sem internet/PeerJS: jogando offline (só bots)', 5); return; }
   const tryOpen = attempt => {
-    const code = genCode();
+    const code = genCode(len);
     const peer = new Peer(PEER_PREFIX + code, { config: ICE, debug: 1 });
     let rc = 0; // tentativas de voltar ao servidor de pareamento
     peer.on('open', () => {
-      const back = NET.online; rc = 0; NET.peer = peer; NET.code = code; NET.online = true; updateRoomInfo();
+      const back = NET.online; rc = 0; NET.peer = peer; NET.code = code; NET.online = true; updateRoomInfo(); if (S.lobby) lobbySync();
       toast(back ? 'Sala de volta no servidor de pareamento' : 'Sala criada! Código: ' + code, back ? 3 : 5);
     });
     peer.on('error', err => {
@@ -5332,7 +5344,7 @@ function joinRoom(code) {
   const status = $('#joinStatus');
   if (NET.joining) return; // Enter + clique (ou dois cliques) abriam duas conexões e um jogador fantasma
   if (!peerAvailable()) { status.textContent = 'PeerJS não carregou (sem internet?)'; status.className = 'status err'; return; }
-  code = code.replace(/.*sala=/i, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5); // aceita o link inteiro colado
+  code = code.replace(/.*sala=/i, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12); // aceita o link inteiro colado
   if (!code) { status.textContent = 'Digite o código'; status.className = 'status err'; return; }
   status.textContent = 'Conectando...'; status.className = 'status';
   NET.isHost = false; NET.joining = true; $('#btnJoin').disabled = true;
@@ -5349,8 +5361,8 @@ function joinRoom(code) {
     const conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
     NET.hostConn = conn;
     // v: 2 = entende "state" sem as skins repetidas (o host manda a versão completa para quem não manda v)
-    conn.on('open', () => { stage = 'waiting'; attachFast(conn, m => { NET.lastHost = performance.now(); if (welcomed) onMsg(m); }); conn.send({ t: 'join', v: 2, name: CFG.name, sk: cleanSk(PROF.data?.equipped) }); });
-    conn.on('data', m => { NET.lastHost = performance.now(); if (m.t === 'welcome') { welcomed = true; NET.joining = false; clearTimeout(timer); NET.code = code; NET.online = true; status.textContent = ''; } onMsg(m); });
+    conn.on('open', () => { stage = 'waiting'; attachFast(conn, m => { NET.lastHost = performance.now(); if (welcomed) onMsg(m); }); conn.send({ t: 'join', v: 2, name: CFG.name, u: PROF.user || '', sk: cleanSk(PROF.data?.equipped) }); });
+    conn.on('data', m => { NET.lastHost = performance.now(); if (m.t === 'deny' && !welcomed) return fail(m.txt); if (m.t === 'welcome') { welcomed = true; NET.joining = false; clearTimeout(timer); NET.code = code; NET.online = true; status.textContent = ''; } onMsg(m); });
     conn.on('close', () => { if (welcomed) lostConnection(); else fail('Conexão recusada'); });
     conn.on('error', err => { if (err?.type === 'message-too-big' || err?.type === 'not-open-yet') console.warn('conn', err); else if (welcomed) lostConnection(); });
   });
@@ -5367,6 +5379,7 @@ function clientHeartbeat(dt) {
   if (NET.lastHost && performance.now() - NET.lastHost > 12000) lostConnection();
 }
 function lostConnection() {
+  if (LB.on && !inGame) { LB.on = false; lobbyUI(); $('#joinStatus').textContent = 'O host fechou a sala'; setTimeout(leaveGame, 2500); return; }
   if (!inGame || NET.lost) return;
   NET.lost = true;
   document.exitPointerLock?.();
@@ -5395,10 +5408,12 @@ function srvOnData(conn, d) {
   conn.lastSeen = performance.now();
   if (d.t === 'ping') { if (d.c > 0) sendFastTo(conn, { t: 'pong', c: d.c }); return; }
   if (d.t === 'join' && !conn.pid) {
+    if (LB.priv && !LB.allow.has(normUser(d.u))) { conn.send({ t: 'deny', txt: 'Essa sala é só com convite: peça para o host te convidar' }); setTimeout(() => conn.close(), 500); return; }
     const id = 'p' + (S.nextId++); conn.pid = id; conn.v = +d.v || 1; NET.conns.set(id, conn); S.skDirty = true;
     const name = String(d.name || 'Jogador').replace(/[<>]/g, '').slice(0, 16) || 'Jogador';
     const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk);
-    conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code });
+    conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code, lobby: S.lobby ? 1 : 0 });
+    if (S.lobby) { lobbySync(); return; }
     broadcast({ t: 'info', txt: name + ' entrou na sala' });
     if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') { // entra já jogando, com os pontos da dificuldade; quem caiu e voltou (até 5 min, mesmo nome) recupera pontos e armas,
       // e quem estava caído/morto na rodada só volta na próxima (sair e entrar não ressuscita mais)
@@ -5420,6 +5435,7 @@ function srvDrop(conn) {
   try { conn.close(); } catch (e) { } // derrubado por erro: fecha de verdade, senão o cliente fica 12 s num jogo que não anda
   broadcast({ t: 'bye', id }); broadcast({ t: 'info', txt: name + ' saiu' });
   if (S.st.mode === 'zombies' && Z.on) zCheckOver();
+  if (S.lobby) lobbySync();
 }
 // o host repassa o que chega para todo mundo: número fora do lugar (NaN, texto, lista gigante) quebrava os
 // outros clientes, e mensagem acima de 16 KB fazia o PeerJS dar erro e o host derrubar jogadores inocentes
@@ -5541,7 +5557,7 @@ function srvStartMatch() {
   Z.on = false;
   syncBots();
   S.round = 0; S.winner = null; S.pre = 0; S.half = false; S.score = { t: 0, ct: 0 }; S.loss = { t: 0, ct: 0 }; S.bomb = null;
-  if (isR()) [...S.players.values()].sort((a, b) => a.isBot - b.isBot).forEach((p, i) => setTeam(p, i % 2 ? 'ct' : 't'));
+  if (isR()) for (const p of [...S.players.values()].sort((a, b) => a.isBot - b.isBot)) setTeam(p, p.team === 't' || p.team === 'ct' ? p.team : teamPick()); // mantém os times do lobby
   for (const p of S.players.values()) { p.kills = p.deaths = p.rw = 0; p.money = 800; p.lossStreak = 0; p.downed = false; p.perks = []; p.maxHp = 100; p.bowie = false; p.inv = defInv(); p.armor = 0; p.helmet = false; p.alive = false; p.respawnAt = now + .3; p.pref = {}; }
   if (S.st.mode === 'dm') { S.phase = 'live'; S.phaseEnd = now + 10 * 60; for (const p of S.players.values()) srvSpawnDM(p); broadcast({ t: 'msg', txt: 'MATA-MATA', sub: `Primeiro a ${S.st.frags} abates vence`, dur: 3 }); }
   else if (S.players.size >= 2) srvStartRound();
@@ -7805,7 +7821,8 @@ function zExplode(pos, owner, r, dmgMax, w, insta) { // granada / macaco
 // ================================================================
 function onMsg(m) {
   switch (m.t) {
-    case 'welcome': C.myId = m.you; C.st = m.st; NET.code = m.code; ZC.snapTs = 0; buildMap(m.st.map); enterGame(); break;
+    case 'welcome': if (m.lobby) { C.myId = m.you; C.st = m.st; NET.code = m.code; LB.on = true; lobbyUI(); break; }
+      C.myId = m.you; C.st = m.st; NET.code = m.code; ZC.snapTs = 0; buildMap(m.st.map); enterGame(); break;
     case 'match':
       C.st = m.st; if (curMapId !== m.st.map) buildMap(m.st.map); else clearFx();
       me.alive = false; me.downed = false; for (const rp of R.values()) { rp.alive = rp.dead = rp.downed = false; rp.buf = []; }
@@ -7949,6 +7966,9 @@ function onMsg(m) {
       break;
     }
     case 'shot': remoteShot(m); break;
+    case 'lobby': LB.data = m; C.st = m.st; lobbyUI(); break;
+    case 'start': LB.on = false; C.st = m.st; ZC.snapTs = 0; buildMap(m.st.map); enterGame(); lobbyUI(); break;
+    case 'deny': toast(m.txt, 4); LB.on = false; lobbyUI(); $('#joinStatus').textContent = m.txt; setTimeout(leaveGame, 2500); break;
     case 'bboom': { const p = new V3(m.p[0], m.p[1] + .6, m.p[2]); boomFx(p); for (let i = 0; i < 6; i++) puff(p.clone().add(new V3(rand(-3, 3), rand(0, 3), rand(-3, 3))), 0x555555, 4, 3); break; }
     case 'nade': spawnNade(m.id, m.k, m.p, m.v); break;
     case 'msg': centerMsg(m.txt, m.sub, m.dur); if (m.snd) play(m.snd); break;
@@ -8349,7 +8369,7 @@ function grantAllSkins() {
   if (d.items.length > before) { profSave(true); PROF.status = `Conta do dono: todas as ${d.items.length} skins liberadas.`; }
   return d.items.length - before;
 }
-const PROF = { uid: null, email: '', name: '', cloud: false, fb: false, data: null, saveT: 0, status: '' };
+const PROF = { user: null, uid: null, email: '', name: '', cloud: false, fb: false, data: null, saveT: 0, status: '' };
 const FB = {};
 const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0 });
 function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) { if (w === '_faca') { if (f === 'karambit') o._faca = f; } else if (W[w] && SKIN_BY[f]) o[w] = f; } return o; }
@@ -8385,20 +8405,21 @@ async function fbInit() {
   } catch (e) { console.warn('firebase', e); PROF.status = 'Não consegui carregar o sistema de contas. Usando perfil local.'; skinsUI(); }
 }
 async function profOnUser(u) {
-  if (!u) { PROF.uid = null; PROF.cloud = false; PROF.email = ''; profLoadLocal(); skinsUI(); skinsChanged(); return; }
+  if (!u) { PROF.uid = null; PROF.user = null; frStop(); nameSync(); PROF.cloud = false; PROF.email = ''; profLoadLocal(); skinsUI(); skinsChanged(); return; }
   PROF.uid = u.uid; PROF.email = u.email || ''; PROF.name = u.displayName || (u.email || 'Jogador').split('@')[0];
   PROF.status = 'Carregando sua conta...'; skinsUI();
   const ref = FB.F.doc(FB.db, 'players', u.uid);
   try {
     const snap = await FB.F.getDoc(ref);
+    PROF.user = (snap.exists() && normUser(snap.data().username)) || PROF.claimed?.[u.uid] || null;
     if (snap.exists()) PROF.data = cleanProf(snap.data());
     else { // conta nova: leva junto o que foi ganho como convidado neste navegador
       const guest = load('prof.guest', null);
       PROF.data = guest ? cleanProf(guest) : newProfile();
-      await FB.F.setDoc(ref, { ...PROF.data, name: PROF.name, created: FB.F.serverTimestamp() });
+      await FB.F.setDoc(ref, { ...PROF.data, name: PROF.name, created: FB.F.serverTimestamp() }, { merge: true });
       if (guest) save('prof.guest', newProfile(0));
     }
-    PROF.cloud = true; PROF.status = ''; save(profKey(), PROF.data);
+    PROF.cloud = true; PROF.status = ''; save(profKey(), PROF.data); nameSync(); frStart();
     if (OWNERS.includes((u.email || '').toLowerCase())) grantAllSkins(); // conta do dono: todas as skins
   } catch (e) {
     console.warn('ler conta', e); profLoadLocal();
@@ -8408,7 +8429,9 @@ async function profOnUser(u) {
 }
 const AUTH_ERR = { 'auth/invalid-email': 'E-mail inválido', 'auth/missing-password': 'Digite a senha', 'auth/weak-password': 'Senha fraca (mínimo 6 caracteres)', 'auth/email-already-in-use': 'Esse e-mail já tem conta — clique em Entrar',
   'auth/invalid-credential': 'E-mail ou senha errados', 'auth/wrong-password': 'E-mail ou senha errados', 'auth/user-not-found': 'Conta não encontrada', 'auth/popup-closed-by-user': 'Janela do Google fechada',
-  'auth/unauthorized-domain': 'Este site não está autorizado no Firebase (Authentication → Configurações → Domínios autorizados)', 'auth/too-many-requests': 'Muitas tentativas, espere um pouco', 'auth/operation-not-allowed': 'Esse tipo de login não está ativado no Firebase' };
+  'auth/unauthorized-domain': 'Este site não está autorizado no Firebase (Authentication → Configurações → Domínios autorizados)', 'auth/too-many-requests': 'Muitas tentativas, espere um pouco', 'auth/operation-not-allowed': 'Esse tipo de login não está ativado no Firebase',
+  'user/invalid': 'Usuário: 3 a 16 caracteres (letras minúsculas, números ou _)', 'user/taken': 'Esse usuário já existe, escolha outro',
+  'permission-denied': 'O banco recusou: publique as regras novas do Firestore (README → Configurar as contas)' };
 async function authDo(kind) {
   if (!PROF.fb) return;
   const em = $('#acEmail')?.value.trim(), pw = $('#acPass')?.value;
@@ -8416,11 +8439,152 @@ async function authDo(kind) {
   try {
     if (kind === 'google') await FB.A.signInWithPopup(FB.auth, new FB.A.GoogleAuthProvider());
     else if (kind === 'login') await FB.A.signInWithEmailAndPassword(FB.auth, em, pw);
-    else if (kind === 'signup') await FB.A.createUserWithEmailAndPassword(FB.auth, em, pw);
+    else if (kind === 'signup') { // o usuário é obrigatório e único: confere antes de criar a conta
+      const un = normUser($('#acUser')?.value); if (!un) throw { code: 'user/invalid' };
+      if ((await FB.F.getDoc(FB.F.doc(FB.db, 'usernames', un))).exists()) throw { code: 'user/taken' };
+      const cr = await FB.A.createUserWithEmailAndPassword(FB.auth, em, pw); PROF.uid = cr.user.uid; await claimUser(un);
+    }
     else if (kind === 'logout') { if (PROF.cloud) profSave(true); await FB.A.signOut(FB.auth); }
     PROF.status = '';
   } catch (e) { PROF.status = AUTH_ERR[e.code] || ('Erro: ' + (e.code || e.message)); }
   skinsUI();
+}
+// ---------- usuário fixo, amigos e convites (Firestore: usernames/{usuário}, friends/{uid_uid}, invites/{de_para}) ----------
+const normUser = v => { v = String(v || '').trim().toLowerCase(); return /^[a-z0-9_]{3,16}$/.test(v) ? v : null; };
+function nameSync() { // logado com usuário: o nome no jogo é o usuário (fixo)
+  if (PROF.user) { PROF.name = PROF.user; CFG.name = PROF.user; }
+  const i = $('#inName'); if (i) { i.value = CFG.name; i.readOnly = !!PROF.user; i.title = PROF.user ? 'Nome da sua conta' : ''; }
+}
+async function claimUser(un) {
+  const F = FB.F, uid = PROF.uid, ref = F.doc(FB.db, 'usernames', un);
+  await F.runTransaction(FB.db, async tx => { const d = await tx.get(ref); if (d.exists() && d.data().uid !== uid) throw { code: 'user/taken' }; tx.set(ref, { uid, name: un, seen: F.serverTimestamp() }); });
+  await F.setDoc(F.doc(FB.db, 'players', uid), { username: un, name: un }, { merge: true });
+  PROF.claimed = { [uid]: un }; PROF.user = un; nameSync(); skinsUI(); frStart();
+}
+const FR = { list: new Map(), inv: [], seen: {}, un: [], msg: '', iv: 0 };
+const frOther = f => { const uid = f.users.find(x => x !== PROF.uid); return { uid, name: f.names?.[uid] || '?' }; };
+const frOnline = n => Date.now() - (FR.seen[n] || 0) < 150e3;
+function frMsg(t) { FR.msg = t; frUI(); }
+function frErr(e) { console.warn('amigos', e); frMsg(AUTH_ERR[e?.code] || 'Erro: ' + (e?.code || e?.message || e)); }
+function frStop() { FR.un.forEach(f => f()); FR.un = []; FR.list.clear(); FR.inv = []; clearInterval(FR.iv); frUI(); }
+function frStart() {
+  frStop(); if (!PROF.cloud || !PROF.user) return;
+  const F = FB.F, uid = PROF.uid;
+  FR.un.push(F.onSnapshot(F.query(F.collection(FB.db, 'friends'), F.where('users', 'array-contains', uid)), q => { FR.list.clear(); q.forEach(d => FR.list.set(d.id, d.data())); frSeen(); frUI(); }, frErr));
+  FR.un.push(F.onSnapshot(F.query(F.collection(FB.db, 'invites'), F.where('to', '==', uid)), q => {
+    const old = new Set(FR.inv.map(i => i.id)); FR.inv = [];
+    q.forEach(d => { const v = d.data(), t = v.t?.toMillis?.() ?? Date.now(); if (Date.now() - t < 15 * 60e3) FR.inv.push({ id: d.id, ...v }); });
+    for (const i of FR.inv) if (!old.has(i.id)) { play('chat'); if (inGame) toast(`${i.fromName} te chamou para uma sala (aparece no menu, aba Jogar)`, 5); }
+    frUI();
+  }, frErr));
+  const ping = () => F.setDoc(F.doc(FB.db, 'usernames', PROF.user), { seen: F.serverTimestamp() }, { merge: true }).catch(() => { });
+  ping(); FR.iv = setInterval(() => { ping(); frSeen(); }, 60e3);
+}
+async function frSeen() { // quem está online: o jogo marca "visto agora" a cada minuto
+  for (const f of FR.list.values()) { const n = frOther(f).name; try { const d = await FB.F.getDoc(FB.F.doc(FB.db, 'usernames', n)); FR.seen[n] = d.data()?.seen?.toMillis?.() || 0; } catch (e) { } }
+  frUI();
+}
+async function frAdd(raw) {
+  const un = normUser(raw), F = FB.F; if (!un) return frMsg(AUTH_ERR['user/invalid']);
+  if (un === PROF.user) return frMsg('Esse é o seu usuário');
+  try {
+    const u = await F.getDoc(F.doc(FB.db, 'usernames', un)); if (!u.exists()) return frMsg('Usuário não encontrado: ' + un);
+    const uid = u.data().uid, id = [PROF.uid, uid].sort().join('_'), ref = F.doc(FB.db, 'friends', id), cur = FR.list.get(id);
+    if (cur?.st === 'ok') return frMsg('Vocês já são amigos');
+    if (cur && cur.from !== PROF.uid) { await F.updateDoc(ref, { st: 'ok' }); return frMsg('Pedido aceito: agora vocês são amigos'); }
+    if (cur) return frMsg('Pedido já enviado');
+    await F.setDoc(ref, { users: [PROF.uid, uid].sort(), names: { [PROF.uid]: PROF.user, [uid]: un }, from: PROF.uid, st: 'pending', t: F.serverTimestamp() });
+    frMsg('Pedido enviado para ' + un); $('#frAddIn') && ($('#frAddIn').value = '');
+  } catch (e) { frErr(e); }
+}
+async function frInvite(id) {
+  const f = FR.list.get(id); if (!f) return;
+  if (!NET.code) return frMsg('A sala ainda não está online');
+  const o = frOther(f), F = FB.F; LB.allow.add(o.name);
+  try {
+    await F.setDoc(F.doc(FB.db, 'invites', PROF.uid + '_' + o.uid), { from: PROF.uid, to: o.uid, fromName: PROF.user, code: NET.code, priv: LB.priv ? 1 : 0, mode: MODE_N[S.st?.mode] || '', t: F.serverTimestamp() });
+    LB.sent.add(o.name); lobbyUI();
+  } catch (e) { frErr(e); }
+}
+const MODE_N = { rounds: 'Rodadas', dm: 'Mata-mata', zombies: 'Zumbis' };
+function frUI() {
+  const box = $('#frBox'); if (!box) return;
+  let h;
+  if (!PROF.fb) h = '<b>Amigos</b><div class="hint">Carregando contas...</div>';
+  else if (!PROF.uid) h = '<b>Amigos</b><div class="hint">Entre na sua conta (aba Skins) para adicionar amigos e receber convites.</div>';
+  else if (!PROF.user) h = `<b>Escolha seu nome de usuário</b><div class="hint" style="margin-top:4px">É o seu ID fixo: aparece no jogo e seus amigos te adicionam por ele. Não dá para trocar depois. De 3 a 16 caracteres: letras minúsculas, números ou _.</div>
+    <div class="row" style="margin-top:10px"><input id="frUser" maxlength="16" placeholder="usuário" autocomplete="off" style="flex:1"><button id="frClaim">Confirmar</button></div>`;
+  else {
+    const all = [...FR.list.entries()], ok = all.filter(([, f]) => f.st === 'ok').sort(([, a], [, b]) => frOnline(frOther(b).name) - frOnline(frOther(a).name));
+    const inc = all.filter(([, f]) => f.st !== 'ok' && f.from !== PROF.uid), out = all.filter(([, f]) => f.st !== 'ok' && f.from === PROF.uid);
+    const row = (f, btns) => { const o = frOther(f); return `<div class="lbrow"><span class="dot${frOnline(o.name) ? ' on' : ''}"></span><b>${esc(o.name)}</b>${btns}</div>`; };
+    h = `<div>Seu usuário: <b style="color:var(--acc)">@${esc(PROF.user)}</b></div>
+      <div class="row" style="margin-top:10px"><input id="frAddIn" maxlength="16" placeholder="usuário do amigo" autocomplete="off" style="flex:1"><button id="frAddBt">Adicionar</button></div>`
+      + (inc.length ? '<div class="lbl">Pedidos recebidos</div>' + inc.map(([id, f]) => row(f, `<button data-fa="${id}">Aceitar</button><button data-fd="${id}">Recusar</button>`)).join('') : '')
+      + `<div class="lbl">Amigos (${ok.length})</div>` + (ok.length ? ok.map(([id, f]) => row(f, `<button data-fd="${id}">Remover</button>`)).join('') : '<div class="hint" style="margin-top:4px">Nenhum amigo ainda: adicione pelo usuário.</div>')
+      + (out.length ? '<div class="lbl">Pedidos enviados</div>' + out.map(([id, f]) => row(f, `<button data-fd="${id}">Cancelar</button>`)).join('') : '');
+  }
+  if (FR.msg) h += `<div class="status${/Erro|recusou|não|Não|inválid|existe/.test(FR.msg) ? ' err' : ''}">${esc(FR.msg)}</div>`;
+  const k1 = $('#frAddIn')?.value, k2 = $('#frUser')?.value; setHTMLm('frBox', h);
+  if (k1 && $('#frAddIn')) $('#frAddIn').value = k1; if (k2 && $('#frUser')) $('#frUser').value = k2;
+  setHTMLm('invBar', inGame || LB.on ? '' : FR.inv.map(i => `<div class="invb"><span><b>${esc(i.fromName)}</b> te chamou para ${i.priv ? 'uma sala só com convite' : 'uma sala'}${i.mode ? ' · ' + esc(i.mode) : ''}</span><span style="flex:1"></span><button data-ij="${esc(i.id)}">Entrar</button><button data-ix="${esc(i.id)}">Recusar</button></div>`).join(''));
+  lobbyUI();
+}
+// ---------- lobby: antes da partida o host chama os amigos, escolhe o modo e monta os times ----------
+const LB = { on: false, priv: false, allow: new Set(), sent: new Set(), data: null, getForm: null };
+function openLobby(priv) {
+  audioInit(); const st = getHostForm(); save('lastSt', st);
+  NET.isHost = true; C.myId = 'h'; C.st = st; S.st = st; S.players.clear(); S.nextId = 1; S.colorI = 0; S.lobby = true;
+  LB.on = true; LB.priv = priv;
+  srvAddPlayer('h', CFG.name, false).skins = cleanSk(PROF.data?.equipped);
+  hostOpenPeer(priv ? 10 : 5);
+  lobbySync();
+}
+function lobbySync() {
+  if (!S.lobby) return;
+  if (isR()) for (const p of S.players.values()) if (p.team !== 't' && p.team !== 'ct') setTeam(p, teamPick());
+  broadcast({ t: 'lobby', st: S.st, code: NET.code, priv: LB.priv ? 1 : 0, pl: [...S.players.values()].map(p => ({ id: p.id, n: p.name, tm: p.team || '', c: p.color })) });
+}
+function lobbyStart() {
+  const st = LB.getForm(); save('lastSt', st); S.st = C.st = st; S.lobby = false; LB.on = false;
+  broadcast({ t: 'start', st }, C.myId); // os outros montam o mapa antes do primeiro "spawn"
+  buildMap(st.map); enterGame(); srvStartMatch(); lobbyUI();
+}
+function lobbyUI() {
+  const el = $('#lobby'); if (!el) return;
+  const on = LB.on && !inGame, host = NET.isHost;
+  el.classList.toggle('hidden', !on); $('#hostBox').classList.toggle('hidden', on); $('#joinBox').classList.toggle('hidden', on);
+  if (!on) return;
+  if (el.dataset.k !== (host ? 'h' : 'c')) { // esqueleto (o formulário do host não é redesenhado a cada mudança)
+    el.dataset.k = host ? 'h' : 'c';
+    el.innerHTML = `<h3 id="lbHead"></h3><div class="lbcols"><div><div class="lbl" style="margin-top:0">Jogadores</div><div id="lbPl"></div>${host ? '<div class="lbl">Convidar amigos</div><div id="lbFr"></div>' : ''}</div>
+      <div>${host ? '<div id="lbForm"></div>' : '<div id="lbInfo"></div>'}</div></div>
+      <div class="row" style="margin-top:16px">${host ? '<button id="lbGo" class="big">Começar partida</button>' : ''}<button id="lbOut" class="big">${host ? 'Fechar sala' : 'Sair do lobby'}</button></div>`;
+    if (host) {
+      LB.getForm = matchForm($('#lbForm'), S.st);
+      $('#lbForm').addEventListener('click', () => setTimeout(() => { S.st = C.st = LB.getForm(); lobbySync(); }));
+      $('#lbGo').onclick = lobbyStart;
+    }
+    $('#lbOut').onclick = leaveGame;
+    el.onclick = e => { // trocar time, remover, copiar código, convidar
+      const b = e.target.closest('button'); if (!b || !host) return;
+      if (b.dataset.sw) { const p = S.players.get(b.dataset.sw); if (p) { setTeam(p, p.team === 't' ? 'ct' : 't'); lobbySync(); } }
+      else if (b.dataset.kick) { const c = NET.conns.get(b.dataset.kick); if (c) { try { c.send({ t: 'deny', txt: 'O host te removeu da sala' }); } catch (e) { } setTimeout(() => { try { c.close(); } catch (e) { } srvDrop(c); }, 300); } }
+      else if (b.dataset.cp) navigator.clipboard?.writeText(NET.code);
+      else if (b.dataset.fi) frInvite(b.dataset.fi);
+    };
+  }
+  const d = LB.data || { pl: [], st: C.st || {} }, st = d.st || {}, rounds = st.mode === 'rounds';
+  setHTMLm('lbHead', 'Lobby · ' + (d.priv ? 'sala só com convite' : d.code ? `sala pública · código <b style="color:var(--acc);letter-spacing:3px">${esc(d.code)}</b>${host ? ' <button data-cp="1">Copiar</button>' : ''}` : 'abrindo a sala...'));
+  setHTMLm('lbPl', d.pl.map(p => `<div class="lbrow"><b style="color:${esc(p.c || '#ddd')}">${esc(p.n)}${p.id === 'h' ? ' <small>(host)</small>' : ''}${p.id === C.myId ? ' <small>(você)</small>' : ''}</b>`
+    + (rounds ? `<span class="tpill" style="background:${TEAMC[p.tm] || '#888'}">${TEAMN[p.tm] || '-'}</span>` : '') + (host && rounds ? `<button data-sw="${esc(p.id)}">Trocar time</button>` : '')
+    + (host && p.id !== 'h' ? `<button data-kick="${esc(p.id)}">Remover</button>` : '') + '</div>').join('') + (rounds ? '<div class="hint" style="margin-top:6px">Os bots entram no time com menos gente quando a partida começa.</div>' : ''));
+  if (host) {
+    const ok = [...FR.list.entries()].filter(([, f]) => f.st === 'ok').sort(([, a], [, b]) => frOnline(frOther(b).name) - frOnline(frOther(a).name));
+    setHTMLm('lbFr', !PROF.user ? '<div class="hint" style="margin-top:4px">Entre na conta e escolha seu usuário (aba Amigos) para convidar amigos.</div>'
+      : ok.length ? ok.map(([id, f]) => { const o = frOther(f), inRoom = d.pl.some(p => p.n === o.name); return `<div class="lbrow"><span class="dot${frOnline(o.name) ? ' on' : ''}"></span><b>${esc(o.name)}</b>${inRoom ? '<small>na sala</small>' : `<button data-fi="${id}">${LB.sent.has(o.name) ? 'Convidar de novo' : 'Convidar'}</button>`}</div>`; }).join('')
+      : '<div class="hint" style="margin-top:4px">Você ainda não tem amigos adicionados (aba Amigos).</div>');
+  } else setHTMLm('lbInfo', `<div class="lbl" style="margin-top:0">Partida</div><div style="font-size:19px">Modo: <b>${MODE_N[st.mode] || '-'}</b> · Mapa: <b>${esc(MAPS[st.map]?.name || '-')}</b>${rounds ? ` · ${st.rounds} rodadas para vencer` : ''}</div><div class="hint">Esperando o host começar a partida...</div>`);
 }
 // ---------- recompensas: XP → caixas ----------
 function grantXP(n) {
@@ -8473,13 +8637,14 @@ function skinsUI() {
   else if (!PROF.uid) ac = `<b>Entre para salvar suas skins na conta</b>
     <div class="row" style="margin-top:8px"><button id="acGoogle">Entrar com Google</button></div>
     <div class="row" style="margin-top:8px"><input id="acEmail" type="email" placeholder="e-mail" autocomplete="email" style="flex:1;min-width:140px"><input id="acPass" type="password" placeholder="senha" autocomplete="current-password" style="flex:1;min-width:110px"></div>
+    <div class="row" style="margin-top:6px"><input id="acUser" maxlength="16" placeholder="usuário (para criar conta)" autocomplete="off" style="flex:1"></div>
     <div class="row" style="margin-top:6px"><button id="acLogin">Entrar</button><button id="acSignup">Criar conta</button></div>
     <div class="hint" style="margin-top:6px">Sem entrar, o progresso fica neste navegador e vai pra conta no primeiro login.</div>`;
-  else ac = `<b>${esc(PROF.name)}</b><div class="hint" style="margin-top:2px">${esc(PROF.email)}${PROF.cloud ? ' · salvo na nuvem' : ''}</div><button id="acOut" style="margin-top:8px">Sair da conta</button>`;
+  else ac = `<b>${esc(PROF.user ? '@' + PROF.user : PROF.name)}</b>${PROF.user ? '' : '<div class="hint" style="margin-top:2px">Escolha seu usuário na aba Amigos</div>'}<div class="hint" style="margin-top:2px">${esc(PROF.email)}${PROF.cloud ? ' · salvo na nuvem' : ''}</div><button id="acOut" style="margin-top:8px">Sair da conta</button>`;
   if (PROF.status) ac += `<div class="status${/Erro|Não|errad|inválid|fraca/.test(PROF.status) ? ' err' : ''}">${esc(PROF.status)}</div>`;
-  const em0 = $('#acEmail')?.value, pw0 = $('#acPass')?.value; // redesenhar não apaga o que foi digitado
+  const em0 = $('#acEmail')?.value, pw0 = $('#acPass')?.value, un0 = $('#acUser')?.value; // redesenhar não apaga o que foi digitado
   setHTMLm('skAcct', ac);
-  if ($('#acEmail') && em0) $('#acEmail').value = em0; if ($('#acPass') && pw0) $('#acPass').value = pw0;
+  if ($('#acEmail') && em0) $('#acEmail').value = em0; if ($('#acPass') && pw0) $('#acPass').value = pw0; if ($('#acUser') && un0) $('#acUser').value = un0;
   $('#acGoogle') && ($('#acGoogle').onclick = () => authDo('google'));
   $('#acLogin') && ($('#acLogin').onclick = () => authDo('login'));
   $('#acSignup') && ($('#acSignup').onclick = () => authDo('signup'));
@@ -8645,15 +8810,30 @@ document.querySelectorAll('#menu .tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('#menu .tabs button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('#menu [data-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab));
   if (b.dataset.tab === 'skins') skinsUI();
+  if (b.dataset.tab === 'friends') frUI();
 });
 const getHostForm = matchForm($('#hostForm'), lastSt);
 settingsForm($('#menuSettings'));
 $('#inName').value = CFG.name;
 $('#inName').oninput = () => { CFG.name = $('#inName').value.replace(/[<>]/g, '').slice(0, 16) || 'Jogador'; save('name', CFG.name); };
 { const sala = new URLSearchParams(location.search).get('sala'); if (sala) { $('#inCode').value = sala.toUpperCase(); $('#joinStatus').textContent = 'Código preenchido pelo link — clique em Entrar'; } }
-$('#btnHost').disabled = $('#btnJoin').disabled = false;
-$('#btnHost').textContent = 'Criar sala'; $('#btnJoin').textContent = 'Entrar';
-$('#btnHost').onclick = () => { audioInit(); const st = getHostForm(); save('lastSt', st); startHost(st); };
+$('#btnHost').disabled = $('#btnHostPriv').disabled = $('#btnJoin').disabled = false;
+$('#btnHost').textContent = 'Criar sala pública'; $('#btnJoin').textContent = 'Entrar';
+$('#btnHost').onclick = () => openLobby(false);
+$('#btnHostPriv').onclick = () => { if (!PROF.user) { $('#hostStatus').textContent = 'Para criar sala só com convite, entre na conta e escolha seu usuário (aba Amigos).'; return; } openLobby(true); };
+$('#frBox').onclick = e => {
+  const b = e.target.closest('button'); if (!b || !FB.F) return; const F = FB.F;
+  if (b.id === 'frClaim') { const un = normUser($('#frUser').value); if (!un) return frMsg(AUTH_ERR['user/invalid']); claimUser(un).then(() => frMsg(''), frErr); }
+  else if (b.id === 'frAddBt') frAdd($('#frAddIn').value);
+  else if (b.dataset.fa) F.updateDoc(F.doc(FB.db, 'friends', b.dataset.fa), { st: 'ok' }).catch(frErr);
+  else if (b.dataset.fd) F.deleteDoc(F.doc(FB.db, 'friends', b.dataset.fd)).catch(frErr);
+};
+$('#invBar').onclick = e => {
+  const b = e.target.closest('button'), i = b && FR.inv.find(x => x.id === (b.dataset.ij || b.dataset.ix)); if (!i) return;
+  FB.F.deleteDoc(FB.F.doc(FB.db, 'invites', i.id)).catch(() => { }); FR.inv = FR.inv.filter(x => x !== i); frUI();
+  if (b.dataset.ij) { audioInit(); $('#inCode').value = i.code; joinRoom(i.code); }
+};
+nameSync();
 $('#btnJoin').onclick = () => { audioInit(); joinRoom($('#inCode').value); };
 $('#inCode').addEventListener('keydown', e => { if (e.code === 'Enter') $('#btnJoin').click(); });
 $('#btnResume').onclick = () => requestLock();
@@ -8762,7 +8942,7 @@ fpLoad('p:ak'); fpLoad('m:knife'); fpLoad('m:karambit'); FPC['k:pack'] = new GLT
 setTimeout(() => { let q = Promise.resolve(); for (const k of Object.keys(FPM)) q = q.then(() => fpLoad('m:' + k)); }, 8000); // modelos das armas aos poucos (mundo e mãos dos outros)
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos)
-window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
+window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>

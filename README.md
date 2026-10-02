@@ -142,6 +142,25 @@ Já configurado no projeto `tiroteio-237ee`. Os passos abaixo servem só para re
        match /players/{uid} {
          allow read, write: if request.auth != null && request.auth.uid == uid;
        }
+       // usuário fixo de cada conta (o ID do documento é o usuário)
+       match /usernames/{name} {
+         allow read: if true;
+         allow create: if request.auth != null && request.resource.data.uid == request.auth.uid && name.matches('^[a-z0-9_]{3,16}$');
+         allow update: if request.auth != null && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid;
+       }
+       // amizades: pedido (pending) e aceito (ok)
+       match /friends/{id} {
+         allow read, delete: if request.auth != null && request.auth.uid in resource.data.users;
+         allow create: if request.auth != null && request.resource.data.from == request.auth.uid
+           && request.auth.uid in request.resource.data.users && request.resource.data.users.size() == 2 && request.resource.data.st == 'pending';
+         allow update: if request.auth != null && request.auth.uid in resource.data.users && request.auth.uid != resource.data.from
+           && request.resource.data.st == 'ok' && request.resource.data.users == resource.data.users && request.resource.data.from == resource.data.from;
+       }
+       // convites para o lobby
+       match /invites/{id} {
+         allow read, delete: if request.auth != null && (request.auth.uid == resource.data.to || request.auth.uid == resource.data.from);
+         allow create, update: if request.auth != null && request.resource.data.from == request.auth.uid;
+       }
      }
    }
    ```
@@ -150,6 +169,13 @@ Já configurado no projeto `tiroteio-237ee`. Os passos abaixo servem só para re
 6. No `index.html`, troque `const FIREBASE_CONFIG = null;` por `const FIREBASE_CONFIG = { ...o que você copiou... };`.
 
 A `apiKey` do Firebase não é segredo (ela identifica o projeto); quem protege os dados são as regras acima. Cada jogador só lê e grava o próprio inventário. Como o jogo roda no navegador, alguém que mexa no código consegue se dar skins. Para jogar entre amigos isso não importa.
+
+## Amigos, lobby e convites
+
+- **Usuário:** ao criar conta com e-mail, escolha um usuário (3 a 16 caracteres: letras minúsculas, números ou _). Ele é o seu ID fixo e o seu nome no jogo. Quem entra com Google escolhe o usuário na aba **Amigos**.
+- **Amigos:** na aba **Amigos**, adicione pelo usuário. O outro aceita o pedido na mesma aba. A bolinha verde mostra quem está com o jogo aberto.
+- **Lobby:** **Criar sala pública** (entra quem tiver o código) ou **Criar sala só com convite** (só entra quem o host convidar). No lobby o host convida amigos, escolhe modo e mapa, troca os jogadores de time no modo Rodadas e clica em **Começar partida**.
+- **Convite:** aparece no topo da aba **Jogar** com o botão **Entrar**.
 
 ## Gráficos
 
