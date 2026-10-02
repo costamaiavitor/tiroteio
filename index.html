@@ -2698,7 +2698,7 @@ const FPK = {
     clips: { idle: 'SG_FPS_Idle', fire: 'SG_FPS_Shot', reload: 'SG_FPS_Reload', walk: 'SG_FPS_Walk' } },
 };
 // modelos: T (gatilho), eixos, L = comprimento real (m), hide = peças soltas que vêm junto (balas, carregador extra), lens = materiais de vidro,
-// vo = deslocamento extra na tela (armas grossas ficam mais longe do olho)
+// vo = deslocamento extra na tela (armas grossas ficam mais longe do olho), ve = giro extra [guinada, arfagem, rolagem]
 const FPM = {
   glock: { T: [null, .505, .431], fwd: '+z', up: '+y', L: .186 },
   usp: { T: [-.014, .082, null], fwd: '+x', up: '+y', L: .194, hide: ['Object_4', 'Object_5', 'Object_7', 'Object_12', 'Object_13', 'Object_14', 'Object_15'] },
@@ -2711,7 +2711,7 @@ const FPM = {
   mp5: { T: [.018, -.02, null], fwd: '+x', up: '+y', L: .70 },
   mp5k: { T: [.15, -.17, null], fwd: '+x', up: '+y', L: .325 },
   mp40: { T: [-33.4, 2, null], fwd: '+x', up: '+y', L: .833 },
-  p90: { T: [12.5, -17.3, null], fwd: '+x', up: '+y', L: .50, vo: [.03, -.02, -.1] },
+  p90: { T: [12.5, -17.3, null], fwd: '+x', up: '+y', L: .50, vo: [.03, -.04, -.22], ve: [.5, .05, .1] }, // bullpup alto: mais longe e virada para mostrar o lado
   ak74u: { T: [-115, 23, null], fwd: '+x', up: '+y', L: .73 },
   galil: { T: [-130, 39, null], fwd: '+x', up: '+y', L: .98 },
   rpk: { T: [-116, 20, null], fwd: '+x', up: '+y', L: 1.04 },
@@ -2887,7 +2887,7 @@ function fpBuild(id, ud) {
   if (D?.lens) model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) Object.assign(o.material, { roughness: .08, metalness: .4 }).color.set(0x14232c); }); // vidro da luneta
   const mz = new THREE.Object3D(); mz.position.copy(tips.muzzle).applyMatrix4(C); body.add(mz);
   // pacote → tela: o gatilho da arma vai para o mesmo ponto da tela em todas as armas (FPV), com o cano no mesmo giro; os braços vêm junto
-  const V = P.v || FPV[P.view || 'long'], k = FPH / P.hr, tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1], Math.PI + V.e[0], V.e[2], 'YXZ'));
+  const V = P.v || FPV[P.view || 'long'], k = FPH / P.hr, de = D?.ve || [0, 0, 0], tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1] + de[1], Math.PI + V.e[0] + de[0], V.e[2] + de[2], 'YXZ'));
   const holder = new THREE.Group(); holder.matrixAutoUpdate = false;
   holder.matrix.compose(new V3(...V.p).add(new V3(...(D?.vo || [0, 0, 0]))), tq, new V3(k, k, k)).multiply(A.clone().invert());
   // mirar: giro e deslocamento da arma que deixam o cano reto para a frente e a mira na linha do olho
