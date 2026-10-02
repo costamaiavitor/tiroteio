@@ -2694,7 +2694,7 @@ const FPK = {
     clips: { idle: 'Arms_FPS_Anim_Idle', draw: 'Arms_FPS_Anim_Draw', fire: 'Arms_FPS_Anim_Shoot', reload: 'Arms_FPS_Anim_Reload_Fast', walk: 'Arms_FPS_Anim_Walk', run: 'Arms_FPS_Anim_Run' } },
   sniper: { url: 'assets/fps/sniper/scene.gltf', armsFrom: 'rifle', v: { p: [.197, -.115, -.325], e: [0, 0, -.03] }, sh: [.04, -.08, .1], hr: 1, body: 'Body', ref: 'Bolt', T: [-.074, null, .045], fwd: '+z', up: '+x', mag: 'Mag', bolt: 'Bolt',
     clips: { idle: 'SRifle_Idle', fire: 'SRifle_Shot_nosight', reload: 'SRifle_Reload', reloadE: 'SRifle_Reload_Full', walk: 'SRifle_Walk' } },
-  pump: { url: 'assets/fps/pump/scene.gltf', armsFrom: 'rifle', v: { p: [.216, -.061, -.362], e: [.034, -.005, -.223] }, sh: [.04, -.08, .1], hr: 1, body: 'Body', ref: 'Slide', T: [null, -.313, .0185], fwd: '+y', up: '-z',
+  pump: { url: 'assets/fps/pump/scene.gltf', armsFrom: 'rifle', v: { p: [.216, -.061, -.362], e: [.034, -.005, -.223] }, sh: [.06, -.14, .18], hr: 1, body: 'Body', ref: 'Slide', T: [null, -.313, .0185], fwd: '+y', up: '-z',
     clips: { idle: 'SG_FPS_Idle', fire: 'SG_FPS_Shot', reload: 'SG_FPS_Reload', walk: 'SG_FPS_Walk' } },
 };
 // modelos: T (gatilho), eixos, L = comprimento real (m), hide = peças soltas que vêm junto (balas, carregador extra), lens = materiais de vidro,
@@ -3056,6 +3056,11 @@ function fpIK(F) {
   if (K.sh[0] || K.sh[1] || K.sh[2]) for (const a of K.arms) { // ombros para fora/baixo/trás (no espaço da câmera)
     I.c.setFromMatrixPosition(a.cl.matrixWorld).add(I.a.set(K.sh[0] * a.sd, K.sh[1], K.sh[2]));
     a.cl.position.copy(a.cl.parent.worldToLocal(I.c)); a.cl.updateMatrixWorld(true);
+  }
+  for (const a of K.arms) { // braço esticado no limite parece duro: o ombro chega mais perto até sobrar folga (cotovelo dobrado)
+    I.s.setFromMatrixPosition(a.ua.matrixWorld); I.e.setFromMatrixPosition(a.fa.matrixWorld); I.w.setFromMatrixPosition(a.wr.matrixWorld);
+    const reach = (I.e.distanceTo(I.s) + I.w.distanceTo(I.e)) * .93, d = a.tw.distanceTo(I.s);
+    if (d > reach) { I.c.copy(a.tw).sub(I.s).normalize().multiplyScalar(d - reach).add(I.s); a.cl.position.add(a.cl.parent.worldToLocal(I.c.clone()).sub(a.cl.parent.worldToLocal(I.s.clone()))); a.cl.updateMatrixWorld(true); }
   }
   for (const a of K.arms) {
     I.s.setFromMatrixPosition(a.ua.matrixWorld); I.e.setFromMatrixPosition(a.fa.matrixWorld); I.w.setFromMatrixPosition(a.wr.matrixWorld);
