@@ -2168,29 +2168,72 @@ function buildMap(id) {
   if (M.zombie) zBuildWorld(M);
   else { ZC.on = false; ZC.world = null; buildNav(M); }
   renderer.shadowMap.needsUpdate = true;
-  // Compila os shaders agora. Senão cada material novo que entra na tela ao girar
-  // compila na hora e trava a câmera por alguns frames.
+  warmUp(M);
+}
+// Aquecimento: compila os shaders agora. Senão cada material novo que entra na tela ao girar compila na hora e
+// trava a câmera por alguns frames. Vai em pedaços (um material por vez, ~12 ms por tarefa): de uma vez só, a
+// entrada na partida travava a aba por segundos nos mapas grandes. Com KHR_parallel_shader_compile a placa
+// compila em paralelo e só se espera ficar pronto; sem ela cada programa trava só a sua parte. Enquanto aquece,
+// o jogo e a rede seguem rodando, mas a tela não é desenhada (mostra "Carregando o mapa").
+let WARM = null;
+function warmUp(M) {
+  WARM?.end();
   const warm = new THREE.Group();
   warm.add(playerModel('#888888'), gunModel('ak47'), nameSprite('x', '#fff'));
   if (M.zombie) warm.add(zombieModel(false), zombieModel(true), zombieModel(false, 2), zombieModel(false, 6), gunModel('raygun_pap'), gunModel('thundergun'));
   warm.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, transparent: true, depthWrite: false })));
   warm.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(), new V3(0, 1, 0)]), new THREE.LineBasicMaterial({ transparent: true })));
   warm.add(new THREE.Mesh(new THREE.SphereGeometry(.1), new THREE.MeshBasicMaterial({ transparent: true })));
-  scene.add(warm);
-  const vmWarm = new THREE.Group(); for (const id of ['m4', 'ak47', 'm1911_pap', 'awp', 'raygun', 'knife']) vmWarm.add(gunModel(id, true)); vmScene.add(vmWarm); // armas PBR da primeira pessoa
-  renderer.compile(scene, camera);
-  renderer.compile(vmScene, vmCam);
-  // e desenha um quadro de verdade com tudo isso (sem recorte, projetando sombra): compila as variantes que o compile()
-  // não pega (sombra com e sem ossos, alvo do pós-processamento no Alto, passes do composer) e já sobe texturas e malhas.
-  // Sem isso o primeiro quadro da partida travava segundos. A imagem não aparece: o próximo frame() desenha por cima.
-  const fc = [], inW = new Set(); warm.traverse(o => inW.add(o)); // o mapa inteiro também, sem recorte: sobe todas as malhas e texturas
-  for (const g of [scene, vmWarm]) g.traverse(o => { fc.push([o, o.frustumCulled, o.castShadow]); o.frustumCulled = false; if (inW.has(o) && o.isMesh && !o.material.transparent) o.castShadow = true; });
-  renderer.shadowMap.needsUpdate = true; renderScene(); renderer.clear();
-  for (const [o, f, c] of fc) { o.frustumCulled = f; o.castShadow = c; }
-  renderer.shadowMap.needsUpdate = true;
-  scene.remove(warm); vmScene.remove(vmWarm);
-  vmWarm.traverse(o => o.geometry?.dispose());
-  warm.traverse(o => { o.skeleton?.dispose(); if (!o.geometry?.userData.keep) o.geometry?.dispose(); if (o.material?.map && o.material.map !== SOFT && !Object.values(GTX || {}).includes(o.material.map)) o.material.map.dispose(); });
+  const vmWarm = new THREE.Group(); for (const id of ['m4', 'ak47', 'm1911_pap', 'awp', 'raygun', 'knife']) vmWarm.add(gunModel(id, true)); // armas PBR da primeira pessoa
+  warm.visible = vmWarm.visible = false; scene.add(warm); vmScene.add(vmWarm);
+  const items = [], seen = new Set(), par = renderer.extensions.has('KHR_parallel_shader_compile');
+  for (const [g, cam] of [[scene, camera], [vmScene, vmCam]]) g.traverse(o => {
+    if (!o.material) return; const ga = o.geometry?.attributes || {};
+    const k = [o.material].flat().map(m => m.uuid).join() + o.type + !!o.instanceColor + !!ga.color + !!ga.tangent + !!o.morphTargetInfluences;
+    if (!seen.has(k)) { seen.add(k); items.push([o, cam, g]); }
+  });
+  const tex = new Set(); for (const [o] of items) for (const m of [o.material].flat()) for (const v of Object.values(m)) if (v?.isTexture && !v.isRenderTargetTexture && v.image) tex.add(v);
+  const texs = [...tex], W = WARM = { i: 0, pend: [], tm: 0, n: items.length + texs.length, t0: performance.now() };
+  W.end = () => {
+    clearTimeout(W.tm); scene.remove(warm); vmScene.remove(vmWarm); if (WARM === W) WARM = null; warmMsg();
+    vmWarm.traverse(o => o.geometry?.dispose());
+    warm.traverse(o => { o.skeleton?.dispose(); if (!o.geometry?.userData.keep) o.geometry?.dispose(); if (o.material?.map && o.material.map !== SOFT && !Object.values(GTX || {}).includes(o.material.map)) o.material.map.dispose(); });
+  };
+  const step = () => {
+    const t = performance.now();
+    if (W.i < items.length) {
+      do {
+        const [o, cam, g] = items[W.i++]; if (!o.parent) continue; // saiu de cena enquanto isso
+        renderer.setRenderTarget(CFG.gfx === 'alto' ? composer.readBuffer : null); // no Alto a cena é desenhada no alvo do pós-processamento (outra variante do shader)
+        try { for (const m of renderer.compile(o, cam, g)) { const pg = renderer.properties.get(m).currentProgram; if (pg) W.pend.push(pg); } } finally { renderer.setRenderTarget(null); }
+        if (!par) while (W.pend.length) W.pend.pop().getUniforms(); // sem a extensão: espera este programa aqui (trava só ele)
+      } while (W.i < items.length && performance.now() - t < 12);
+      warmMsg(W); W.tm = setTimeout(step, 0); return;
+    }
+    if (W.i < W.n) { // texturas: sobem uma a uma
+      do renderer.initTexture(texs[W.i++ - items.length]); while (W.i < W.n && performance.now() - t < 12);
+      warmMsg(W); W.tm = setTimeout(step, 0); return;
+    }
+    W.pend = W.pend.filter(pg => !pg.isReady()); if (W.pend.length && performance.now() - W.t0 < 2e4) { W.tm = setTimeout(step, 10); return; } // contexto perdido nunca fica pronto: desiste em 20 s
+    // e passa um quadro de verdade por tudo isso (sem recorte, projetando sombra): compila as variantes que o compile()
+    // não pega (sombra com e sem ossos, passes do composer) e já sobe as malhas. Sem isso o primeiro quadro da partida
+    // travava segundos. Para ser leve, nada é pintado: cada malha entra com 0 vértices (sobe e compila, mas não desenha);
+    // o próximo frame() desenha de verdade.
+    warm.visible = vmWarm.visible = true;
+    const fc = [], inW = new Set(), dr = new Map(); warm.traverse(o => inW.add(o)); // o mapa inteiro também, sem recorte: sobe todas as malhas
+    for (const g of [scene, vmWarm]) g.traverse(o => { fc.push([o, o.frustumCulled, o.castShadow]); o.frustumCulled = false; if (inW.has(o) && o.isMesh && !o.material.transparent) o.castShadow = true; if (o.geometry && !dr.has(o.geometry)) dr.set(o.geometry, o.geometry.drawRange.count); });
+    try { for (const g of dr.keys()) g.drawRange.count = 0; renderer.shadowMap.needsUpdate = true; renderScene(); renderer.clear(); }
+    finally { for (const [g, n] of dr) g.drawRange.count = n; for (const [o, f, c] of fc) { o.frustumCulled = f; o.castShadow = c; } }
+    renderer.shadowMap.needsUpdate = true;
+    W.end();
+  };
+  step();
+}
+function warmMsg(W) { // aviso enquanto o mapa aquece
+  let el = document.getElementById('warmMsg');
+  if (!W) { el?.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'warmMsg'; el.style.cssText = 'position:fixed;left:0;right:0;top:46%;text-align:center;color:#fff;font:600 18px system-ui,sans-serif;text-shadow:0 2px 6px #000;pointer-events:none;z-index:30'; document.body.appendChild(el); }
+  el.textContent = 'Carregando o mapa... ' + Math.min(99, Math.round(W.i / Math.max(1, W.n) * 100)) + '%';
 }
 
 // ---------- navegação dos bots (grade automática) ----------
@@ -2482,26 +2525,39 @@ function addFx(obj, life, upd) { obj.userData.own = true; fxGroup.add(obj); fx.p
 function updateFx() {
   for (let i = fx.length - 1; i >= 0; i--) {
     const f = fx[i], k = (now - f.t0) / f.life;
-    if (k >= 1) { fxGroup.remove(f.obj); f.obj.geometry?.dispose(); f.obj.material?.dispose(); fx.splice(i, 1); continue; }
+    if (k >= 1) { fxGroup.remove(f.obj); fxFree(f.obj); fx.splice(i, 1); continue; }
     f.upd && f.upd(k, f.obj);
   }
   if (flashLight.intensity > 0) flashLight.intensity = Math.max(0, flashLight.intensity - 400 * (1 / 60));
 }
 function clearFx() {
-  for (const f of fx) { fxGroup.remove(f.obj); f.obj.geometry?.dispose(); f.obj.material?.dispose(); }
+  for (const f of fx) { fxGroup.remove(f.obj); fxFree(f.obj); }
   fx.length = 0;
   for (const d of decals) d.visible = false;
   for (const b of bloods) b.visible = false;
   for (const n of nades) fxGroup.remove(n.mesh); nades.length = 0;
   for (const s of smokes) for (const sp of s.sprites) { fxGroup.remove(sp); sp.material.dispose(); } smokes.length = 0;
 }
+// Efeitos de tiro reaproveitados (traçante, fumaça, faísca, clarão). Criar e descartar geometria/material a cada tiro
+// pesava com vários jogadores atirando (cada material novo passa pela montagem de programa do three).
+const FXP = { line: [], puff: [], add: [], spark: [] };
+function fxFree(o) {
+  const P = o.userData.pool; if (P && P.length < 300) { P.push(o); return; }
+  o.geometry?.dispose(); o.material?.dispose();
+}
+function fxSprite(kind, color, opacity) { // 'puff' normal, 'add' aditivo, 'spark' faísca
+  const s = FXP[kind].pop() || new THREE.Sprite(kind === 'spark' ? SPARK.clone() : new THREE.SpriteMaterial({ map: SOFT, transparent: true, depthWrite: false, blending: kind === 'add' ? THREE.AdditiveBlending : THREE.NormalBlending }));
+  if (color != null) s.material.color.set(color); s.material.opacity = opacity; s.userData.pool = FXP[kind]; return s;
+}
 function tracer(a, b, color = 0xffe9a0) {
-  const g = new THREE.BufferGeometry().setFromPoints([a, b]);
-  const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2), transparent: true, opacity: .85 }));
+  let l = FXP.line.pop();
+  if (!l) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3)); l = new THREE.Line(g, new THREE.LineBasicMaterial({ transparent: true })); l.userData.pool = FXP.line; }
+  const g = l.geometry, pa = g.attributes.position; pa.setXYZ(0, a.x, a.y, a.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true; g.computeBoundingSphere();
+  l.material.color.set(color).multiplyScalar(2); l.material.opacity = .85;
   addFx(l, .07, (k, o) => o.material.opacity = .85 * (1 - k));
 }
 function puff(pos, color, size, life, rise = .6) {
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, color, transparent: true, depthWrite: false, opacity: .8 }));
+  const s = fxSprite('puff', color, .8);
   s.position.copy(pos); s.scale.setScalar(size * .5);
   addFx(s, life, (k, o) => { o.scale.setScalar(size * (.5 + k)); o.material.opacity = .8 * (1 - k); o.position.y += rise * .016; });
 }
@@ -2512,7 +2568,7 @@ for (let i = 0; i < 90; i++) { const m = new THREE.Mesh(decalGeo, decalMat); m.v
 const SPARK = new THREE.SpriteMaterial({ map: SOFT, color: new THREE.Color(0xffc060).multiplyScalar(4), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
 function sparks(p, n, nrm) {
   for (let i = 0; i < n; i++) {
-    const s = new THREE.Sprite(SPARK.clone()); s.position.copy(p); s.scale.setScalar(.05);
+    const s = fxSprite('spark', null, 1); s.position.copy(p); s.scale.setScalar(.05);
     const v = new V3(rand(-1, 1), rand(0, 1.5), rand(-1, 1)); if (nrm) v.add(new V3(nrm[0], nrm[1], nrm[2]).multiplyScalar(1.5)); v.multiplyScalar(rand(2, 4));
     addFx(s, rand(.15, .3), (k, o) => { o.position.addScaledVector(v, .016); v.y -= .3; o.material.opacity = 1 - k; });
   }
@@ -2534,9 +2590,10 @@ function bloodSplat(p) {
   const m = bloods[bloodI++ % bloods.length]; m.visible = true;
   m.position.set(p.x + rand(-.5, .5), .012, p.z + rand(-.5, .5)); m.scale.setScalar(rand(.5, 1.5)); m.rotation.z = rand(0, 7);
 }
+const MFLASH_C = new THREE.Color(0xffd27a).multiplyScalar(3);
 function muzzleFlash(pos, world) {
   flashLight.position.copy(pos); flashLight.intensity = 25;
-  if (world) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, color: new THREE.Color(0xffd27a).multiplyScalar(3), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); s.position.copy(pos); s.scale.setScalar(.5); addFx(s, .05); }
+  if (world) { const s = fxSprite('add', MFLASH_C, 1); s.position.copy(pos); s.scale.setScalar(.5); addFx(s, .05); }
 }
 // cápsulas saindo da arma (desenhadas na cena da arma, em primeira pessoa)
 const vmFx = [];
@@ -4802,12 +4859,25 @@ function getRemote(id) {
   setRemoteGun(rp, 'glock');
   return rp;
 }
+// Arma na mão dos outros: um molde por modelo + skin e cada jogador recebe uma cópia leve (geometria e material do molde).
+// Montar a arma (procedural + modelo baixado) a cada troca de arma de outro jogador travava o quadro.
+const RGUN = new Map();
+function remoteGunTpl(mid, skin) {
+  const k = mid + '|' + (skin || ''), nl = Object.keys(FPC).filter(fpReady).length; let t = RGUN.get(k);
+  if (t && !t.userData.dl && nl > t.userData.nl) t = null; // chegou modelo baixado depois do molde: refaz
+  if (!t) { t = gunModel(mid, false, skin); t.scale.setScalar(1.1); t.userData.nl = nl; RGUN.set(k, t); }
+  return t;
+}
+function cloneShared(t) { // o three copia userData por JSON (aqui ele guarda malhas): fica de fora da cópia
+  const st = []; t.traverse(o => { st.push(o.userData); o.userData = {}; });
+  try { return SkeletonUtils.clone(t); } finally { let i = 0; t.traverse(o => { o.userData = st[i++]; }); }
+}
 function setRemoteGun(rp, w) {
   if (!w || rp.w === w) return; rp.w = w;
-  const gh = rp.model.userData.gh; while (gh.children.length) { const c = gh.children[0]; gh.remove(c); c.traverse(o => o.geometry?.dispose()); }
-  const mid = knifeModelOf(w, rp.sk), g = gunModel(mid, false, rp.sk?.[mid]); g.scale.setScalar(1.1); gh.add(g);
+  const gh = rp.model.userData.gh; while (gh.children.length) gh.remove(gh.children[0]); // não descarta: é do molde
+  const mid = knifeModelOf(w, rp.sk); gh.add(cloneShared(remoteGunTpl(mid, rp.sk?.[mid])));
 }
-function removeRemote(id) { const rp = R.get(id); if (!rp) return; scene.remove(rp.model); disposeGroup(rp.model); R.delete(id); }
+function removeRemote(id) { const rp = R.get(id); if (!rp) return; scene.remove(rp.model); const gh = rp.model.userData.gh; while (gh.children.length) gh.remove(gh.children[0]); disposeGroup(rp.model); R.delete(id); }
 function refreshRemoteInfo(rp) {
   const info = C.players.get(rp.id); if (!info) return;
   if (info.c !== rp.color) { rp.color = info.c; rp.model.userData.bodyM.color.set(info.c); }
@@ -5070,6 +5140,8 @@ function startHost(st) {
       conn.on('open', () => attachFast(conn, d => srvOnData(conn, d)));
       conn.on('data', d => srvOnData(conn, d));
       conn.on('close', () => srvDrop(conn));
+      // aba fechada sem aviso: o PeerJS demora a disparar 'close'; se a ligação WebRTC cair e não voltar em 4 s, sai (sem fantasma parado no mapa)
+      conn.on('open', () => { const pc = conn.peerConnection; if (pc) pc.addEventListener('connectionstatechange', () => { const st = pc.connectionState; if (st === 'failed' || st === 'closed') srvDrop(conn); else if (st === 'disconnected') setTimeout(() => { if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') srvDrop(conn); }, 4000); }); });
       // "message-too-big"/"not-open-yet" são de uma mensagem só: não derrubam o jogador
       conn.on('error', err => { if (err?.type === 'message-too-big' || err?.type === 'not-open-yet') console.warn('conn', err); else srvDrop(conn); });
     });
@@ -5109,6 +5181,7 @@ function joinRoom(code) {
 // depois de 5 min escondido, e o host derrubava quem estava morto/assistindo com a aba em segundo plano.
 function clientHeartbeat(dt) {
   if (NET.isHost || !NET.hostConn?.open) return;
+  const pn = performance.now(); if (NET.hbAt && pn - NET.hbAt > 2000 && NET.lastHost) NET.lastHost = Math.max(NET.lastHost, pn - 2000); NET.hbAt = pn; // esta aba ficou travada (não o host): as mensagens da fila ainda chegam
   NET.pingT = (NET.pingT || 0) - dt; if (NET.pingT > 0) return; NET.pingT = 1;
   sendToHostFast({ t: 'ping', c: Math.round(performance.now()) });
   if (NET.lastHost && performance.now() - NET.lastHost > 12000) lostConnection();
@@ -7978,7 +8051,7 @@ function grantXP(n) {
   d.xp += n; let got = 0;
   while (d.xp >= XP_CASE) { d.xp -= XP_CASE; d.cases++; got++; }
   if (got && inGame) { toast(got > 1 ? `Você ganhou ${got} caixas de skin! Abra no menu → Skins` : 'Você ganhou uma caixa de skin! Abra no menu → Skins', 4); play('kaching'); }
-  profSave(); skinsUI();
+  profSave(); if (!inGame) skinsUI(); // em jogo o menu está escondido (e sair recarrega a página): redesenhar aqui travava o host ~0,3 s a cada XP
 }
 // ---------- caixa ----------
 function rollItem() {
@@ -8083,7 +8156,9 @@ function vCategories() {
   const rest = all.filter(w => !used.has(w)); if (rest.length) cols[3].push(['Outras', rest]);
   return cols;
 }
-// miniaturas das armas (de perfil, com a skin), desenhadas uma por quadro num renderizador separado
+// miniaturas das armas (de perfil, com a skin), desenhadas uma por vez num renderizador separado. Na partida só
+// andam com a loja aberta (a fila do menu, ~50 cartões, travava os primeiros segundos de quem entrava);
+// o PNG é codificado fora da thread principal (toBlob)
 const THC = {}, thQ = [];
 let TH = null;
 function thumbURL(w, f) {
@@ -8094,6 +8169,7 @@ function thumbURL(w, f) {
 }
 function thPump() {
   const k = thQ[0]; if (!k) return;
+  if (inGame && !C.buyOpen) { setTimeout(thPump, 500); return; }
   if (!TH) {
     const c = document.createElement('canvas'); c.width = 360; c.height = 150;
     const r = new THREE.WebGLRenderer({ canvas: c, antialias: true, alpha: true, preserveDrawingBuffer: true }); r.toneMapping = THREE.ACESFilmicToneMapping;
@@ -8108,10 +8184,10 @@ function thPump() {
   const asp = 360 / 150, hw = Math.max(sz.z / 2, sz.y / 2 * asp) * 1.08, hh = hw / asp;
   Object.assign(TH.cam, { left: -hw, right: hw, top: hh, bottom: -hh }); TH.cam.position.set(5, 0, 0); TH.cam.lookAt(0, 0, 0); TH.cam.updateProjectionMatrix(); // de lado: cano para a direita
   TH.r.render(TH.sc, TH.cam);
-  const url = THC[k] = TH.c.toDataURL('image/png');
+  const done = url => { THC[k] = url; thQ.shift(); document.querySelectorAll(`img[data-th="${k}"]`).forEach(i => { i.src = url; i.removeAttribute('data-th'); }); if (thQ.length) setTimeout(thPump, 10); };
   TH.sc.remove(g); g.traverse(o => o.geometry?.dispose());
-  document.querySelectorAll(`img[data-th="${k}"]`).forEach(i => { i.src = url; i.removeAttribute('data-th'); });
-  thQ.shift(); if (thQ.length) setTimeout(thPump, 10);
+  if (TH.c.toBlob) TH.c.toBlob(b => done(b ? URL.createObjectURL(b) : TH.c.toDataURL('image/png')), 'image/png'); // copia a imagem agora e codifica depois
+  else done(TH.c.toDataURL('image/png'));
 }
 function setHTMLm(id, html) { const el = document.getElementById(id); if (el && el.innerHTML !== html) el.innerHTML = html; }
 // roleta estilo CS: a faixa corre e para no item sorteado
@@ -8252,7 +8328,7 @@ function frame() {
   now = performance.now() / 1000; lastFrameAt = performance.now();
   if (!inGame) { renderer.clear(); return; }
   if (window.__simLock) now = window.__simNow ?? now; else tick(dt); // testes automáticos controlam o tempo
-  renderScene();
+  if (WARM) renderer.clear(); else renderScene(); // aquecendo os shaders do mapa: não desenha (o desenho compilaria tudo de uma vez)
 }
 function renderScene() {
   sky.position.copy(camera.position); if (CULL.length) zCull();
