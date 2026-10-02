@@ -2482,26 +2482,39 @@ function addFx(obj, life, upd) { obj.userData.own = true; fxGroup.add(obj); fx.p
 function updateFx() {
   for (let i = fx.length - 1; i >= 0; i--) {
     const f = fx[i], k = (now - f.t0) / f.life;
-    if (k >= 1) { fxGroup.remove(f.obj); f.obj.geometry?.dispose(); f.obj.material?.dispose(); fx.splice(i, 1); continue; }
+    if (k >= 1) { fxGroup.remove(f.obj); fxFree(f.obj); fx.splice(i, 1); continue; }
     f.upd && f.upd(k, f.obj);
   }
   if (flashLight.intensity > 0) flashLight.intensity = Math.max(0, flashLight.intensity - 400 * (1 / 60));
 }
 function clearFx() {
-  for (const f of fx) { fxGroup.remove(f.obj); f.obj.geometry?.dispose(); f.obj.material?.dispose(); }
+  for (const f of fx) { fxGroup.remove(f.obj); fxFree(f.obj); }
   fx.length = 0;
   for (const d of decals) d.visible = false;
   for (const b of bloods) b.visible = false;
   for (const n of nades) fxGroup.remove(n.mesh); nades.length = 0;
   for (const s of smokes) for (const sp of s.sprites) { fxGroup.remove(sp); sp.material.dispose(); } smokes.length = 0;
 }
+// Efeitos de tiro reaproveitados (traçante, fumaça, faísca, clarão). Criar e descartar geometria/material a cada tiro
+// pesava com vários jogadores atirando (cada material novo passa pela montagem de programa do three).
+const FXP = { line: [], puff: [], add: [], spark: [] };
+function fxFree(o) {
+  const P = o.userData.pool; if (P && P.length < 300) { P.push(o); return; }
+  o.geometry?.dispose(); o.material?.dispose();
+}
+function fxSprite(kind, color, opacity) { // 'puff' normal, 'add' aditivo, 'spark' faísca
+  const s = FXP[kind].pop() || new THREE.Sprite(kind === 'spark' ? SPARK.clone() : new THREE.SpriteMaterial({ map: SOFT, transparent: true, depthWrite: false, blending: kind === 'add' ? THREE.AdditiveBlending : THREE.NormalBlending }));
+  if (color != null) s.material.color.set(color); s.material.opacity = opacity; s.userData.pool = FXP[kind]; return s;
+}
 function tracer(a, b, color = 0xffe9a0) {
-  const g = new THREE.BufferGeometry().setFromPoints([a, b]);
-  const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2), transparent: true, opacity: .85 }));
+  let l = FXP.line.pop();
+  if (!l) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3)); l = new THREE.Line(g, new THREE.LineBasicMaterial({ transparent: true })); l.userData.pool = FXP.line; }
+  const g = l.geometry, pa = g.attributes.position; pa.setXYZ(0, a.x, a.y, a.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true; g.computeBoundingSphere();
+  l.material.color.set(color).multiplyScalar(2); l.material.opacity = .85;
   addFx(l, .07, (k, o) => o.material.opacity = .85 * (1 - k));
 }
 function puff(pos, color, size, life, rise = .6) {
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, color, transparent: true, depthWrite: false, opacity: .8 }));
+  const s = fxSprite('puff', color, .8);
   s.position.copy(pos); s.scale.setScalar(size * .5);
   addFx(s, life, (k, o) => { o.scale.setScalar(size * (.5 + k)); o.material.opacity = .8 * (1 - k); o.position.y += rise * .016; });
 }
@@ -2512,7 +2525,7 @@ for (let i = 0; i < 90; i++) { const m = new THREE.Mesh(decalGeo, decalMat); m.v
 const SPARK = new THREE.SpriteMaterial({ map: SOFT, color: new THREE.Color(0xffc060).multiplyScalar(4), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
 function sparks(p, n, nrm) {
   for (let i = 0; i < n; i++) {
-    const s = new THREE.Sprite(SPARK.clone()); s.position.copy(p); s.scale.setScalar(.05);
+    const s = fxSprite('spark', null, 1); s.position.copy(p); s.scale.setScalar(.05);
     const v = new V3(rand(-1, 1), rand(0, 1.5), rand(-1, 1)); if (nrm) v.add(new V3(nrm[0], nrm[1], nrm[2]).multiplyScalar(1.5)); v.multiplyScalar(rand(2, 4));
     addFx(s, rand(.15, .3), (k, o) => { o.position.addScaledVector(v, .016); v.y -= .3; o.material.opacity = 1 - k; });
   }
@@ -2534,9 +2547,10 @@ function bloodSplat(p) {
   const m = bloods[bloodI++ % bloods.length]; m.visible = true;
   m.position.set(p.x + rand(-.5, .5), .012, p.z + rand(-.5, .5)); m.scale.setScalar(rand(.5, 1.5)); m.rotation.z = rand(0, 7);
 }
+const MFLASH_C = new THREE.Color(0xffd27a).multiplyScalar(3);
 function muzzleFlash(pos, world) {
   flashLight.position.copy(pos); flashLight.intensity = 25;
-  if (world) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, color: new THREE.Color(0xffd27a).multiplyScalar(3), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); s.position.copy(pos); s.scale.setScalar(.5); addFx(s, .05); }
+  if (world) { const s = fxSprite('add', MFLASH_C, 1); s.position.copy(pos); s.scale.setScalar(.5); addFx(s, .05); }
 }
 // cápsulas saindo da arma (desenhadas na cena da arma, em primeira pessoa)
 const vmFx = [];
@@ -4802,12 +4816,25 @@ function getRemote(id) {
   setRemoteGun(rp, 'glock');
   return rp;
 }
+// Arma na mão dos outros: um molde por modelo + skin e cada jogador recebe uma cópia leve (geometria e material do molde).
+// Montar a arma (procedural + modelo baixado) a cada troca de arma de outro jogador travava o quadro.
+const RGUN = new Map();
+function remoteGunTpl(mid, skin) {
+  const k = mid + '|' + (skin || ''), nl = Object.keys(FPC).filter(fpReady).length; let t = RGUN.get(k);
+  if (t && !t.userData.dl && nl > t.userData.nl) t = null; // chegou modelo baixado depois do molde: refaz
+  if (!t) { t = gunModel(mid, false, skin); t.scale.setScalar(1.1); t.userData.nl = nl; RGUN.set(k, t); }
+  return t;
+}
+function cloneShared(t) { // o three copia userData por JSON (aqui ele guarda malhas): fica de fora da cópia
+  const st = []; t.traverse(o => { st.push(o.userData); o.userData = {}; });
+  try { return SkeletonUtils.clone(t); } finally { let i = 0; t.traverse(o => { o.userData = st[i++]; }); }
+}
 function setRemoteGun(rp, w) {
   if (!w || rp.w === w) return; rp.w = w;
-  const gh = rp.model.userData.gh; while (gh.children.length) { const c = gh.children[0]; gh.remove(c); c.traverse(o => o.geometry?.dispose()); }
-  const mid = knifeModelOf(w, rp.sk), g = gunModel(mid, false, rp.sk?.[mid]); g.scale.setScalar(1.1); gh.add(g);
+  const gh = rp.model.userData.gh; while (gh.children.length) gh.remove(gh.children[0]); // não descarta: é do molde
+  const mid = knifeModelOf(w, rp.sk); gh.add(cloneShared(remoteGunTpl(mid, rp.sk?.[mid])));
 }
-function removeRemote(id) { const rp = R.get(id); if (!rp) return; scene.remove(rp.model); disposeGroup(rp.model); R.delete(id); }
+function removeRemote(id) { const rp = R.get(id); if (!rp) return; scene.remove(rp.model); const gh = rp.model.userData.gh; while (gh.children.length) gh.remove(gh.children[0]); disposeGroup(rp.model); R.delete(id); }
 function refreshRemoteInfo(rp) {
   const info = C.players.get(rp.id); if (!info) return;
   if (info.c !== rp.color) { rp.color = info.c; rp.model.userData.bodyM.color.set(info.c); }
