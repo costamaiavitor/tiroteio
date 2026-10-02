@@ -2694,7 +2694,7 @@ const FPK = {
     clips: { idle: 'Arms_FPS_Anim_Idle', draw: 'Arms_FPS_Anim_Draw', fire: 'Arms_FPS_Anim_Shoot', reload: 'Arms_FPS_Anim_Reload_Fast', walk: 'Arms_FPS_Anim_Walk', run: 'Arms_FPS_Anim_Run' } },
   sniper: { url: 'assets/fps/sniper/scene.gltf', armsFrom: 'rifle', v: { p: [.197, -.115, -.325], e: [0, 0, -.03] }, sh: [.04, -.08, .1], hr: 1, body: 'Body', ref: 'Bolt', T: [-.074, null, .045], fwd: '+z', up: '+x', mag: 'Mag', bolt: 'Bolt',
     clips: { idle: 'SRifle_Idle', fire: 'SRifle_Shot_nosight', reload: 'SRifle_Reload', reloadE: 'SRifle_Reload_Full', walk: 'SRifle_Walk' } },
-  pump: { url: 'assets/fps/pump/scene.gltf', armsFrom: 'rifle', v: { p: [.216, -.061, -.362], e: [.034, -.005, -.223] }, sh: [.06, -.14, .18], hr: 1, body: 'Body', ref: 'Slide', T: [null, -.313, .0185], fwd: '+y', up: '-z',
+  pump: { url: 'assets/fps/pump/scene.gltf', shells: 4, armsFrom: 'rifle', v: { p: [.216, -.061, -.362], e: [.034, -.005, -.223] }, sh: [.06, -.14, .18], hr: 1, body: 'Body', ref: 'Slide', T: [null, -.313, .0185], fwd: '+y', up: '-z',
     clips: { idle: 'SG_FPS_Idle', fire: 'SG_FPS_Shot', reload: 'SG_FPS_Reload', walk: 'SG_FPS_Walk' } },
 };
 // modelos: T (gatilho), eixos, L = comprimento real (m), hide = peças soltas que vêm junto (balas, carregador extra), lens = materiais de vidro,
@@ -2716,7 +2716,7 @@ const FPM = {
   galil: { T: [-130, 39, null], fwd: '+x', up: '+y', L: .98, brass: ['Material.007', 'Material.008', 'Material.009'] },
   rpk: { T: [-116, 20, null], fwd: '+x', up: '+y', L: 1.04 },
   hk21: { T: [-1.0, -.30, null], fwd: '+x', up: '+y', L: 1.02, lens: ['Material.015'], lhf: .78 }, // mão esquerda à frente da caixa de munição
-  dragunov: { T: [-93, -6.7, null], fwd: '+x', up: '+y', L: 1.225 },
+  dragunov: { T: [-93, -6.7, null], fwd: '+x', up: '+y', L: 1.225, noMag2: 1 }, // carregador curto: a cópia na mão ficava solta
   m4: { T: [-20, -3, null], fwd: '+x', up: '+y', L: .84 , lhf: .5 },
   commando: { T: [-44, -1, null], fwd: '+x', up: '+y', L: .85 , lhf: .5 },
   fal: { T: [-16.5, 2.3, null], fwd: '+x', up: '+y', L: 1.09 , lhf: .5 , tint: { Material: 0x2b2b2b, 'Material.003': 0x2b2b2b }, brass: ['Material.001', 'Material.002'] },
@@ -2815,7 +2815,7 @@ function fpBuild(id, ud) {
     }
     const s = D.L * FPG * P.hr / tips.L;
     C = new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A).multiply(new THREE.Matrix4().makeScale(s, s, s)); // referencial da arma → osso do corpo
-    root.traverse(o => { if (o.isMesh && !fpArm(o)) o.visible = false; }); // some a arma do pacote
+    root.traverse(o => { if (o.isMesh && !fpArm(o) && o.material?.name !== '12ge') o.visible = false; }); // some a arma do pacote (o cartucho na mão da escopeta fica)
     model = new THREE.Group(); model.matrixAutoUpdate = false; model.matrix.copy(C).multiply(Mi); model.add(ms); body.add(model);
     root.updateMatrixWorld(true);
     // peças móveis do modelo seguem as do pacote (carregador na recarga, ferrolho da pistola, ferrolho do fuzil)
@@ -2832,7 +2832,7 @@ function fpBuild(id, ud) {
       follow.push(f);
     }
     // segundo carregador do pacote (o novo, que a mão esquerda traz na recarga da AK): cópia do modelo em que só o carregador aparece
-    const a2 = P.mag2 && fpBone(root, P.mag2), fm = follow.find(f => f.rest), hl2 = fpBone(root, 'Hand_L');
+    const a2 = P.mag2 && !D.noMag2 && fpBone(root, P.mag2), fm = follow.find(f => f.rest), hl2 = fpBone(root, 'Hand_L');
     if (a2 && fm && hl2) {
       const g2 = SkeletonUtils.clone(FPC[mk].scene); g2.traverse(o => { if (o.isMesh && D.hide?.includes(o.name)) o.visible = false; });
       let b2 = null; g2.traverse(o => { if (!b2 && o.isBone && o.name === fm.b.name) b2 = o; });
@@ -2971,9 +2971,14 @@ function fpPlay(ud, name, dur) {
   const F = ud.fps2, c = F.clips[name] || F.clips.idle; if (!c) return;
   const a = F.mixer.clipAction(c), once = !['idle', 'walk', 'run'].includes(name);
   if (F.act === a && !once) return;
-  a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = true; a.timeScale = dur ? c.duration / dur : 1; a.play();
+  const w = W[G.cur];
+  if (name === 'fire' && !dur && w?.rate && w.rate < c.duration) dur = w.rate * .95; // o próximo tiro não corta a bomba/ferrolho no meio
+  let loop = !once;
+  if ((name === 'reload' || name === 'reloadE') && w?.shellTime && F.P.shells) { dur = null; loop = true; } // escopeta: uma volta do clipe a cada F.P.shells cartuchos
+  a.reset(); a.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce); a.clampWhenFinished = true;
+  a.timeScale = dur ? c.duration / dur : loop && w?.shellTime && F.P.shells ? c.duration / F.P.shells / (G.reload?.iv || w.shellTime) : 1; a.play();
   if (F.act && F.act !== a) F.act.crossFadeTo(a, name === 'fire' ? .04 : name === 'draw' ? 0 : .15, false);
-  F.act = a; F.cur = name; F.until = once ? now + c.duration / a.timeScale : 0;
+  F.act = a; F.cur = name; F.until = once && !loop ? now + c.duration / a.timeScale : 0;
 }
 const _fm = new THREE.Matrix4(), _fm2 = new THREE.Matrix4(), _fv = new V3(), _fv2 = new V3();
 // centro (no espaço do osso) dos vértices que se movem com o osso b (peso principal nele)
