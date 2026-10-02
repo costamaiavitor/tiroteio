@@ -105,7 +105,13 @@ test('V02 pos (zumbis): posição fora da grade do mapa é ignorada', async () =
 });
 
 test('V03 zhit (zumbis): o acerto honesto continua valendo e o balde por arma continua igual', async () => {
-  const r = await noJogo(J.page, T => { T.zStartRound(); T.sim(6); const p = T.S.players.get('h'), z = [...T.Z.zs.values()][0]; const hp0 = z.hp, m0 = p.money; T.sendToHost({ t: 'zhit', v: z.id, dmg: 20, z: 'body', w: 'm1911' }); return { d: hp0 - z.hp, pts: p.money - m0, vivo: T.Z.zs.has(z.id) }; });
+  const r = await noJogo(J.page, T => {
+    if (T.Z.phase !== 'round') T.zStartRound(); T.sim(6); const p = T.S.players.get('h'), z = [...T.Z.zs.values()][0];
+    // o host agora exige linha de visão: põe o zumbi a 2,5 m do jogador numa direção sem parede
+    const V3 = T.camera.position.constructor, eye = new V3(p.pos[0], p.pos[1] + 1.62, p.pos[2]);
+    for (const [dx, dz] of [[2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]]) { const c = new V3(p.pos[0] + dx, p.pos[1] + 1.15, p.pos[2] + dz), d = c.clone().sub(eye), dist = d.length(); d.divideScalar(dist); if (T.trace(eye, d, dist, null).t >= dist - .05) { z.body.pos.set(p.pos[0] + dx, p.pos[1], p.pos[2] + dz); z.st = 'in'; z.ph = []; break; } }
+    const hp0 = z.hp, m0 = p.money; T.sendToHost({ t: 'zhit', v: z.id, dmg: 20, z: 'body', w: 'm1911' }); return { d: hp0 - z.hp, pts: p.money - m0, vivo: T.Z.zs.has(z.id) };
+  });
   assert.equal(r.d, 20); if (r.vivo) assert.equal(r.pts, 10);
   assert.deepEqual(J.erros, []);
 });

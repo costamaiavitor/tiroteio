@@ -19,8 +19,9 @@ test('zumbis: sala criada offline, host vivo com M1911 e 500 pontos (Normal)', {
 });
 
 test('zumbis: a rodada 1 começa e zumbis nascem', { timeout: 60000 }, async () => {
-  const r = await noJogo(J.page, T => { T.zStartRound(); T.sim(6); return { round: T.Z.round, n: T.Z.zs.size, toSpawn: T.Z.toSpawn }; });
-  assert.equal(r.round, 1); assert.ok(r.n > 0, 'nenhum zumbi nasceu');
+  // a fase "pre" (5 s) pode já ter acabado sozinha enquanto o mapa carregava (o relógio do jogo fica parado durante o buildMap): então a rodada já é 1
+  const r = await noJogo(J.page, T => { if (T.Z.phase !== 'round') T.zStartRound(); T.sim(6); return { round: T.Z.round, n: T.Z.zs.size, toSpawn: T.Z.toSpawn }; });
+  assert.ok(r.round >= 1); assert.ok(r.n > 0, 'nenhum zumbi nasceu');
 });
 
 test('zhit: dano é limitado ao teto da arma e dá 10 pontos por acerto', async () => {
@@ -52,6 +53,10 @@ test('zhit: repetir a mensagem muitas vezes no mesmo instante só vale até a ca
     const p = T.S.players.get('h');
     T.sim(2); // enche a cota de cadência
     const z = [...T.Z.zs.values()].reduce((a, b) => (a && a.hp > b.hp ? a : b));
+    { // fase 2: o host exige linha de visão; põe o zumbi a 2,5 m do jogador numa direção sem parede
+      const V3 = T.camera.position.constructor, eye = new V3(p.pos[0], p.pos[1] + 1.62, p.pos[2]);
+      for (const [dx, dz] of [[2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]]) { const c = new V3(p.pos[0] + dx, p.pos[1] + 1.15, p.pos[2] + dz), d = c.clone().sub(eye), dist = d.length(); d.divideScalar(dist); if (T.trace(eye, d, dist, null).t >= dist - .05) { z.body.pos.set(p.pos[0] + dx, p.pos[1], p.pos[2] + dz); z.st = 'in'; z.ph = []; break; } }
+    }
     const m0 = p.money, hp0 = z.hp;
     for (let i = 0; i < 60; i++) T.sendToHost({ t: 'zhit', v: z.id, dmg: 1, z: 'body', w: 'm1911' });
     return { acertos: (p.money - m0) / 10, hp0, hp1: z.hp };
@@ -128,14 +133,15 @@ test('chat: texto é cortado em 120 caracteres e mostrado escapado (sem HTML)', 
   assert.ok(r.len <= 120 + 30, 'texto não foi cortado');
 });
 
-test('selfdmg: dano próprio é limitado a 100 e não mata com PhD', async () => {
+test('selfdmg: explosão da própria arma machuca (até o dano dela) e não machuca com PhD', async () => {
   const r = await noJogo(J.page, T => {
-    const p = T.S.players.get('h'); p.hp = p.maxHp; p.perks = [];
-    T.sendToHost({ t: 'selfdmg', d: 30 }); const a = p.hp;
-    p.hp = p.maxHp; p.perks = ['phd']; T.sendToHost({ t: 'selfdmg', d: 30 }); const b = p.hp;
-    p.perks = []; p.hp = p.maxHp; return { a, b, max: p.maxHp };
+    const p = T.S.players.get('h'); p.hp = p.maxHp; p.perks = []; const inv0 = { ...p.inv }; p.inv.primary = 'raygun'; // fase 2: só logo depois de um tiro de arma que explode
+    const tiro = () => { T.sim(.5); T.sendToHost({ t: 'shot', w: 'raygun', o: [p.pos[0], p.pos[1] + 1.6, p.pos[2]], e: [[p.pos[0] + 2, p.pos[1], p.pos[2]]] }); };
+    tiro(); T.sendToHost({ t: 'selfdmg', d: 20 }); const a = p.hp;
+    p.hp = p.maxHp; p.perks = ['phd']; tiro(); T.sendToHost({ t: 'selfdmg', d: 20 }); const b = p.hp;
+    p.perks = []; p.hp = p.maxHp; p.inv = inv0; return { a, b, max: p.maxHp };
   });
-  assert.equal(r.a, r.max - 30); assert.equal(r.b, r.max);
+  assert.equal(r.a, r.max - 20); assert.equal(r.b, r.max);
 });
 
 test('nade: granada sem estoque ou lançada de longe é recusada; válida desconta', async () => {

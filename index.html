@@ -412,7 +412,8 @@ summary{cursor:pointer;color:#fff;font-weight:700}
       <div class="box"><h3>Configurações</h3><div id="pauseSettings"></div>
         <button id="btnFull" style="margin-top:6px">Tela cheia</button></div>
       <div class="box" id="pHostBox"><h3>Partida (host)</h3><div id="pauseForm"></div>
-        <button id="btnApply" class="big">Aplicar e reiniciar partida</button></div>
+        <button id="btnApply" class="big">Aplicar e reiniciar partida</button>
+        <div id="pKick"></div></div>
     </div>
     <div class="row" style="margin-top:14px;justify-content:flex-end"><button id="btnLeave">Sair para o menu</button></div>
   </div>
@@ -447,8 +448,12 @@ function save(k, v) { try { localStorage.setItem('tiroteio.' + k, JSON.stringify
 function load(k, d) { try { const v = localStorage.getItem('tiroteio.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
 let now = performance.now() / 1000;
 
+// Ambiente de desenvolvimento (testes e ferramentas rodam em localhost/127.0.0.1): só aqui o jogo expõe os ganchos de depuração
+// (window.__T, relógio travável). No site publicado eles não existem: davam a qualquer um, no console, atalhos prontos para trapacear.
+const DEBUG = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+const PROTO = 3; // versão do protocolo de rede: subir quando mensagens, armas (W) ou mapas mudarem; host e cliente precisam ser iguais
 const CFG = {
-  name: load('name', 'Jogador' + Math.floor(rand(100, 999))),
+  name: String(load('name', 'Jogador' + Math.floor(rand(100, 999)))).replace(/[<>]/g, '').slice(0, 16) || 'Jogador', // mesmo filtro do campo (o localStorage é editável)
   sens: load('sens', 1), fov: load('fov', 85), vol: load('vol', 0.6), shadows: load('shadows', true), gfx: load('gfx', null),
   bright: load('bright', 1), zmarks: load('zmarks', true), lant: load('lant', false), autofull: load('autofull', true),
 };
@@ -2780,7 +2785,7 @@ const skinSwatch = id => { const f = SKIN_BY[id]; return f ? skinTex(f).map.imag
 const GM = {};
 let VM_ENV = 1;
 function gunMats(pap, fp, skin) {
-  const f = !pap && skin ? SKIN_BY[skin] : null;
+  const f = !pap && typeof skin === 'string' && Object.hasOwn(SKIN_BY, skin) ? SKIN_BY[skin] : null;
   const key = (pap ? 'p' : 'n') + (fp ? 'f' : 't') + (f ? f.id : ''); if (GM[key]) return GM[key];
   const T = gunTextures();
   const mk = o => { if (fp) { const metal = (o.metalness ?? 0) > .5, m = metal ? new THREE.MeshPhysicalMaterial({ ...o, clearcoat: .35, clearcoatRoughness: .35 }) : new THREE.MeshStandardMaterial({ ...o }); m.userData.env = metal ? 1 : .35; m.envMapIntensity = VM_ENV * m.userData.env; return m; } const { metalness, roughness, roughnessMap, ...rest } = o; return new THREE.MeshLambertMaterial(rest); };
@@ -3696,7 +3701,7 @@ const GRIP = { gripAt: .62, tilt: -.3, r: [0, 0, 0], l: [0, -.01, 0], lroll: .5,
 const ARMS = { holder: null, root: null, mixer: null, clips: {}, cur: null, knife: null };
 // cada faca tem a sua pose de mão: karambit a partir do quadro 0, faca a partir do 1000
 const ARMS_FR = { idle: [0, 60], draw: [100, 118], slash: [200, 216], slash2: [300, 316], stab: [400, 425], inspect: [500, 596] }, ARMS_OFF = { karambit: 0, knife: 1000 };
-const ARMS_VER = location.hostname === 'localhost' ? Date.now() : 6; // subir a cada nova exportação do Blender (o navegador guarda o arquivo em cache)
+const ARMS_VER = DEBUG ? Date.now() : 6; // subir a cada nova exportação do Blender (o navegador guarda o arquivo em cache)
 function loadArms() {
   new GLTFLoader().load('assets/arms.glb?v=' + ARMS_VER, g => {
     const root = g.scene; root.updateMatrixWorld(true);
@@ -5054,12 +5059,12 @@ const NET = { peer: null, isHost: false, code: null, conns: new Map(), hostConn:
 // um pacote perdido segura todos os seguintes até ser reenviado — é isso que dava os "travões".
 // Só é usado depois que chega algo do outro lado por ele (versão antiga do jogo continua no canal normal).
 const FAST_ID = 101;
-function attachFast(conn, onData) {
+function attachFast(conn, onData, maxLen = 0) { // maxLen: no host, tamanho máximo aceito (um cliente manda só pos/ping/zhit, bem abaixo de 1 KB)
   if (conn.fast) return;
   try {
     const dc = conn.peerConnection.createDataChannel('rapido', { negotiated: true, id: FAST_ID, ordered: false, maxRetransmits: 0 });
     conn.fast = dc;
-    dc.onmessage = e => { conn.fastOk = true; let m; try { m = JSON.parse(e.data); } catch (err) { return; } if (m.t !== 'ping' || m.c) onData(m); };
+    dc.onmessage = e => { conn.fastOk = true; if (typeof e.data !== 'string' || (maxLen && e.data.length > maxLen)) return; let m; try { m = JSON.parse(e.data); } catch (err) { return; } if (m && typeof m === 'object' && (m.t !== 'ping' || m.c)) onData(m); };
     dc.onopen = () => { let n = 0; const iv = setInterval(() => { if (dc.readyState !== 'open' || n++ > 20) return clearInterval(iv); try { dc.send('{"t":"ping"}'); } catch (e) { } if (conn.fastOk && n > 3) clearInterval(iv); }, 500); };
   } catch (e) { console.warn('canal rápido indisponível', e); }
 }
@@ -5085,7 +5090,7 @@ function sendToHostFast(m) {
 const NCLK = new Map(), NRING = 64, _nsrt = new Float32Array(NRING);
 function netTime(src, ts) {
   if (!(ts > 0)) return now;
-  const arr = window.__simLock ? now : performance.now() / 1000; // hora em que chegou de fato (now é a do último quadro: +0–33 ms de tremida falsa)
+  const arr = DEBUG && window.__simLock ? now : performance.now() / 1000; // hora em que chegou de fato (now é a do último quadro: +0–33 ms de tremida falsa)
   const o = arr - ts; let c = NCLK.get(src);
   if (!c || Math.abs(o - c.off) > 5) { c = { off: o, lastTs: 0, os: new Float32Array(NRING), gs: new Float32Array(NRING), oi: 0, on: 0, gi: 0, gn: 0, d: 0, tgt: .12, at: 0, calcT: 0 }; NCLK.set(src, c); }
   if (o < c.off) c.off = o; else c.off += (o - c.off) * .002;
@@ -5128,7 +5133,7 @@ function netFix(o, buf, xmax, vmax) {
   o.rx = s.x; o.rz = s.z;
 }
 function netEo(e, dt) { const k = Math.exp(-dt * 10); e.x *= k; e.z *= k; if (Math.abs(e.x) + Math.abs(e.z) < 1e-3) e.x = e.z = 0; }
-const genCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+const genCode = () => Array.from(crypto.getRandomValues(new Uint8Array(5)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b & 31]).join(''); // aleatório de verdade (Math.random é previsível)
 function sendToHost(m) {
   if (NET.isHost) srvHandle(C.myId, m);
   else if (NET.hostConn?.open) { try { NET.hostConn.send(m); } catch (e) { } }
@@ -5142,8 +5147,17 @@ function sendTo(pid, m) {
   else { const c = NET.conns.get(pid); if (c?.open) try { c.send(m); } catch (e) { } }
 }
 function peerAvailable() { return typeof window.Peer === 'function'; }
+function tokenReentrada(code) { // um token aleatório por sala, renovado a cada entrada e esquecido em 10 min (apagar o armazenamento do navegador perde a reentrada: raro)
+  try {
+    const k = 'tiroteio.rk.' + code, agora = Date.now();
+    for (const key of Object.keys(localStorage)) if (key.startsWith('tiroteio.rk.')) { try { if (agora - (JSON.parse(localStorage.getItem(key))?.at || 0) > 600000) localStorage.removeItem(key); } catch (e) { localStorage.removeItem(key); } }
+    let v = null; try { v = JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { }
+    if (!v || typeof v.tok !== 'string' || agora - (v.at || 0) > 600000) v = { tok: crypto.randomUUID(), at: agora };
+    v.at = agora; localStorage.setItem(k, JSON.stringify(v)); return v.tok;
+  } catch (e) { return undefined; }
+}
 function startHost(st) {
-  NET.isHost = true; C.myId = 'h'; C.st = st;
+  NET.isHost = true; C.myId = 'h'; C.st = st; NET.hostKey = genCode() + genCode(); // segredo do host: vai no link de convite e volta no 'welcome' (quem entrou pelo link confere que caiu na sala certa)
   S.st = st; S.players.clear(); S.nextId = 1; S.colorI = 0;
   buildMap(st.map);
   srvAddPlayer('h', CFG.name, false).skins = cleanSk(PROF.data?.equipped);
@@ -5155,23 +5169,31 @@ function startHost(st) {
     const peer = new Peer(PEER_PREFIX + code, { config: ICE, debug: 1 });
     let rc = 0; // tentativas de voltar ao servidor de pareamento
     peer.on('open', () => {
-      const back = NET.online; rc = 0; NET.peer = peer; NET.code = code; NET.online = true; updateRoomInfo();
-      toast(back ? 'Sala de volta no servidor de pareamento' : 'Sala criada! Código: ' + code, back ? 3 : 5);
+      const back = NET.online && NET.peer === peer, trocou = NET.online && NET.peer !== peer; rc = 0; NET.peer = peer; NET.code = code; NET.online = true; updateRoomInfo();
+      if (trocou) broadcast({ t: 'room', code, hk: NET.hostKey }); // código novo (o antigo foi tomado): quem já está na sala atualiza o HUD e o link
+      toast(back ? 'Sala de volta no servidor de pareamento' : trocou ? 'Sala com código novo: ' + code : 'Sala criada! Código: ' + code, back ? 3 : 5);
     });
     peer.on('error', err => {
-      // código já usado: só troca de código antes de a sala abrir. Depois, "unavailable-id" vem da reconexão
-      // (o servidor ainda segura o socket velho) e destruir o peer derrubaria todos os jogadores.
+      // código já usado: só troca de código antes de a sala abrir. Depois, "unavailable-id" vem da reconexão: ou o servidor ainda
+      // segura o socket velho, ou alguém registrou o nosso código enquanto estávamos fora (e passaria a receber quem entra pelo link).
+      // Destruir o peer derrubaria todos os jogadores, então ele é abandonado (as ligações diretas continuam) e abre-se um código novo.
       if (err.type === 'unavailable-id' && !NET.online && attempt < 4) { peer.destroy(); tryOpen(attempt + 1); }
       else if (!NET.online) { toast('Não deu pra abrir a sala online (' + err.type + '). Jogando offline.', 6); }
+      else if (err.type === 'unavailable-id' && !peer.abandonado && peer.disconnected) { peer.abandonado = true; toast('O código da sala foi tomado por outra pessoa: abrindo um código novo', 6); tryOpen(0); }
       else console.warn('peer error', err);
     });
     // sem o servidor de pareamento a partida continua (as conexões são diretas), só ninguém novo entra
     peer.on('disconnected', () => {
+      if (peer.abandonado) return;
       if (NET.online && rc === 0) toast('Servidor de pareamento caiu: a partida continua, reconectando a sala...', 4);
-      setTimeout(() => { if (!peer.destroyed && peer.disconnected) try { peer.reconnect(); } catch (e) { } }, Math.min(30000, 1500 * 2 ** rc++));
+      setTimeout(() => { if (!peer.destroyed && peer.disconnected && !peer.abandonado) try { peer.reconnect(); } catch (e) { } }, Math.min(30000, 1500 * 2 ** rc++));
     });
     peer.on('connection', conn => {
-      conn.on('open', () => attachFast(conn, d => srvOnData(conn, d)));
+      // conexão que não vira jogador (sem 'join' em 10 s, ou acima do teto de pendentes) é fechada: cada uma custa um RTCPeerConnection
+      NET.pend = (NET.pend || 0) + 1;
+      if (NET.pend > MAX_PENDENTES) { NET.pend--; setTimeout(() => { try { conn.close(); } catch (e) { } }, 0); return; }
+      setTimeout(() => { if (!conn.pid) { NET.pend = Math.max(0, (NET.pend || 0) - 1); try { conn.close(); } catch (e) { } } }, 10000);
+      conn.on('open', () => attachFast(conn, d => srvOnData(conn, d), 4096));
       conn.on('data', d => srvOnData(conn, d));
       conn.on('close', () => srvDrop(conn));
       // aba fechada sem aviso: o PeerJS demora a disparar 'close'; se a ligação WebRTC cair e não voltar em 4 s, sai (sem fantasma parado no mapa)
@@ -5203,8 +5225,15 @@ function joinRoom(code) {
     const conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
     NET.hostConn = conn;
     // v: 2 = entende "state" sem as skins repetidas (o host manda a versão completa para quem não manda v)
-    conn.on('open', () => { stage = 'waiting'; attachFast(conn, m => { NET.lastHost = performance.now(); if (welcomed) onMsg(m); }); conn.send({ t: 'join', v: 2, name: CFG.name, sk: cleanSk(PROF.data?.equipped) }); });
-    conn.on('data', m => { NET.lastHost = performance.now(); if (m.t === 'welcome') { welcomed = true; NET.joining = false; clearTimeout(timer); NET.code = code; NET.online = true; status.textContent = ''; } onMsg(m); });
+    // rk: token de reentrada (guardado por sala por 10 min: só quem tem o nome E o token recupera pontos e armas ao voltar); pv: versão do protocolo
+    conn.on('open', () => { stage = 'waiting'; attachFast(conn, m => { NET.lastHost = performance.now(); if (welcomed) onMsg(m); }); conn.send({ t: 'join', v: 2, pv: PROTO, name: CFG.name, sk: cleanSk(PROF.data?.equipped), rk: tokenReentrada(code) }); });
+    conn.on('data', m => {
+      NET.lastHost = performance.now(); if (!m || typeof m !== 'object') return;
+      if (!welcomed && m.t === 'err') return fail(String(m.txt || 'Conexão recusada').slice(0, 160)); // sala cheia, versão diferente, removido
+      if (!welcomed && m.t === 'welcome' && NET.linkKey && m.hk !== NET.linkKey) return fail('Esse código agora é de outra sala (o host mudou). Peça um link novo.'); // entrou pelo link: confere o segredo do host
+      if (m.t === 'welcome') { welcomed = true; NET.joining = false; clearTimeout(timer); NET.code = code; NET.online = true; status.textContent = ''; }
+      onMsg(m);
+    });
     conn.on('close', () => { if (welcomed) lostConnection(); else fail('Conexão recusada'); });
     conn.on('error', err => { if (err?.type === 'message-too-big' || err?.type === 'not-open-yet') console.warn('conn', err); else if (welcomed) lostConnection(); });
   });
@@ -5247,29 +5276,43 @@ function srvAddPlayer(id, name, isBot) {
 function srvOnData(conn, d) {
   if (!d || typeof d !== 'object') return;
   conn.lastSeen = performance.now();
-  if (d.t === 'ping') { if (d.c > 0) sendFastTo(conn, { t: 'pong', c: d.c }); return; }
+  if (typeof d.t !== 'string') return;
+  if (d.t === 'ping') { if (conn.pid && finN(d.c) && d.c > 0 && d.c < 1e12 && taxaOk(conn, 'ping')) sendFastTo(conn, { t: 'pong', c: d.c }); return; } // só depois do join: conexão sem jogador não ganha resposta
   if (d.t === 'join' && !conn.pid) {
-    const id = 'p' + (S.nextId++); conn.pid = id; conn.v = +d.v || 1; NET.conns.set(id, conn); S.skDirty = true;
-    const name = String(d.name || 'Jogador').replace(/[<>]/g, '').slice(0, 16) || 'Jogador';
-    const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk);
-    conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code });
+    const recusa = txt => { try { conn.send({ t: 'err', txt }); } catch (e) { } setTimeout(() => { try { conn.close(); } catch (e) { } }, 200); };
+    if ((d.pv | 0) !== PROTO) return recusa('Sua versão do jogo é diferente da do host: recarregue a página com Ctrl+F5 e tente de novo'); // tabelas de armas/mapas e mensagens precisam bater
+    if ([...S.players.values()].filter(p => !p.isBot).length >= MAX_JOGADORES) return recusa('Sala cheia');
+    const id = 'p' + (S.nextId++); conn.pid = id; conn.v = +d.v || 1; NET.conns.set(id, conn); S.skDirty = true; NET.pend = Math.max(0, (NET.pend || 0) - 1);
+    // nome: sem < >, sem caracteres invisíveis (homoglifos de "Vitor" com um caractere invisível no placar), até 16; repetido na sala ganha " (2)" como os bots
+    let name = String(d.name || 'Jogador').normalize('NFKC').replace(INVISIVEIS, '').trim().slice(0, 16) || 'Jogador';
+    const nome0 = name, rk = typeof d.rk === 'string' && /^[0-9a-f-]{8,40}$/i.test(d.rk) ? d.rk : null, chaveLeft = rk ? nome0 + '\u0000' + rk : nome0; // rk: token de reentrada (só quem tem nome E token recupera a partida)
+    if (S.banidos?.has(chaveLeft)) { conn.pid = null; NET.conns.delete(id); return recusa('Você foi removido desta sala pelo host'); }
+    for (let n = 2; [...S.players.values()].some(p => p.name === name); n++) name = nome0.slice(0, 12) + ' (' + n + ')';
+    const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk); np.chaveLeft = chaveLeft;
+    conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code, hk: NET.hostKey });
     broadcast({ t: 'info', txt: name + ' entrou na sala' });
-    if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') { // entra já jogando, com os pontos da dificuldade; quem caiu e voltou (até 5 min, mesmo nome) recupera pontos e armas,
+    if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') { // entra já jogando, com os pontos da dificuldade; quem caiu e voltou (até 5 min, mesmo nome e mesmo token) recupera pontos e armas,
       // e quem estava caído/morto na rodada só volta na próxima (sair e entrar não ressuscita mais)
-      zResetPlayer(np); const L = S.left?.get(name); if (L) S.left.delete(name);
+      zResetPlayer(np); const L = S.left?.get(chaveLeft); if (L) S.left.delete(chaveLeft);
       if (L && now - L.at < 300) { Object.assign(np, { money: L.money, kills: L.kills, hs: L.hs, downs: L.downs, revives: L.revives }); np.inv = L.inv; } else np.money = zDf().pts;
       if (!(L && L.dead && Z.phase === 'round' && now - L.at < 300)) srvSpawn(np, zSpawnPoint(S.players.size - 1), true, Math.PI);
     }
     S.zKey = null; srvState(); // quem entrou recebe o mundo dos zumbis já
     return;
   }
-  if (conn.pid) srvHandle(conn.pid, d);
+  if (!conn.pid) return;
+  if (!taxaOk(conn, d.t)) { if (conn.excesso > 2000) srvDrop(conn); return; } // enxurrada: descarta em silêncio; só uma inundação de verdade derruba
+  srvHandle(conn.pid, d);
 }
 function srvDrop(conn) {
   const id = conn.pid; if (!id || !S.players.has(id)) return;
   bombDrop(S.players.get(id));
   const lp = S.players.get(id), name = lp.name;
-  if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') (S.left ||= new Map()).set(name, { money: lp.money, inv: { ...lp.inv, third: null }, kills: lp.kills, hs: lp.hs, downs: lp.downs, revives: lp.revives, dead: !lp.alive || lp.downed, at: now }); // para quem voltar
+  if (S.st.mode === 'zombies' && Z.on && S.phase !== 'over') { // para quem voltar (chave = nome + token de reentrada)
+    const L = (S.left ||= new Map()); L.set(lp.chaveLeft || name, { money: lp.money, inv: { ...lp.inv, third: null }, kills: lp.kills, hs: lp.hs, downs: lp.downs, revives: lp.revives, dead: !lp.alive || lp.downed, at: now });
+    for (const [k, v] of L) if (now - v.at > 300) L.delete(k); // quem não voltou em 5 min não volta mais
+    while (L.size > 32) L.delete(L.keys().next().value); // teto: entrar e sair com nomes diferentes não enche a memória
+  }
   S.players.delete(id); NET.conns.delete(id);
   try { conn.close(); } catch (e) { } // derrubado por erro: fecha de verdade, senão o cliente fica 12 s num jogo que não anda
   broadcast({ t: 'bye', id }); broadcast({ t: 'info', txt: name + ' saiu' });
@@ -5308,6 +5351,31 @@ function fichaOk(tb, key, gap, tg = 1) {
 }
 const armaIv = (w, wd) => w === 'knife' ? .5 : wd.burst ? (wd.rate + (wd.burst - 1) * wd.brate) / wd.burst : (wd.rate || .1); // intervalo médio entre tiros (rajada: média da rajada + pausa)
 const temArma = (p, w) => w === 'knife' || p.inv.primary === w || p.inv.secondary === w || p.inv.third === w;
+// arma que o jogador pode estar segurando agora (inclui granadas do estoque, pistola de quem caiu e a Máquina da Morte com folga de rede)
+const temArmaZ = (p, w) => temArma(p, w) || (W[w]?.slot === 'nade' && p.inv[w] > 0) || (w === 'm1911_ls' && p.downed) || (w === 'dmach' && p.dmEnd > now - .5);
+const _zv2 = new V3();
+// o jogador vê o zumbi? Pontos do corpo (cabeça, tronco, pernas e laterais; cão e rastejante mais baixos), na posição atual e nas recentes
+function veZumbi(p, z) {
+  const o = olhoDe(p), s = (ZKIND[z.kind | 0]?.sz || 1), pts = z.dog ? [[.9, 0, 0], [.5, 0, 0], [.5, .4, 0], [.5, -.4, 0], [.5, 0, .4], [.5, 0, -.4]] : z.crawler ? [[.5, 0, 0], [.3, .5, 0], [.3, -.5, 0], [.3, 0, .5], [.3, 0, -.5]]
+    : [[1.64 * s, 0, 0], [1.15 * s, 0, 0], [.42 * s, 0, 0], [1.15 * s, .35 * s, 0], [1.15 * s, -.35 * s, 0], [1.15 * s, 0, .35 * s], [1.15 * s, 0, -.35 * s]];
+  const P = z.body.pos, lista = [[P.x, P.y, P.z]]; for (const h of z.ph || []) if (now - h.t <= VAL.histS) lista.push(h.p);
+  for (const vp of lista) for (const [dy, dx, dz] of pts) if (visaoLivre(o, _zv2.set(vp[0] + dx, vp[1] + dy, vp[2] + dz))) return true;
+  return false;
+}
+// o zumbi está dentro do cone da arma (Arma Trovão / Winter's Howl)? Com folga de 25° e 2 m para quem vira enquanto atira
+function noCone(p, z, range, cosA) {
+  const o = olhoDe(p), P = z.body.pos, d = _zv2.set(P.x - o.x, P.y + .9 - o.y, P.z - o.z), dist = d.length(); if (dist > range + 2) return false; if (dist < 2.5) return true;
+  d.divideScalar(dist); const f = new V3(-Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), -Math.cos(p.yaw) * Math.cos(p.pitch));
+  return d.dot(f) >= Math.cos(Math.acos(clamp(cosA, -1, 1)) + .44);
+}
+// limite de mensagens por conexão e por tipo: [por segundo, rajada]. Jogo normal: pos 30/s, hold 7/s, zhit até ~20/s em escopeta/Trovão
+const TAXA = { pos: [45, 70], shot: [25, 40], zhit: [60, 90], hit: [40, 60], hold: [15, 30], use: [10, 20], chat: [2, 5], skins: [1, 3], ping: [5, 10], nade: [5, 10], zclay: [5, 10], zfx: [5, 10], selfdmg: [5, 10], bomb: [10, 20], buy: [10, 20], suicide: [2, 4], '*': [20, 40] };
+function taxaOk(conn, t) {
+  const [r, B] = TAXA[t] || TAXA['*'], tb = (conn.taxa ||= {}), pn = performance.now(), b = tb[t] || (tb[t] = { n: B, t: pn });
+  b.n = Math.min(B, b.n + (pn - b.t) / 1000 * r); b.t = pn; if (b.n < 1) { conn.excesso = (conn.excesso || 0) + 1; return false; } b.n--; return true;
+}
+const MAX_JOGADORES = 12, MAX_PENDENTES = 16;
+const INVISIVEIS = new RegExp('[<>' + String.fromCharCode(0x200B) + '-' + String.fromCharCode(0x200F) + String.fromCharCode(0x2028) + '-' + String.fromCharCode(0x202F) + String.fromCharCode(0x2060) + '-' + String.fromCharCode(0x206F) + String.fromCharCode(0xFEFF) + ']', 'g'); // < > e caracteres invisíveis/largura zero (nomes falsos no placar) // humanos por sala; conexões abertas que ainda não mandaram 'join'
 // teto de dano de um tiro (mesma conta que o cliente faz, com 10 % de folga): dano × zona × bagos
 function tetoDano(w, wd, zone) { if (w === 'knife') return 180; return (wd.dmg || 0) * (zone === 'head' ? Math.max(wd.head || 4, 1) : zone === 'legs' ? .75 : 1) * (wd.pellets || 1) * 1.1; }
 const olhoDe = p => new V3(p.pos[0], p.pos[1] + (p.crouch ? EYE_CROUCH : EYE_STAND), p.pos[2]);
@@ -5347,13 +5415,19 @@ function srvHandle(pid, m) {
       p.posTs = ts;
       { const real = now - (p.posAt ?? now), dt = ts && ts0 > 0 ? Math.min(ts - ts0, real * 1.5 + .05) : real; if (dt > 0 && Math.hypot(m.p[0] - p.pos[0], m.p[2] - p.pos[2]) / Math.max(.02, dt) > 3.5) p.fastT = now; p.posAt = now; } // última vez que andou rápido (o PhD confere o deslize), no relógio de quem mandou (rede com soluços não engana), preso a 1,5× o tempo real (relógio esticado não esconde velocidade)
       (p.ph ||= []).push({ t: now, p: p.pos }); if (p.ph.length > VAL.histN) p.ph.shift(); // posições recentes (linha de visão dos tiros dos outros)
-      p.pos = m.p; p.yaw = m.y; p.pitch = m.pi; p.crouch = m.c ? 1 : 0; p.w = isW(m.w) ? m.w : p.w;
+      p.pos = m.p; p.yaw = m.y; p.pitch = m.pi; p.crouch = m.c ? 1 : 0; p.w = isW(m.w) && temArmaZ(p, m.w) ? m.w : p.w; // arma na mão: só do inventário
       broadcastFast({ t: 'pos', id: pid, p: m.p, y: m.y, pi: m.pi, c: p.crouch, w: p.w, d: p.downed ? 1 : 0, ts, sq: p.sq }, pid); break;
     }
     case 'shot': {
+      // só efeitos (rastro, som, clarão) nos outros clientes, mas repassado a todos: confere arma, origem perto do jogador e cadência
+      // (antes, 'shot' com 12 explosões de arma que o jogador não tinha, de qualquer ponto do mapa, a centenas por segundo, travava todo mundo)
       if (!vec3(m.o) || !isW(m.w)) return;
-      const e = (Array.isArray(m.e) ? m.e : []).slice(0, 12).filter(vec3);
-      p.shotT = now; broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e }, pid); break;
+      if (!p.alive && now - p.diedAt > .6) return;
+      const wd = W[m.w]; if (!temArmaZ(p, m.w)) return srvAnom(p, 'shot:arma');
+      if (Math.hypot(m.o[0] - p.pos[0], m.o[1] - p.pos[1] - (p.crouch ? EYE_CROUCH : EYE_STAND), m.o[2] - p.pos[2]) > 3) return srvAnom(p, 'shot:origem'); // boca do cano fica a ~0,8 m da câmera
+      if (!fichaOk(p.sb ||= {}, m.w, armaIv(m.w, wd) * .6)) return srvAnom(p, 'shot:cadencia');
+      const e = (Array.isArray(m.e) ? m.e : []).slice(0, wd.pellets || 1).filter(vec3);
+      p.shotT = now; p.shotW = m.w; broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e }, pid); break;
     }
     case 'zhit': {
       // o cliente decide o acerto, mas o host confere: arma que ele tem, dano que a arma pode dar
@@ -5363,7 +5437,15 @@ function srvHandle(pid, m) {
       if (!((w === 'knife' && !p.downed) || ((p.inv.primary === w || p.inv.secondary === w) && (!p.downed || wd.slot === 'secondary')) || (p.inv.third === w && !p.downed) || (w === 'm1911_ls' && p.downed) || (w === 'dmach' && !p.downed && p.dmEnd > now - .5))) return; // caído: só pistola // terceira arma (Mule Kick); Máquina da Morte com folga de rede
       const cap = (wd.thunder ? 1e7 : w === 'knife' ? (p.bowie ? 1000 : 150) : (wd.dmg || 0) * Math.max(wd.head || 4, 1) * (wd.pellets || 1) * 1.1 + (wd.splash?.dmg || 0)) * (p.perks.includes('ds') && w !== 'knife' ? 1.5 : 1); // Deadshot: headshot +50%
       if (w === 'knife' && Math.hypot(z.body.pos.x - p.pos[0], z.body.pos.z - p.pos[2]) > 4.5 + Math.min(2.5, z.speed * .4)) return; // facada (com o bote) alcança uns 3,4 m, mais o que o zumbi andou desde o golpe
-      p.shotT = now; // atirou de verdade (Electric Cherry confere)
+      // alvo plausível: não está no subsolo (nascendo), não está a mais de 260 m e, no tiro direto, está à vista; cone das armas de onda conferido aqui
+      // (antes, zhit em qualquer id de Z.zs valia: zumbi atrás da parede, do outro lado do mapa ou ainda embaixo do chão)
+      if (z.st === 'rise' && z.body.pos.y < -1) return srvAnom(p, 'zhit:subsolo');
+      { const P = z.body.pos, dist = Math.hypot(P.x - p.pos[0], P.y - p.pos[1], P.z - p.pos[2]); if (dist > VAL.alcance) return srvAnom(p, 'zhit:longe');
+        if (wd.thunder) { if (!noCone(p, z, wd.pap ? 18 : 14, Math.cos(wd.pap ? .8 : .62)) || !veZumbi(p, z)) return srvAnom(p, 'zhit:cone'); }
+        else if (wd.frost) { if (!noCone(p, z, wd.frost.range, wd.frost.cos) || !veZumbi(p, z)) return srvAnom(p, 'zhit:cone'); }
+        else if (w !== 'knife' && !m.sp && !veZumbi(p, z)) return srvAnom(p, 'zhit:visao'); // explosão (sp) pode pegar quem está atrás da esquina: só distância
+        if (m.sp && !wd.splash && !wd.chain && !wd.frost) return srvAnom(p, 'zhit:sp'); } // "explosão" só de arma que explode
+      p.shotT = now; p.shotW = w; // atirou de verdade (Electric Cherry confere)
       const iv = armaIv(w, wd), gap = wd.thunder ? 0 : iv * .6; // Double Tap = 0,75 da cadência
       if (gap && !fichaOk(z.tb ||= {}, pid, gap)) return; // por zumbi; folga de 0,5 s: tiros que chegam juntos depois de um soluço da rede valem
       { // limite de alvos por tiro, somando todos os zumbis: cada arma acerta no máximo tg zumbis por disparo (bala 1, escopeta 1 por bago, explosão/cone mais)
@@ -5377,7 +5459,12 @@ function srvHandle(pid, m) {
     }
     case 'use': if (S.st.mode === 'zombies' && Z.on) srvZUse(p, m); break;
     case 'hold': if (S.st.mode === 'zombies' && Z.on) srvZHold(p, m); break;
-    case 'selfdmg': if (S.st.mode === 'zombies' && Z.on && !p.perks.includes('phd')) zHurt(p, clamp(+m.d || 0, 0, 100), null); break; // PhD Flopper: explosão não machuca
+    case 'selfdmg': { // explosão da própria arma (Ray Gun, China Lake...) perto de si: só logo depois de um tiro dessa arma, até o dano dela, 1 por 0,3 s, e sem acionar o Dying Wish
+      if (S.st.mode !== 'zombies' || !Z.on || p.perks.includes('phd')) return; // PhD Flopper: explosão não machuca
+      const sw = W[p.shotW]; if (!sw?.splash?.self || now - (p.shotT || -99) > 1.5) return srvAnom(p, 'selfdmg:semtiro');
+      if (now < (p.selfT || 0)) return; p.selfT = now + .3;
+      zHurt(p, clamp(+m.d || 0, 0, sw.splash.self), null, true); break;
+    }
     case 'zfx': if (S.st.mode === 'zombies' && Z.on) srvZFx(p, m); break;
     case 'zclay': if (S.st.mode === 'zombies' && Z.on) srvZClay(p, m); break;
     case 'hit': {
@@ -5408,7 +5495,7 @@ function srvHandle(pid, m) {
     case 'nade': if (!p.alive || p.downed || !isW(m.k) || W[m.k].slot !== 'nade' || m.k === 'clay' || !vec3(m.p) || !vec3(m.v) || !(p.inv[m.k] > 0)
       || Math.hypot(m.p[0] - p.pos[0], m.p[1] - p.pos[1] - 1.5, m.p[2] - p.pos[2]) > 4 || Math.hypot(m.v[0], m.v[1], m.v[2]) > 30) return; p.inv[m.k]--; broadcast({ t: 'nade', id: pid, k: m.k, p: m.p, v: m.v }, pid); break;
     case 'chat': broadcast({ t: 'chat', id: pid, txt: String(m.txt || '').slice(0, 120) }); break;
-    case 'suicide': if (p.alive) srvKill(p, null, 'world', false); break;
+    case 'suicide': if (p.alive && !p.downed && S.phase !== 'over') srvKill(p, null, 'world', false); break; // caído nos zumbis não pula o sangramento
   }
 }
 function srvDamage(vid, aid, raw, zone, w) {
@@ -5548,7 +5635,7 @@ function bombTick() {
   }
 }
 function srvBuy(p, item) {
-  const it = W[item], err = txt => sendTo(p.id, { t: 'err', txt });
+  const it = isW(item) ? W[item] : null, err = txt => sendTo(p.id, { t: 'err', txt });
   if (!it || !(it.price || it.equip)) return;
   if (!p.alive) return err('Você está morto');
   const free = S.st.mode === 'dm' || S.phase === 'warmup';
@@ -6319,7 +6406,7 @@ function zOnSnap(m) {
   ZC.insta = m.ins ? now + m.ins : 0; ZC.dbl = m.dbl ? now + m.dbl : 0; ZC.fire = m.fs ? now + m.fs : 0; ZC.bf = m.bf ? now + m.bf : 0;
   ZC.bo = +m.bo || 0; ZC.boT = now; // vida do Carniceiro (fração)
   if (m.cl) for (const c of m.cl) zCloudAdd(c);
-  ZC.rem = m.rem ?? ZC.rem; ZC.nextR = m.nx ? now + m.nx : 0;
+  ZC.rem = finN(m.rem) ? m.rem | 0 : ZC.rem; ZC.nextR = finN(m.nx) && m.nx > 0 ? now + m.nx : 0;
 }
 function zAimAssist() { // Deadshot: ao mirar, a mira vai para a cabeça do zumbi mais perto do centro (cone de ~12°)
   const o = camera.position, f = _v.set(0, 0, -1).applyQuaternion(camera.quaternion); let best = null, bc = Math.cos(.21);
@@ -7127,10 +7214,10 @@ function zTickPlayers(dt) {
     for (const p of S.players.values()) if (p.alive && !p.downed && Math.hypot(p.pos[0] - d.x, p.pos[2] - d.z) < 1.6) { Z.drops.splice(i, 1); broadcast({ t: 'zdropgone', id: d.id }); zPower(d.type, p); break; }
   }
 }
-function zHurt(p, dmg, from) {
+function zHurt(p, dmg, from, semDW) { // semDW: dano autoinfligido não aciona o Dying Wish (senão ficava intocável quando quisesse)
   if (!p.alive || p.downed || S.phase === 'over' || !(dmg > 0) || p.dwEnd > now) return; // Dying Wish: intocável por alguns segundos
   let dw = false;
-  if (dmg >= p.hp && p.perks.includes('dying') && now >= (p.dwCd || 0)) { dw = true; dmg = Math.max(0, p.hp - 1); p.dwEnd = now + ZPK.dwInv; p.dwCd = now + ZPK.dwCd; } // golpe fatal: fica com 1 de vida
+  if (!semDW && dmg >= p.hp && p.perks.includes('dying') && now >= (p.dwCd || 0)) { dw = true; dmg = Math.max(0, p.hp - 1); p.dwEnd = now + ZPK.dwInv; p.dwCd = now + ZPK.dwCd; } // golpe fatal: fica com 1 de vida
   p.hp = Math.max(0, p.hp - dmg); p.lastHurt = now;
   sendTo(p.id, { t: 'dmg', v: p.id, a: null, hp: Math.round(p.hp), ar: 0, d: Math.round(dmg), ap: from ? [r2(from.x), r2(from.z)] : null }); // só a vítima: os outros veem a vida no 'state' (era ~40% das mensagens do canal confiável)
   if (dw) broadcast({ t: 'zfx', k: 'dw', id: p.id });
@@ -7221,6 +7308,7 @@ function zTickZombies(dt) {
   for (const z of Z.zs.values()) arr.push(z);
   for (let zi = 0; zi < arr.length; zi++) { const z = arr[zi];
     if (!Z.zs.has(z.id)) continue; // morreu nesta volta (explosão de outro)
+    if (now - (z.phT || -1) >= .05) { const P0 = z.body.pos; (z.ph ||= []).push({ t: now, p: [P0.x, P0.y, P0.z] }); if (z.ph.length > 9) z.ph.shift(); z.phT = now; } // posições recentes (linha de visão dos tiros com lag)
     if (z.frzT && now >= z.frzT) { z.frzT = 0; z.frz = 0; z.speed = z.spd0; z.sc = z.sc0; } // o gelo passou
     if (z.nukeAt && now >= z.nukeAt) { if (z.kind === 6) { z.nukeAt = 0; z.hp = Math.max(1, z.hp - z.maxHp * .2); } else { zKill(z, null, 'body', 'nuke', false, true); continue; } } // Nuke não mata o Carniceiro: tira 20%
     const P = z.body.pos;
@@ -7666,23 +7754,38 @@ function zExplode(pos, owner, r, dmgMax, w, insta) { // granada / macaco
 // ================================================================
 // Cliente: mensagens
 // ================================================================
-function onMsg(m) {
+// o que chega do host é entrada não confiável (o host é outro jogador): forma conferida aqui, e uma mensagem malformada não derruba o cliente
+const saneSt = st => { st = st && typeof st === 'object' ? st : {}; return { ...st, map: Object.hasOwn(MAPS, st.map) ? st.map : 'arena', mode: ['rounds', 'dm', 'zombies'].includes(st.mode) ? st.mode : 'rounds', rounds: st.rounds | 0, frags: st.frags | 0, bots: clamp(st.bots | 0, 0, 7), diff: st.diff | 0, zdiff: clamp(st.zdiff | 0, 0, ZDIFF.length - 1) }; };
+function sanePl(pl) {
+  pl.id = String(pl.id); pl.n = String(pl.n ?? '').slice(0, 20); pl.c = /^#[0-9a-f]{3,8}$/i.test(pl.c) ? pl.c : '#cccccc';
+  for (const k of ['hp', 'ar', 'm', 'rw', 'mh', 'bl', 'rv']) pl[k] = +pl[k] || 0;
+  for (const k of ['k', 'd', 'hs', 'dw', 'rvs']) pl[k] = pl[k] | 0;
+  pl.tm = pl.tm === 't' || pl.tm === 'ct' ? pl.tm : undefined; pl.pk = Array.isArray(pl.pk) ? pl.pk.filter(k => Object.hasOwn(ZPERKS, k)) : [];
+  pl.ac = Array.isArray(pl.ac) && finN(pl.ac[0]) && finN(pl.ac[1]) ? pl.ac : 0; pl.sk = pl.sk && typeof pl.sk === 'object' ? cleanSk(pl.sk) : pl.sk;
+  return pl;
+}
+function onMsg(m) { try { onMsgInner(m); } catch (e) { console.warn('mensagem inválida', m?.t, e); } }
+function onMsgInner(m) {
+  if (!m || typeof m !== 'object') return;
   switch (m.t) {
-    case 'welcome': C.myId = m.you; C.st = m.st; NET.code = m.code; ZC.snapTs = 0; buildMap(m.st.map); enterGame(); break;
+    case 'welcome': C.myId = String(m.you); C.st = saneSt(m.st); NET.code = String(m.code || '').slice(0, 8); NET.hostKey = typeof m.hk === 'string' ? m.hk.slice(0, 16) : null; ZC.snapTs = 0; buildMap(C.st.map); enterGame(); break;
+    case 'room': if (typeof m.code === 'string' && /^[A-Z0-9]{5}$/.test(m.code)) { NET.code = m.code; NET.hostKey = typeof m.hk === 'string' ? m.hk.slice(0, 16) : NET.hostKey; updateRoomInfo(); toast('A sala tem um código novo: ' + m.code, 5); } break;
     case 'match':
-      C.st = m.st; if (curMapId !== m.st.map) buildMap(m.st.map); else clearFx();
+      C.st = saneSt(m.st); if (curMapId !== C.st.map) buildMap(C.st.map); else clearFx();
       me.alive = false; me.downed = false; for (const rp of R.values()) { rp.alive = rp.dead = rp.downed = false; rp.buf = []; }
       break;
     case 'state': {
-      C.phase = m.ph; C.timeLeft = m.tl; C.round = m.r; C.winner = m.win; C.pre = m.pre; C.bomb = m.bomb || null; if (m.sc) C.sc = m.sc;
-      if (m.st) { if (C.st && C.st.map !== m.st.map) buildMap(m.st.map); C.st = m.st; }
+      // tudo que entra no HUD por innerHTML é número ou passa por esc(): um host editado mandava texto (HTML) nos campos numéricos
+      C.phase = String(m.ph); C.timeLeft = +m.tl || 0; C.round = m.r | 0; C.winner = m.win == null ? null : String(m.win); C.pre = +m.pre || 0; C.bomb = m.bomb && typeof m.bomb === 'object' ? m.bomb : null; if (m.sc && typeof m.sc === 'object') C.sc = { t: m.sc.t | 0, ct: m.sc.ct | 0 };
+      if (m.st && typeof m.st === 'object') { const st = saneSt(m.st); if (C.st && C.st.map !== st.map) buildMap(st.map); C.st = st; }
       const zmode = C.st?.mode === 'zombies', ids = new Set();
-      for (const pl of m.pl) {
+      for (const pl of Array.isArray(m.pl) ? m.pl : []) {
+        if (!pl || typeof pl !== 'object') continue; sanePl(pl);
         ids.add(pl.id); if (!pl.sk) pl.sk = C.players.get(pl.id)?.sk; C.players.set(pl.id, pl);
         if (pl.id === C.myId) {
           C.actEnd = pl.ac ? now + pl.ac[0] : 0; C.actDur = pl.ac ? pl.ac[1] : 1;
           me.hp = pl.hp; me.armor = pl.ar; me.helmet = !!pl.hm; me.money = pl.m; if (!pl.al && me.alive) { me.alive = false; me.downed = false; C.deadAt = now; }
-          if (zmode) { if (me.alive && pl.al && !!pl.dn !== me.downed) zSetDowned(!!pl.dn); ZC.perks = pl.pk || []; ZC.bowie = !!pl.bw; if (pl.dn && pl.bl) ZC.bleedEnd = now + pl.bl; }
+          if (zmode) { if (me.alive && pl.al && !!pl.dn !== me.downed) zSetDowned(!!pl.dn); ZC.perks = pl.pk; ZC.bowie = !!pl.bw; if (pl.dn && pl.bl) ZC.bleedEnd = now + pl.bl; }
         } else { const rp = getRemote(pl.id); refreshRemoteInfo(rp); rp.downed = !!pl.dn; if (!pl.al) rp.alive = false; else if (!rp.alive && rp.buf.length) { rp.alive = true; rp.dead = false; } }
       }
       for (const id of [...C.players.keys()]) if (!ids.has(id)) C.players.delete(id);
@@ -7739,7 +7842,7 @@ function onMsg(m) {
     case 'zdoor': if (zDoorOpen(m.id)) { const d = ZD.doors.find(x => x.id === m.id); play('door', d ? new V3(d.x, 1.5, d.z) : null); } break;
     case 'zpower': zPowerOn(); play('power'); centerMsg('ENERGIA LIGADA', 'Bebidas e Pack-a-Punch funcionando', 3); break;
     case 'zperk':
-      if (m.id === C.myId && ZPERKS[m.k]) { if (!ZC.perks.includes(m.k)) ZC.perks.push(m.k); if (m.k === 'widow') ZC.widow = ZPK.widowN; play('perk'); centerMsg(ZPERKS[m.k].name, ZPERKS[m.k].desc, 2.5); }
+      if (m.id === C.myId && typeof m.k === 'string' && Object.hasOwn(ZPERKS, m.k)) { if (!ZC.perks.includes(m.k)) ZC.perks.push(m.k); if (m.k === 'widow') ZC.widow = ZPK.widowN; play('perk'); centerMsg(ZPERKS[m.k].name, ZPERKS[m.k].desc, 2.5); }
       break;
     case 'zbox': {
       const Bx = ZC.box, L = ZD.boxes[m.loc ?? Bx.loc];
@@ -7758,7 +7861,7 @@ function onMsg(m) {
       break;
     }
     case 'zdrop': zDropAdd(m.d); break;
-    case 'ztrap': { const T = ZC.traps[m.i]; if (T) { T.st = m.st; T.end = now + (m.t || 0); if (m.st === 'on') { const t = ZD.traps[m.i]; play('power', new V3(t.x, 1.2, t.z)); } } break; }
+    case 'ztrap': { const T = Number.isInteger(m.i) ? ZC.traps[m.i] : null; if (T) { T.st = m.st; T.end = now + (m.t || 0); if (m.st === 'on') { const t = ZD.traps[m.i]; play('power', new V3(t.x, 1.2, t.z)); } } break; }
     case 'zfx': { // choque do Electric Cherry / explosão do PhD Flopper / teia do Widow's Wine / Dying Wish
       if (m.id === C.myId && (m.k === 'web' || m.k === 'wn') && finN(m.n)) ZC.widow = clamp(m.n | 0, 0, ZPK.widowN);
       if (m.k === 'wn') break;
@@ -7789,10 +7892,10 @@ function onMsg(m) {
       else { const rp = R.get(m.id); if (rp) { rp.downed = false; rp.alive = false; } }
       break;
     case 'zover': grantXP(30 + 8 * (m.r || 0)); ZC.over = true; play('over'); centerMsg('FIM DE JOGO', `${C.players.size > 1 ? 'Vocês sobreviveram' : 'Você sobreviveu'} ${m.r} rodada${m.r === 1 ? '' : 's'} · recomeça em 12s`, 11); break;
-    case 'pts': me.money = m.m; zPopup(m.n); if (m.n < 0) play('kaching'); break;
-    case 'ammo': if (W[m.w]) { G.ammo[m.w] = { mag: W[m.w].mag, res: W[m.w].res }; play('kaching'); } break;
+    case 'pts': me.money = +m.m || 0; zPopup(+m.n || 0); if (m.n < 0) play('kaching'); break;
+    case 'ammo': if (isW(m.w)) { G.ammo[m.w] = { mag: W[m.w].mag, res: W[m.w].res }; play('kaching'); } break;
     case 'zbowie': ZC.bowie = true; play('kaching'); centerMsg('FACA BOWIE', 'Facadas muito mais fortes', 2); break;
-    case 'inv': applyInv(m.inv, false, m.got); me.money = m.m; me.armor = m.ar; me.helmet = !!m.hm; if (m.got) play('buy'); renderBuy(); break;
+    case 'inv': if (!m.inv || typeof m.inv !== 'object') break; applyInv(m.inv, false, m.got); me.money = +m.m || 0; me.armor = +m.ar || 0; me.helmet = !!m.hm; if (m.got) play('buy'); renderBuy(); break;
     case 'dmg': {
       const info = C.players.get(m.v); if (info) { info.hp = m.hp; info.ar = m.ar; }
       if (m.v === C.myId) {
@@ -7814,9 +7917,9 @@ function onMsg(m) {
     case 'shot': remoteShot(m); break;
     case 'bboom': { const p = new V3(m.p[0], m.p[1] + .6, m.p[2]); boomFx(p); for (let i = 0; i < 6; i++) puff(p.clone().add(new V3(rand(-3, 3), rand(0, 3), rand(-3, 3))), 0x555555, 4, 3); break; }
     case 'nade': spawnNade(m.id, m.k, m.p, m.v); break;
-    case 'msg': centerMsg(m.txt, m.sub, m.dur); if (m.snd) play(m.snd); break;
-    case 'err': toast(m.txt, 2); play('empty'); break;
-    case 'info': toast(m.txt, 3); break;
+    case 'msg': centerMsg(String(m.txt ?? '').slice(0, 80), String(m.sub ?? '').slice(0, 160), finN(m.dur) ? clamp(m.dur, 0, 30) : 3); if (typeof m.snd === 'string') play(m.snd); break;
+    case 'err': toast(String(m.txt ?? '').slice(0, 160), 2); play('empty'); break;
+    case 'info': toast(String(m.txt ?? '').slice(0, 160), 3); break;
     case 'chat': chatAdd(`<b style="color:${esc(colorOf(m.id))}">${esc(nameOf(m.id))}:</b> ${esc(m.txt)}`); play('chat'); break;
     case 'bye': removeRemote(m.id); C.players.delete(m.id); break;
   }
@@ -7827,7 +7930,7 @@ function onMsg(m) {
 // ================================================================
 let toastT = 0, centerT = 0;
 function toast(txt, dur = 3) { const t = $('#toast'); t.textContent = txt; t.style.opacity = 1; toastT = now + dur; }
-function centerMsg(big, small, dur = 3) { $('#center').innerHTML = `<div class="big">${esc(big)}</div><div class="small">${esc(small || '')}</div>`; centerT = now + dur; }
+function centerMsg(big, small, dur = 3) { $('#center').innerHTML = `<div class="big">${esc(big)}</div><div class="small">${esc(small || '')}</div>`; centerT = now + (finN(dur) ? dur : 3); }
 function feedAdd(k, v, w, hs) {
   const d = document.createElement('div');
   if (k === C.myId || v === C.myId) d.className = 'me';
@@ -7843,7 +7946,7 @@ function chatAdd(html) {
 }
 function updateRoomInfo() {
   $('#room').innerHTML = NET.code ? `Sala <b>${esc(NET.code)}</b>${NET.isHost ? ' (você é o host)' : ''}` : (NET.isHost ? 'Offline' : '');
-  const url = location.protocol.startsWith('http') && NET.code ? location.origin + location.pathname + '?sala=' + NET.code : '';
+  const url = location.protocol.startsWith('http') && NET.code ? location.origin + location.pathname + '?sala=' + NET.code + (NET.hostKey ? '&h=' + NET.hostKey : '') : ''; // h: segredo do host (quem entra pelo link confere que a sala é a mesma)
   $('#pRoom').innerHTML = NET.code
     ? `<div class="row" style="justify-content:space-between"><div>Código da sala:<div class="code">${esc(NET.code)}</div></div><div class="row"><button id="cpCode">Copiar código</button>${url ? '<button id="cpLink">Copiar link</button>' : ''}</div></div>`
     : `<div>${NET.isHost ? 'Sala offline (sem conexão com o servidor de pareamento). Dá pra jogar contra bots.' : ''}</div>`;
@@ -8133,6 +8236,9 @@ function matchForm(el, st0) {
   if (!MAPS[st.zmap]?.zonly) st.zmap = 'vila';
   if (!['rounds', 'dm', 'zombies'].includes(st.mode)) st.mode = 'rounds';
   st.zdiff = clamp(st.zdiff | 0, 0, ZDIFF.length - 1);
+  // os números vêm do localStorage (editável) e vão para o HTML e para os outros jogadores: só valores das listas do formulário
+  const ROUNDS = [3, 5, 8, 10, 13, 16], FRAGS = [10, 15, 20, 30, 50];
+  st.rounds = ROUNDS.includes(+st.rounds) ? +st.rounds : 8; st.frags = FRAGS.includes(+st.frags) ? +st.frags : 20; st.bots = clamp(st.bots | 0, 0, 7); st.diff = clamp(st.diff | 0, 0, 2);
   const hex = c => '#' + (c >>> 0).toString(16).padStart(6, '0');
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, t]) => `<button type="button" data-k="${k}" data-v="${v}"${String(st[k]) === String(v) ? ' class="on"' : ''}>${t}</button>`).join('')}</div>`;
   const MODES = [['rounds', 'Rodadas', 'Estilo CS: ataque x defesa, plantar e desarmar a bomba'], ['dm', 'Mata-mata', 'Renasce na hora, tudo grátis'], ['zombies', 'Zumbis', 'Cooperativo até 4, estilo CoD']];
@@ -8215,11 +8321,11 @@ function grantAllSkins() {
 const PROF = { uid: null, email: '', name: '', cloud: false, fb: false, data: null, saveT: 0, status: '' };
 const FB = {};
 const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0 });
-function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) { if (w === '_faca') { if (f === 'karambit') o._faca = f; } else if (W[w] && SKIN_BY[f]) o[w] = f; } return o; }
+function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) { if (w === '_faca') { if (f === 'karambit') o._faca = f; } else if (typeof f === 'string' && Object.hasOwn(W, w) && Object.hasOwn(SKIN_BY, f)) o[w] = f; } return o; } // hasOwn: 'constructor'/'toString' passavam e quebravam o state de todos
 function cleanProf(d) {
   const p = newProfile(0); if (!d || typeof d !== 'object') return p;
   p.xp = Math.max(0, +d.xp || 0); p.cases = Math.max(0, Math.floor(+d.cases || 0)); p.opened = Math.max(0, +d.opened || 0);
-  p.items = Array.isArray(d.items) ? [...new Set(d.items.filter(it => typeof it === 'string' && W[it.split(':')[0]] && SKIN_BY[it.split(':')[1]]))] : [];
+  p.items = Array.isArray(d.items) ? [...new Set(d.items.filter(it => typeof it === 'string' && Object.hasOwn(W, it.split(':')[0]) && Object.hasOwn(SKIN_BY, it.split(':')[1] ?? '')))] : [];
   p.equipped = cleanSk(d.equipped); for (const [w, f] of Object.entries(p.equipped)) if (w !== '_faca' && !p.items.includes(w + ':' + f)) delete p.equipped[w];
   return p;
 }
@@ -8230,10 +8336,15 @@ function profSave(now_) {
   save(profKey(), PROF.data);
   if (!PROF.cloud) return;
   clearTimeout(PROF.saveT);
-  PROF.saveT = setTimeout(async () => {
-    try { await FB.F.setDoc(FB.F.doc(FB.db, 'players', PROF.uid), { ...PROF.data, name: PROF.name, upd: FB.F.serverTimestamp() }, { merge: true }); }
-    catch (e) { console.warn('salvar conta', e); PROF.status = 'Não consegui salvar na nuvem (' + (e.code || e.message) + '). Tento de novo na próxima mudança.'; skinsUI(); }
-  }, now_ ? 0 : 3000);
+  const gravar = async (imediato) => {
+    try { await FB.F.setDoc(FB.F.doc(FB.db, 'players', PROF.uid), { ...PROF.data, name: PROF.name, upd: FB.F.serverTimestamp() }, { merge: true }); PROF.retentou = false; }
+    catch (e) {
+      // as regras do Firestore (firestore.rules) aceitam uma gravação por segundo: duas imediatas no mesmo segundo (abrir caixa e esconder a aba) são refeitas em silêncio
+      if (imediato && e.code === 'permission-denied' && !PROF.retentou) { PROF.retentou = true; clearTimeout(PROF.saveT); PROF.saveT = setTimeout(() => gravar(false), 3100); return; }
+      console.warn('salvar conta', e); PROF.status = 'Não consegui salvar na nuvem (' + (e.code || e.message) + '). Tento de novo na próxima mudança.'; skinsUI();
+    }
+  };
+  PROF.saveT = setTimeout(() => gravar(!!now_), now_ ? 0 : 3000);
 }
 addEventListener('visibilitychange', () => { if (document.hidden && PROF.cloud) profSave(true); });
 async function fbInit() {
@@ -8513,7 +8624,7 @@ const getHostForm = matchForm($('#hostForm'), lastSt);
 settingsForm($('#menuSettings'));
 $('#inName').value = CFG.name;
 $('#inName').oninput = () => { CFG.name = $('#inName').value.replace(/[<>]/g, '').slice(0, 16) || 'Jogador'; save('name', CFG.name); };
-{ const sala = new URLSearchParams(location.search).get('sala'); if (sala) { $('#inCode').value = sala.toUpperCase(); $('#joinStatus').textContent = 'Código preenchido pelo link — clique em Entrar'; } }
+{ const q = new URLSearchParams(location.search), sala = q.get('sala'), h = q.get('h'); if (sala) { $('#inCode').value = sala.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5); NET.linkKey = h && /^[A-Z0-9]{10}$/.test(h) ? h : null; $('#joinStatus').textContent = 'Código preenchido pelo link — clique em Entrar'; } }
 $('#btnHost').disabled = $('#btnJoin').disabled = false;
 $('#btnHost').textContent = 'Criar sala'; $('#btnJoin').textContent = 'Entrar';
 $('#btnHost').onclick = () => { audioInit(); const st = getHostForm(); save('lastSt', st); startHost(st); };
@@ -8536,8 +8647,21 @@ function showPause() {
   $('#pause').classList.remove('hidden');
   settingsForm($('#pauseSettings'));
   $('#pHostBox').style.display = NET.isHost ? '' : 'none';
-  if (NET.isHost) getPauseForm = matchForm($('#pauseForm'), S.st);
+  if (NET.isHost) { getPauseForm = matchForm($('#pauseForm'), S.st); renderKick(); }
   updateRoomInfo();
+}
+// lista de jogadores com "Expulsar" (só o host vê): quem acumulou mensagens fora do esperado aparece marcado; a decisão é sempre do host
+function renderKick() {
+  const el = $('#pKick'); if (!el) return;
+  const ps = [...S.players.values()].filter(p => !p.isBot && p.id !== 'h');
+  el.innerHTML = ps.length ? `<div class="lbl" style="margin-top:10px">Jogadores</div>` + ps.map(p => `<div class="row" style="justify-content:space-between;margin:4px 0"><span>${esc(p.name)}${p.suspeito ? ' <b style="color:#ff5050" title="mensagens fora do esperado (posição, tiros)">suspeito</b>' : p.anom?.n >= VAL.anomAviso ? ' <small style="color:#ffb020">avisos</small>' : ''}</span><button data-kick="${esc(p.id)}">Expulsar</button></div>`).join('') : '';
+  el.querySelectorAll('[data-kick]').forEach(b => b.onclick = () => { srvKick(b.dataset.kick); renderKick(); });
+}
+function srvKick(pid) { // tira da sala e não deixa voltar (pelo nome + token de reentrada) enquanto a sala existir
+  const p = S.players.get(pid), c = NET.conns.get(pid); if (!p || !c) return;
+  (S.banidos ||= new Set()).add(p.chaveLeft || p.name);
+  try { c.send({ t: 'err', txt: 'Você foi removido da sala pelo host' }); } catch (e) { }
+  srvDrop(c); toast(p.name + ' foi removido da sala', 3);
 }
 function enterGame() {
   inGame = true;
@@ -8545,7 +8669,7 @@ function enterGame() {
   vmSetWeapon('knife'); updateRoomInfo();
   window.onbeforeunload = e => { releaseInput(); document.exitPointerLock?.(); e.preventDefault(); return ''; }; // se a pessoa cancelar, volta parada e na pausa
 }
-function leaveGame() { window.onbeforeunload = null; try { NET.peer?.destroy(); } catch (e) { } location.href = location.pathname; }
+function leaveGame() { window.onbeforeunload = null; if (PROF.cloud) profSave(true); try { NET.peer?.destroy(); } catch (e) { } location.href = location.pathname; } // salva o XP dos últimos segundos antes de recarregar
 
 // ================================================================
 // Loop principal
@@ -8557,7 +8681,7 @@ let bgLast = 0, lastFrameAt = 0;
 try {
   const tw = new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),33)'], { type: 'text/javascript' })));
   tw.onmessage = () => {
-    if (!inGame || performance.now() - lastFrameAt < 200 || window.__simLock) { bgLast = 0; return; }
+    if (!inGame || performance.now() - lastFrameAt < 200 || (DEBUG && window.__simLock)) { bgLast = 0; return; }
     const t = performance.now() / 1000, dt = bgLast ? Math.min(t - bgLast, .1) : 1 / 30;
     bgLast = t; now = t; tick(dt);
   };
@@ -8567,7 +8691,7 @@ function frame() {
   const dt = Math.min(clock.getDelta(), .05);
   now = performance.now() / 1000; lastFrameAt = performance.now();
   if (!inGame) { renderer.clear(); return; }
-  if (window.__simLock) now = window.__simNow ?? now; else tick(dt); // testes automáticos controlam o tempo
+  if (DEBUG && window.__simLock) now = window.__simNow ?? now; else tick(dt); // testes automáticos controlam o tempo (só em desenvolvimento)
   if (WARM) renderer.clear(); else renderScene(); // aquecendo os shaders do mapa: não desenha (o desenho compilaria tudo de uma vez)
 }
 function renderScene() {
@@ -8624,8 +8748,8 @@ loadArms();
 fpLoad('p:ak'); fpLoad('m:knife'); fpLoad('m:karambit'); FPC['k:pack'] = new GLTFLoader().loadAsync(FPKNIFE.url).then(g => (FPC['k:pack'] = g));
 setTimeout(() => { let q = Promise.resolve(); for (const k of Object.keys(FPM)) q = q.then(() => fpLoad('m:' + k)); }, 8000); // modelos das armas aos poucos (mundo e mãos dos outros)
 requestAnimationFrame(frame);
-// ganchos de depuração (usados nos testes automáticos)
-window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
+// ganchos de depuração (usados nos testes automáticos); só em desenvolvimento (DEBUG), nunca no site publicado
+if (DEBUG) window.__T = { S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast, srvOnData, srvDrop,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>
