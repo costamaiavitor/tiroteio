@@ -3013,7 +3013,7 @@ function fpUpdate(ud, dt) {
   if (!F.until && !F.reloading) fpPlay(ud, me.sprinting && F.clips.run ? 'run' : hs > 1.5 && me.onGround && F.clips.walk ? 'walk' : 'idle');
   if (F.ik?.sv) { F.ik.arms.forEach((a, i) => { const v = F.ik.sv[i]; a.cl.position.copy(v[0]); a.ua.quaternion.copy(v[1]); a.fa.quaternion.copy(v[2]); if (a.hand) a.hand.position.copy(v[3]); }); if (F.ik.hp) F.ik.hl.position.copy(F.ik.hp); } // desfaz o IK do quadro anterior (ossos sem chave na animação)
   F.mixer.update(dt);
-  if (F.kn) knRetarget(F, dt);
+  if (F.hideL) F.hideL.scale.setScalar(1e-3); // faca: a mão esquerda do pacote fica parada no canto da tela, então some (como no CS)
   if (F.ik) fpIK(F); // braços antes das peças: o carregador na mão esquerda acompanha o desvio da mão (pushL)
   if (F.follow.length) { // peças móveis do modelo copiam o movimento das peças do pacote
     F.root.updateMatrixWorld(true);
@@ -3071,55 +3071,21 @@ function fpIK(F) {
 // entra no lugar da faca do pacote, presa ao mesmo nó: o referencial "knife" do pacote tem o cabo no eixo Y (lâmina para +Y, saindo pelo
 // lado do indicador), o fio para +Z (para onde apontam os nós dos dedos) e as unidades em centímetros. O pacote tem uma animação só,
 // cortada em clipes (quadros a 30 fps). A câmera do jogo fica em eye olhando para look (espaço do pacote).
-const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 12, -34], look: [0, -2, 30], sh: [.3, -.2, .16],
+const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 8, -22], look: [0, -2, 30], sh: [.3, -.2, .16],
   clips: { idle: [0, 42], inspect: [43, 66], stab: [66, 87], slash: [87, 112], slash2: [112, 138], draw: [138, 153] },
   // ponto de encaixe do modelo (FPKN: guarda da KA-BAR / centro do anel da karambit) vai para Q no pacote,
   // fwd/up: para onde vão o cano (lâmina) e o dorso do modelo; len: comprimento total (cm)
   fit: { knife: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 30 }, karambit: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 26 } } }; // butterfly: cabos fechados no punho, lâmina saindo pelo lado do indicador
 function knBuild(kind, ud, skin) {
-  const key = 'k:pack', mk = 'm:' + kind, bp = 'p:pistol', ap = 'p:rifle';
+  const key = 'k:pack', mk = 'm:' + kind;
   if (!FPC[key]) FPC[key] = new GLTFLoader().loadAsync(FPKNIFE.url).then(g => (FPC[key] = g), e => { console.warn('faca', e); delete FPC[key]; });
-  if (![key, mk, bp, ap].every(fpReady)) { Promise.all([FPC[key], fpLoad(mk), fpLoad(bp), fpLoad(ap)]).then(() => { if (vmGun && W[G.cur]?.slot === 'knife' && !vmGun.userData.fps2) vmSetWeapon(G.cur); }); return false; }
-  const g = FPC[key], K = FPKNIFE, F = K.fit[kind], D = FPKN[kind];
-  // pacote da faca (só a animação: não aparece)
-  const kroot = SkeletonUtils.clone(g.scene), all = g.animations[0], mixer = new THREE.AnimationMixer(kroot), clips = {};
+  if (!fpReady(key) || !fpReady(mk) || !fpReady('p:rifle')) { Promise.all([FPC[key], fpLoad(mk), fpLoad('p:rifle')]).then(() => { if (vmGun && W[G.cur]?.slot === 'knife' && !vmGun.userData.fps2) vmSetWeapon(G.cur); }); return false; }
+  const g = FPC[key], root = SkeletonUtils.clone(g.scene), K = FPKNIFE, F = K.fit[kind], D = FPKN[kind];
+  const all = g.animations[0], mixer = new THREE.AnimationMixer(root), clips = {};
   for (const [n, [a, b]] of Object.entries(K.clips)) clips[n] = THREE.AnimationUtils.subclip(all, n, a, b, 30);
-  kroot.traverse(o => { if (o.isMesh) o.visible = false; });
-  const C = new THREE.Matrix4().lookAt(new V3(...K.eye), new V3(...K.look), new V3(0, 1, 0)).setPosition(new V3(...K.eye));
-  const hk = new THREE.Group(); hk.matrixAutoUpdate = false; hk.matrix.makeScale(K.k, K.k, K.k).multiply(C.invert()); hk.add(kroot);
-  // braços do pacote da pistola (os mesmos das armas), sem a pistola e sem o braço esquerdo
-  const PP = FPK.pistol, croot = SkeletonUtils.clone(FPC[bp].scene); fpArmsSwap(croot, FPC[ap].scene);
-  croot.traverse(o => { if (o.isMesh) { o.visible = o.name === 'arms_swap'; o.frustumCulled = false; o.castShadow = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; } });
-  const cmixer = new THREE.AnimationMixer(croot), cidle = FPC[bp].animations.find(a => a.name.endsWith('|' + PP.clips.idle));
-  cmixer.clipAction(cidle).play();
-  const hc = new THREE.Group(); hc.matrixAutoUpdate = false; hc.add(croot);
-  const box = new THREE.Group(); box.add(hk, hc);
-  const B = n => { let b = null; croot.traverse(o => { if (!b && o.isBone && o.name.replace(/_\d+$/, '') === n) b = o; }); return b; };
-  const KB = n => kroot.getObjectByName(n) || (() => { let b = null; kroot.traverse(o => { if (!b && o.name.startsWith(n + '_')) b = o; }); return b; })();
-  const R = {
-    hand: B('IK_Hand_Cntrl_R'), wr: B('BoneTwist_01R_end'), ua: B('UpArm_R'), fa: B('Forearm_R'), cl: B('Arm_R'),
-    hideL: [B('Arm_L'), B('IK_Hand_Cntrl_L')],
-    idx: ['Bone_R005', 'Bone_R006', 'Bone_R007'].map(B), mid: ['Bone_R009', 'Bone_R010', 'Bone_R011'].map(B),
-    cf: [['Bone_R005', 'Bone_R006', 'Bone_R007', 'Bone_R007_end'], ['Bone_R009', 'Bone_R010', 'Bone_R011', 'Bone_R011_end'], ['Bone_R013', 'Bone_R014', 'Bone_R015', 'Bone_R015_end'], ['Bone_R017', 'Bone_R018', 'Bone_R019', 'Bone_R019_end']].map(c => c.map(B)),
-    kf: ['point', 'middle', 'ring', 'pink'].map(f => [1, 2, 3, 0].map(i => KB('R_' + f + (i || '')))),
-    knife: KB('knife'), kshoulder: KB('R_arm')
-  };
-  R.cl0 = R.cl.position.clone();
-  // pose de referência: os dois parados no primeiro quadro, indicador da pistola fechado como o dedo médio
-  mixer.clipAction(clips.idle).play(); mixer.update(0); cmixer.update(0); knCurl(R);
-  box.updateMatrixWorld(true);
-  const Kf = knFist(R.kf), Cf = knFist(R.cf), Hw = R.hand.matrixWorld.clone();
-  R.Rk = R.knife.matrixWorld.clone().invert().multiply(Kf);       // punho em relação à faca (pacote da faca)
-  R.Ghi = Cf.clone().invert().multiply(Hw);                         // mão em relação ao punho (braços)
-  R.wl = new V3().setFromMatrixPosition(R.wr.matrixWorld).applyMatrix4(Hw.clone().invert()); // pulso no espaço do controle da mão
-  // braços: girados para olhar para a frente (o pacote olha para +Z), na escala do jogo, com o ombro direito no mesmo ponto das armas
-  // (K.sh, metros a partir do olho), onde o corte da manga fica fora da tela
-  const k = FPH / PP.hr, rq = new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), Math.PI);
-  hc.matrix.compose(new V3(), rq, new V3(k, k, k)); box.updateMatrixWorld(true);
-  const sC = new V3().setFromMatrixPosition(R.ua.matrixWorld);
-  hc.matrix.compose(new V3(...K.sh).sub(sC), rq, new V3(k, k, k));
-  mixer.stopAllAction(); cmixer.clipAction(cidle).reset().play();
-  // faca do jogo: no nó da faca do pacote (mesmo referencial de antes), mas presa à mão dos braços
+  root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; if (/arm/i.test(o.material.name)) { const tx = knArmsTex(o.material.map); if (tx) o.material.map = tx; } } });
+  // faca do jogo no nó da faca do pacote
+  const node = root.getObjectByName('knife'); node.traverse(o => { if (o.isMesh) o.visible = false; });
   const ms = FPC[mk].scene.clone(true); ms.updateMatrixWorld(true);
   const pts = fpPts(ms, () => true), Mf = fpFit({ T: D.A, fwd: D.fwd, up: D.up }, pts, new THREE.Matrix4()), Mi = Mf.clone().invert();
   let z0 = 1e9, z1 = -1e9; for (const p of pts) { p.applyMatrix4(Mi); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); }
@@ -3127,13 +3093,50 @@ function knBuild(kind, ud, skin) {
   h.matrix.copy(fpFrame(new V3(...F.Q), new V3(...F.fwd), new V3(...F.up))).multiply(new THREE.Matrix4().makeScale(sc, sc, sc)).multiply(Mi);
   ms.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; } });
   if (skin) fpSkin(ms, skin, z1 - z0, [], true);
-  // faca no mundo = faca do pacote · h = mão · (mão⁻¹ · punho) · Rk⁻¹ · h; a mão é recalculada a cada quadro
-  const kg = new THREE.Group(); kg.matrixAutoUpdate = false; kg.matrix.copy(R.Ghi.clone().invert()).multiply(R.Rk.clone().invert()).multiply(h.matrix); kg.add(ms);
-  R.hand.add(kg);
-  const mz = new THREE.Object3D(); croot.add(mz);
-  Object.assign(ud, { fps2: { holder: box, root: croot, mixer, clips, act: null, cur: '', P: { hr: 1 }, mz, follow: [], ik: null, aq: new THREE.Quaternion(), ap: new V3(), knife: true, kn: { R, cmixer, box } }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
-  fpPlay(ud, 'draw'); mixer.update(0); knRetarget(ud.fps2, 0);
-  return box;
+  h.add(ms); node.add(h);
+  // câmera do pacote → câmera do jogo
+  const C = new THREE.Matrix4().lookAt(new V3(...K.eye), new V3(...K.look), new V3(0, 1, 0)).setPosition(new V3(...K.eye));
+  const holder = new THREE.Group(); holder.matrixAutoUpdate = false; holder.matrix.makeScale(K.k, K.k, K.k).multiply(C.invert()); holder.add(root);
+  const mz = new THREE.Object3D(); root.add(mz);
+  Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P: { hr: 1 }, mz, follow: [], ik: null, aq: new THREE.Quaternion(), ap: new V3(), knife: true, hideL: root.getObjectByName('L_arm_02') }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
+  fpPlay(ud, 'draw'); mixer.update(0);
+  return holder;
+}
+// luva e manga dos braços da faca iguais às dos braços das armas. A textura do pacote da faca tem pele (antebraço de fora), manga
+// preta e luva marrom: pele e manga viram o tecido camuflado da textura dos braços do fuzil (mesmo padrão, no mesmo lugar do UV,
+// com o relevo do pixel original) e a luva puxa para o tom das luvas do fuzil
+let KN_TEX = null;
+function knArmsTex(src) {
+  if (KN_TEX) return KN_TEX;
+  const ref = fpReady('p:rifle') && (() => { let m = null; FPC['p:rifle'].scene.traverse(o => { if (!m && o.isMesh && /arm/i.test(o.material.name)) m = o.material.map; }); return m; })();
+  if (!ref?.image || !src?.image) { fpLoad('p:rifle'); return null; }
+  const W = src.image.width, H = src.image.height, px = img => { const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'); g.drawImage(img, 0, 0, W, H); return [c, g, g.getImageData(0, 0, W, H)]; };
+  const [c, g, id] = px(src.image), R = px(ref.image)[2].data, d = id.data, lum = (a, i) => .3 * a[i] + .59 * a[i + 1] + .11 * a[i + 2];
+  // região de cada pixel pela cor mais próxima (grupos medidos na textura): 0 manga (escura), 1 pele (clara), 2 luva (marrom escuro)
+  const KC = [[34, 33, 32, 0], [191, 132, 104, 1], [153, 105, 81, 1], [92, 69, 47, 2]];
+  const knReg = (r, gg, b) => { let bi = 0, bd = 1e9; for (const q of KC) { const e = (r - q[0]) ** 2 + (gg - q[1]) ** 2 + (b - q[2]) ** 2; if (e < bd) { bd = e; bi = q[3]; } } return bi; };
+  const reg = new Uint8Array(W * H), sum = [0, 0, 0], cnt = [0, 0, 0], gl = [0, 0, 0];
+  let refL = 0; for (let i = 0; i < R.length; i += 4) refL += lum(R, i); refL /= R.length / 4;
+  const rg = [0, 0, 0]; for (let i = 0; i < R.length; i += 4) for (let k = 0; k < 3; k++) rg[k] += R[i + k]; for (let k = 0; k < 3; k++) rg[k] /= R.length / 4;
+  // classifica pela textura borrada: vincos escuros da luva não viram manga e as bordas entre regiões ficam suaves
+  const sc = document.createElement('canvas'); sc.width = W; sc.height = H; const sg = sc.getContext('2d'); sg.filter = 'blur(' + Math.round(W / 90) + 'px)'; sg.drawImage(src.image, 0, 0); const sd = sg.getImageData(0, 0, W, H).data;
+  const wg = new Float32Array(W * H); // peso da luva (0 a 1)
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    const dist = KC.map(q => Math.hypot(sd[i] - q[0], sd[i + 1] - q[1], sd[i + 2] - q[2])), dg = dist[3], dn = Math.min(dist[0], dist[1], dist[2]);
+    wg[j] = clamp(.5 + (dn - dg) / 40, 0, 1);
+    const l = lum(d, i), r = wg[j] > .5 ? 2 : knReg(sd[i], sd[i + 1], sd[i + 2]);
+    reg[j] = r; sum[r] += l; cnt[r]++; if (r === 2) for (let k = 0; k < 3; k++) gl[k] += d[i + k];
+  }
+  for (let k = 0; k < 3; k++) { sum[k] = sum[k] / Math.max(1, cnt[k]); gl[k] /= Math.max(1, cnt[2]); }
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    const r = reg[j], l = lum(d, i) / (sum[r] || 1);
+    // luva no tom das luvas das armas; manga e pele no tecido camuflado; mistura suave na borda
+    const lg = lum(d, i) / (sum[2] || 1), fg = Math.min(1.6, Math.max(.45, lg)), fc = Math.min(1.5, Math.max(.55, Math.pow(l, .6))), w = wg[j];
+    for (let k = 0; k < 3; k++) d[i + k] = Math.min(255, w * rg[k] * 1.25 * fg + (1 - w) * R[i + k] * fc);
+  }
+  g.putImageData(id, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = src.colorSpace; t.flipY = src.flipY; t.wrapS = src.wrapS; t.wrapT = src.wrapT; t.anisotropy = 4;
+  return (KN_TEX = t);
 }
 // dedos do pacote da faca / da pistola → referencial do punho: origem no meio dos dedos fechados, Y do mindinho para o indicador
 // (eixo do cabo), Z para os nós dos dedos
@@ -3148,7 +3151,7 @@ function knFist(ch) {
 function knCurl(R) { for (let i = 0; i < 3; i++) R.idx[i].quaternion.copy(R.mid[i].quaternion); }
 // a cada quadro: anima o pacote da faca e os braços; a mão dos braços vai para onde o pacote da faca põe o punho, e braço e
 // antebraço seguem por IK (o ombro avança se o braço não alcança)
-const _kn = { m: new THREE.Matrix4(), p: new V3(), q: new THREE.Quaternion(), s: new V3(), t: new V3() };
+const _kn = { m: new THREE.Matrix4(), p: new V3(), q: new THREE.Quaternion(), s: new V3(), t: new V3(), c: new V3() };
 function knRetarget(F, dt) {
   const { R, cmixer, box } = F.kn, I = _kn;
   R.cl.position.copy(R.cl0); cmixer.update(dt); knCurl(R);
@@ -3156,16 +3159,32 @@ function knRetarget(F, dt) {
   box.updateMatrixWorld(true);
   // punho alvo (sem escala) e controle da mão
   I.m.copy(R.knife.matrixWorld).multiply(R.Rk); I.m.decompose(I.p, I.q, I.s);
-  const T = new THREE.Matrix4().compose(I.p, I.q, new V3(1, 1, 1)).multiply(R.Ghi);
+  // a mão pode girar em volta do cabo sem soltar a faca: escolhe o giro em que o antebraço natural da mão (pulso reto) fica na mesma
+  // direção do antebraço da animação da faca; a faca gira ao contrário dentro da mão e continua onde a animação põe
+  const Yh = new V3(0, 1, 0).applyQuaternion(I.q), Fq = new THREE.Matrix4().compose(I.p, I.q, new V3(1, 1, 1));
+  let th = 0;
+  if (R.kelbow && R.kwrist) {
+    const T0 = Fq.clone().multiply(R.Ghi), dc = R.el.clone().applyMatrix4(T0).sub(R.wl.clone().applyMatrix4(T0));
+    const dt = I.c.setFromMatrixPosition(R.kelbow.matrixWorld).sub(I.t.setFromMatrixPosition(R.kwrist.matrixWorld));
+    dc.addScaledVector(Yh, -dc.dot(Yh)); dt.addScaledVector(Yh, -dt.dot(Yh));
+    if (dc.lengthSq() > 1e-12 && dt.lengthSq() > 1e-12) th = Math.atan2(Yh.dot(new V3().crossVectors(dc, dt)), dc.dot(dt));
+  }
+  const T = Fq.clone().multiply(new THREE.Matrix4().makeRotationY(th)).multiply(R.Ghi);
+  R.kg.matrix.copy(R.GhiInv).multiply(new THREE.Matrix4().makeRotationY(-th)).multiply(R.kgBase);
   I.m.copy(R.hand.parent.matrixWorld).invert().multiply(T); I.m.decompose(R.hand.position, R.hand.quaternion, R.hand.scale);
   R.hand.updateMatrixWorld(true);
-  const tw = R.wl.clone().applyMatrix4(R.hand.matrixWorld);
-  // ombro: avança na direção do pulso se o braço esticado não chega
+  // braço montado a partir da mão: o antebraço sai reto do pulso (direção natural da mão, pulso reto), o cotovelo fica onde esse
+  // antebraço termina e o braço vai do cotovelo para o ombro, que se move (fora da tela) para onde o braço chegar
+  const tw = R.wl.clone().applyMatrix4(R.hand.matrixWorld), ew = R.el.clone().applyMatrix4(R.hand.matrixWorld);
   const s = new V3().setFromMatrixPosition(R.ua.matrixWorld), e = new V3().setFromMatrixPosition(R.fa.matrixWorld), w = new V3().setFromMatrixPosition(R.wr.matrixWorld);
-  const L1 = e.distanceTo(s), L2 = w.distanceTo(e), d = tw.distanceTo(s);
-  if (d > (L1 + L2) * .97) { I.t.copy(s).addScaledVector(tw.clone().sub(s).normalize(), d - (L1 + L2) * .97); R.cl.position.add(R.cl.parent.worldToLocal(I.t.clone()).sub(R.cl.parent.worldToLocal(s.clone()))); R.cl.updateMatrixWorld(true); }
-  const a = { ua: R.ua, fa: R.fa, wr: R.wr, tw };
-  fpTwoBone(a);
+  const L1 = e.distanceTo(s), L2 = w.distanceTo(e);
+  const e2 = tw.clone().addScaledVector(ew.sub(tw).normalize(), L2);
+  // braço: na direção do braço da animação da faca (cotovelo → ombro), puxada para o ombro de referência para o corte da manga ficar fora da tela
+  const up = R.kshoulder && R.kelbow ? I.c.setFromMatrixPosition(R.kshoulder.matrixWorld).sub(I.t.setFromMatrixPosition(R.kelbow.matrixWorld)).normalize() : new V3();
+  const anchor = box.localToWorld(R.anchor.clone()).sub(e2).normalize(), s2 = e2.clone().addScaledVector(up.add(anchor).normalize(), L1);
+  R.cl.position.add(R.cl.parent.worldToLocal(s2.clone()).sub(R.cl.parent.worldToLocal(s.clone()))); R.cl.updateMatrixWorld(true);
+  I.t.setFromMatrixPosition(R.ua.matrixWorld); fpRot(R.ua, e.clone().sub(s), e2.clone().sub(I.t)); // (ombro já no lugar novo: e - s é a direção atual do braço)
+  I.t.setFromMatrixPosition(R.fa.matrixWorld); fpRot(R.fa, I.c.setFromMatrixPosition(R.wr.matrixWorld).sub(I.t), tw.clone().sub(I.t));
 }
 function fpTwoBone(a) { // braço e antebraço: o pulso (a.wr) vai para a.tw, cotovelo no mesmo plano de antes
   const I = _ik;
