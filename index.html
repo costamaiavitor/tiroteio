@@ -2711,17 +2711,17 @@ const FPM = {
   mp5: { T: [.018, -.02, null], fwd: '+x', up: '+y', L: .70 },
   mp5k: { T: [.15, -.17, null], fwd: '+x', up: '+y', L: .325, vo: [-.01, .005, .07] }, // curta: mais perto do olho para não sumir na tela
   mp40: { T: [-33.4, 2, null], fwd: '+x', up: '+y', L: .833 },
-  p90: { T: [10, -40, null], fwd: '-x', up: '+y', L: .68, lhf: .3 }, // Modular P90 Tactical (com supressor)
+  p90: { T: [10, -40, null], fwd: '-x', up: '+y', L: .68, lhf: .3, lens: ['Colimator'] }, // Modular P90 Tactical (com supressor)
   ak74u: { T: [-115, 23, null], fwd: '+x', up: '+y', L: .73 },
   galil: { T: [-130, 39, null], fwd: '+x', up: '+y', L: .98, brass: ['Material.007', 'Material.008', 'Material.009'] },
   rpk: { T: [-116, 20, null], fwd: '+x', up: '+y', L: 1.04 },
   hk21: { T: [-1.0, -.30, null], fwd: '+x', up: '+y', L: 1.02, lens: ['Material.015'], lhf: .78 }, // mão esquerda à frente da caixa de munição
   dragunov: { T: [-93, -6.7, null], fwd: '+x', up: '+y', L: 1.225 },
-  m4: { T: [-20, -3, null], fwd: '+x', up: '+y', L: .84 },
-  commando: { T: [-44, -1, null], fwd: '+x', up: '+y', L: .85 },
-  fal: { T: [-16.5, 2.3, null], fwd: '+x', up: '+y', L: 1.09 },
-  m14: { T: [-1.885, -.055, null], fwd: '+x', up: '+y', L: 1.118 },
-  thundergun: { T: [-17.5, null, -6.2], fwd: '+x', up: '+z', L: .85, vo: [.04, -.03, -.12] },
+  m4: { T: [-20, -3, null], fwd: '+x', up: '+y', L: .84 , lhf: .5 },
+  commando: { T: [-44, -1, null], fwd: '+x', up: '+y', L: .85 , lhf: .5 },
+  fal: { T: [-16.5, 2.3, null], fwd: '+x', up: '+y', L: 1.09 , lhf: .5 , tint: { Material: 0x2b2b2b, 'Material.003': 0x2b2b2b }, brass: ['Material.001', 'Material.002'] },
+  m14: { T: [-1.885, -.055, null], fwd: '+x', up: '+y', L: 1.118 , lhf: .5 },
+  thundergun: { T: [-17.5, null, -6.2], fwd: '+x', up: '+z', L: .85, vo: [.04, -.04, -.2] },
   scout: { T: [-97, -19, null], fwd: '+x', up: '+y', L: 1.2, lens: ['Material.019'] },
   awp: { T: [-94, 5.5, null], fwd: '+x', up: '+y', L: 1.2, lens: ['Material.019'] },
   stakeout: { T: [-.204, -.003, null], fwd: '+x', up: '+y', L: 1.0 },
@@ -2885,6 +2885,7 @@ function fpBuild(id, ud) {
     if (D) { fpSkin(model.children[0], mats, tips.L, D.lens); if (F2) fpSkin(F2.g.children[0], mats, tips.L, D.lens); }
     else fpSkin(root, mats, tips.L, ['12ge'], false, m => !fpArm(m));
   }
+  if (D?.tint) model.traverse(o => { if (o.isMesh && D.tint[o.material.name] != null) o.material.color.set(D.tint[o.material.name]); }); // cores chapadas estranhas do modelo
   if (D?.brass) model.traverse(o => { if (o.isMesh && D.brass.includes(o.material.name)) Object.assign(o.material, { metalness: .9, roughness: .35 }).color.set(0xb08d3c); }); // balas brancas sem textura viram latão
   if (D?.lens) model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) Object.assign(o.material, { roughness: .08, metalness: .4 }).color.set(0x14232c); }); // vidro da luneta
   const mz = new THREE.Object3D(); mz.position.copy(tips.muzzle).applyMatrix4(C); body.add(mz);
