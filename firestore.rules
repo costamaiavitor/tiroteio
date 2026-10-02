@@ -76,9 +76,9 @@ service cloud.firestore {
 
       // ---- D4: tetos absolutos na criação ----
       // O create não tem estado anterior: um convidado com localStorage editado entraria com qualquer valor.
-      // Um convidado honesto raramente passa de 20 caixas ou 50 skins antes de criar a conta.
+      // Um convidado honesto dificilmente passa de 200 caixas ou 400 skins antes de criar a conta.
       function tetosCriacao() {
-        return d().cases <= 20 && d().items.size() <= 50;
+        return d().cases <= 200 && d().items.size() <= 400; // convidado que jogou muito antes de criar a conta ainda passa; o salto absurdo (cases 999999) não
       }
 
       // ---- D3: intervalo mínimo de 1 s entre gravações ----
