@@ -8287,9 +8287,10 @@ function matchForm(el, st0) {
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, t]) => `<button type="button" data-k="${k}" data-v="${v}"${String(st[k]) === String(v) ? ' class="on"' : ''}>${t}</button>`).join('')}</div>`;
   const MODES = [['rounds', 'Rodadas', 'Estilo CS: ataque x defesa, plantar e desarmar a bomba'], ['dm', 'Mata-mata', 'Renasce na hora, tudo grátis'], ['zombies', 'Zumbis', 'Cooperativo até 4, estilo CoD']];
   const render = () => {
-    if (st.mode === 'rounds' && !MAPS[st.map]?.bomb) st.map = 'duna'; // rodadas: só mapa com bombs
+    if (st.mode === 'rounds' && !MAPS[st.map]?.bomb) st.map = 'duna'; // rodadas: só os mapas de bomba
+    if (st.mode === 'dm' && MAPS[st.map]?.bomb) st.map = 'arena'; // mata-mata: os mapas de bomba não entram
     const z = st.mode === 'zombies', cur = z ? st.zmap : st.map;
-    const maps = Object.entries(MAPS).filter(([, m]) => !!m.zonly === z && (st.mode !== 'rounds' || m.bomb));
+    const maps = Object.entries(MAPS).filter(([, m]) => !!m.zonly === z && (z || (st.mode === 'rounds') === !!m.bomb));
     const opts = z
       ? `<div class="lbl">Dificuldade</div>${seg('zdiff', ZDIFF.map((d, i) => [i, d.name]))}<div class="zdesc"><b>${ZDIFF[st.zdiff].name}:</b> ${ZDIFF[st.zdiff].desc}</div>`
       : `<div class="optrow">${st.mode === 'rounds' ? `<div><div class="lbl">Rodadas para vencer</div>${seg('rounds', [3, 5, 8, 10, 13, 16].map(n => [n, n]))}</div>` : `<div><div class="lbl">Abates para vencer</div>${seg('frags', [10, 15, 20, 30, 50].map(n => [n, n]))}</div>`}
