@@ -143,6 +143,8 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #xhair i{position:absolute;background:#6cff6c;box-shadow:0 0 0 1px rgba(0,0,0,.75)}
 #xhair .v{width:2px;height:18px;left:-1px;top:-9px}
 #xhair .h{width:18px;height:2px;left:-9px;top:-1px}
+#xhair svg{position:absolute;left:-20px;top:-20px;display:block}
+.xhprev{width:52px;height:52px;background:#4a525c;border-radius:6px;display:flex;align-items:center;justify-content:center;flex:none}
 #hitmark{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px;opacity:0;transform:scale(1.2);filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 2px rgba(0,0,0,.8))}
 #hitmark:before,#hitmark:after{content:"";position:absolute;left:12px;top:0;width:2px;height:26px;background:#fff;transform:rotate(45deg);-webkit-mask:linear-gradient(#000 35%,transparent 35% 65%,#000 65%);mask:linear-gradient(#000 35%,transparent 35% 65%,#000 65%)}
 #hitmark:after{transform:rotate(-45deg)}
@@ -462,7 +464,7 @@ let now = performance.now() / 1000;
 const CFG = {
   name: load('name', 'Jogador' + Math.floor(rand(100, 999))),
   sens: load('sens', 1), fov: load('fov', 85), vol: load('vol', 0.6), shadows: load('shadows', true), gfx: load('gfx', null),
-  bright: load('bright', 1), zmarks: load('zmarks', true), lant: load('lant', false), autofull: load('autofull', true),
+  bright: load('bright', 1), xh: load('xh', 'padrao'), xhc: load('xhc', 'verde'), zmarks: load('zmarks', true), lant: load('lant', false), autofull: load('autofull', true),
 };
 
 // ================================================================
@@ -8315,16 +8317,34 @@ function matchForm(el, st0) {
     return { map: z ? st.zmap : st.map, cmap: st.map, zmap: st.zmap, mode: st.mode, rounds: st.rounds, frags: st.frags, bots: z ? 0 : st.bots, diff: st.diff, zdiff: st.zdiff };
   };
 }
+// ---------- mira: formatos e cores (SVG com contorno escuro para aparecer em qualquer fundo) ----------
+const XH = { // nome, desenho (path ou 'C' + raio de círculo), espessura, raio do ponto do meio
+  padrao: ['Cruz (padrão)', 'M11 20H29M20 11V29', 2], vao: ['Cruz com vão', 'M10 20H16M24 20H30M20 10V16M20 24V30', 2], cruzponto: ['Cruz com ponto', 'M10 20H16M24 20H30M20 10V16M20 24V30', 2, 1.4],
+  fina: ['Cruz fina', 'M8 20H17M23 20H32M20 8V17M20 23V32', 1], grossa: ['Cruz grossa', 'M11 20H17M23 20H29M20 11V17M20 23V29', 3.2], ponto: ['Ponto', '', 0, 2.4],
+  circulo: ['Círculo', 'C7', 1.6], circponto: ['Círculo com ponto', 'C8', 1.6, 1.3], t: ['Em T', 'M10 20H16M24 20H30M20 24V30', 2],
+  cantos: ['Cantos', 'M12 16V12H16M24 12H28V16M28 24V28H24M16 28H12V24', 1.8], seta: ['Seta', 'M13 26L20 19L27 26', 2.2, 1.2] };
+const XHC = { verde: ['Verde', '#6cff6c'], branco: ['Branco', '#ffffff'], amarelo: ['Amarelo', '#ffe14a'], ciano: ['Ciano', '#4ae3ff'], vermelho: ['Vermelho', '#ff4a4a'], rosa: ['Rosa', '#ff6fd8'] };
+function xhSVG(id, col) {
+  const [, d, w, dot] = XH[id] || XH.padrao;
+  const shape = (c, sw) => !d ? '' : d[0] === 'C' ? `<circle cx="20" cy="20" r="${d.slice(1)}" fill="none" stroke="${c}" stroke-width="${sw}"/>` : `<path d="${d}" fill="none" stroke="${c}" stroke-width="${sw}" stroke-linecap="square"/>`;
+  const pt = (c, r) => dot ? `<circle cx="20" cy="20" r="${r}" fill="${c}"/>` : '';
+  return `<svg width="40" height="40" viewBox="0 0 40 40">${shape('rgba(0,0,0,.75)', w + 2)}${pt('rgba(0,0,0,.75)', dot + 1)}${shape(col, w)}${pt(col, dot)}</svg>`;
+}
+function xhApply() { const h = xhSVG(CFG.xh, (XHC[CFG.xhc] || XHC.verde)[1]); $('#xhair').innerHTML = h; document.querySelectorAll('[data-xhp]').forEach(e => e.innerHTML = h); }
 function settingsForm(el) {
   el.innerHTML = `
     <label>Sensibilidade <span class="v" data-v="sens"></span><input type="range" data-k="sens" min="0.1" max="4" step="0.05"></label>
     <label>Campo de visão <span class="v" data-v="fov"></span><input type="range" data-k="fov" min="60" max="110" step="1"></label>
     <label>Volume <span class="v" data-v="vol"></span><input type="range" data-k="vol" min="0" max="1" step="0.05"></label>
     <label>Brilho <span class="v" data-v="bright"></span><input type="range" data-k="bright" min="0.6" max="1.8" step="0.05"></label>
+    <div class="row" style="align-items:flex-end;gap:10px"><label style="flex:1">Mira <select data-k="xh">${Object.entries(XH).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('')}</select></label>
+      <label style="flex:1">Cor da mira <select data-k="xhc">${Object.entries(XHC).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('')}</select></label><div class="xhprev" data-xhp></div></div>
     <label>Gráficos <select data-k="gfx"><option value="baixo">Baixo (notebook fraco)</option><option value="medio">Médio</option><option value="alto">Alto (brilho, sombras de tudo, resolução cheia)</option></select></label>
     <label class="chk"><input type="checkbox" data-k="shadows"> Sombras (desligue se travar)</label>
     <label class="chk"><input type="checkbox" data-k="zmarks"> Zumbis: marcar energia, caixa e Pack-a-Punch na tela</label>
     <label class="chk"><input type="checkbox" data-k="autofull"> Tela cheia ao jogar (Chrome/Edge: o Ctrl agacha e o Ctrl+W não fecha a aba; Esc sai)</label>`;
+  for (const k of ['xh', 'xhc']) { const q = el.querySelector(`[data-k="${k}"]`); q.value = CFG[k]; q.onchange = () => { CFG[k] = q.value; save(k, CFG[k]); xhApply(); }; }
+  xhApply();
   const gq = el.querySelector('[data-k="gfx"]'); gq.value = CFG.gfx;
   gq.onchange = () => { CFG.gfx = gq.value; save('gfx', CFG.gfx); applySettings(); };
   for (const k of ['sens', 'fov', 'vol', 'bright']) {
