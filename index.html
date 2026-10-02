@@ -5140,6 +5140,8 @@ function startHost(st) {
       conn.on('open', () => attachFast(conn, d => srvOnData(conn, d)));
       conn.on('data', d => srvOnData(conn, d));
       conn.on('close', () => srvDrop(conn));
+      // aba fechada sem aviso: o PeerJS demora a disparar 'close'; se a ligação WebRTC cair e não voltar em 4 s, sai (sem fantasma parado no mapa)
+      conn.on('open', () => { const pc = conn.peerConnection; if (pc) pc.addEventListener('connectionstatechange', () => { const st = pc.connectionState; if (st === 'failed' || st === 'closed') srvDrop(conn); else if (st === 'disconnected') setTimeout(() => { if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') srvDrop(conn); }, 4000); }); });
       // "message-too-big"/"not-open-yet" são de uma mensagem só: não derrubam o jogador
       conn.on('error', err => { if (err?.type === 'message-too-big' || err?.type === 'not-open-yet') console.warn('conn', err); else srvDrop(conn); });
     });
@@ -8049,7 +8051,7 @@ function grantXP(n) {
   d.xp += n; let got = 0;
   while (d.xp >= XP_CASE) { d.xp -= XP_CASE; d.cases++; got++; }
   if (got && inGame) { toast(got > 1 ? `Você ganhou ${got} caixas de skin! Abra no menu → Skins` : 'Você ganhou uma caixa de skin! Abra no menu → Skins', 4); play('kaching'); }
-  profSave(); skinsUI();
+  profSave(); if (!inGame) skinsUI(); // em jogo o menu está escondido (e sair recarrega a página): redesenhar aqui travava o host ~0,3 s a cada XP
 }
 // ---------- caixa ----------
 function rollItem() {
