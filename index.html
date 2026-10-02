@@ -454,6 +454,11 @@ const CFG = {
 const PEER_PREFIX = 'tiroteio-br-v1-';
 const GRAV = 22, JUMP_V = 7.3, RUN = 6.4, PR = 0.34;
 const H_STAND = 1.8, H_CROUCH = 1.25, EYE_STAND = 1.62, EYE_CROUCH = 1.08, STEP = 0.5;
+// Zumbis: o zumbi escala até a altura do pulo do jogador (ZVAULT ~1,21 m). Para não sobrar lugar onde ele não chega, nos mapas
+// de zumbi o jogador não fica de pé em nada mais alto que ZTOP (muro, telhado, pilha de caixotes, pedra alta) nem na água:
+// para ele essas caixas são paredes até o céu (zHigh). Como em todo o mapa o chão é y = 0, a altura absoluta basta.
+const ZVAULT = JUMP_V * JUMP_V / (2 * GRAV), ZTOP = ZVAULT;
+const zHigh = b => b.maxY > ZTOP || (b.ns && b.minY < .1); // ns + chão = água (o 'inv' da janela começa no peitoril)
 const COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#ff6fb5'];
 const BOT_NAMES = ['Zé', 'Tião', 'Juca', 'Neide', 'Chico', 'Rosa', 'Biel', 'Cida'];
 
@@ -2277,7 +2282,7 @@ function blockedAt(px, py, pz, h) { const L = colQuery(px - PR, px + PR, pz - PR
 // mesmo resultado do laço por todo o COL: enquanto o corpo fica dentro da região consultada, as caixas de fora
 // não encostam nele; se um empurrão o tirar da região, o resto da volta segue pelo COL inteiro, na mesma ordem
 function moveBody(o, dt) {
-  const p = o.pos, v = o.vel, wasGround = o.onGround; o.stepUp = 0;
+  const p = o.pos, v = o.vel, wasGround = o.onGround, pc = o === me && ZC.on; o.stepUp = 0; // pc: jogador num mapa de zumbi (zHigh vira parede)
   const mx = Math.abs(v.x * dt) + PR + .5, mz = Math.abs(v.z * dt) + PR + .5, rx0 = p.x - mx, rx1 = p.x + mx, rz0 = p.z - mz, rz1 = p.z + mz;
   const L = colQuery(rx0, rx1, rz0, rz1, CG.q1), n = L.length, N = COL.length;
   for (const ax of AXES) {
@@ -2286,9 +2291,10 @@ function moveBody(o, dt) {
     for (let k = 0, i = -1; ;) {
       if (lin) { if (++i >= N) break; } else { if (k >= n) break; i = L[k++]; }
       const b = COL[i];
-      if (!overlapBox(p.x, p.y, p.z, o.h, b)) continue;
+      const hi = pc && zHigh(b);
+      if (hi ? !(p.x + PR > b.minX && p.x - PR < b.maxX && p.z + PR > b.minZ && p.z - PR < b.maxZ && p.y + o.h > b.minY && p.y < b.maxY - 1e-3) : !overlapBox(p.x, p.y, p.z, o.h, b)) continue;
       const sh = b.maxY - p.y;
-      if (wasGround && sh > 0 && sh <= STEP && !blockedAt(p.x, b.maxY + .001, p.z, o.h)) { o.stepUp += sh; p.y = b.maxY + .001; continue; }
+      if (!hi && wasGround && sh > 0 && sh <= STEP && !blockedAt(p.x, b.maxY + .001, p.z, o.h)) { o.stepUp += sh; p.y = b.maxY + .001; continue; }
       if (ax === 'x') p.x = d > 0 ? b.minX - PR - 1e-4 : b.maxX + PR + 1e-4; else p.z = d > 0 ? b.minZ - PR - 1e-4 : b.maxZ + PR + 1e-4;
       v[ax] = 0;
       if (!lin && !(p.x - PR > rx0 && p.x + PR < rx1 && p.z - PR > rz0 && p.z + PR < rz1)) lin = true;
@@ -5623,7 +5629,8 @@ function zombieModel(dog, kind = 0, id = (Math.random() * 1e6) | 0) {
   const ud = { skel }; for (const [k, v] of Object.entries(t.map)) ud[k] = Array.isArray(v) ? v.map(i => bones[i]) : typeof v === 'number' ? bones[v] : v.e !== undefined ? ex[v.e] : v.v;
   g.userData = ud;
   if (!dog) { // variações do mesmo molde
-    const hr = kind === 1 || kind === 6 ? 0 : kind === 3 ? 2 : L.hair; zHide(ud.hairS, hr !== 1); zHide(ud.hairL, hr !== 2); // Brutamonte careca, Carniceiro de capacete zHide(ud.shoeR, L.bare); zHide(ud.bareR, !L.bare); zHide(ud.ribs, !(L.wound || kind === 3));
+    const hr = kind === 1 || kind === 6 ? 0 : kind === 3 ? 2 : L.hair; zHide(ud.hairS, hr !== 1); zHide(ud.hairL, hr !== 2); // Brutamonte careca, Carniceiro de capacete
+    zHide(ud.shoeR, L.bare); zHide(ud.bareR, !L.bare); zHide(ud.ribs, !(L.wound || kind === 3));
     zHide(ud.foreL, L.stump); zHide(ud.stumpL, !L.stump); zHide(ud.jaw, L.nojaw); zHide(ud.neckB, 1); zHide(ud.kneeL, 1); zHide(ud.kneeR, 1);
     g.scale.setScalar(zSize(kind, id));
   }
@@ -6035,7 +6042,7 @@ function zNewClientZombie(id, f) {
 function zRemoveClient(zc) { zGroup.remove(zc.model); zc.model.userData.skel?.dispose(); zc.model.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); ZC.zs.delete(zc.id); }
 function zOnSnap(m) {
   if (m.ts) { if (m.ts <= (ZC.snapTs || 0)) return; ZC.snapTs = m.ts; } // canal sem ordem: foto velha é descartada
-  const a = m.z, t = netTime('z', m.ts);
+  const a = m.z, t = netTime('z', m.ts); ZC.snapAt = now;
   for (let i = 0; i + 5 < a.length; i += 6) {
     const id = a[i]; let zc = ZC.zs.get(id), fresh = false;
     if (!zc) { if (ZC.gone.has(id)) continue; zc = zNewClientZombie(id, a[i + 5]); fresh = true; } // não ressuscita zumbi que já morreu
@@ -6117,7 +6124,7 @@ function zShockRing(p, col, r, life) {
   m.rotation.x = -Math.PI / 2; m.position.copy(p); addFx(m, life, (k, o) => { o.scale.setScalar(.4 + k * r); o.material.opacity = .6 * (1 - k); });
 }
 function zAnimHuman(zc, ud, dt) {
-  const f = zc.f, sc = f & 3, atk = !!(f & 4), crawl = !!(f & 8), win = !!(f & 32), rise = !!(f & 64), K = zc.kind, t = now, spd = zc.spd, side = zc.side;
+  const f = zc.f, sc = f & 3, atk = !!(f & 4), crawl = !!(f & 8), win = !!(f & 32) || !!(f & 1024), rise = !!(f & 64), K = zc.kind, t = now, spd = zc.spd, side = zc.side;
   const k = 1 - Math.exp(-dt * 16), run = sc >= 2 || (K === 6 && sc >= 1), mv = clamp(spd / (run ? 2.5 : 1), 0, 1), heavy = K === 1 || K === 6;
   zc.anim += dt * (spd / ((.9 + spd * .25) * zc.sz) * 6.283 * (K === 2 ? 1.3 : 1) + .4); // a fase anda com a distância: o pé não escorrega
   const a = zc.anim, s = Math.sin(a), c = Math.cos(a), ph = zc.ph;
@@ -6311,8 +6318,9 @@ function updateZombies(dt) {
   const rt = now - netDelay('z');
   for (const zc of ZC.zs.values()) { // apagar do Map durante o laço é seguro
     const ud = zc.model.userData, M_ = zc.model;
+    if (zc.sink) { const k = (now - zc.sink) / 1.2; M_.position.y = zc.pos.y - 2 * Math.min(1, k * k); if (k >= 1) zRemoveClient(zc); continue; }
     if (zc.dead) { if (zAnimDead(zc, ud, dt)) zRemoveClient(zc); continue; }
-    if (now - zc.lastSeen > 2.5) { zRemoveClient(zc); continue; } // folga para picos de rede (antes sumiam e voltavam)
+    if (now - zc.lastSeen > 2.5 && ((ZC.snapAt || 0) - zc.lastSeen > 1 || now - zc.lastSeen > 8)) { zRemoveClient(zc); continue; } // folga para picos de rede (antes sumiam e voltavam)
     const buf = zc.buf;
     if (buf.length) { // interpola; foto atrasada: extrapola até 200 ms e o erro some aos poucos (netFix); teleporte não atravessa parede
       const s = netPick(buf, rt, .2, ZVMAX), A = s.a, Bq = s.b, k = s.k; netEo(zc.eo, dt);
@@ -6472,7 +6480,7 @@ function zArcFx(pts, pap) { // raio da Wunderwaffe pulando de zumbi em zumbi (po
 }
 function zPush() { // zumbi é sólido: dá pra ficar encurralado
   for (const zc of ZC.zs.values()) {
-    if (zc.dead || (zc.f & 96)) continue;
+    if (zc.dead || (zc.f & 1120)) continue; // 32 janela, 64 subindo do chão, 1024 escalando
     const dx = me.pos.x - zc.pos.x, dz = me.pos.z - zc.pos.z, d = Math.hypot(dx, dz), r = zc.dog ? .7 : .62;
     if (d < r && d > 1e-4 && Math.abs(me.pos.y - zc.pos.y) < 1.5) {
       const k = r - d, nx = me.pos.x + dx / d * k, nz = me.pos.z + dz / d * k;
@@ -6723,12 +6731,22 @@ function zFlowStart(srcs) {
   if (FQ.length < N * 8) FQ = new Int32Array(N * 8);
   if (!FF.back || FF.back.length !== N) FF.back = new Float32Array(N);
   // células de origem primeiro: mesmas células, mesma grade e mesmo campo pronto = o resultado seria idêntico (jogador parado)
-  if (FS.src.length < srcs.length) FS.src = new Int32Array(srcs.length * 2);
+  if (FS.src.length < srcs.length * 41) FS.src = new Int32Array(srcs.length * 41);
   const sc = FS.src; let ns = 0;
-  for (const [x, z] of srcs) {
-    let c = ffCell(x, z); if (c < 0) continue;
-    if (!Wk[c]) { const i0 = (c / nz) | 0, j0 = c % nz; c = -1; let bd = 9; for (let di = -2; di <= 2; di++) for (let dj = -2; dj <= 2; dj++) { const ii = i0 + di, jj = j0 + dj; if (ii < 0 || jj < 0 || ii >= nx || jj >= nz || !Wk[ii * nz + jj]) continue; const d = di * di + dj * dj; if (d < bd) { bd = d; c = ii * nz + jj; } } }
-    if (c >= 0) sc[ns++] = c;
+  for (let si = 0; si < srcs.length; si++) { const x = srcs[si][0], z = srcs[si][1];
+    const c = ffCell(x, z); if (c < 0) continue;
+    if (Wk[c]) { sc[ns++] = c; continue; }
+    // em cima de algo (chafariz, fogueira, feno...): fontes em todas as celulas andaveis do primeiro anel livre (e do seguinte), ate 6 m,
+    // desde que a reta ate o jogador nao cruze nada mais alto que o pulo (nao vaza para o outro lado de um muro)
+    const y = srcs.y ? srcs.y[si] : 0, mk = c + ':' + Math.round(y * 10) + ':' + FS.wv, mm = (FS.ring ||= new Map()).get(mk); // mesmo lugar e mesma grade: reaproveita
+    if (mm) { for (let k = 0; k < mm.length; k++) sc[ns++] = mm[k]; continue; }
+    const i0 = (c / nz) | 0, j0 = c % nz; let found = 0, n0 = ns;
+    for (let k = 1; k <= 6 && (!found || k <= found + 1); k++) for (let di = -k; di <= k; di++) for (let dj = -k; dj <= k; dj += (di === -k || di === k) ? 1 : 2 * k) {
+      const ii = i0 + di, jj = j0 + dj; if (ii < 0 || jj < 0 || ii >= nx || jj >= nz || !Wk[ii * nz + jj] || ns - n0 >= 40) continue;
+      if (!segClearH(x, z, FF.x0 + ii + .5, FF.z0 + jj + .5, y + ZVAULT, y - 1.7)) continue;
+      if (!found) found = k; sc[ns++] = ii * nz + jj;
+    }
+    if (FS.ring.size > 64) FS.ring.clear(); FS.ring.set(mk, sc.slice(n0, ns));
   }
   const key = FS.wv + ':' + FF.x0 + ':' + FF.z0 + ':' + N + ':' + FS.lim;
   if (FS.done === FF.dist && FS.key === key && FS.ns === ns) { let same = true; for (let k = 0; k < ns; k++) if (FS.last[k] !== sc[k]) { same = false; break; } if (same) { FS.busy = false; return; } }
@@ -6782,6 +6800,13 @@ function zFlowDir(x, z) {
   if (bi < 0) return null;
   const dx = FF.x0 + bi + .5 - x, dz = FF.z0 + bj + .5 - z, d = hyp(dx, dz) || 1; FDV[0] = dx / d; FDV[1] = dz / d; return FDV; // buffer fixo: quem chama copia
 }
+// footFreeH: como footFreeR, mas ignora caixa com topo <= lo (da para pisar / esta sob o alvo) e caixa que comeca acima da cabeca (fl + 1,7)
+function footFreeH(x, z, r, lo, fl) {
+  const L = colQuery(x - r, x + r, z - r, z + r, CG.q2);
+  for (let k = 0; k < L.length; k++) { const b = COL[L[k]]; if (b.maxY <= lo || b.minY >= fl + 1.7) continue; if (x + r > b.minX && x - r < b.maxX && z + r > b.minZ && z - r < b.maxZ) return false; }
+  return true;
+}
+function segClearH(ax, az, bx2, bz, lo, fl) { const d = hyp(bx2 - ax, bz - az), n = Math.ceil(d / .5); for (let i = 1; i < n; i++) { const t = i / n; if (!footFreeH(lerp(ax, bx2, t), lerp(az, bz, t), .3, lo, fl)) return false; } return true; }
 function segClearR(ax, az, bx2, bz) { const d = hyp(bx2 - ax, bz - az), n = Math.ceil(d / .5); for (let i = 1; i < n; i++) { const t = i / n; if (!footFreeR(lerp(ax, bx2, t), lerp(az, bz, t), .3)) return false; } return true; }
 function zReset() {
   S.left = new Map(); // partida nova: ninguém recupera nada da anterior
@@ -6840,7 +6865,7 @@ function zTick(dt) {
   zTickClouds();
   zTickPlayers(dt);
   if (S.phase === 'over') return;
-  if (now >= Z.ffT && !FS.busy) { Z.ffT = now + .3; zFlowStart(Z.lure ? [Z.lure] : [...S.players.values()].filter(p => p.alive && !p.downed && !(p.zbEnd > now)).map(p => [p.pos[0], p.pos[2]])); }
+  if (now >= Z.ffT && !FS.busy) { Z.ffT = now + .3; { const ps = Z.lure ? null : [...S.players.values()].filter(p => p.alive && !p.downed && !(p.zbEnd > now)), src = Z.lure ? [Z.lure] : ps.map(p => [p.pos[0], p.pos[2]]); src.y = ps ? ps.map(p => p.pos[1]) : null; zFlowStart(src); } }
   if (FS.busy) { const t0 = performance.now(); do zFlowStep(2500); while (FS.busy && performance.now() - t0 < .8); } // fatia por tick: até ~0,8 ms (mapa gigante todo aberto: o campo novo leva alguns ticks)
   zTickZombies(dt);
   zTickObjects();
@@ -6877,7 +6902,7 @@ function zHurt(p, dmg, from) {
 function zWidow(p) { // Widow's Wine: golpe recebido solta a teia (prende quem está perto)
   if (!p.alive || p.downed || !p.perks.includes('widow') || !(p.widow > 0) || now < (p.widowT || 0)) return;
   p.widow--; p.widowT = now + 1.5;
-  for (const z of Z.zs.values()) { const P = z.body.pos; if (z.st === 'in' && Math.hypot(P.x - p.pos[0], P.z - p.pos[2]) < ZPK.widowR && Math.abs(P.y - p.pos[1]) < 2) { z.webT = now + ZPK.widowT; z.atkWind = 0; z.atkT = Math.max(z.atkT, now + 1); } }
+  for (const z of Z.zs.values()) { const P = z.body.pos; if ((z.st === 'in' || z.st === 'vault') && Math.hypot(P.x - p.pos[0], P.z - p.pos[2]) < ZPK.widowR && Math.abs(P.y - p.pos[1]) < 2) { z.webT = now + ZPK.widowT; z.atkWind = 0; z.atkT = Math.max(z.atkT, now + 1); } }
   broadcast({ t: 'zfx', k: 'web', id: p.id, n: p.widow });
 }
 function zDown(p) {
@@ -6986,6 +7011,12 @@ function zTickZombies(dt) {
         if (k >= 1) { z.st = 'in'; P.y = 0; z.body.vel.set(0, 0, 0); z.body.onGround = true; z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z; }
         break;
       }
+      case 'vault': { // sobe na borda: primeiro o corpo, depois avanca (cinematico: sem colisao no meio, sem tremer)
+        const k = clamp((now - z.t0) / z.vd, 0, 1), e = k * k * (3 - 2 * k);
+        P.x = lerp(z.cx, z.vx, e); P.z = lerp(z.cz, z.vz, e); P.y = lerp(z.cy, z.vy, Math.min(1, k * 1.7)) + Math.sin(k * Math.PI) * .12;
+        if (k >= 1) { z.st = 'in'; P.y = z.vy + .001; z.body.vel.set(0, 0, 0); z.body.onGround = true; z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z; z.losT = 0; }
+        break;
+      }
       case 'in': zChase(z, dt); if (z.kind === 5 && now >= z.scrT && Z.zs.has(z.id)) zScream(z); break;
     }
   }
@@ -6993,7 +7024,7 @@ function zTickZombies(dt) {
   arr.length = 0; for (const z of Z.zs.values()) arr.push(z);
   for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
     const a = arr[i], b = arr[j];
-    if (a.st === 'climb' || b.st === 'climb' || a.st === 'rise' || b.st === 'rise') continue;
+    if (a.st === 'climb' || b.st === 'climb' || a.st === 'rise' || b.st === 'rise' || a.st === 'vault' || b.st === 'vault') continue;
     const inA = a.st === 'in'; if (inA !== (b.st === 'in')) continue;
     const pa = a.body.pos, pb = b.body.pos, dx = pb.x - pa.x, dz = pb.z - pa.z, rr = inA ? a.rad + b.rad : .55;
     if (dx >= rr || dx <= -rr || dz >= rr || dz <= -rr) continue; // longe nos eixos: nem calcula a distância
@@ -7017,9 +7048,10 @@ function zChase(z, dt) {
   if (Z.lure) { gx = Z.lure[0]; gz = Z.lure[1]; has = true; z.atkWind = 0; } else if (tgt) { gx = tgt.pos[0]; gz = tgt.pos[2]; has = true; }
   if (has) {
     const dx = gx - P.x, dz = gz - P.z; dist = hyp(dx, dz);
-    if (now >= z.losT) { z.losT = now + .35 + Math.random() * .1; z.los = dist < 14 && segClearR(P.x, P.z, gx, gz); }
+    if (now >= z.losT) { z.losT = now + .35 + Math.random() * .1; const gy = Z.lure ? 0 : tgt.pos[1]; z.los = dist < 14 && segClearH(P.x, P.z, gx, gz, Math.max(P.y + STEP, gy + .05), Math.min(P.y, gy)); }
     if (z.los || dist < 1.2) { if (dist > .01) { dX = dx / dist; dZ = dz / dist; } z.lost = 0; }
-    else { const fd = zFlowDir(P.x, P.z); if (fd) { dX = fd[0]; dZ = fd[1]; } else if (dist > .01) { dX = dx / dist; dZ = dz / dist; } z.lost = fd ? 0 : (z.lost || 0) + dt; } // sem caminho (longe demais de todos): anda reto
+    else { const fd = zFlowDir(P.x, P.z); if (fd) { dX = fd[0]; dZ = fd[1]; } else if (dist > .01) { dX = dx / dist; dZ = dz / dist; } const fc = ffCell(P.x, P.z); z.lost = fd || (fc >= 0 && FF.dist[fc] < Infinity) ? 0 : (z.lost || 0) + dt; } // sem caminho (longe demais de todos): anda reto
+    if (z.lost > 8 && zSeenHold(z)) z.lost = 4;
     if (z.lost > 8) { zRecycle(z); return; } // e se continuar sem caminho volta para a fila e renasce perto
     if (!Z.lure && tgt) { if (z.los || z.atkWind) zTryAttack(z, tgt, z.dog ? 1.5 : z.kind === 6 ? 2.3 : z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35); if (dist < (z.dog ? .9 : .85 + (z.rad - .3) * 2)) dX = dZ = 0; } // sem linha livre (grade no meio) não bate
     else if (Z.lure && dist < 1) dX = dZ = 0;
@@ -7028,14 +7060,42 @@ function zChase(z, dt) {
   b.vel.x += (dX * spd - b.vel.x) * k; b.vel.z += (dZ * spd - b.vel.z) * k;
   const face = (dX || dZ) ? Math.atan2(-dX, -dZ) : has ? Math.atan2(-(gx - P.x), -(gz - P.z)) : z.yaw;
   z.yaw += clamp(angDiff(z.yaw, face), -8 * dt, 8 * dt);
+  const ox = P.x, oz = P.z, want = (dX || dZ) ? spd : 0;
   moveBody(b, dt);
+  if (want && b.onGround && hyp(P.x - ox, P.z - oz) < want * dt * .3) z.stall = (z.stall || 0) + dt; else z.stall = 0;
+  const gyv = has && !Z.lure && tgt ? tgt.pos[1] : P.y, canHit = z.atkWind || (z.los && dist < (z.dog ? 1.5 : z.kind === 6 ? 2.3 : z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35) && Math.abs(gyv - P.y) < 1.5);
+  if (z.stall > .2 && !canHit && now >= (z.vaultT || 0)) { z.vaultT = now + .4; if (zTryVault(z, dX, dZ, gx, gz, gyv)) return; }
   if (P.y < -5) { zRecycle(z); return; }
   if (now >= z.chkT) { // travado atrás de alguma coisa por muito tempo? volta pra fila e renasce
     const moved = hyp(P.x - z.chkX, P.z - z.chkZ);
-    const unreach = !Z.lure && tgt && dist < 2.5 && Math.abs(tgt.pos[1] - P.y) >= 1.5; // jogador num lugar alto: não alcança e a rodada não acabava
-    z.stuck = (moved < .6 && dist > 2.5) || (unreach && moved < 1.5) ? z.stuck + 1 : 0; z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z;
+    const unreach = !Z.lure && tgt && dist < 2.5 && Math.abs(tgt.pos[1] - P.y) >= 1.5 && !(now - (z.vaultAt || -9) < 6); // escalou ha pouco: ainda tentando a escada // jogador num lugar alto: não alcança e a rodada não acabava
+    const crowd = moved < .6 && dist > 2.5 && zCrowded(z, dist) ? (z.crowdN = (z.crowdN || 0) + 1) <= 3 : (z.crowdN = 0, false);
+    z.stuck = (moved < .6 && dist > 2.5 && !crowd) || (unreach && moved < 1.5) ? z.stuck + 1 : 0; z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z;
+    if (z.stuck >= 2 && zSeenHold(z)) z.stuck = 1;
     if (z.stuck >= 2) zRecycle(z);
   }
+}
+// borda ao alcance (STEP < altura <= ZVAULT) em volta do zumbi: escolhe a que mais aproxima do alvo e sobe nela (estado 'vault')
+function zLedgeTop(x, z, y0) { // topo mais alto (que comeca abaixo do alcance) sob um apoio de raio ,2 em (x,z); null se nada
+  const r = .2, L = colQuery(x - r, x + r, z - r, z + r, CG.q2); let top = null;
+  for (let k = 0; k < L.length; k++) { const b = COL[L[k]]; if (x + r <= b.minX || x - r >= b.maxX || z + r <= b.minZ || z - r >= b.maxZ || b.minY > y0 + ZVAULT || b.maxY <= y0 + STEP || zHigh(b)) continue; if (top === null || b.maxY > top) top = b.maxY; }
+  return top;
+}
+const ZVR = [.5, .8, 1.1, 1.4];
+function zTryVault(z, dX, dZ, gx, gz, gy) {
+  const b = z.body, P = b.pos, a0 = (dX || dZ) ? Math.atan2(dZ, dX) : Math.atan2(gz - P.z, gx - P.x), d0 = hyp(gx - P.x, gz - P.z);
+  let best = null, bs = Infinity;
+  for (let a = 0; a < 16; a++) { const ang = a0 + ((a + 1) >> 1) * (a & 1 ? 1 : -1) * Math.PI / 8, cx = Math.cos(ang), cz = Math.sin(ang);
+    for (const r of ZVR) {
+      const x = P.x + cx * r, zz = P.z + cz * r, top = zLedgeTop(x, zz, P.y); if (top === null || top - P.y > ZVAULT) continue;
+      if (blockedAt(x, top + .002, zz, b.h) || blockedAt(P.x, top + .002, P.z, b.h) || blockedAt((P.x + x) / 2, top + .002, (P.z + zz) / 2, b.h)) continue; // cabe la em cima e no caminho
+      const dg = hyp(gx - x, gz - zz), sc = dg + r * .3 - (gy > P.y + .3 ? (top - P.y) * 1.5 : 0);
+      if ((dg < d0 + .2 || gy > P.y + .3) && sc < bs) { bs = sc; best = [x, zz, top]; }
+    }
+  }
+  if (!best) return false;
+  z.st = 'vault'; z.t0 = now; z.cx = P.x; z.cz = P.z; z.cy = P.y; z.vx = best[0]; z.vz = best[1]; z.vy = best[2]; z.vd = (.35 + .45 * (best[2] - P.y)) * (z.webT > now ? 5 : z.slowT > now || z.frzT ? 1.7 : 1); z.vaultAt = now; z.atkWind = 0; z.stall = 0; b.vel.set(0, 0, 0);
+  return true;
 }
 function zTryAttack(z, q, reach) {
   const P = z.body.pos, d = hyp(q.pos[0] - P.x, q.pos[2] - P.z), dy = Math.abs(q.pos[1] - P.y);
@@ -7083,6 +7143,11 @@ function zTickClouds() { // nuvem do Tóxico (7 s, 2,8 m): tira vida de quem fic
   }
 }
 function zRecycle(z) { Z.zs.delete(z.id); Z.toSpawn++; if (z.kind) Z.reQ.push([z.kind, z.kind === 6 ? z.hp : 0, z.maxHp]); broadcast({ t: 'zgone', id: z.id }); } // especial volta para a fila com o mesmo tipo
+const ZSEE_R = 45, ZSEE_MAX = 60, _zsA = new V3(), _zsB = new V3();
+function zAtGoal(x, z) { const c = ffCell(x, z); return c >= 0 && FF.walk[c] && isFinite(FF.dist[c]) && FF.dist[c] <= 15; } // ate ~3 m de caminho da origem do campo
+function zSeen(z) { const P = z.body.pos; _zsB.set(P.x, P.y + 1.1, P.z); for (const q of S.players.values()) { if (!q.alive) continue; const d = hyp(q.pos[0] - P.x, q.pos[2] - P.z); if (d > ZSEE_R) continue; _zsA.set(q.pos[0], q.pos[1] + 1.6, q.pos[2]); if (losClear(_zsA, _zsB) || losClear(_zsA, _zsB.set(P.x, P.y + 1.7, P.z))) return true; _zsB.set(P.x, P.y + 1.1, P.z); } return false; }
+function zSeenHold(z) { if (!zSeen(z)) { z.hold0 = 0; return false; } if (!z.hold0) z.hold0 = now; return now - z.hold0 < ZSEE_MAX; } // visto: adia (o jogador pode matar)
+function zCrowded(z, dist) { if (dist > 12) return false; const P = z.body.pos; for (const o of Z.zs.values()) { if (o === z || o.st !== 'in') continue; const r = z.rad + o.rad + .3; if (Math.abs(o.body.pos.x - P.x) < r && Math.abs(o.body.pos.z - P.z) < r) return true; } return false; }
 function zPts(p, n) { if (Z.dbl > now) n *= 2; p.money += n; sendTo(p.id, { t: 'pts', n, m: p.money }); }
 function zPay(p, c) { if (p.money < c) { sendTo(p.id, { t: 'err', txt: 'Pontos insuficientes' }); return false; } p.money -= c; sendTo(p.id, { t: 'pts', n: -c, m: p.money }); return true; }
 function zHit(p, zid, dmg, zone, w, splash) {
@@ -7110,7 +7175,7 @@ function zChain(p, z0, wd, w) { // Wunderwaffe: o raio pula para o zumbi mais pe
 }
 function zKill(z, p, zone, w, splash, nuke) {
   if (!Z.zs.has(z.id)) return; Z.zs.delete(z.id);
-  const wi = z.win >= 0 && z.st !== 'in' ? ZD.windows[z.win] : null;
+  const wi = z.win >= 0 && (z.st === 'out' || z.st === 'tear' || z.st === 'climb') ? ZD.windows[z.win] : null;
   const dx = wi ? wi.ix : z.body.pos.x, dz = wi ? wi.iz : z.body.pos.z;
   let pts = 0;
   if (p && !nuke) { pts = (w === 'knife' ? 130 : splash ? 50 : zone === 'head' ? 100 : zone === 'legs' ? 50 : 60) + (ZKIND[z.kind]?.pts || 0); zPts(p, zGain(pts)); p.kills++; if (zone === 'head' && !splash) p.hs++; }
@@ -7155,7 +7220,7 @@ function zTickClays() {
     if (!S.players.has(c.own)) { Z.clays.splice(i, 1); broadcast({ t: 'zclayx', id: c.id }); continue; }
     if (now - c.t0 < ZCLAY.arm) continue;
     let hit = false;
-    for (const z of Z.zs.values()) { if (z.st !== 'in') continue; const P = z.body.pos; if ((P.x - c.x) ** 2 + (P.z - c.z) ** 2 < ZCLAY.r * ZCLAY.r && Math.abs(P.y - c.y) < 1.2) { hit = true; break; } }
+    for (const z of Z.zs.values()) { if (z.st !== 'in' && z.st !== 'vault') continue; const P = z.body.pos; if ((P.x - c.x) ** 2 + (P.z - c.z) ** 2 < ZCLAY.r * ZCLAY.r && Math.abs(P.y - c.y) < 1.2) { hit = true; break; } }
     if (!hit) continue;
     Z.clays.splice(i, 1); broadcast({ t: 'zclayx', id: c.id, b: 1 });
     zExplode(new V3(c.x, c.y + .4, c.z), c.own, ZCLAY.boom, Math.min(6000, 500 + 150 * Z.round), 'clay', false);
@@ -7372,7 +7437,7 @@ const zBoardsDec = s => { const o = []; for (const ch of s) { const c = ch.charC
 function zSnap() {
   const a = []; let bo = 0;
   for (const z of Z.zs.values()) {
-    const P = z.body.pos, f = z.sc | (z.atkWind ? 4 : 0) | (z.crawler ? 8 : 0) | (z.dog ? 16 : 0) | (z.st === 'out' || z.st === 'tear' || z.st === 'climb' ? 32 : 0) | (z.st === 'rise' ? 64 : 0) | (z.kind << 7); // 128-512: tipo
+    const P = z.body.pos, f = z.sc | (z.atkWind ? 4 : 0) | (z.crawler ? 8 : 0) | (z.dog ? 16 : 0) | (z.st === 'out' || z.st === 'tear' || z.st === 'climb' ? 32 : 0) | (z.st === 'rise' ? 64 : 0) | (z.kind << 7) | (z.st === 'vault' ? 1024 : 0); // 128-512: tipo
     a.push(z.id, r2(P.x), r2(P.y), r2(P.z), r2(wrapA(z.yaw)), f);
     if (z.kind === 6) bo = Math.max(bo, r2(Math.max(0, z.hp) / z.maxHp));
   }
@@ -7466,7 +7531,7 @@ function onMsg(m) {
       break;
     }
     case 'zarc': { const pts = Array.isArray(m.p) ? m.p.slice(0, 20).filter(vec3) : []; if (pts.length > 1) zArcFx(pts, m.pap); break; }
-    case 'zgone': { ZC.gone.add(m.id); const zc = ZC.zs.get(m.id); if (zc) zRemoveClient(zc); break; }
+    case 'zgone': { ZC.gone.add(m.id); const zc = ZC.zs.get(m.id); if (zc && !zc.dead) { zc.dead = true; zc.sink = now; _zv.set(zc.pos.x, Math.max(0, zc.pos.y) + .05, zc.pos.z); puff(_zv, 0x4a3a28, 1.6, .8, .3); } break; } // afunda no chao
     case 'zround': ZC.round = m.r; ZC.dog = !!m.dog; ZC.phase = 'round'; zRoundFx(m.r, m.dog); if (m.bo) centerMsg('RODADA ' + m.r, 'Algo grande está vindo...', 3); break;
     case 'zboss': play('boss'); centerMsg('O CARNICEIRO CHEGOU', 'Quando ele erguer o cutelo, saia do anel vermelho', 4); break;
     case 'zslam': { if (!finN(m.x) || !finN(m.z)) break; const p = new V3(m.x, .2, m.z); play('slam', p); puff(p, 0x6b5a48, 4, .6, .2); puff(p, 0xff4a20, 2, .3, 0); zShockRing(p, 0xff5a20, 3.2, .45);
