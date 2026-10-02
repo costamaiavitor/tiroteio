@@ -125,6 +125,7 @@ button.card.on{border-color:var(--acc);background:rgba(255,176,32,.1);box-shadow
 .box{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:8px;padding:14px}
 .status{min-height:22px;margin-top:8px;color:var(--acc)}
 .lbrow{display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--line)}.lbrow b{flex:1}.lbrow button{padding:4px 10px;font-size:14px}
+.rank{width:100%;border-collapse:collapse;font-size:15px;margin-top:4px}.rank th,.rank td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line)}.rank th{color:#8b94a0;font-weight:600}.rank tr.me td{color:var(--acc)}
 .tpill{font-size:13px;font-weight:700;padding:2px 9px;border-radius:10px;color:#111}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#555}.dot.on{background:#3c3}
 .invb{display:flex;align-items:center;gap:10px;background:rgba(255,176,32,.12);border:1px solid var(--acc);border-radius:8px;padding:10px 14px;margin-bottom:8px}
@@ -161,6 +162,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #feed .w{color:#aaa;margin:0 6px}
 #feed .hs{color:var(--red)}
 #room{position:absolute;top:10px;left:12px;font-size:16px;color:#ccc}
+#mmLbl{position:absolute;top:240px;left:12px;width:200px;text-align:center;font-size:17px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000}
 #mmap{position:absolute;top:36px;left:12px;width:200px;height:200px;border:1px solid #fff3;border-radius:6px;display:none}
 #bombui{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);text-align:center;font-size:18px;color:#fff;text-shadow:0 1px 3px #000}
 #bombui .bar{width:260px;height:8px;background:#0008;margin:6px auto 0;border-radius:4px;overflow:hidden}#bombui .bar i{display:block;height:100%;background:#ffb020}
@@ -313,6 +315,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
   </div>
   <div id="room"></div>
   <canvas id="mmap" width="200" height="200"></canvas>
+  <div id="mmLbl"></div>
   <div id="bombui"></div>
   <div id="top"><div id="score"></div><div id="timer"></div></div>
   <div id="feed"></div>
@@ -634,32 +637,13 @@ const MAPS = {
   },
 };
 
-// ---------- mapa do modo Rodadas (bomba): Porto ----------
-// Ataque nasce no sul, defesa no norte entre os dois bombs. Três rotas: túnel do B (oeste), meio e corredor longo do A (leste).
-MAPS.porto = {
-  name: 'Porto', desc: 'mapa de bomba: bombs A e B, meio, túnel e corredor longo', w: 96, d: 80, sky: 0xa9c8e4, skyTop: 0x3f7cc0, fog: [70, 200], bomb: 1,
-  theme: { floor: ['concrete', 0x9a978f], wall: ['brick', 0xa8664a], crate: ['crate', 0xb58450], container: ['container', 0x2d6fa8], stone: ['concrete', 0xb9b4a8] },
-  sites: { A: [24, 42, -34, -16], B: [-42, -24, -34, -16] }, // x0, x1, z0, z1
-  boxes: () => [floor(96, 80), ...border(96, 80, 7),
-    B(-20, -2.5, 10, 13, 5), B(-20, 14.5, 10, 13, 5), B(20, 6, 10, 30, 5), // blocos entre as rotas (passagem meio ↔ túnel em z 4..8)
-    B(-36, 8, 14, 1.5, 5), B(-41, -3, 14, 1.5, 5), B(-30, 16, 2, 2, 1.6, 'crate'), // túnel do B em zigue-zague
-    B(31, 0, 12, 1.5, 5), B(42, 12, 2.5, 6, 2.6, 'container'), B(30, 14, 1.6, 1.6, 1.6, 'crate'), // corredor longo do A
-    B(0, 26, 14, 1.5, 4), B(0, 8, 2.5, 2.5, 2.2, 'crate'), B(-6, -3, 1.6, 1.6, 1.3, 'crate'), B(7, 14, 1.6, 1.6, 1.3, 'crate'), B(5, -6, 6, 1, 1.2, 'stone'), // meio
-    B(14, -27, 1.5, 12, 5), B(-14, -27, 1.5, 12, 5), B(0, -24, 6, 1, 1.2, 'stone'), // base da defesa
-    B(33, -25, 3, 3, 2.2, 'crate'), B(30.6, -23.6, 1.5, 1.5, 1.1, 'crate'), B(38, -31, 6, 2.5, 2.6, 'container', 0, 0xb04030), B(27, -33, 1.6, 1.6, 1.6, 'crate'), B(40, -19, 1, 4, 1.2, 'stone'), // bomb A
-    B(-33, -25, 4, 2, 2.2, 'crate'), B(-28, -31, 6, 2.5, 2.6, 'container'), B(-39, -20, 1.6, 1.6, 1.6, 'crate'), B(-25, -18, 1.5, 1.5, 1.1, 'crate'), // bomb B
-  ],
-  spawns: [[-6, 34], [-2, 34], [2, 34], [6, 34], [-4, 37], [0, 37], [4, 37], [8, 37]], // ataque
-  spawnsB: [[-6, -36], [-2, -36], [2, -36], [6, -36], [-4, -38.5], [0, -38.5], [4, -38.5], [8, -38.5]], // defesa
-  build(M) { // chão pintado e letra flutuando em cada bomb
-    for (const [k, r] of Object.entries(M.sites)) {
-      const w = r[1] - r[0], d = r[3] - r[2], m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({ color: 0xc0392b, transparent: true, opacity: .25, depthWrite: false }));
-      m.rotation.x = -Math.PI / 2; m.position.set(r[0] + w / 2, .02, r[2] + d / 2); world.add(m);
-      const t = nameSprite(k, '#ff5040'); t.position.set(r[0] + w / 2, 6, r[2] + d / 2); t.scale.multiplyScalar(4); world.add(t);
-    }
-  },
-};
-
+function siteDeco(M) { // chão pintado e letra flutuando em cada bomb
+  for (const [k, r] of Object.entries(M.sites)) {
+    const w = r[1] - r[0], d = r[3] - r[2], m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({ color: 0xc0392b, transparent: true, opacity: .25, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.position.set(r[0] + w / 2, .02, r[2] + d / 2); world.add(m);
+    const t = nameSprite(k, '#ff5040'); t.position.set(r[0] + w / 2, 6, r[2] + d / 2); t.scale.multiplyScalar(4); world.add(t);
+  }
+}
 // ---------- mapas do modo Rodadas inspirados no CS (Dust 2, Mirage, Inferno): bombs fechados, com 2 ou 3 entradas estreitas ----------
 // Planta em grade de 3 m. '#' parede, 'r' passagem com teto, 'c' caixa grande, 'k' mureta, 'x' caixa pequena,
 // A/B chão dos bombs, T/C bases do ataque e da defesa. Norte (z negativo) = defesa.
@@ -683,7 +667,7 @@ function gridMap(rows, cell, meta) {
     else if (ch === 'x') xs.push(B(x, z, 1.5, 1.5, 1.4, 'crate'));
   }));
   for (const s of Object.values(sites)) { s[0] -= cell / 2; s[1] += cell / 2; s[2] -= cell / 2; s[3] += cell / 2; }
-  return { w, d, bomb: 1, sites, spawns: sp.T, spawnsB: sp.C, build: MAPS.porto.build, boxes: () => [floor(w, d), ...gridBoxes(rows, cell, x0, z0), ...xs], ...meta };
+  return { w, d, bomb: 1, sites, spawns: sp.T, spawnsB: sp.C, build: siteDeco, areas: (meta.areasC || []).map(([n, c0, c1, r0, r1]) => [n, x0 + c0 * cell, x0 + (c1 + 1) * cell, z0 + r0 * cell, z0 + (r1 + 1) * cell]), boxes: () => [floor(w, d), ...gridBoxes(rows, cell, x0, z0), ...xs], ...meta };
 }
 MAPS.duna = gridMap([
     '####################################',
@@ -721,7 +705,7 @@ MAPS.duna = gridMap([
     '###########...TTTTTT.x.#############',
     '###########............#############',
     '####################################',
-    '####################################'], 3, { name: 'Duna', desc: 'como o Dust 2: long, curto, meio com portas e túneis até o B',
+    '####################################'], 3, { areasC: [['Bomb A', 26, 33, 2, 10], ['Bomb B', 2, 10, 2, 9], ['Portas do B', 11, 13, 6, 7], ['Rampa do A', 24, 25, 3, 4], ['Base da Defesa', 14, 23, 1, 5], ['Meio da Defesa', 13, 17, 6, 13], ['Curto', 19, 25, 10, 17], ['Long', 29, 33, 11, 24], ['Portas do Long', 30, 31, 25, 25], ['Fora do Long', 22, 33, 26, 28], ['Meio', 15, 18, 14, 28], ['Base do Ataque', 11, 22, 29, 33], ['Saída do túnel', 5, 6, 10, 11], ['Túnel de baixo', 7, 14, 19, 20], ['Túnel de cima', 4, 6, 12, 26], ['Túnel de cima', 4, 10, 27, 30]], name: 'Duna', desc: 'como o Dust 2: long, curto, meio com portas e túneis até o B',
   sky: 0xbcd4e6, skyTop: 0x4a86c8, fogC: 0xe6d6b4, fog: [70, 210], theme: { floor: ['sand', 0xd9c08c], wall: ['brick', 0xd8bb8c], crate: ['crate', 0xb07d45], stone: ['concrete', 0xcbb48a], roof: ['wood', 0x6b4a2e] } });
 MAPS.miragem = gridMap([
     '####################################',
@@ -759,7 +743,7 @@ MAPS.miragem = gridMap([
     '############...TTTTTT....###########',
     '############.............###########',
     '####################################',
-    '####################################'], 3, { name: 'Miragem', desc: 'como a Mirage: palácio, rampa e conector no A; apartamentos, mercado e curto no B',
+    '####################################'], 3, { areasC: [['Bomb A', 23, 32, 4, 11], ['Bomb B', 2, 10, 8, 15], ['Palácio', 32, 34, 8, 25], ['Rampa', 27, 29, 12, 20], ['Rampa', 25, 31, 21, 24], ['Conector', 19, 22, 10, 14], ['Mercado', 6, 9, 4, 8], ['Base da Defesa', 8, 22, 1, 3], ['Sala da janela', 14, 19, 4, 8], ['Curto do B', 11, 13, 13, 14], ['Meio', 14, 19, 9, 22], ['Apartamentos', 4, 5, 16, 25], ['Apartamentos', 2, 11, 26, 30], ['Topo do meio', 13, 24, 23, 25], ['Base do Ataque', 12, 24, 26, 33]], name: 'Miragem', desc: 'como a Mirage: palácio, rampa e conector no A; apartamentos, mercado e curto no B',
   sky: 0xb8d2ea, skyTop: 0x3f7cc0, fogC: 0xead8c0, fog: [70, 210], theme: { floor: ['tile', 0xc9b79a], wall: ['plaster', 0xe0c9a6], crate: ['crate', 0xb58450], stone: ['concrete', 0xbfae94], roof: ['wood', 0x7a5236] } });
 MAPS.vilarejo = gridMap([
     '####################################',
@@ -797,7 +781,7 @@ MAPS.vilarejo = gridMap([
     '####..TTTTTTTT...###################',
     '####.............###################',
     '####################################',
-    '####################################'], 3, { name: 'Vilarejo', desc: 'como a Inferno: banana até o B; arco, apartamentos e curto até o A',
+    '####################################'], 3, { areasC: [['Bomb A', 24, 33, 3, 11], ['Bomb B', 2, 11, 2, 10], ['Banana', 5, 10, 11, 28], ['Arco', 22, 23, 3, 4], ['Base da Defesa', 12, 21, 1, 6], ['Curto do A', 22, 23, 11, 12], ['Segundo meio', 22, 25, 17, 19], ['Apartamentos', 26, 30, 12, 24], ['Meio', 17, 21, 12, 24], ['Saída dos apartamentos', 22, 30, 25, 27], ['Base do Ataque', 4, 21, 25, 33]], name: 'Vilarejo', desc: 'como a Inferno: banana até o B; arco, apartamentos e curto até o A',
   sky: 0xa9c8e4, skyTop: 0x3a78c0, fogC: 0xd9cdb8, fog: [60, 190], theme: { floor: ['asphalt', 0x8a8378], wall: ['brick', 0xb4785a], crate: ['crate', 0xa87a48], stone: ['rock', 0x9a948a], roof: ['wood', 0x5e4630] } });
 
 // ---------- mapa do modo zumbis: Sanatório ----------
@@ -5501,7 +5485,7 @@ function srvHandle(pid, m) {
     case 'skins': p.skins = cleanSk(m.sk); S.skDirty = true; break;
     case 'nade': if (!p.alive || p.downed || !isW(m.k) || W[m.k].slot !== 'nade' || m.k === 'clay' || !vec3(m.p) || !vec3(m.v) || !(p.inv[m.k] > 0)
       || Math.hypot(m.p[0] - p.pos[0], m.p[1] - p.pos[1] - 1.5, m.p[2] - p.pos[2]) > 4 || Math.hypot(m.v[0], m.v[1], m.v[2]) > 30) return; p.inv[m.k]--; broadcast({ t: 'nade', id: pid, k: m.k, p: m.p, v: m.v }, pid); break;
-    case 'chat': broadcast({ t: 'chat', id: pid, txt: String(m.txt || '').slice(0, 120) }); break;
+    case 'chat': { const cm = { t: 'chat', id: pid, txt: String(m.txt || '').slice(0, 120), tm: m.tm && isR() ? 1 : 0 }; if (cm.tm) { for (const q of S.players.values()) if (q.team === p.team) sendTo(q.id, cm); } else broadcast(cm); break; }
     case 'suicide': if (p.alive) srvKill(p, null, 'world', false); break;
   }
 }
@@ -5574,7 +5558,7 @@ function srvStartRound() {
   }
   const taken = [];
   for (const p of S.players.values()) {
-    if (!p.alive || S.round === 1) { p.inv = defInv(); p.armor = 0; p.helmet = false; p.kit = false; }
+    if (!p.alive || S.round === 1) { p.inv = defInv(); if (p.team === 'ct') p.inv.secondary = 'usp'; p.armor = 0; p.helmet = false; p.kit = false; }
     p.act = null;
     const s = pickSpawn(p.team === 'ct' ? 'b' : 'a', taken); taken.push(s);
     srvSpawn(p, s, true);
@@ -5607,6 +5591,7 @@ function srvEndRound(win, why) {
   srvState();
 }
 // ---------- modo Rodadas: Ataque (t) x Defesa (ct), plantar e desarmar a bomba ----------
+const TEAMW = { ak47: 't', glock: 't', m4: 'ct', usp: 'ct' }; // armas de um time só (como no CS)
 const TEAMC = { t: '#e0a030', ct: '#4a90e2' }, TEAMN = { t: 'Ataque', ct: 'Defesa' };
 const BOMB = { plant: 3.2, defuse: 10, kit: 5, timer: 40, r: 22 };
 function isR() { return S.st?.mode === 'rounds'; }
@@ -5647,6 +5632,8 @@ function srvBuy(p, item) {
   if (!p.alive) return err('Você está morto');
   const free = S.st.mode === 'dm' || S.phase === 'warmup';
   if (!(free || S.phase === 'freeze' || (S.phase === 'live' && now < S.liveStart + 20))) return err('Tempo de compra acabou');
+  if (isR() && TEAMW[item] && TEAMW[item] !== p.team) return err('Essa arma é do outro time');
+  if (isR() && !free && !(SPAWNS[p.team === 'ct' ? 'b' : 'a'] || []).some(sp => Math.hypot(sp[0] - p.pos[0], sp[2] - p.pos[2]) < 16)) return err('Fora da zona de compra: volte para a base do seu time');
   const cost = free ? 0 : it.price;
   if (p.money < cost) return err('Dinheiro insuficiente');
   if (it.slot === 'primary' || it.slot === 'secondary') { if (p.inv[it.slot] === item) return err('Você já tem'); p.inv[it.slot] = item; if (S.st.mode === 'dm') p.pref[it.slot] = item; }
@@ -5662,7 +5649,7 @@ function botBuy(p) {
   const m = p.money;
   if (!p.inv.primary) {
     if (m >= 5400 && Math.random() < .25) srvBuy(p, 'awp');
-    else if (m >= 3700) srvBuy(p, Math.random() < .5 ? 'ak47' : 'm4');
+    else if (m >= 3700) srvBuy(p, isR() ? (p.team === 'ct' ? 'm4' : 'ak47') : Math.random() < .5 ? 'ak47' : 'm4');
     else if (m >= 2500) srvBuy(p, Math.random() < .5 ? 'mp5' : 'scout');
     else if (m >= 1050 && Math.random() < .5) srvBuy(p, 'nova');
     else if (m >= 700) srvBuy(p, 'deagle');
@@ -5718,7 +5705,7 @@ function srvTick(dt) {
       for (const p of S.players.values()) if (!p.alive && now >= p.respawnAt) srvSpawnDM(p);
       let lead = null; for (const p of S.players.values()) if (!lead || p.kills > lead.kills) lead = p;
       if (lead && (lead.kills >= st.frags || now >= S.phaseEnd)) { S.phase = 'over'; S.phaseEnd = now + 10; S.winner = lead.id; broadcast({ t: 'mend', w: lead.id }); broadcast({ t: 'msg', txt: lead.name + ' VENCEU!', sub: `${lead.kills} abates — nova partida em 10s`, dur: 9, snd: 'win' }); srvState(); }
-    } else if (S.phase === 'over' && now >= S.phaseEnd) srvStartMatch();
+    } else if (S.phase === 'over' && now >= S.phaseEnd) srvAfterMatch();
   } else {
     switch (S.phase) {
       case 'warmup':
@@ -5734,7 +5721,7 @@ function srvTick(dt) {
         break;
       }
       case 'end': if (now >= S.phaseEnd) { if (n >= 2) srvStartRound(); else { S.phase = 'warmup'; } } break;
-      case 'over': if (now >= S.phaseEnd) srvStartMatch(); break;
+      case 'over': if (now >= S.phaseEnd) srvAfterMatch(); break;
     }
   }
   S.stateT -= dt; if (S.stateT <= 0) { S.stateT = .25; srvState(); }
@@ -7870,7 +7857,7 @@ function onMsg(m) {
     case 'zs': if (ZC.on) zOnSnap(m); break;
     case 'zdie': {
       ZC.gone.add(m.id);
-      if (m.by === C.myId) { grantXP((m.hs ? 5 : 3) + (ZKIND[m.k]?.xp || 0)); zStreak(); } // especiais dão XP extra
+      if (m.by === C.myId) { stat('zk'); grantXP((m.hs ? 5 : 3) + (ZKIND[m.k]?.xp || 0)); zStreak(); } // especiais dão XP extra
       if (Array.isArray(m.ex) && m.ex.length === 3) zBloatFx(m.ex);
       if (m.k === 6) { ZC.bo = 0; play('win'); centerMsg('CARNICEIRO DERROTADO', m.by ? 'abatido por ' + nameOf(m.by) : '', 3.5); }
       const zc = ZC.zs.get(m.id); if (!zc || zc.dead) break;
@@ -7942,7 +7929,7 @@ function onMsg(m) {
       if (m.id === C.myId) { zSetDowned(false); me.alive = false; C.deadAt = now; C.spec = null; centerMsg('VOCÊ SANGROU', 'Você volta na próxima rodada', 3); }
       else { const rp = R.get(m.id); if (rp) { rp.downed = false; rp.alive = false; } }
       break;
-    case 'zover': grantXP(30 + 8 * (m.r || 0)); ZC.over = true; play('over'); centerMsg('FIM DE JOGO', `${C.players.size > 1 ? 'Vocês sobreviveram' : 'Você sobreviveu'} ${m.r} rodada${m.r === 1 ? '' : 's'} · recomeça em 12s`, 11); break;
+    case 'zover': stat('zr', m.r || 0); grantXP(30 + 8 * (m.r || 0)); ZC.over = true; play('over'); centerMsg('FIM DE JOGO', `${C.players.size > 1 ? 'Vocês sobreviveram' : 'Você sobreviveu'} ${m.r} rodada${m.r === 1 ? '' : 's'} · recomeça em 12s`, 11); break;
     case 'pts': me.money = m.m; zPopup(m.n); if (m.n < 0) play('kaching'); break;
     case 'ammo': if (W[m.w]) { G.ammo[m.w] = { mag: W[m.w].mag, res: W[m.w].res }; play('kaching'); } break;
     case 'zbowie': ZC.bowie = true; play('kaching'); centerMsg('FACA BOWIE', 'Facadas muito mais fortes', 2); break;
@@ -7956,9 +7943,10 @@ function onMsg(m) {
       }
       break;
     }
-    case 'mend': grantXP(m.w === C.myId ? 150 : 40); break;
+    case 'mend': grantXP(m.w === C.myId ? 150 : 40); stat('m'); if (m.w === C.myId) stat('w'); break;
     case 'kill': {
       feedAdd(m.k, m.v, m.w, m.hs);
+      if (C.st?.mode !== 'zombies') { if (m.k === C.myId && m.v !== C.myId) { stat('k'); if (m.hs) stat('hs'); } if (m.v === C.myId) stat('d'); }
       if (m.v === C.myId) { me.alive = false; C.deadAt = now; C.killer = m.k; G.scope = 0; G.reloadEnd = 0; C.spec = null; C.buyOpen = false; renderBuy(); }
       else { const rp = R.get(m.v); if (rp) { rp.alive = false; rp.dead = true; rp.deadT = now; } }
       if (m.k === C.myId && m.v !== C.myId) { play('kill'); grantXP((m.hs ? 15 : 10) * (C.players.get(m.v)?.b ? .5 : 1)); } // XP: abate (metade contra bot)
@@ -7967,6 +7955,7 @@ function onMsg(m) {
     }
     case 'shot': remoteShot(m); break;
     case 'lobby': LB.data = m; C.st = m.st; lobbyUI(); break;
+    case 'tolobby': LB.on = true; toMenu(); lobbyUI(); break;
     case 'start': LB.on = false; C.st = m.st; ZC.snapTs = 0; buildMap(m.st.map); enterGame(); lobbyUI(); break;
     case 'deny': toast(m.txt, 4); LB.on = false; lobbyUI(); $('#joinStatus').textContent = m.txt; setTimeout(leaveGame, 2500); break;
     case 'bboom': { const p = new V3(m.p[0], m.p[1] + .6, m.p[2]); boomFx(p); for (let i = 0; i < 6; i++) puff(p.clone().add(new V3(rand(-3, 3), rand(0, 3), rand(-3, 3))), 0x555555, 4, 3); break; }
@@ -7974,7 +7963,7 @@ function onMsg(m) {
     case 'msg': centerMsg(m.txt, m.sub, m.dur); if (m.snd) play(m.snd); break;
     case 'err': toast(m.txt, 2); play('empty'); break;
     case 'info': toast(m.txt, 3); break;
-    case 'chat': chatAdd(`<b style="color:${esc(colorOf(m.id))}">${esc(nameOf(m.id))}:</b> ${esc(m.txt)}`); play('chat'); break;
+    case 'chat': chatAdd((m.tm ? '<span style="color:#8fd">(time)</span> ' : '') + `<b style="color:${esc(colorOf(m.id))}">${esc(nameOf(m.id))}:</b> ${esc(m.txt)}`); play('chat'); break;
     case 'bye': removeRemote(m.id); C.players.delete(m.id); break;
   }
 }
@@ -7999,6 +7988,7 @@ function chatAdd(html) {
   setTimeout(() => d.style.opacity = 0, 9000); setTimeout(() => d.remove(), 9700);
 }
 function updateRoomInfo() {
+  frPing();
   $('#room').innerHTML = NET.code ? `Sala <b>${esc(NET.code)}</b>${NET.isHost ? ' (você é o host)' : ''}` : (NET.isHost ? 'Offline' : '');
   const url = location.protocol.startsWith('http') && NET.code ? location.origin + location.pathname + '?sala=' + NET.code : '';
   $('#pRoom').innerHTML = NET.code
@@ -8120,7 +8110,9 @@ function bombHud(dt) {
 }
 function drawMinimap(dt) {
   const cv = $('#mmap'), M = curMap, on = !!(C.st?.mode === 'rounds' && inGame && M?.sites);
-  cv.style.display = on ? 'block' : 'none'; if (!on || (mmT -= dt) > 0) return; mmT = 1 / 15;
+  cv.style.display = on ? 'block' : 'none';
+  const ar = on && me.alive ? (M.areas || []).find(a => me.pos.x >= a[1] && me.pos.x <= a[2] && me.pos.z >= a[3] && me.pos.z <= a[4]) : null; setHTML('mmLbl', ar ? esc(ar[0]) : '');
+  if (!on || (mmT -= dt) > 0) return; mmT = 1 / 15;
   const N = cv.width, k = N / Math.max(M.w, M.d), P = (x, z) => [N / 2 + x * k, N / 2 + z * k], g = cv.getContext('2d');
   if (MM.key !== curMapId) { // fundo: paredes e caixas vistas de cima, desenhado uma vez por mapa
     MM.key = curMapId; const b = MM.bg = document.createElement('canvas'); b.width = b.height = N; const h = b.getContext('2d');
@@ -8161,9 +8153,9 @@ function renderBuy() {
     const pic = gear ? `<div class="bmico">${GEAR_ICON[id]}</div>` : url ? `<img src="${url}" alt="">` : `<img data-th="${id}:${skin}" alt="">`;
     return `<div class="bmc${cls}${gear ? ' gear' : ''}" data-buy="${id}"><span class="bmp">${free ? 'GRÁTIS' : '$' + w.price}</span>${pic}<b>${esc(w.name)}</b>${own ? '<i>COMPRADO</i>' : ''}</div>`;
   };
-  const cols = BUY_COLS.map(col => `<div class="bmcol">${col.map(([t, ids]) => `<div class="bmcat">${t}</div>${ids.filter(id => W[id]).map(id => card(id)).join('')}`).join('')}</div>`).join('');
+  const cols = BUY_COLS.map(col => `<div class="bmcol">${col.map(([t, ids]) => `<div class="bmcat">${t}</div>${ids.filter(id => W[id] && !(C.st?.mode === 'rounds' && TEAMW[id] && TEAMW[id] !== C.players.get(C.myId)?.tm)).map(id => card(id)).join('')}`).join('')}</div>`).join('');
   setHTML('buy', `<div class="bmwrap"><div class="bmtop"><div><div class="bmt">LOJA</div><div class="bmh">Clique para comprar · <b>B</b> ou <b>Esc</b> fecha</div></div><div class="bmcred"><span>DINHEIRO</span>${free ? 'GRÁTIS' : '$' + money}</div></div>
-    <div class="bmgrid">${cols}</div><div class="bmcat">Equipamento</div><div class="bmgear">${BUY_GEAR.map(id => card(id, true)).join('')}</div></div>`);
+    <div class="bmgrid">${cols}</div><div class="bmcat">Equipamento</div><div class="bmgear">${BUY_GEAR.filter(id => id !== 'kit' || (C.st?.mode === 'rounds' && C.players.get(C.myId)?.tm === 'ct')).map(id => card(id, true)).join('')}</div></div>`);
 }
 function openBuy() { if (!me.alive || ZC.on) return; C.buyOpen = true; hudCache.buy = null; renderBuy(); document.exitPointerLock?.(); }
 function closeBuy() { C.buyOpen = false; renderBuy(); requestLock(); }
@@ -8180,7 +8172,7 @@ $('#buy').addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('keydown', e => {
   if (!inGame) return;
   if (C.chatOpen) {
-    if (e.code === 'Enter') { const v = $('#chatin').value.trim(); if (v) sendToHost({ t: 'chat', txt: v }); closeChat(); }
+    if (e.code === 'Enter') { const v = $('#chatin').value.trim(); if (v) sendToHost({ t: 'chat', txt: v, tm: C.chatTeam ? 1 : 0 }); closeChat(); }
     else if (e.code === 'Escape') closeChat();
     return;
   }
@@ -8207,6 +8199,7 @@ addEventListener('keydown', e => {
     case 'KeyR': startReload(); break;
     case 'KeyB': openBuy(); break;
     case 'KeyY': case 'Enter': openChat(); e.preventDefault(); break;
+    case 'KeyU': openChat(true); e.preventDefault(); break;
     case 'KeyL': if (ZC.on) { CFG.lant = !CFG.lant; save('lant', CFG.lant); play('empty'); toast(CFG.lant ? 'Lanterna ligada (L)' : 'Lanterna desligada (L)'); } break;
     case 'Space': if (!me.alive) cycleSpec(); break;
   }
@@ -8244,12 +8237,12 @@ addEventListener('mousemove', e => {
   mouseDX += e.movementX;
 });
 addEventListener('wheel', e => { if (locked() && me.alive && !C.buyOpen) cycleWeapon(e.deltaY > 0 ? 1 : -1); });
-function openChat() { C.chatOpen = true; const i = $('#chatin'); i.classList.remove('hidden'); i.value = ''; setTimeout(() => i.focus(), 0); for (const k in keys) keys[k] = false; }
+function openChat(team) { C.chatOpen = true; C.chatTeam = !!team && C.st?.mode === 'rounds'; const i = $('#chatin'); i.classList.remove('hidden'); i.value = ''; i.placeholder = C.chatTeam ? 'mensagem para o seu time' : 'mensagem para todos'; setTimeout(() => i.focus(), 0); for (const k in keys) keys[k] = false; }
 function closeChat() { C.chatOpen = false; const i = $('#chatin'); i.blur(); i.classList.add('hidden'); if (!locked()) $('#click').classList.remove('hidden'); }
 // Ctrl+W: em tela cheia, a Keyboard Lock API (Chrome/Edge) deixa o jogo segurar as teclas do jogo, e o atalho
 // do navegador vira só "andar agachado". O Esc fica de fora: continua abrindo a pausa e saindo da tela cheia.
 // Sem a API (Firefox/Safari) o "Sair do site?" segura a aba e o jogo solta as teclas (releaseInput).
-const LOCK_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyR', 'KeyF', 'KeyT', 'KeyN', 'KeyC', 'KeyV', 'KeyB', 'KeyL', 'KeyY', 'Tab', 'Space', 'Enter', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'];
+const LOCK_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyR', 'KeyF', 'KeyT', 'KeyN', 'KeyC', 'KeyV', 'KeyB', 'KeyL', 'KeyY', 'KeyU', 'Tab', 'Space', 'Enter', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'];
 async function lockKeyboard() {
   if (!navigator.keyboard?.lock || !document.fullscreenEnabled) return false;
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); await navigator.keyboard.lock(LOCK_KEYS); NET.kbLock = true; return true; } catch (e) { return false; }
@@ -8272,7 +8265,7 @@ document.addEventListener('pointerlockchange', () => {
   else if (!C.chatOpen) { showPause(); for (const k in keys) keys[k] = false; mouseDown = false; G.adsHold = false; }
 });
 function cycleSpec() {
-  const alive = [...R.values()].filter(r => r.alive);
+  const myT = C.players.get(C.myId)?.tm, alive = [...R.values()].filter(r => r.alive && (C.st?.mode !== 'rounds' || C.players.get(r.id)?.tm === myT)); // Rodadas: só assiste o próprio time
   if (!alive.length) { C.spec = null; return; }
   const i = alive.findIndex(r => r.id === C.spec);
   C.spec = alive[(i + 1) % alive.length].id;
@@ -8371,12 +8364,14 @@ function grantAllSkins() {
 }
 const PROF = { user: null, uid: null, email: '', name: '', cloud: false, fb: false, data: null, saveT: 0, status: '' };
 const FB = {};
-const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0 });
+const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0, st: {} });
+const STK = ['k', 'd', 'hs', 'w', 'm', 'zk', 'zr']; // abates, mortes, headshots, vitórias, partidas, zumbis, recorde de rodada
 function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) { if (w === '_faca') { if (f === 'karambit') o._faca = f; } else if (W[w] && SKIN_BY[f]) o[w] = f; } return o; }
 function cleanProf(d) {
   const p = newProfile(0); if (!d || typeof d !== 'object') return p;
   p.xp = Math.max(0, +d.xp || 0); p.cases = Math.max(0, Math.floor(+d.cases || 0)); p.opened = Math.max(0, +d.opened || 0);
   p.items = Array.isArray(d.items) ? [...new Set(d.items.filter(it => typeof it === 'string' && W[it.split(':')[0]] && SKIN_BY[it.split(':')[1]]))] : [];
+  p.st = {}; if (d.st && typeof d.st === 'object') for (const k of STK) p.st[k] = Math.max(0, Math.floor(+d.st[k] || 0));
   p.equipped = cleanSk(d.equipped); for (const [w, f] of Object.entries(p.equipped)) if (w !== '_faca' && !p.items.includes(w + ':' + f)) delete p.equipped[w];
   return p;
 }
@@ -8461,7 +8456,7 @@ async function claimUser(un) {
   await F.setDoc(F.doc(FB.db, 'players', uid), { username: un, name: un }, { merge: true });
   PROF.claimed = { [uid]: un }; PROF.user = un; nameSync(); skinsUI(); frStart();
 }
-const FR = { list: new Map(), inv: [], seen: {}, un: [], msg: '', iv: 0 };
+const FR = { list: new Map(), inv: [], seen: {}, info: {}, un: [], msg: '', iv: 0 };
 const frOther = f => { const uid = f.users.find(x => x !== PROF.uid); return { uid, name: f.names?.[uid] || '?' }; };
 const frOnline = n => Date.now() - (FR.seen[n] || 0) < 150e3;
 function frMsg(t) { FR.msg = t; frUI(); }
@@ -8477,11 +8472,17 @@ function frStart() {
     for (const i of FR.inv) if (!old.has(i.id)) { play('chat'); if (inGame) toast(`${i.fromName} te chamou para uma sala (aparece no menu, aba Jogar)`, 5); }
     frUI();
   }, frErr));
-  const ping = () => F.setDoc(F.doc(FB.db, 'usernames', PROF.user), { seen: F.serverTimestamp() }, { merge: true }).catch(() => { });
-  ping(); FR.iv = setInterval(() => { ping(); frSeen(); }, 60e3);
+  frPing(true); FR.iv = setInterval(() => { frPing(true); frSeen(); }, 60e3);
+}
+function stat(k, v = 1) { const d = PROF.data; if (!d) return; const t = d.st || (d.st = {}); t[k] = k === 'zr' ? Math.max(t[k] || 0, v) : (t[k] || 0) + v; profSave(); }
+function frPing(force) { // "visto agora", a sala em que estou (amigos entram por ela) e as estatísticas (ranking entre amigos)
+  if (!PROF.cloud || !PROF.user) return;
+  const room = (LB.on || inGame) && NET.code ? NET.code : '';
+  if (!force && room === FR.room0) return; FR.room0 = room;
+  FB.F.setDoc(FB.F.doc(FB.db, 'usernames', PROF.user), { seen: FB.F.serverTimestamp(), room, rp: LB.priv ? 1 : 0, st: PROF.data?.st || {} }, { merge: true }).catch(() => { });
 }
 async function frSeen() { // quem está online: o jogo marca "visto agora" a cada minuto
-  for (const f of FR.list.values()) { const n = frOther(f).name; try { const d = await FB.F.getDoc(FB.F.doc(FB.db, 'usernames', n)); FR.seen[n] = d.data()?.seen?.toMillis?.() || 0; } catch (e) { } }
+  for (const f of FR.list.values()) { const n = frOther(f).name; try { const d = await FB.F.getDoc(FB.F.doc(FB.db, 'usernames', n)), v = d.data() || {}; FR.seen[n] = v.seen?.toMillis?.() || 0; FR.info[n] = { room: v.room || '', rp: v.rp, st: v.st || {} }; } catch (e) { } }
   frUI();
 }
 async function frAdd(raw) {
@@ -8506,6 +8507,12 @@ async function frInvite(id) {
     LB.sent.add(o.name); lobbyUI();
   } catch (e) { frErr(e); }
 }
+function frRank(ok) { // ranking entre amigos (você incluído), por vitórias e depois abates
+  const rows = [[PROF.user, PROF.data?.st || {}], ...ok.map(([, f]) => { const n = frOther(f).name; return [n, FR.info[n]?.st || {}]; })]
+    .sort(([, a], [, b]) => (b.w || 0) - (a.w || 0) || (b.k || 0) - (a.k || 0));
+  return `<div class="lbl">Ranking entre amigos</div><table class="rank"><tr><th>#</th><th>Jogador</th><th>Vitórias</th><th>Partidas</th><th>Abates</th><th>K/D</th><th>HS</th><th>Zumbis</th><th>Recorde</th></tr>`
+    + rows.map(([n, t], i) => `<tr${n === PROF.user ? ' class="me"' : ''}><td>${i + 1}</td><td>${esc(n)}</td><td>${t.w || 0}</td><td>${t.m || 0}</td><td>${t.k || 0}</td><td>${((t.k || 0) / Math.max(1, t.d || 0)).toFixed(2)}</td><td>${t.k ? Math.round(100 * (t.hs || 0) / t.k) : 0}%</td><td>${t.zk || 0}</td><td>${t.zr ? 'rodada ' + t.zr : '-'}</td></tr>`).join('') + '</table>';
+}
 const MODE_N = { rounds: 'Rodadas', dm: 'Mata-mata', zombies: 'Zumbis' };
 function frUI() {
   const box = $('#frBox'); if (!box) return;
@@ -8521,7 +8528,9 @@ function frUI() {
     h = `<div>Seu usuário: <b style="color:var(--acc)">@${esc(PROF.user)}</b></div>
       <div class="row" style="margin-top:10px"><input id="frAddIn" maxlength="16" placeholder="usuário do amigo" autocomplete="off" style="flex:1"><button id="frAddBt">Adicionar</button></div>`
       + (inc.length ? '<div class="lbl">Pedidos recebidos</div>' + inc.map(([id, f]) => row(f, `<button data-fa="${id}">Aceitar</button><button data-fd="${id}">Recusar</button>`)).join('') : '')
-      + `<div class="lbl">Amigos (${ok.length})</div>` + (ok.length ? ok.map(([id, f]) => row(f, `<button data-fd="${id}">Remover</button>`)).join('') : '<div class="hint" style="margin-top:4px">Nenhum amigo ainda: adicione pelo usuário.</div>')
+      + `<div class="lbl">Amigos (${ok.length})</div>` + (ok.length ? ok.map(([id, f]) => { const o = frOther(f), inf = FR.info[o.name] || {}, rm = frOnline(o.name) && inf.room && inf.room !== NET.code;
+        return row(f, (rm ? (inf.rp ? '<small>em sala privada</small>' : `<button data-fj="${esc(inf.room)}">Entrar na sala</button>`) : '') + `<button data-fd="${id}">Remover</button>`); }).join('') : '<div class="hint" style="margin-top:4px">Nenhum amigo ainda: adicione pelo usuário.</div>')
+      + frRank(ok)
       + (out.length ? '<div class="lbl">Pedidos enviados</div>' + out.map(([id, f]) => row(f, `<button data-fd="${id}">Cancelar</button>`)).join('') : '');
   }
   if (FR.msg) h += `<div class="status${/Erro|recusou|não|Não|inválid|existe/.test(FR.msg) ? ' err' : ''}">${esc(FR.msg)}</div>`;
@@ -8545,8 +8554,19 @@ function lobbySync() {
   if (isR()) for (const p of S.players.values()) if (p.team !== 't' && p.team !== 'ct') setTeam(p, teamPick());
   broadcast({ t: 'lobby', st: S.st, code: NET.code, priv: LB.priv ? 1 : 0, pl: [...S.players.values()].map(p => ({ id: p.id, n: p.name, tm: p.team || '', c: p.color })) });
 }
+function srvAfterMatch() { if (S.fromLobby) backToLobby(); else srvStartMatch(); }
+function backToLobby() { // fim da partida: todo mundo volta ao lobby (o host troca modo, mapa e times e começa de novo)
+  S.lobby = true; LB.on = true; S.phase = 'warmup';
+  for (const p of [...S.players.values()]) { if (p.isBot) { S.players.delete(p.id); broadcast({ t: 'bye', id: p.id }); } else p.alive = false; }
+  broadcast({ t: 'tolobby' }); lobbySync();
+}
+function toMenu() {
+  inGame = false; me.alive = false; C.buyOpen = false; document.exitPointerLock?.();
+  $('#menu').classList.remove('hidden'); $('#hud').classList.add('hidden'); $('#click').classList.add('hidden'); $('#pause').classList.add('hidden');
+  document.querySelector('#menu .tabs [data-tab="play"]')?.click();
+}
 function lobbyStart() {
-  const st = LB.getForm(); save('lastSt', st); S.st = C.st = st; S.lobby = false; LB.on = false;
+  const st = LB.getForm(); save('lastSt', st); S.st = C.st = st; S.lobby = false; LB.on = false; S.fromLobby = true;
   broadcast({ t: 'start', st }, C.myId); // os outros montam o mapa antes do primeiro "spawn"
   buildMap(st.map); enterGame(); srvStartMatch(); lobbyUI();
 }
@@ -8566,6 +8586,7 @@ function lobbyUI() {
       $('#lbGo').onclick = lobbyStart;
     }
     $('#lbOut').onclick = leaveGame;
+    frPing();
     el.onclick = e => { // trocar time, remover, copiar código, convidar
       const b = e.target.closest('button'); if (!b || !host) return;
       if (b.dataset.sw) { const p = S.players.get(b.dataset.sw); if (p) { setTeam(p, p.team === 't' ? 'ct' : 't'); lobbySync(); } }
@@ -8827,6 +8848,7 @@ $('#frBox').onclick = e => {
   else if (b.id === 'frAddBt') frAdd($('#frAddIn').value);
   else if (b.dataset.fa) F.updateDoc(F.doc(FB.db, 'friends', b.dataset.fa), { st: 'ok' }).catch(frErr);
   else if (b.dataset.fd) F.deleteDoc(F.doc(FB.db, 'friends', b.dataset.fd)).catch(frErr);
+  else if (b.dataset.fj) { audioInit(); document.querySelector('#menu .tabs [data-tab="play"]').click(); $('#inCode').value = b.dataset.fj; joinRoom(b.dataset.fj); }
 };
 $('#invBar').onclick = e => {
   const b = e.target.closest('button'), i = b && FR.inv.find(x => x.id === (b.dataset.ij || b.dataset.ix)); if (!i) return;

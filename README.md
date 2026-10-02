@@ -176,6 +176,10 @@ A `apiKey` do Firebase não é segredo (ela identifica o projeto); quem protege 
 - **Amigos:** na aba **Amigos**, adicione pelo usuário. O outro aceita o pedido na mesma aba. A bolinha verde mostra quem está com o jogo aberto.
 - **Lobby:** **Criar sala pública** (entra quem tiver o código) ou **Criar sala só com convite** (só entra quem o host convidar). No lobby o host convida amigos, escolhe modo e mapa, troca os jogadores de time no modo Rodadas e clica em **Começar partida**.
 - **Convite:** aparece no topo da aba **Jogar** com o botão **Entrar**.
+- **Entrar na sala de um amigo:** na lista de amigos aparece **Entrar na sala** quando ele está numa sala pública.
+- **Fim da partida:** quem veio do lobby volta para o lobby (o host troca modo, mapa e times e começa de novo).
+- **Ranking entre amigos:** na aba **Amigos** (vitórias, partidas, abates, K/D, headshots, zumbis e recorde de rodada), salvo na conta.
+- **Rodadas:** compra só perto da base do seu time; AK e Glock são do Ataque, M4, USP e kit são da Defesa; **U** fala só com o time; morto só assiste o próprio time; o nome do lugar aparece embaixo do mini mapa.
 
 ## Gráficos
 
