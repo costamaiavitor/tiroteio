@@ -51,6 +51,7 @@ A dificuldade aparece no canto de cima, junto com o nome do mapa.
 
 - **Rodadas infinitas.** A vida dos zumbis segue a fórmula do CoD (150 na rodada 1, +100 por rodada até a 9, depois ×1,1). A quantidade cresce a cada rodada. Os zumbis começam andando e passam a correr e disparar nas rodadas altas.
 - **Pontos:** 10 por acerto; ao matar, 60 (corpo), 50 (pernas ou explosão), 100 (headshot) ou 130 (faca), mais o extra dos zumbis especiais (veja abaixo). Consertar janela dá 10 por tábua (até 500 por rodada).
+- **Sem lugar seguro:** os zumbis sobem em tudo que você alcança com um pulo (chafariz, fogueira, balcão, maca, caixote, até 1,21 m) e batem em quem está em cima. Nos mapas de zumbi não dá para ficar de pé em nada mais alto que isso (muro, telhado, pilha de caixotes, pedra alta) nem andar sobre a água. Zumbi que fica preso longe de todos volta para a fila afundando no chão, e nunca some na frente de quem está vendo.
 - **Janelas:** os zumbis vêm de fora, arrancam as tábuas e pulam para dentro. Segure F perto da janela para pregar as tábuas de volta. Na Vila (e nos lugares abertos do Sanatório) eles também saem do chão.
 - **Portões, portas e entulho** (750 a 4000; quanto mais longe, mais caro) liberam novas áreas, com mais armas e mais janelas.
 - **Armas de parede** (contorno de giz, na parede ou em placas de madeira): M14, Olympia, MP40, MP5K, AK-74u, Stakeout, granadas, Semtex, Claymores e Faca Bowie; nas alas novas do Sanatório, nos anéis de fora da Vila e nas áreas novas dos dois mapas também Dragunov, Galil, SPAS-12, FAL, Commando, HK21 e RPK. Se você já tem a arma, compra munição pela metade do preço (arma com Pack-a-Punch: 4500).
@@ -132,12 +133,23 @@ Já configurado no projeto `tiroteio-237ee`. Os passos abaixo servem só para re
 1. Em https://console.firebase.google.com, crie um projeto (o Google Analytics pode ficar desligado).
 2. **Authentication → Vamos começar → Método de login:** ative **Google** e **E-mail/senha**.
 3. **Authentication → Configurações → Domínios autorizados:** adicione `costamaiavitor.github.io` (o `localhost` já vem).
-4. **Firestore Database → Criar banco de dados** (modo de produção, qualquer região). Na aba **Regras**, cole o conteúdo do arquivo [`firestore.rules`](firestore.rules) deste repositório e publique. Antes de publicar, use o **Simulador de regras** da própria aba com um `create` e um `update` reais (os campos que o jogo grava estão comentados no arquivo) para um uid de teste. Se a conta do dono for receber todas as skins, troque o placeholder `COLOQUE_AQUI_O_UID_DO_DONO` pelo uid dela.
+4. **Firestore Database → Criar banco de dados** (modo de produção, qualquer região). Na aba **Regras**, cole o conteúdo do arquivo [`firestore.rules`](firestore.rules) deste repositório e publique. Antes de publicar, use o **Simulador de regras** da própria aba com um `create` e um `update` reais (os campos que o jogo grava estão comentados no arquivo) para um uid de teste. Se a conta do dono for receber todas as skins, troque o placeholder `COLOQUE_AQUI_O_UID_DO_DONO` pelo uid dela. O arquivo também traz as regras das coleções `usernames` (usuário fixo de cada conta), `friends` (pedidos e amizades) e `invites` (convites para o lobby) usadas pela aba Amigos.
 
 5. **Configurações do projeto (engrenagem) → Seus apps → Web (`</>`):** registre o app e copie o objeto `firebaseConfig`.
 6. No `index.html`, troque `const FIREBASE_CONFIG = null;` por `const FIREBASE_CONFIG = { ...o que você copiou... };`.
 
 A `apiKey` do Firebase não é segredo (ela identifica o projeto); quem protege os dados são as regras acima. Cada jogador só lê e grava o próprio inventário. Como o jogo roda no navegador, alguém que mexa no código consegue se dar skins. As regras do `firestore.rules` limitam a forma do documento e o quanto ele pode mudar a cada gravação (no máximo 10 caixas e 1 skin por vez, uma gravação por segundo), mas sem um servidor o progresso continua sendo decidido pelo cliente. Para jogar entre amigos isso não importa.
+
+## Amigos, lobby e convites
+
+- **Usuário:** ao criar conta com e-mail, escolha um usuário (3 a 16 caracteres: letras minúsculas, números ou _). Ele é o seu ID fixo e o seu nome no jogo. Quem entra com Google escolhe o usuário na aba **Amigos**.
+- **Amigos:** na aba **Amigos**, adicione pelo usuário. O outro aceita o pedido na mesma aba. A bolinha verde mostra quem está com o jogo aberto.
+- **Lobby:** **Criar sala pública** (entra quem tiver o código) ou **Criar sala só com convite** (só entra quem o host convidar). No lobby o host convida amigos, escolhe modo e mapa, troca os jogadores de time no modo Rodadas e clica em **Começar partida**.
+- **Convite:** aparece no topo da aba **Jogar** com o botão **Entrar**.
+- **Entrar na sala de um amigo:** na lista de amigos aparece **Entrar na sala** quando ele está numa sala pública.
+- **Fim da partida:** quem veio do lobby volta para o lobby (o host troca modo, mapa e times e começa de novo).
+- **Ranking entre amigos:** na aba **Amigos** (vitórias, partidas, abates, K/D, headshots, zumbis e recorde de rodada), salvo na conta.
+- **Rodadas:** compra só perto da base do seu time; AK e Glock são do Ataque, M4, USP e kit são da Defesa; **U** fala só com o time; morto só assiste o próprio time; o nome do lugar aparece embaixo do mini mapa.
 
 ## Gráficos
 

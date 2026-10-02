@@ -50,9 +50,16 @@ service cloud.firestore {
       //   merge  (l. 8166):   { xp, cases, items, equipped, opened, name, upd: serverTimestamp() }
       // xp é number (pode ser fracionário: abate contra bot vale 7,5, l. 7742) e fica em [0, 300) porque
       // grantXP (l. 8221-8227) troca cada 300 XP por uma caixa. cases e opened são inteiros >= 0.
+      // st: estatísticas (stat(), STK = k, d, hs, w, m, zk, zr), inteiros >= 0, só crescem no cliente honesto
+      function statsOk(m) {
+        return m is map && m.keys().hasOnly(['k', 'd', 'hs', 'w', 'm', 'zk', 'zr'])
+          && (!('k' in m) || inteiro(m.k)) && (!('d' in m) || inteiro(m.d)) && (!('hs' in m) || inteiro(m.hs)) && (!('w' in m) || inteiro(m.w))
+          && (!('m' in m) || inteiro(m.m)) && (!('zk' in m) || inteiro(m.zk)) && (!('zr' in m) || (inteiro(m.zr) && m.zr <= 10000));
+      }
       function formaOk() {
-        return d().keys().hasOnly(['xp', 'cases', 'items', 'equipped', 'opened', 'name', 'upd', 'created'])
+        return d().keys().hasOnly(['xp', 'cases', 'items', 'equipped', 'opened', 'name', 'upd', 'created', 'st'])
           && d().keys().hasAll(['xp', 'cases', 'items', 'equipped', 'opened'])
+          && (!('st' in d()) || statsOk(d().st))
           && d().xp is number && d().xp >= 0 && d().xp < 300
           && inteiro(d().cases) && d().cases <= 100000
           && inteiro(d().opened) && d().opened <= 1000000
@@ -110,6 +117,27 @@ service cloud.firestore {
         && (donoDoProjeto() || saltoOk());
 
       allow delete: if false;                   // o app não exclui (ver D8 se um dia tiver "Excluir conta")
+    }
+
+    // ---- Aba Amigos (usuário fixo, amizades e convites), como no README da main ----
+    // usuário fixo de cada conta (o ID do documento é o usuário); o dono grava também seen/room/rp/st (presença)
+    match /usernames/{name} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid && name.matches('^[a-z0-9_]{3,16}$');
+      allow update: if request.auth != null && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid;
+    }
+    // amizades: pedido (pending) e aceito (ok)
+    match /friends/{id} {
+      allow read, delete: if request.auth != null && request.auth.uid in resource.data.users;
+      allow create: if request.auth != null && request.resource.data.from == request.auth.uid
+        && request.auth.uid in request.resource.data.users && request.resource.data.users.size() == 2 && request.resource.data.st == 'pending';
+      allow update: if request.auth != null && request.auth.uid in resource.data.users && request.auth.uid != resource.data.from
+        && request.resource.data.st == 'ok' && request.resource.data.users == resource.data.users && request.resource.data.from == resource.data.from;
+    }
+    // convites para o lobby
+    match /invites/{id} {
+      allow read, delete: if request.auth != null && (request.auth.uid == resource.data.to || request.auth.uid == resource.data.from);
+      allow create, update: if request.auth != null && request.resource.data.from == request.auth.uid;
     }
   }
 }
