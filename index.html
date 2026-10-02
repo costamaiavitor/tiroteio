@@ -3081,7 +3081,7 @@ const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 8, -22], 
   clips: { idle: [0, 42], inspect: [43, 66], stab: [66, 87], slash: [87, 112], slash2: [112, 138], draw: [138, 153] },
   // ponto de encaixe do modelo (FPKN: guarda da KA-BAR / centro do anel da karambit) vai para Q no pacote,
   // fwd/up: para onde vão o cano (lâmina) e o dorso do modelo; len: comprimento total (cm)
-  fit: { knife: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 30 }, karambit: { Q: [0, 8.5, .2], fwd: [0, 1, 0], up: [-1, 0, 0], len: 28 } } }; // butterfly: lâmina de lado para a câmera e mais à frente (os cabos não passam tanto do mindinho) // butterfly: cabos fechados no punho, lâmina saindo pelo lado do indicador
+  fit: { knife: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 30 }, karambit: { Q: [1.6, 8.5, .2], fwd: [0, 1, 0], up: [-1, 0, 0], len: 30 } } }; // butterfly: lâmina de lado para a câmera e mais à frente (os cabos não passam tanto do mindinho) // butterfly: cabos fechados no punho, lâmina saindo pelo lado do indicador
 function knBuild(kind, ud, skin) {
   const key = 'k:pack', mk = 'm:' + kind;
   if (!FPC[key]) FPC[key] = new GLTFLoader().loadAsync(FPKNIFE.url).then(g => (FPC[key] = g), e => { console.warn('faca', e); delete FPC[key]; });
