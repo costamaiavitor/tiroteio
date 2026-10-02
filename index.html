@@ -2686,7 +2686,7 @@ const FPV = { long: { p: [.202, -.118, -.233], e: [.025, 0, -.102] }, pistol: { 
 const FPK = {
   ak: { url: 'assets/fps/ak/scene.gltf', mag2: 'Pmag2', armsFrom: 'rifle', v: { p: [.2, -.095, -.25], e: [.025, 0, -.102] }, sh: [.04, -.08, .1], hr: 1.99, body: 'PBody', ref: 'Rif', T: [null, .194, -.075], fwd: '-y', up: '+z', mag: 'Pmag', spare: ['Object_99'],
     clips: { idle: 'AK_Idle', draw: 'AK_Draw', fire: 'AK_Shot', reload: 'AK_Reload', reloadE: 'AK_Reload_full', walk: 'AK_Walk', run: 'AK_Run' } },
-  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.14, -.1, -.30], e: [.06, 0, -.2] }, sh: [.04, -.08, .1], hr: 1, view: 'pistol', body: 'PBody', ref: 'Rif', T: [.061, null, .054], fwd: '+x', up: '-z', mag: 'Pmag', slide: 'Rif',
+  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.14, -.085, -.30], e: [.06, 0, -.2] }, sh: [.04, -.08, .1], hr: 1, view: 'pistol', body: 'PBody', ref: 'Rif', T: [.061, null, .054], fwd: '+x', up: '-z', mag: 'Pmag', slide: 'Rif',
     clips: { idle: 'FPS_Pistol_Idle', fire: 'FPS_Pistol_Fire', reload: 'FPS_Pistol_Reload_easy', reloadE: 'FPS_Pistol_Reload_full', walk: 'FPS_Pistol_Walk' } },
   smg: { url: 'assets/fps/smg/scene.gltf', armsFrom: 'rifle', v: { p: [.198, -.083, -.383], e: [.016, -.007, -.105] }, sh: [.05, -.1, .13], hr: 1.98, body: 'PBody', ref: 'Rif', T: [-.092, null, -.067], fwd: '+x', up: '+z', mag: 'Pmag', spare: ['Object_96'],
     clips: { idle: 'KDW_DPose_Idle', draw: 'KDW_Draw', fire: 'KDW_Shot', reload: 'KDW_Reload_fast', reloadE: 'KDW_Reload_full', walk: 'KDW_Walk', run: 'KDW_Run' } },
@@ -2709,7 +2709,7 @@ const FPM = {
   python: { T: [null, -.041, .002], fwd: '-z', up: '+y', L: .292 },
   raygun: { T: [null, -1.14, 0], fwd: '+z', up: '+y', L: .30 },
   mp5: { T: [.018, -.02, null], fwd: '+x', up: '+y', L: .70 },
-  mp5k: { T: [.15, -.17, null], fwd: '+x', up: '+y', L: .325 },
+  mp5k: { T: [.15, -.17, null], fwd: '+x', up: '+y', L: .325, vo: [-.01, .005, .07] }, // curta: mais perto do olho para não sumir na tela
   mp40: { T: [-33.4, 2, null], fwd: '+x', up: '+y', L: .833 },
   p90: { T: [12.5, -17.3, null], fwd: '+x', up: '+y', L: .50, vo: [.02, -.025, -.06], ve: [.08, .22, 0], lhf: .12 }, // mão esquerda no laço da frente, logo à frente do gatilho // bullpup alto: mais longe e virada para mostrar o lado
   ak74u: { T: [-115, 23, null], fwd: '+x', up: '+y', L: .73 },
@@ -3048,7 +3048,7 @@ function fpIK(F) {
   // (a câmera fica na origem, olhando para -Z)
   K.pushL = null;
   for (const a of K.arms) {
-    const s = clamp((a.tw.z + .25) / .15, 0, 1); if (!s || !a.hand) continue;
+    const s = F.cur === 'reload' || F.cur === 'reloadE' ? clamp((a.tw.z + .25) / .15, 0, 1) : 0; if (!s || !a.hand) continue; // só na recarga (as pistolas ficam perto do olho de propósito)
     if (a.sd < 0) K.pushL = new V3(0, -.16 * s, -.1 * s);
     I.c.set(0, -.16 * s, -.1 * s); a.tw.add(I.c);
     I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true);
