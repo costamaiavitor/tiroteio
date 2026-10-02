@@ -1,0 +1,11 @@
+Model Information:
+* title:	Low-Poly SPAS-12
+* source:	https://sketchfab.com/3d-models/low-poly-spas-12-c95154ea2348443e9195250a6ad122cb
+* author:	TastyTony (https://sketchfab.com/TastyTony)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Low-Poly SPAS-12" (https://sketchfab.com/3d-models/low-poly-spas-12-c95154ea2348443e9195250a6ad122cb) by TastyTony (https://sketchfab.com/TastyTony) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

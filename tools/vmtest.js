@@ -20,6 +20,7 @@ export function settle(n = 1) { const t = T(); window.__simLock = true; window._
 export function release() { window.__simLock = false; }
 export function equip(id) { const t = T(), w = t.W[id]; if (w.slot === 'primary') t.G.inv.primary = id; else if (w.slot === 'secondary') t.G.inv.secondary = id; t.equip(id, true); settle(); }
 async function rtShot(name, cam, w, h, cross) {
+  if (!scene) { let o = T().vmRoot; while (o.parent) o = o.parent; scene = o; }
   const r = T().renderer, rt = new THREE.WebGLRenderTarget(w, h, { samples: 4 }); rt.texture.colorSpace = THREE.SRGBColorSpace;
   const prev = r.getRenderTarget(), cc = r.getClearColor(new THREE.Color()), ca = r.getClearAlpha();
   r.setRenderTarget(rt); r.setClearColor(0xc9b48a, 1); r.clear(); r.render(scene, cam);
@@ -53,3 +54,23 @@ export function probe() {
   if (ud.armsGun) { out.lh = P(ud.armsGun.lt.getWorldPosition(new THREE.Vector3())); out.rh = P(ud.armsGun.rt.getWorldPosition(new THREE.Vector3())); }
   return out;
 }
+// braços prontos (FPS2): equipa, espera o pacote e o modelo carregarem, põe na pose parada e fotografa
+export async function shotW(id, name, w = 1280) {
+  const t = T(); release(); equip(id);
+  for (let i = 0; i < 200 && !t.vmGun.userData.fps2; i++) await wait(100);
+  if (!t.vmGun.userData.fps2) return id + ': sem fps2';
+  const F = t.vmGun.userData.fps2; F.until = 0; F.act = null; F.mixer.stopAllAction();
+  settle(3); await full(name || 'g_' + id, 16 / 9, w);
+  return id + ' ok';
+}
+// FPS2: pose de uma animação (idle, fire, reload, reloadE, draw, walk, run) numa fração do tempo; ads = mira (0..1)
+export async function poseW(name, clip, f, ads = 0, w = 640) {
+  const t = T(), ud = t.vmGun.userData, F = ud.fps2; if (!F) return 'sem fps2';
+  const c = F.clips[clip]; if (!c) return 'sem clip ' + clip;
+  F.mixer.stopAllAction(); F.act = null; const a = F.mixer.clipAction(c); a.reset(); a.play(); F.mixer.setTime(Math.max(0, c.duration * f - 1 / 60));
+  F.until = now() + 99; F.reloading = true; t.G.ads = ads; t.G.adsHold = ads > 0;
+  settle(1); // o quadro avança 1/60 s e cai na fração pedida, já com o IK
+  await full(name, 16 / 9, w); F.reloading = false; F.until = 0; t.G.ads = 0; t.G.adsHold = false;
+  return name;
+}
+const now = () => T().now ?? performance.now() / 1000;

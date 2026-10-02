@@ -1,0 +1,11 @@
+Model Information:
+* title:	China Lake Colored
+* source:	https://sketchfab.com/3d-models/china-lake-colored-8e81aded97d94eebb369eb935c62cb93
+* author:	TatumWilbanks (https://sketchfab.com/TatumWilbanks)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "China Lake Colored" (https://sketchfab.com/3d-models/china-lake-colored-8e81aded97d94eebb369eb935c62cb93) by TatumWilbanks (https://sketchfab.com/TatumWilbanks) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -123,7 +123,7 @@ Aba **Skins** no menu.
 - **Coleção (estilo Valorant):** todas as armas aparecem ao mesmo tempo, em colunas por categoria (pistolas; SMGs e escopetas; rifles; precisão, pesadas e faca), cada uma desenhada com a skin que está equipada. Clique numa arma para abrir a tela dela: à esquerda as skins que você tem (e a Padrão), no centro a arma em 3D (arraste para girar), e o botão **Equipar**. Os outros jogadores veem a sua skin.
 - **Conta:** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
 
-- **Facas:** além da Faca, tem o **Karambit** (lâmina em garra, com anel). Os braços de primeira pessoa das facas foram feitos no Blender (`assets/arms.glb`) a partir de um humano do [MPFB/MakeHuman](https://static.makehumancommunity.org/mpfb.html) (licença CC0), com animações no estilo do CS2: parado, saque (a karambit gira no dedo), cortes alternando o lado, estocada no botão direito e inspeção no F. Nas armas de fogo os mesmos braços seguram a arma por IK: a mão direita fecha no punho com o indicador no gatilho e a esquerda fica por baixo do guarda-mão, acompanhando as recargas. Os scripts que geram o arquivo ficam em `tools/blender/` (`pipeline.sh` refaz tudo com o Blender em segundo plano). Na Coleção, abra a arma e clique em **Usar esta faca**; equipar uma skin de karambit também já troca a faca.
+- **Facas:** além da Faca (KA-BAR), tem a **Butterfly**. As duas usam os mesmos braços das armas: a mão direita segue uma animação de faca pronta (parado, saque, cortes alternando o lado, estocada no botão direito e inspeção no F) e fecha no cabo. Na Coleção, abra a arma e clique em **Usar esta faca**; equipar uma skin da butterfly também já troca a faca.
 
 ### Configurar as contas (Firebase, uma vez só)
 
@@ -197,4 +197,51 @@ Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Mé
 
 ## Tecnologia
 
-Um único arquivo `index.html`. Usa [three.js](https://threejs.org) para o 3D e [PeerJS](https://peerjs.com) para a conexão. Gráficos, sons e mapas são gerados por código, sem arquivos externos.
+Um único arquivo `index.html`. Usa [three.js](https://threejs.org) para o 3D e [PeerJS](https://peerjs.com) para a conexão. Sons e mapas são gerados por código; os braços em primeira pessoa e os modelos das armas são arquivos glTF em `assets/` (veja os créditos abaixo).
+
+## Créditos dos modelos 3D
+
+Os braços animados e os modelos das armas e facas vêm do [Sketchfab](https://sketchfab.com), todos com licença [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (uso livre com atribuição). Foram reduzidos (texturas em 1024 px) e encaixados nos braços pelo jogo; os arquivos ficam em `assets/fps/`.
+
+Braços e animações (um pacote por classe de arma):
+
+- braços + AK-74M (AK-47): [FPS AK-74m animations](https://sketchfab.com/3d-models/fps-ak-74m-animations-94be8385c402474cacd39bc096c6ca14), de [Cransh](https://sketchfab.com/ccransh)
+- braços de pistola: [FPS pistol animations](https://sketchfab.com/3d-models/fps-pistol-animations-0d7a343dcb6f401197a73c91aee93f6d), de [Cransh](https://sketchfab.com/ccransh)
+- braços de submetralhadora: [SMG FPS Animations](https://sketchfab.com/3d-models/smg-fps-animations-ca37ea9148dc4fcc9cc632175d311b23), de [Cransh](https://sketchfab.com/ccransh)
+- braços de fuzil: [Animated FPS hands (rifle animation pack)](https://sketchfab.com/3d-models/animated-fps-hands-rifle-animation-pack-5f2d0ed780a94724b36ab505f7564057), de [Cransh](https://sketchfab.com/ccransh)
+- braços de rifle de precisão: [FPS animations sniper rifle](https://sketchfab.com/3d-models/fps-animations-sniper-rifle-c15ae8393d824f5b929e3f69691cdd31), de [Cransh](https://sketchfab.com/ccransh)
+- braços + Remington (Nova): [FPS Arms remington (shotgun)](https://sketchfab.com/3d-models/fps-arms-remington-shotgun-e68ef617fe8a48cca8610d016ffd5881), de [Cransh](https://sketchfab.com/ccransh)
+- animação das facas (a mão dos braços das armas segue o punho desta animação): [Knife animated](https://sketchfab.com/3d-models/knife-animated-5f83f0bd4b2c429aa14aa46461efe404), de [DJMaesen](https://sketchfab.com/bumstrum)
+
+Armas e facas:
+
+- AK-74u: [Low-Poly AKS-74U](https://sketchfab.com/3d-models/low-poly-aks-74u-4fc741a30b20477ea748f5d2837ac0b4), de [TastyTony](https://sketchfab.com/TastyTony)
+- Arma Trovão: [Call of Duty Zombies: Classic Thundergun No Rig](https://sketchfab.com/3d-models/call-of-duty-zombies-classic-thundergun-no-rig-ede362de578c4ed9aac513604d05e857), de [TheShibeLord](https://sketchfab.com/TheShibeLord)
+- AWP: [Low-Poly L118A1](https://sketchfab.com/3d-models/low-poly-l118a1-5e2f001d6e6245bcacf2b1e2de8892f4), de [TastyTony](https://sketchfab.com/TastyTony)
+- China Lake: [China Lake Colored](https://sketchfab.com/3d-models/china-lake-colored-8e81aded97d94eebb369eb935c62cb93), de [TatumWilbanks](https://sketchfab.com/TatumWilbanks)
+- Commando: [Low-Poly HK416](https://sketchfab.com/3d-models/low-poly-hk416-059e968f6f764357880807c62c117ab7), de [TastyTony](https://sketchfab.com/TastyTony)
+- CZ75: [Low-Poly CZ-75 SP-01](https://sketchfab.com/3d-models/low-poly-cz-75-sp-01-7cf2a3a662d344ee989e343ccaee56e9), de [TastyTony](https://sketchfab.com/TastyTony)
+- Desert Eagle: [Low-Poly Desert Eagle](https://sketchfab.com/3d-models/low-poly-desert-eagle-b81da261345f4462b2c4412352162287), de [TastyTony](https://sketchfab.com/TastyTony)
+- Dragunov: [Low-Poly SVD Dragunov](https://sketchfab.com/3d-models/low-poly-svd-dragunov-fe40c5c2696441bc8696ed042056709e), de [TastyTony](https://sketchfab.com/TastyTony)
+- Faca: [KA-BAR USMC Knife](https://sketchfab.com/3d-models/ka-bar-usmc-knife-73ddfa74144b49fd8bad8177646e5ed5), de [Urpo](https://sketchfab.com/Urpo)
+- FN FAL: [Low-Poly FN FAL](https://sketchfab.com/3d-models/low-poly-fn-fal-c737946bdccf4441b558b97ede5d0e3b), de [TastyTony](https://sketchfab.com/TastyTony)
+- Galil: [Low-Poly IMI Galil](https://sketchfab.com/3d-models/low-poly-imi-galil-4bc3146c48d34171ab0ea879757000b7), de [TastyTony](https://sketchfab.com/TastyTony)
+- Glock-18: [glock 17](https://sketchfab.com/3d-models/glock-17-ccf58223a7804de8b15d1d35b7d0b587), de [Friendly](https://sketchfab.com/Friendly1)
+- HK21: [Low-Poly M240B](https://sketchfab.com/3d-models/low-poly-m240b-657a3b8ce0194aae9c7c9036c18c54b9), de [TastyTony](https://sketchfab.com/TastyTony)
+- Butterfly: [Butterfly Knife - Vanilla](https://sketchfab.com/3d-models/butterfly-knife-vanilla-514edc772445441083b3cd611fd4e65c), de [DjJaba](https://sketchfab.com/djjaba)
+- M14: [Low-Poly M14](https://sketchfab.com/3d-models/low-poly-m14-30e47673a17b434386e9c3af54670bed), de [TastyTony](https://sketchfab.com/TastyTony)
+- M1911: [Low-Poly M1911](https://sketchfab.com/3d-models/low-poly-m1911-117f542d21954ae0a59afaedadcff338), de [TastyTony](https://sketchfab.com/TastyTony)
+- M4A4: [Low-Poly M4a1](https://sketchfab.com/3d-models/low-poly-m4a1-8cab1cbeb82c4396a154f9fc8771417b), de [TastyTony](https://sketchfab.com/TastyTony)
+- MP40: [Low-Poly MP40](https://sketchfab.com/3d-models/low-poly-mp40-2b0a107a709a4004bbff310dba4af14b), de [TastyTony](https://sketchfab.com/TastyTony)
+- MP5-SD: [Low-Poly HK MP5](https://sketchfab.com/3d-models/low-poly-hk-mp5-80980f757c2c463ebc73460a31611652), de [TastyTony](https://sketchfab.com/TastyTony)
+- MP5K: [Low-Poly HK MP5K](https://sketchfab.com/3d-models/low-poly-hk-mp5k-091b4f73c00b4605b754f5c0b3fcdd26), de [TastyTony](https://sketchfab.com/TastyTony)
+- Olympia: [Double Barrel Shotgun](https://sketchfab.com/3d-models/double-barrel-shotgun-04741a40f2224cffafc343b0236d5bbe), de [Sebastian Kansik](https://sketchfab.com/Pepego)
+- P250: [Low-Poly Sig P226](https://sketchfab.com/3d-models/low-poly-sig-p226-0d90f858e9f74c418ce3aae61cef9f4e), de [TastyTony](https://sketchfab.com/TastyTony)
+- P90: [Modular P90 Tactical](https://sketchfab.com/3d-models/modular-p90-tactical-080897fc0366455884b1a916684313fe), de [doomsentinel](https://sketchfab.com/doomsentinel)
+- Python: [GameReady: Colt Python Revolver](https://sketchfab.com/3d-models/gameready-colt-python-revolver-3def6e3980e64dfa832f298004ce1b94), de [HYQQM](https://sketchfab.com/HYQQM)
+- Ray Gun: [Ray Gun v1](https://sketchfab.com/3d-models/ray-gun-v1-fbbb221cb97f4e92a898e9b704e2c774), de [dev-shawn](https://sketchfab.com/dev-shawn)
+- RPK: [Low-Poly RPK](https://sketchfab.com/3d-models/low-poly-rpk-acdc6fe399514c41aa4130f8044875fb), de [TastyTony](https://sketchfab.com/TastyTony)
+- SPAS-12: [Low-Poly SPAS-12](https://sketchfab.com/3d-models/low-poly-spas-12-c95154ea2348443e9195250a6ad122cb), de [TastyTony](https://sketchfab.com/TastyTony)
+- SSG 08: [Low-Poly Sako TRG-42](https://sketchfab.com/3d-models/low-poly-sako-trg-42-e1430b54583c41daa2695680347058bd), de [TastyTony](https://sketchfab.com/TastyTony)
+- Stakeout: [Low-Poly Ithaca M37](https://sketchfab.com/3d-models/low-poly-ithaca-m37-74da1e6054cc40e3b61bed4b4d8eef61), de [TastyTony](https://sketchfab.com/TastyTony)
+- USP-S: [low-poly HK USP 9mm](https://sketchfab.com/3d-models/low-poly-hk-usp-9mm-5a06cfce588d4c6b960b9eda658ec47d), de [D_U](https://sketchfab.com/DU1701)

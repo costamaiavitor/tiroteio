@@ -1,0 +1,11 @@
+Model Information:
+* title:	glock 17
+* source:	https://sketchfab.com/3d-models/glock-17-ccf58223a7804de8b15d1d35b7d0b587
+* author:	Friendly (https://sketchfab.com/Friendly1)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "glock 17" (https://sketchfab.com/3d-models/glock-17-ccf58223a7804de8b15d1d35b7d0b587) by Friendly (https://sketchfab.com/Friendly1) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
