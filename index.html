@@ -3901,7 +3901,8 @@ const FPW = { ak47: { pack: 'ak', vo: [.01, .005, -.07] }, // a AK do pacote é 
   nova: { pack: 'pump' }, m1911_ls: { pack: 'pistol', m: 'm1911' } };
 for (const [p, l] of Object.entries({ pistol: 'glock usp p250 deagle cz75 m1911 python raygun', smg: 'mp5 mp5k mp40 p90', ak: 'ak74u galil rpk hk21 dragunov',
   rifle: 'm4 commando fal m14 thundergun', sniper: 'scout awp', pump: 'stakeout olympia chinalake spas' })) for (const id of l.split(' ')) FPW[id] = { pack: p, m: id };
-const fpw = id => FPW[W[id]?.base || id]; // a versão do Pack-a-Punch usa os braços e o modelo da arma base
+// a versão do Pack-a-Punch usa os braços e o modelo da arma base; no modo Zumbis as armas ficam com o modelo feito no código (as baixadas são do modo CS)
+const fpw = id => C.st?.mode === 'zombies' ? undefined : FPW[W[id]?.base || id];
 const FPC = {}; // cache dos glTF carregados ('p:pacote' e 'm:modelo')
 function fpLoad(key) {
   if (FPC[key]) return FPC[key];
@@ -4896,7 +4897,7 @@ function getRemote(id) {
 // Montar a arma (procedural + modelo baixado) a cada troca de arma de outro jogador travava o quadro.
 const RGUN = new Map();
 function remoteGunTpl(mid, skin) {
-  const k = mid + '|' + (skin || ''), nl = Object.keys(FPC).filter(fpReady).length; let t = RGUN.get(k);
+  const k = mid + '|' + (skin || '') + (C.st?.mode === 'zombies' ? '|z' : ''), nl = Object.keys(FPC).filter(fpReady).length; let t = RGUN.get(k);
   if (t && !t.userData.dl && nl > t.userData.nl) t = null; // chegou modelo baixado depois do molde: refaz
   if (!t) { t = gunModel(mid, false, skin); t.scale.setScalar(1.1); t.userData.nl = nl; RGUN.set(k, t); }
   return t;
