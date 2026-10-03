@@ -1,0 +1,16 @@
+# Configuração do Jekyll usado pelo GitHub Pages (build "legacy", publica a raiz da main).
+# O jogo é só index.html + assets/ (+ vendor/, quando existir). Tudo que está em `exclude` continua no
+# repositório, mas NÃO sai publicado em https://costamaiavitor.github.io/tiroteio/ : ferramentas de
+# desenvolvimento, testes, a auditoria de segurança (docs/) e os arquivos do pnpm.
+# README.md fica de fora da lista de propósito: o Jekyll não o publica como página do jogo e o dono pode
+# querer vê-lo pelo site. Ver docs/seguranca/auditoria/09-configuracao.md (F5).
+exclude:
+  - tools
+  - tests
+  - docs
+  - package.json
+  - pnpm-lock.yaml
+  - node_modules
+  - firestore.rules
+  - CLAUDE.md
+  - _config.yml

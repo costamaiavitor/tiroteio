@@ -133,23 +133,23 @@ Já configurado no projeto `tiroteio-237ee`. Os passos abaixo servem só para re
 1. Em https://console.firebase.google.com, crie um projeto (o Google Analytics pode ficar desligado).
 2. **Authentication → Vamos começar → Método de login:** ative **Google** e **E-mail/senha**.
 3. **Authentication → Configurações → Domínios autorizados:** adicione `costamaiavitor.github.io` (o `localhost` já vem).
-4. **Firestore Database → Criar banco de dados** (modo de produção, qualquer região). Na aba **Regras**, cole e publique:
-
-   ```
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /players/{uid} {
-         allow read, write: if request.auth != null && request.auth.uid == uid;
-       }
-     }
-   }
-   ```
+4. **Firestore Database → Criar banco de dados** (modo de produção, qualquer região). Na aba **Regras**, cole o conteúdo do arquivo [`firestore.rules`](firestore.rules) deste repositório e publique. Antes de publicar, use o **Simulador de regras** da própria aba com um `create` e um `update` reais (os campos que o jogo grava estão comentados no arquivo) para um uid de teste. Se a conta do dono for receber todas as skins, troque o placeholder `COLOQUE_AQUI_O_UID_DO_DONO` pelo uid dela. O arquivo também traz as regras das coleções `usernames` (usuário fixo de cada conta), `friends` (pedidos e amizades) e `invites` (convites para o lobby) usadas pela aba Amigos.
 
 5. **Configurações do projeto (engrenagem) → Seus apps → Web (`</>`):** registre o app e copie o objeto `firebaseConfig`.
 6. No `index.html`, troque `const FIREBASE_CONFIG = null;` por `const FIREBASE_CONFIG = { ...o que você copiou... };`.
 
-A `apiKey` do Firebase não é segredo (ela identifica o projeto); quem protege os dados são as regras acima. Cada jogador só lê e grava o próprio inventário. Como o jogo roda no navegador, alguém que mexa no código consegue se dar skins. Para jogar entre amigos isso não importa.
+A `apiKey` do Firebase não é segredo (ela identifica o projeto); quem protege os dados são as regras acima. Cada jogador só lê e grava o próprio inventário. Como o jogo roda no navegador, alguém que mexa no código consegue se dar skins. As regras do `firestore.rules` limitam a forma do documento e o quanto ele pode mudar a cada gravação (no máximo 10 caixas e 1 skin por vez, uma gravação por segundo), mas sem um servidor o progresso continua sendo decidido pelo cliente. Para jogar entre amigos isso não importa.
+
+## Amigos, lobby e convites
+
+- **Usuário:** ao criar conta com e-mail, escolha um usuário (3 a 16 caracteres: letras minúsculas, números ou _). Ele é o seu ID fixo e o seu nome no jogo. Quem entra com Google escolhe o usuário na aba **Amigos**.
+- **Amigos:** na aba **Amigos**, adicione pelo usuário. O outro aceita o pedido na mesma aba. A bolinha verde mostra quem está com o jogo aberto.
+- **Lobby:** **Criar sala pública** (entra quem tiver o código) ou **Criar sala só com convite** (só entra quem o host convidar). No lobby o host convida amigos, escolhe modo e mapa, troca os jogadores de time no modo Rodadas e clica em **Começar partida**.
+- **Convite:** aparece no topo da aba **Jogar** com o botão **Entrar**.
+- **Entrar na sala de um amigo:** na lista de amigos aparece **Entrar na sala** quando ele está numa sala pública.
+- **Fim da partida:** quem veio do lobby volta para o lobby (o host troca modo, mapa e times e começa de novo).
+- **Ranking entre amigos:** na aba **Amigos** (vitórias, partidas, abates, K/D, headshots, zumbis e recorde de rodada), salvo na conta.
+- **Rodadas:** compra só perto da base do seu time; AK e Glock são do Ataque, M4, USP e kit são da Defesa; **U** fala só com o time; morto só assiste o próprio time; o nome do lugar aparece embaixo do mini mapa.
 
 ## Gráficos
 
@@ -198,7 +198,11 @@ Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Mé
 
 ## Tecnologia
 
-Um único arquivo `index.html`. Usa [three.js](https://threejs.org) para o 3D e [PeerJS](https://peerjs.com) para a conexão. Sons e mapas são gerados por código; os braços em primeira pessoa e os modelos das armas são arquivos glTF em `assets/` (veja os créditos abaixo).
+Um único arquivo `index.html`. Usa [three.js](https://threejs.org) para o 3D e [PeerJS](https://peerjs.com) para a conexão (as duas bibliotecas ficam em `vendor/`, com os hashes em `vendor/HASHES.md`; abrindo o arquivo direto do disco elas vêm da CDN). Sons e mapas são gerados por código; os braços em primeira pessoa e os modelos das armas são arquivos glTF em `assets/` (veja os créditos abaixo).
+
+## Segurança
+
+O host confere o que cada cliente manda (posição, tiros, acertos, compras, cadência, limite de mensagens) e avisa quando alguém sai do esperado; na pausa o host pode expulsar. A auditoria completa, as correções e o que ainda depende de configuração manual (TURN, regras do Firestore, chave de API, App Check, GitHub) estão em `docs/seguranca/` (`relatorio_final.md` e `acoes_manuais.md`). Testes: `pnpm install` e `pnpm test` (abre um Chromium por arquivo; precisa de internet). Ao mudar armas, mapas ou mensagens de rede, subir `PROTO` no `index.html`.
 
 ## Créditos dos modelos 3D
 

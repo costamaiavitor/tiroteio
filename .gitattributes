@@ -1,0 +1,3 @@
+# vendor/: bytes exatos das bibliotecas (os hashes de vendor/HASHES.md valem só sem conversao de fim de linha)
+vendor/** -text
+*.glb binary
