@@ -3869,7 +3869,8 @@ function fpTips(c) {
   tip.divideScalar(n || 1); tip.z = z1;
   // mira: o ponto mais alto perto da linha do cano (centro lateral tirado da boca do cano, que é simétrica)
   for (const p of c) if (p.z > -L * .05 && p.z < L * .3 && Math.abs(p.x - tip.x) < L * .03) sy = Math.max(sy, p.y);
-  return { L, muzzle: tip, sight: new V3(tip.x, sy, 0) };
+  let ry = -1e9; for (const p of c) if (p.z > -L * .06 && p.z < L * .1 && Math.abs(p.x - tip.x) < L * .025) ry = Math.max(ry, p.y); // topo da caixa da culatra (trilho da mira do Armeiro)
+  return { L, muzzle: tip, sight: new V3(tip.x, sy, 0), rail: new V3(tip.x, ry > -1e8 ? ry : sy, L * .02) };
 }
 const fpArm = m => /arm/i.test(m.material?.name || '') || m.material?.name === 'material';
 // monta os braços + arma para a arma id; devolve false se ainda não carregou (aí usa o modelo antigo até carregar)
@@ -4607,7 +4608,7 @@ const ATT_ORDER = Object.keys(ATT); // um acessório por nível, do nível 2 ao 
 const ATT_SLOTS = { optic: 'Mira', muzzle: 'Boca', barrel: 'Cano', under: 'Sob o cano', mag: 'Carregador', rgrip: 'Empunhadura', stock: 'Coronha', laser: 'Laser' };
 const ATT_MAX = 5, WLV_MAX = ATT_ORDER.length + 1;
 const attBase = id => W[id]?.base || id;
-const attOK = id => { const b = attBase(id), w = W[b]; return !!w && !w.ls && !w.pu && !['knife', 'karambit', 'chinalake', 'raygun', 'thundergun', 'monkey', 'dmach'].includes(b) && (w.slot === 'primary' || w.slot === 'secondary' || !!w.wall || !!w.box); };
+const attOK = id => { const b = attBase(id), w = W[b]; return !!w && !w.ls && !w.pu && !w.splash && !w.thunder && !w.frost && !w.chain && !['knife', 'karambit', 'chinalake', 'raygun', 'raygun2', 'thundergun', 'wunderwaffe', 'wintershowl', 'crossbow', 'law', 'monkey', 'dmach'].includes(b) && (w.slot === 'primary' || w.slot === 'secondary' || !!w.wall || !!w.box); };
 const wlvNeed = l => 120 + 60 * (l - 1); // XP para passar do nível l para o l+1
 function wLevel(id) {
   let xp = PROF.data?.wxp?.[attBase(id)] || 0, l = 1;
@@ -4647,13 +4648,13 @@ function attParts(id, u, tips, sc) {
   for (const a of on) {
     const A = ATT[a];
     if (A.dot) { // mira: corpo em cima da arma; o ponto de mira sobe para o centro da janela
-      const y = sight.y + .018 * u, z = sight.z + .02 * u;
-      box(.032, .006, .06, sight.x, sight.y + .003 * u, z); // base
+      const rail = (tips.rail || tips.sight).clone().multiplyScalar(sc), y = rail.y + .018 * u, z = rail.z; // sobre a culatra, logo à frente do olho
+      box(.032, .006, .06, sight.x, rail.y + .003 * u, z); // base
       for (const s of [-1, 1]) box(.004, .03, .05, sight.x + s * .014 * u, y + .004 * u, z); // laterais
       box(.032, .005, .05, sight.x, y + .02 * u, z); // teto
       const gl = new THREE.Mesh(new THREE.PlaneGeometry(.024 * u, .024 * u), new THREE.MeshBasicMaterial({ color: 0x6fb6d8, transparent: true, opacity: .12, depthWrite: false }));
       gl.position.set(sight.x, y + .004 * u, z + .024 * u); g.add(gl);
-      tips.sight.set(sight.x / sc, (y + .004 * u) / sc, tips.sight.z);
+      tips.sight.set(sight.x / sc, (y + .004 * u) / sc, z / sc);
     }
     if (A.sup) { // supressor na boca do cano; o clarão vai para a ponta dele
       const c = new THREE.Mesh(new THREE.CylinderGeometry(.017 * u, .017 * u, .16 * u, 14), M); c.rotation.x = Math.PI / 2; c.position.set(mz.x, mz.y, mz.z + .08 * u); g.add(c);
@@ -4684,7 +4685,7 @@ function armoryUI() {
   el.innerHTML = `<div class="armgrid"><div class="armlist">${list}</div><div class="armdet"><h3>${esc(W[ARM_SEL].name)} <small>Nível ${L.l}${L.need ? ` · ${L.xp}/${L.need} XP` : ' · máximo'}</small></h3>${bar(L.xp, L.need)}<div class="hint">Escolha até ${ATT_MAX} acessórios, um por encaixe (${eq.length}/${ATT_MAX}). Valem no modo Zumbi, também na arma do Pack-a-Punch. Mate zumbis com a arma para subir de nível (tiro na cabeça vale mais).</div><div class="armatts">${rows}</div></div></div>`;
   el.querySelectorAll('.armw').forEach(b => b.onclick = () => { ARM_SEL = b.dataset.w; armoryUI(); });
   el.querySelectorAll('.arma input').forEach(c => c.onchange = () => {
-    const a = c.dataset.a, d = PROF.data; d.att = d.att || {}; let cur = (d.att[ARM_SEL] || []).filter(x => x !== a);
+    const a = c.dataset.a, d = PROF.data; d.att = d.att || {}; if (!attUnlocked(ARM_SEL).includes(a)) { c.checked = false; return; } let cur = (d.att[ARM_SEL] || []).filter(x => x !== a);
     if (c.checked) { cur = cur.filter(x => ATT[x].slot !== ATT[a].slot); if (cur.length >= ATT_MAX) { c.checked = false; centerMsg('Máximo de ' + ATT_MAX + ' acessórios', '', 1.5); return; } cur.push(a); }
     d.att[ARM_SEL] = cur; profSave(); armoryUI();
   });
@@ -4767,7 +4768,7 @@ function shoot() {
       if (h.zone === 'head' && !h.sp) hs = true;
     }
     if (dmgBy.size) { showHitmarker(hs); play(hs ? 'hs' : 'hit'); }
-    sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: ends });
+    sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: ends, sup: attHas(G.cur, 'sup') ? 1 : undefined });
   }
   if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); muzzleFlash(mz); vmFlashUntil = now + .05; } // supressor: sem clarão, tiro abafado
   G.kick = (vmGun?.userData.fps2 ? .25 : 1) * attStat(G.cur, 'kick');
@@ -4977,7 +4978,7 @@ function remoteShot(m) {
     if (w?.splash) m.e.forEach(e => zBoomFx(new V3(e[0], e[1], e[2]), w));
     else if (w?.pellets) m.e.forEach(e => puff(new V3(e[0], e[1], e[2]), 0xbbb5a8, .3, .3, .3)); else m.e.forEach(e => impact(new V3(e[0], e[1], e[2]), null));
   }
-  play(w?.snd || 'pistol', o); muzzleFlash(o, true);
+  if (m.sup) playQ(w?.snd || 'pistol', .2); else { play(w?.snd || 'pistol', o); muzzleFlash(o, true); } // supressor (Armeiro)
   if (ZC.on && !w?.thunder && !w?.frost) zShotReact(o, m.e);
   if (rp) setRemoteGun(rp, m.w);
 }
@@ -5309,7 +5310,7 @@ function srvHandle(pid, m) {
     case 'shot': {
       if (!vec3(m.o) || !isW(m.w)) return;
       const e = (Array.isArray(m.e) ? m.e : []).slice(0, 12).filter(vec3);
-      p.shotT = now; broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e }, pid); break;
+      p.shotT = now; broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e, sup: m.sup ? 1 : undefined }, pid); break;
     }
     case 'zhit': {
       // o cliente decide o acerto, mas o host confere: arma que ele tem, dano que a arma pode dar
@@ -8033,7 +8034,7 @@ function cleanProf(d) {
   p.xp = Math.max(0, +d.xp || 0); p.cases = Math.max(0, Math.floor(+d.cases || 0)); p.opened = Math.max(0, +d.opened || 0);
   p.items = Array.isArray(d.items) ? [...new Set(d.items.filter(it => typeof it === 'string' && W[it.split(':')[0]] && SKIN_BY[it.split(':')[1]]))] : [];
   if (d.wxp && typeof d.wxp === 'object') for (const [k, v] of Object.entries(d.wxp)) if (W[k] && +v > 0) p.wxp[k] = Math.floor(+v); // nível das armas (Armeiro)
-  if (d.att && typeof d.att === 'object') for (const [k, v] of Object.entries(d.att)) if (W[k] && Array.isArray(v)) { const a = [...new Set(v.filter(x => ATT[x]))].slice(0, ATT_MAX); if (a.length) p.att[k] = a; }
+  if (d.att && typeof d.att === 'object') for (const [k, v] of Object.entries(d.att)) if (W[k] && Array.isArray(v)) { const a = [], sl = new Set(); for (const x of v) if (ATT[x] && !sl.has(ATT[x].slot) && a.length < ATT_MAX) { sl.add(ATT[x].slot); a.push(x); } if (a.length) p.att[k] = a; }
   p.equipped = cleanSk(d.equipped); for (const [w, f] of Object.entries(p.equipped)) if (w !== '_faca' && !p.items.includes(w + ':' + f)) delete p.equipped[w];
   return p;
 }
