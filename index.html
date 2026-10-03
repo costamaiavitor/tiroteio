@@ -1699,6 +1699,7 @@ function vilaGround() {
 // Cada área registra uma função em ATMOS[mapa][id da área], chamada no build do mapa com a API "A" abaixo.
 // ================================================================
 const ATMOS = { vila: {}, sanatorio: {} };
+const ATMOS_POST = []; // fase 3: funções (mapId, AT, M) chamadas no fim de atmosBuild (desgaste, partículas, névoa, shaders...): cada domínio empurra a sua
 let AT = null; // estado da atmosfera do mapa montado (null fora dos mapas de zumbi)
 const ATMOS_LOOK0 = { tint: [1, 1, 1], sat: 1, vig: 0, fog: 1 }; // aparência neutra (= sem atmosfera)
 const atHash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
@@ -1719,6 +1720,7 @@ function atmosBuild(mapId) {
     root.traverse(o => { if (o.material) o.userData.own = true; });
     AT.areas.push(ar);
   }
+  for (const f of ATMOS_POST) try { f(mapId, AT, M); } catch (e) { console.error('atmosfera pós', e); }
 }
 // API entregue a cada área (A). Coordenadas no mundo; y = 0 é o chão; "ry" gira em volta do eixo vertical.
 function atmosApi(ar, M) {
