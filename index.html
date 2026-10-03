@@ -4294,10 +4294,6 @@ function fpBuild(id, ud) {
   if (D?.tint) model.traverse(o => { if (o.isMesh && D.tint[o.material.name] != null) o.material.color.set(D.tint[o.material.name]); }); // cores chapadas estranhas do modelo
   if (D?.brass) model.traverse(o => { if (o.isMesh && D.brass.includes(o.material.name)) Object.assign(o.material, { metalness: .9, roughness: .35 }).color.set(0xb08d3c); }); // balas brancas sem textura viram latão
   if (D?.lens) model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) Object.assign(o.material, { roughness: .08, metalness: .4 }).color.set(0x14232c); }); // vidro da luneta
-  { // acessórios do Armeiro (modo Zumbi): peças no referencial da arma; mira e supressor mudam o ponto de mira e a boca do cano
-    const ag = attParts(id, FPG * P.hr, tips, D ? D.L * FPG * P.hr / tips.L : 1);
-    if (ag) { ag.matrixAutoUpdate = false; ag.matrix.copy(body.matrixWorld).invert().multiply(A); body.add(ag); }
-  }
   const mz = new THREE.Object3D(); mz.position.copy(tips.muzzle).applyMatrix4(C); body.add(mz);
   // pacote → tela: o gatilho da arma vai para o mesmo ponto da tela em todas as armas (FPV), com o cano no mesmo giro; os braços vêm junto
   const V = P.v || FPV[P.view || 'long'], k = FPH / P.hr, de = D?.ve || [0, 0, 0], tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1] + de[1], Math.PI + V.e[0] + de[0], V.e[2] + de[2], 'YXZ'));
@@ -4932,7 +4928,7 @@ function wLevel(id) {
 }
 const attUnlocked = id => ATT_ORDER.slice(0, wLevel(id).l - 1);
 function attOn(id) { // acessórios valendo agora (só no modo Zumbi)
-  if (!ZC.on || !attOK(id)) return [];
+  if (!ZC.on || !attOK(id) || fpw(id)) return []; // só nas armas feitas no código (modo Zumbi), nunca nas baixadas
   const un = new Set(attUnlocked(id));
   return (PROF.data?.att?.[attBase(id)] || []).filter(a => un.has(a) && ATT[a]);
 }
@@ -4954,37 +4950,7 @@ function playQ(name, vol) { // som abafado (supressor)
   if (!AC || !SND[name]) return;
   try { const g = AC.createGain(); g.gain.value = vol; g.connect(sdest()); SND[name](g); } catch (e) { }
 }
-// peças dos acessórios no modelo da primeira pessoa (mira, supressor e laser), no referencial da arma (gatilho na origem, cano em +Z)
-function attParts(id, u, tips, sc) {
-  const on = attOn(id), g = new THREE.Group(); if (!on.length) return null;
-  const M = new THREE.MeshStandardMaterial({ color: 0x1c1d20, metalness: .6, roughness: .5 });
-  const box = (w, h, d, x, y, z, m = M) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w * u, h * u, d * u), m); o.position.set(x, y, z); g.add(o); return o; };
-  const mz = tips.muzzle.clone().multiplyScalar(sc), sight = tips.sight.clone().multiplyScalar(sc);
-  for (const a of on) {
-    const A = ATT[a];
-    if (A.dot) { // mira: corpo em cima da arma; o ponto de mira sobe para o centro da janela
-      const rail = (tips.rail || tips.sight).clone().multiplyScalar(sc), y = rail.y + .018 * u, z = rail.z; // sobre a culatra, logo à frente do olho
-      box(.032, .006, .06, sight.x, rail.y + .003 * u, z); // base
-      for (const s of [-1, 1]) box(.004, .03, .05, sight.x + s * .014 * u, y + .004 * u, z); // laterais
-      box(.032, .005, .05, sight.x, y + .02 * u, z); // teto
-      const gl = new THREE.Mesh(new THREE.PlaneGeometry(.024 * u, .024 * u), new THREE.MeshBasicMaterial({ color: 0x6fb6d8, transparent: true, opacity: .12, depthWrite: false }));
-      gl.position.set(sight.x, y + .004 * u, z + .024 * u); g.add(gl);
-      tips.sight.set(sight.x / sc, (y + .004 * u) / sc, z / sc);
-    }
-    if (A.sup) { // supressor na boca do cano; o clarão vai para a ponta dele
-      const c = new THREE.Mesh(new THREE.CylinderGeometry(.017 * u, .017 * u, .16 * u, 14), M); c.rotation.x = Math.PI / 2; c.position.set(mz.x, mz.y, mz.z + .08 * u); g.add(c);
-      tips.muzzle.z += .16 * u / sc;
-    }
-    if (A.laser) { // laser embaixo do cano, com o feixe para a frente
-      const p = new V3(mz.x + .012 * u, mz.y - .03 * u, mz.z * .55); box(.018, .018, .05, p.x, p.y, p.z);
-      const beam = new THREE.Mesh(new THREE.CylinderGeometry(.0012 * u, .0012 * u, 3 * u, 4), new THREE.MeshBasicMaterial({ color: 0xff2020, transparent: true, opacity: .45, depthWrite: false }));
-      beam.rotation.x = Math.PI / 2; beam.position.set(p.x, p.y, p.z + 1.5 * u); g.add(beam);
-    }
-  }
-  g.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
-  return g;
-}
-// o mesmo no modelo feito no código (modo Zumbi): metros, cano para -Z; a mira vai sobre a alça (atrás) e o ponto de mira sobe para ela
+// peças dos acessórios (mira, supressor, laser) no modelo feito no código (as armas do modo Zumbi; as baixadas ficam nos modos estilo CS sem acessórios): metros, cano para -Z; a mira vai sobre a alça (atrás) e o ponto de mira sobe para ela
 function attPartsProc(id, gun, ud) {
   const on = attOn(id); if (!on.length || !ud.muzzle) return;
   const M = new THREE.MeshStandardMaterial({ color: 0x1c1d20, metalness: .6, roughness: .5 }), add = (geo, x, y, z, m = M) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); gun.add(o); return o; };
