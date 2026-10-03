@@ -134,6 +134,19 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 /* HUD */
 #hud{position:fixed;inset:0;pointer-events:none;z-index:10;text-shadow:0 1px 3px #000,0 0 2px #000}
 #xhair{position:absolute;left:50%;top:50%}
+#reddot{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#ff2b2b;box-shadow:0 0 4px #f00}
+#reddot.holo{width:30px;height:30px;margin:-15px 0 0 -15px;background:radial-gradient(circle,#ff2b2b 0 2px,transparent 3px);border:1.5px solid rgba(255,40,40,.85);box-shadow:none}
+.armgrid{display:grid;grid-template-columns:260px 1fr;gap:14px;max-height:62vh}
+.armlist{overflow:auto;display:flex;flex-direction:column;gap:4px;padding-right:4px}
+.armw{display:grid;grid-template-columns:1fr auto;gap:2px 8px;text-align:left;padding:7px 10px;font-size:14px}
+.armw.on{outline:2px solid var(--acc)}
+.armw .axbar{grid-column:1/3}
+.axbar{height:5px;background:#0006;border-radius:3px;overflow:hidden}.axbar i{display:block;height:100%;background:var(--acc)}
+.armdet{overflow:auto}.armdet h3{margin:0 0 6px}.armdet h3 small{color:#8b94a0;font-weight:400}
+.armatts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.arma{display:grid;grid-template-columns:auto 1fr;gap:0 8px;align-items:center;padding:7px 9px;border-radius:6px;background:#ffffff0d;cursor:pointer}
+.arma input{grid-row:1/4}.arma .sl{font-size:11px;color:#8b94a0;text-transform:uppercase}.arma small{color:#aab2bc}
+.arma.on{background:#ffffff1f;outline:1px solid var(--acc)}.arma.lock{opacity:.45;cursor:default}
 #xhair i{position:absolute;background:#6cff6c;box-shadow:0 0 0 1px rgba(0,0,0,.75)}
 #xhair .v{width:2px;height:18px;left:-1px;top:-9px}
 #xhair .h{width:18px;height:2px;left:-9px;top:-1px}
@@ -278,7 +291,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 
 <div id="hud" class="hidden">
   <div id="scope" class="hidden"></div>
-  <div id="xhair"><i class="v"></i><i class="h"></i></div>
+  <div id="xhair"><i class="v"></i><i class="h"></i></div><div id="reddot" class="hidden"></div>
   <div id="hitmark"></div>
   <div id="dmgflash"></div>
   <div id="dmgdir"></div>
@@ -329,7 +342,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
       <div><h1>DAN OF DUTY</h1><div class="sub">FPS no navegador. x1 com os amigos ou sobrevivam juntos no modo Zumbis.</div></div>
       <label class="mname">Seu nome <input id="inName" maxlength="16" autocomplete="off"></label>
     </div>
-    <div class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="skins">Skins</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></div>
+    <div class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="skins">Skins</button><button data-tab="armory">Armeiro</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></div>
     <div data-pane="play" class="cols2">
       <div class="box">
         <h3>Criar sala</h3>
@@ -345,6 +358,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
         <div class="hint">Quem cria a sala recebe um código de 5 letras. O amigo digita aqui (ou abre o link que o host copiar no Esc). Funciona na mesma rede ou pela internet.</div>
       </div>
     </div>
+    <div data-pane="armory" class="hidden"><div class="box" id="armoryBox"></div></div>
     <div data-pane="skins" id="skinsPane" class="hidden">
       <div class="skhead">
         <div class="box" id="skAcct"></div>
@@ -3965,6 +3979,10 @@ function fpBuild(id, ud) {
   if (D?.tint) model.traverse(o => { if (o.isMesh && D.tint[o.material.name] != null) o.material.color.set(D.tint[o.material.name]); }); // cores chapadas estranhas do modelo
   if (D?.brass) model.traverse(o => { if (o.isMesh && D.brass.includes(o.material.name)) Object.assign(o.material, { metalness: .9, roughness: .35 }).color.set(0xb08d3c); }); // balas brancas sem textura viram latão
   if (D?.lens) model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) Object.assign(o.material, { roughness: .08, metalness: .4 }).color.set(0x14232c); }); // vidro da luneta
+  { // acessórios do Armeiro (modo Zumbi): peças no referencial da arma; mira e supressor mudam o ponto de mira e a boca do cano
+    const ag = attParts(id, FPG * P.hr, tips, D ? D.L * FPG * P.hr / tips.L : 1);
+    if (ag) { ag.matrixAutoUpdate = false; ag.matrix.copy(body.matrixWorld).invert().multiply(A); body.add(ag); }
+  }
   const mz = new THREE.Object3D(); mz.position.copy(tips.muzzle).applyMatrix4(C); body.add(mz);
   // pacote → tela: o gatilho da arma vai para o mesmo ponto da tela em todas as armas (FPV), com o cano no mesmo giro; os braços vêm junto
   const V = P.v || FPV[P.view || 'long'], k = FPH / P.hr, de = D?.ve || [0, 0, 0], tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1] + de[1], Math.PI + V.e[0] + de[0], V.e[2] + de[2], 'YXZ'));
@@ -4561,29 +4579,135 @@ function equip(id, force) {
 function applyInv(inv, refill, got) {
   G.inv = { ...inv };
   for (const k of ['primary', 'secondary', 'third']) { const f = fpw(inv[k]); if (f) { fpLoad('p:' + f.pack); if (f.m) fpLoad('m:' + f.m); } } // braços prontos: já baixa os da arma comprada
-  for (const k of ['primary', 'secondary', 'third']) { const w = inv[k]; if (w && (refill || !G.ammo[w] || got === w)) G.ammo[w] = { mag: W[w].mag, res: W[w].res }; }
+  for (const k of ['primary', 'secondary', 'third']) { const w = inv[k]; if (w && (refill || !G.ammo[w] || got === w)) G.ammo[w] = { mag: wMag(w), res: W[w].res }; }
   if (G.cur === 'dmach' && hasW('dmach')) { if (got && W[got]?.slot !== 'nade') C.dmPrev = got; return; } // Máquina da Morte na mão: a arma nova espera
   if (got && (W[got]?.slot === 'primary' || W[got]?.slot === 'secondary')) equip(got, true);
   else if (refill || !hasW(G.cur)) equip(me.downed ? zDownGun() : bestW(), true);
 }
+// ---------- Armeiro: nível das armas e acessórios no modo Zumbi (como o Gunsmith do Black Ops 6) ----------
+// Cada arma ganha XP própria matando zumbis (tiro na cabeça vale mais) e sobe de nível; cada nível libera um acessório, numa ordem
+// fixa. No Armeiro (menu) você escolhe até 5 acessórios, um por encaixe. No modo Zumbi a arma vem com eles, inclusive a do Pack-a-Punch.
+// O nível fica salvo no perfil. Facas, lança-granadas e armas especiais não têm acessórios (como no BO6).
+const ATT = {
+  optic_reflex: { slot: 'optic', name: 'Mira Reflex', d: 'Ponto vermelho na mira; zoom 1,1x', zoom: 1.1, dot: 1 },
+  mag_ext1: { slot: 'mag', name: 'Carregador Estendido I', d: '+25% de munição no carregador', magX: 1.25 },
+  muzzle_comp: { slot: 'muzzle', name: 'Compensador', d: 'Menos coice: -15% de dispersão e de tranco', spr: .85, kick: .6 },
+  under_vgrip: { slot: 'under', name: 'Empunhadura Vertical', d: 'Arma mais estável: -15% de dispersão', spr: .85, kick: .8 },
+  laser: { slot: 'laser', name: 'Laser Tático', d: 'Tiro sem mirar 30% mais preciso', hip: .7, laser: 1 },
+  barrel_long: { slot: 'barrel', name: 'Cano Longo', d: '+5% de dano e alcance maior (o dano cai mais devagar)', dmgX: 1.05, rangeX: 1.5, adsSpd: .9 },
+  optic_holo: { slot: 'optic', name: 'Mira Holográfica', d: 'Retícula holográfica; zoom 1,25x', zoom: 1.25, dot: 2 },
+  mag_fast: { slot: 'mag', name: 'Carregador Rápido', d: 'Recarga 30% mais rápida', reloadX: .7 },
+  rgrip: { slot: 'rgrip', name: 'Empunhadura Emborrachada', d: 'Mira 30% mais rápida', adsSpd: 1.3 },
+  muzzle_sup: { slot: 'muzzle', name: 'Supressor', d: 'Sem clarão e com o tiro abafado', sup: 1 },
+  under_agrip: { slot: 'under', name: 'Empunhadura Angular', d: 'Mira 20% mais rápida e -8% de dispersão', adsSpd: 1.2, spr: .92 },
+  stock: { slot: 'stock', name: 'Coronha Tática', d: 'Atira andando com 40% menos dispersão', moveX: .6 },
+  mag_ext2: { slot: 'mag', name: 'Carregador Estendido II', d: '+50% de munição no carregador, recarga um pouco mais lenta', magX: 1.5, reloadX: 1.1 },
+};
+const ATT_ORDER = Object.keys(ATT); // um acessório por nível, do nível 2 ao 14
+const ATT_SLOTS = { optic: 'Mira', muzzle: 'Boca', barrel: 'Cano', under: 'Sob o cano', mag: 'Carregador', rgrip: 'Empunhadura', stock: 'Coronha', laser: 'Laser' };
+const ATT_MAX = 5, WLV_MAX = ATT_ORDER.length + 1;
+const attBase = id => W[id]?.base || id;
+const attOK = id => { const b = attBase(id), w = W[b]; return !!w && !w.ls && !w.pu && !['knife', 'karambit', 'chinalake', 'raygun', 'thundergun', 'monkey', 'dmach'].includes(b) && (w.slot === 'primary' || w.slot === 'secondary' || !!w.wall || !!w.box); };
+const wlvNeed = l => 120 + 60 * (l - 1); // XP para passar do nível l para o l+1
+function wLevel(id) {
+  let xp = PROF.data?.wxp?.[attBase(id)] || 0, l = 1;
+  while (l < WLV_MAX && xp >= wlvNeed(l)) { xp -= wlvNeed(l); l++; }
+  return { l, xp, need: l < WLV_MAX ? wlvNeed(l) : 0 };
+}
+const attUnlocked = id => ATT_ORDER.slice(0, wLevel(id).l - 1);
+function attOn(id) { // acessórios valendo agora (só no modo Zumbi)
+  if (!ZC.on || !attOK(id)) return [];
+  const un = new Set(attUnlocked(id));
+  return (PROF.data?.att?.[attBase(id)] || []).filter(a => un.has(a) && ATT[a]);
+}
+function attStat(id, k) { let v = 1; for (const a of attOn(id)) if (ATT[a][k] != null) v *= ATT[a][k]; return v; }
+const attHas = (id, k) => attOn(id).some(a => ATT[a][k]);
+const wMag = id => Math.max(1, Math.round(W[id].mag * attStat(id, 'magX')));
+let WXP_SAVE = 0;
+function wxpAdd(id, n) {
+  if (!PROF.data || !attOK(id)) return;
+  const b = attBase(id), before = wLevel(b).l;
+  PROF.data.wxp = PROF.data.wxp || {}; PROF.data.wxp[b] = (PROF.data.wxp[b] || 0) + n;
+  const after = wLevel(b).l;
+  if (after > before) {
+    const un = ATT[ATT_ORDER[after - 2]];
+    centerMsg(`${W[b].name} · NÍVEL ${after}`, un ? 'Desbloqueado no Armeiro: ' + un.name : '', 3); play('kaching'); profSave();
+  } else if (++WXP_SAVE % 25 === 0) profSave();
+}
+function playQ(name, vol) { // som abafado (supressor)
+  if (!AC || !SND[name]) return;
+  try { const g = AC.createGain(); g.gain.value = vol; g.connect(sdest()); SND[name](g); } catch (e) { }
+}
+// peças dos acessórios no modelo da primeira pessoa (mira, supressor e laser), no referencial da arma (gatilho na origem, cano em +Z)
+function attParts(id, u, tips, sc) {
+  const on = attOn(id), g = new THREE.Group(); if (!on.length) return null;
+  const M = new THREE.MeshStandardMaterial({ color: 0x1c1d20, metalness: .6, roughness: .5 });
+  const box = (w, h, d, x, y, z, m = M) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w * u, h * u, d * u), m); o.position.set(x, y, z); g.add(o); return o; };
+  const mz = tips.muzzle.clone().multiplyScalar(sc), sight = tips.sight.clone().multiplyScalar(sc);
+  for (const a of on) {
+    const A = ATT[a];
+    if (A.dot) { // mira: corpo em cima da arma; o ponto de mira sobe para o centro da janela
+      const y = sight.y + .018 * u, z = sight.z + .02 * u;
+      box(.032, .006, .06, sight.x, sight.y + .003 * u, z); // base
+      for (const s of [-1, 1]) box(.004, .03, .05, sight.x + s * .014 * u, y + .004 * u, z); // laterais
+      box(.032, .005, .05, sight.x, y + .02 * u, z); // teto
+      const gl = new THREE.Mesh(new THREE.PlaneGeometry(.024 * u, .024 * u), new THREE.MeshBasicMaterial({ color: 0x6fb6d8, transparent: true, opacity: .12, depthWrite: false }));
+      gl.position.set(sight.x, y + .004 * u, z + .024 * u); g.add(gl);
+      tips.sight.set(sight.x / sc, (y + .004 * u) / sc, tips.sight.z);
+    }
+    if (A.sup) { // supressor na boca do cano; o clarão vai para a ponta dele
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(.017 * u, .017 * u, .16 * u, 14), M); c.rotation.x = Math.PI / 2; c.position.set(mz.x, mz.y, mz.z + .08 * u); g.add(c);
+      tips.muzzle.z += .16 * u / sc;
+    }
+    if (A.laser) { // laser embaixo do cano, com o feixe para a frente
+      const p = new V3(mz.x + .012 * u, mz.y - .03 * u, mz.z * .55); box(.018, .018, .05, p.x, p.y, p.z);
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(.0012 * u, .0012 * u, 3 * u, 4), new THREE.MeshBasicMaterial({ color: 0xff2020, transparent: true, opacity: .45, depthWrite: false }));
+      beam.rotation.x = Math.PI / 2; beam.position.set(p.x, p.y, p.z + 1.5 * u); g.add(beam);
+    }
+  }
+  g.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
+  return g;
+}
+// tela do Armeiro (menu): nível, XP e acessórios de cada arma
+let ARM_SEL = null;
+function armoryUI() {
+  const el = $('#armoryBox'); if (!el || !PROF.data) return;
+  const ws = Object.keys(W).filter(k => attOK(k) && !W[k].pap).sort((a, b) => wLevel(b).l - wLevel(a).l || (PROF.data.wxp?.[b] || 0) - (PROF.data.wxp?.[a] || 0) || W[a].name.localeCompare(W[b].name));
+  if (!ARM_SEL || !ws.includes(ARM_SEL)) ARM_SEL = ws[0];
+  const bar = (x, n) => `<div class="axbar"><i style="width:${n ? Math.round(100 * x / n) : 100}%"></i></div>`;
+  const list = ws.map(k => { const L = wLevel(k); return `<button class="armw${k === ARM_SEL ? ' on' : ''}" data-w="${k}"><b>${esc(W[k].name)}</b><span>Nv ${L.l}</span>${bar(L.xp, L.need)}</button>`; }).join('');
+  const L = wLevel(ARM_SEL), un = new Set(attUnlocked(ARM_SEL)), eq = PROF.data.att?.[ARM_SEL] || [];
+  const rows = ATT_ORDER.map((a, i) => {
+    const A = ATT[a], ok = un.has(a), on = eq.includes(a);
+    return `<label class="arma${ok ? '' : ' lock'}${on ? ' on' : ''}"><input type="checkbox" data-a="${a}"${on ? ' checked' : ''}${ok ? '' : ' disabled'}><span class="sl">${ATT_SLOTS[A.slot]}</span><b>${esc(A.name)}</b><small>${ok ? esc(A.d) : 'Libera no nível ' + (i + 2)}</small></label>`;
+  }).join('');
+  el.innerHTML = `<div class="armgrid"><div class="armlist">${list}</div><div class="armdet"><h3>${esc(W[ARM_SEL].name)} <small>Nível ${L.l}${L.need ? ` · ${L.xp}/${L.need} XP` : ' · máximo'}</small></h3>${bar(L.xp, L.need)}<div class="hint">Escolha até ${ATT_MAX} acessórios, um por encaixe (${eq.length}/${ATT_MAX}). Valem no modo Zumbi, também na arma do Pack-a-Punch. Mate zumbis com a arma para subir de nível (tiro na cabeça vale mais).</div><div class="armatts">${rows}</div></div></div>`;
+  el.querySelectorAll('.armw').forEach(b => b.onclick = () => { ARM_SEL = b.dataset.w; armoryUI(); });
+  el.querySelectorAll('.arma input').forEach(c => c.onchange = () => {
+    const a = c.dataset.a, d = PROF.data; d.att = d.att || {}; let cur = (d.att[ARM_SEL] || []).filter(x => x !== a);
+    if (c.checked) { cur = cur.filter(x => ATT[x].slot !== ATT[a].slot); if (cur.length >= ATT_MAX) { c.checked = false; centerMsg('Máximo de ' + ATT_MAX + ' acessórios', '', 1.5); return; } cur.push(a); }
+    d.att[ARM_SEL] = cur; profSave(); armoryUI();
+  });
+}
 function startReload() {
   const w = W[G.cur], a = G.ammo[G.cur];
-  if (!a || G.reloadEnd || a.mag >= w.mag || a.res <= 0) return;
+  if (!a || G.reloadEnd || a.mag >= wMag(G.cur) || a.res <= 0) return;
   const sp = zPerk('speed') ? .5 : 1;
-  if (zPerk('cherry') && !me.downed) sendToHost({ t: 'zfx', k: 'ch', f: r2(1 - a.mag / w.mag) }); // Electric Cherry: o host confere a bebida e a recarga
+  if (zPerk('cherry') && !me.downed) sendToHost({ t: 'zfx', k: 'ch', f: r2(1 - a.mag / wMag(G.cur)) }); // Electric Cherry: o host confere a bebida e a recarga
   G.burstN = 0; G.reloadStart = now; G.scope = 0; G.rezoom = 0; G.reloadEmpty = a.mag === 0; G.rEv = {};
   if (w.shellTime) { // escopeta / lança-granadas: uma bala por vez (atirar interrompe)
-    G.reload = { stage: 'start', t0: now, iv: w.shellTime * sp, sp };
-    G.reloadEnd = now + .35 * sp + Math.min(w.mag - a.mag, a.res) * G.reload.iv + .45 * sp;
-  } else { G.reload = null; G.reloadEnd = now + w.reload * sp; }
+    G.reload = { stage: 'start', t0: now, iv: w.shellTime * sp * attStat(G.cur, 'reloadX'), sp };
+    G.reloadEnd = now + .35 * sp + Math.min(wMag(G.cur) - a.mag, a.res) * G.reload.iv + .45 * sp;
+  } else { G.reload = null; G.reloadEnd = now + w.reload * sp * attStat(G.cur, 'reloadX'); }
 }
 function calcSpread(w) {
   let s = (w.scope && G.scope > 0) ? w.sspread : w.spread;
   const hs = Math.hypot(me.vel.x, me.vel.z), mf = clamp((hs - 1.4) / (RUN - 1.4), 0, 1);
-  s += (w.move || 0) * mf;
+  s += (w.move || 0) * mf * attStat(G.cur, 'moveX');
   if (!me.onGround) s += w.air ?? .15;
   if (me.crouch && me.onGround) s *= .75;
   s *= 1 - .45 * (G.ads || 0); // mirando: mais precisão
+  s *= attStat(G.cur, 'spr') * (G.ads > .5 ? 1 : attStat(G.cur, 'hip')); // acessórios do Armeiro (modo Zumbi)
   if (zPerk('ds')) s *= .6; // Deadshot Daiquiri
   return s;
 }
@@ -4625,7 +4749,7 @@ function shoot() {
       if (i < 4) tracer(mz, res.p, w.tracer);
       if (res.id) {
         const mult = res.zone === 'head' ? (w.head || 4) * (zPerk('ds') ? 1.5 : 1) : res.zone === 'legs' ? .75 : 1;
-        const dmg = w.dmg * mult * Math.pow(w.rm || 1, res.t / 10);
+        const dmg = w.dmg * mult * Math.pow(w.rm || 1, res.t / 10 / attStat(G.cur, 'rangeX')) * attStat(G.cur, 'dmgX');
         const cur = dmgBy.get(res.id) || { dmg: 0, zone: 'legs', sp: false };
         cur.dmg += dmg; cur.sp = false; if (res.zone === 'head' || (res.zone === 'body' && cur.zone === 'legs')) cur.zone = res.zone;
         dmgBy.set(res.id, cur); puff(res.p, zmode ? 0x6a0000 : 0xa01010, .35, .3, 0); bloodSplat(res.p);
@@ -4645,7 +4769,8 @@ function shoot() {
     if (dmgBy.size) { showHitmarker(hs); play(hs ? 'hs' : 'hit'); }
     sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: ends });
   }
-  play(w.snd); muzzleFlash(mz); vmFlashUntil = now + .05; G.kick = vmGun?.userData.fps2 ? .25 : 1;
+  if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); muzzleFlash(mz); vmFlashUntil = now + .05; } // supressor: sem clarão, tiro abafado
+  G.kick = (vmGun?.userData.fps2 ? .25 : 1) * attStat(G.cur, 'kick');
   if (vmGun?.userData.fps2) fpPlay(vmGun.userData, 'fire');
   if (!['shotgun', 'launcher', 'dbarrel', 'revolver', 'scout', 'awp'].includes(w.model) || w.rate < .6 && w.model === 'shotgun') ejectShell(w); // bomba/ferrolho ejetam na hora da ação
   if (w.scope && G.scope) { G.rezoom = G.scope; G.scope = 0; }
@@ -4693,11 +4818,11 @@ function updateWeapon(dt) {
     const S_ = G.reload, a = G.ammo[G.cur];
     if (S_.stage === 'start' && now - S_.t0 >= .35 * S_.sp) { S_.stage = 'load'; S_.t0 = now; }
     else if (S_.stage === 'load' && now - S_.t0 >= S_.iv) {
-      if (a && a.res > 0 && a.mag < w.mag) { a.mag++; a.res--; play('shellin'); }
-      S_.t0 = now; if (!a || a.mag >= w.mag || a.res <= 0) S_.stage = 'end';
+      if (a && a.res > 0 && a.mag < wMag(G.cur)) { a.mag++; a.res--; play('shellin'); }
+      S_.t0 = now; if (!a || a.mag >= wMag(G.cur) || a.res <= 0) S_.stage = 'end';
     } else if (S_.stage === 'end' && now - S_.t0 >= .45 * S_.sp) { G.reload = null; G.reloadEnd = 0; }
     if (G.reload && S_.stage !== 'end' && (G.trigger || mouseDown) && a?.mag > 0 && locked()) { G.reload = null; G.reloadEnd = 0; } // atirar interrompe
-  } else if (G.reloadEnd && now >= G.reloadEnd) { const a = G.ammo[G.cur]; if (a) { const take = Math.min(w.mag - a.mag, a.res); a.mag += take; a.res -= take; } G.reloadEnd = 0; }
+  } else if (G.reloadEnd && now >= G.reloadEnd) { const a = G.ammo[G.cur]; if (a) { const take = Math.min(wMag(G.cur) - a.mag, a.res); a.mag += take; a.res -= take; } G.reloadEnd = 0; }
   if (G.rezoom && now >= G.nextFire) { G.scope = G.rezoom; G.rezoom = 0; }
   const since = now - G.lastShot;
   if (since > .08) { const k = Math.exp(-dt * (since > .3 ? 9 : 4)); G.punchP *= k; G.punchY *= k; }
@@ -6398,7 +6523,7 @@ function zPowerFx(k, by) {
     ZC.dmEnd = now + 30; G.ammo.dmach = { mag: W.dmach.mag, res: 0 }; equip('dmach', true);
   }
   if (k === 'max') {
-    for (const w of [G.inv.primary, G.inv.secondary, G.inv.third]) if (w && W[w]) { const a = G.ammo[w] || (G.ammo[w] = { mag: W[w].mag, res: 0 }); a.res = W[w].res; }
+    for (const w of [G.inv.primary, G.inv.secondary, G.inv.third]) if (w && W[w]) { const a = G.ammo[w] || (G.ammo[w] = { mag: wMag(w), res: 0 }); a.res = W[w].res; }
     if (G.ammo.m1911_ls) G.ammo.m1911_ls.res = 24;
     if (me.alive) G.inv.he = 4;
   }
@@ -6516,7 +6641,7 @@ function zInteract(dt) {
       const has = zHasG(wb.w), hasP = zHasG(wb.w + '_pap');
       if (has || hasP) {
         const id = has ? wb.w : wb.w + '_pap', a = G.ammo[id]; cost = has ? Math.round(wb.cost / 2) : 4500;
-        if (a && a.mag >= W[id].mag && a.res >= W[id].res) { txt = 'Munição cheia'; ok = false; } else txt = `Munição ${W[id].name} [${cost}]`;
+        if (a && a.mag >= wMag(id) && a.res >= W[id].res) { txt = 'Munição cheia'; ok = false; } else txt = `Munição ${W[id].name} [${cost}]`;
       } else { cost = wb.cost; txt = `Comprar ${W[wb.w].name} [${cost}]`; }
     }
     cand(dist, { k: 'wall', id: i, txt, ok, cost });
@@ -7114,7 +7239,7 @@ function zKill(z, p, zone, w, splash, nuke) {
   const dx = wi ? wi.ix : z.body.pos.x, dz = wi ? wi.iz : z.body.pos.z;
   let pts = 0;
   if (p && !nuke) { pts = (w === 'knife' ? 130 : splash ? 50 : zone === 'head' ? 100 : zone === 'legs' ? 50 : 60) + (ZKIND[z.kind]?.pts || 0); zPts(p, zGain(pts)); p.kills++; if (zone === 'head' && !splash) p.hs++; }
-  const K = z.kind | 0, msg = { t: 'zdie', id: z.id, hs: zone === 'head' && !splash ? 1 : 0, fl: w === 'thundergun' || w === 'thundergun_pap' ? 1 : 0, by: p ? p.id : null };
+  const K = z.kind | 0, msg = { t: 'zdie', id: z.id, w: p && !nuke ? W[w]?.base || w : undefined, hs: zone === 'head' && !splash ? 1 : 0, fl: w === 'thundergun' || w === 'thundergun_pap' ? 1 : 0, by: p ? p.id : null };
   if (W[w]?.frost) msg.ic = 1; // Uivo do Inverno: o zumbi congelado se estilhaça
   const bx = z.body.pos.x, bz = z.body.pos.z; // dx/dz é o ponto de dentro da janela (para o power-up); estouro e nuvem ficam onde ele está
   if (K) msg.k = K; if (K === 2 && !nuke) msg.ex = [r2(bx), r2(Math.max(0, z.body.pos.y)), r2(bz)];
@@ -7453,7 +7578,7 @@ function onMsg(m) {
     case 'zs': if (ZC.on) zOnSnap(m); break;
     case 'zdie': {
       ZC.gone.add(m.id);
-      if (m.by === C.myId) { grantXP((m.hs ? 5 : 3) + (ZKIND[m.k]?.xp || 0)); zStreak(); } // especiais dão XP extra
+      if (m.by === C.myId) { grantXP((m.hs ? 5 : 3) + (ZKIND[m.k]?.xp || 0)); zStreak(); if (m.w) wxpAdd(m.w, (m.hs ? 15 : 10) + (ZKIND[m.k]?.xp || 0) * 3); } // XP da arma (Armeiro) // especiais dão XP extra
       if (Array.isArray(m.ex) && m.ex.length === 3) zBloatFx(m.ex);
       if (m.k === 6) { ZC.bo = 0; play('win'); centerMsg('CARNICEIRO DERROTADO', m.by ? 'abatido por ' + nameOf(m.by) : '', 3.5); }
       const zc = ZC.zs.get(m.id); if (!zc || zc.dead) break;
@@ -7527,7 +7652,7 @@ function onMsg(m) {
       break;
     case 'zover': grantXP(30 + 8 * (m.r || 0)); ZC.over = true; play('over'); centerMsg('FIM DE JOGO', `${C.players.size > 1 ? 'Vocês sobreviveram' : 'Você sobreviveu'} ${m.r} rodada${m.r === 1 ? '' : 's'} · recomeça em 12s`, 11); break;
     case 'pts': me.money = m.m; zPopup(m.n); if (m.n < 0) play('kaching'); break;
-    case 'ammo': if (W[m.w]) { G.ammo[m.w] = { mag: W[m.w].mag, res: W[m.w].res }; play('kaching'); } break;
+    case 'ammo': if (W[m.w]) { G.ammo[m.w] = { mag: wMag(m.w), res: W[m.w].res }; play('kaching'); } break;
     case 'zbowie': ZC.bowie = true; play('kaching'); centerMsg('FACA BOWIE', 'Facadas muito mais fortes', 2); break;
     case 'inv': applyInv(m.inv, false, m.got); me.money = m.m; me.armor = m.ar; me.helmet = !!m.hm; if (m.got) play('buy'); renderBuy(); break;
     case 'dmg': {
@@ -7901,12 +8026,14 @@ function grantAllSkins() {
 }
 const PROF = { uid: null, email: '', name: '', cloud: false, fb: false, data: null, saveT: 0, status: '' };
 const FB = {};
-const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0 });
+const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0, wxp: {}, att: {} });
 function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) { if (w === '_faca') { if (f === 'karambit') o._faca = f; } else if (W[w] && SKIN_BY[f]) o[w] = f; } return o; }
 function cleanProf(d) {
   const p = newProfile(0); if (!d || typeof d !== 'object') return p;
   p.xp = Math.max(0, +d.xp || 0); p.cases = Math.max(0, Math.floor(+d.cases || 0)); p.opened = Math.max(0, +d.opened || 0);
   p.items = Array.isArray(d.items) ? [...new Set(d.items.filter(it => typeof it === 'string' && W[it.split(':')[0]] && SKIN_BY[it.split(':')[1]]))] : [];
+  if (d.wxp && typeof d.wxp === 'object') for (const [k, v] of Object.entries(d.wxp)) if (W[k] && +v > 0) p.wxp[k] = Math.floor(+v); // nível das armas (Armeiro)
+  if (d.att && typeof d.att === 'object') for (const [k, v] of Object.entries(d.att)) if (W[k] && Array.isArray(v)) { const a = [...new Set(v.filter(x => ATT[x]))].slice(0, ATT_MAX); if (a.length) p.att[k] = a; }
   p.equipped = cleanSk(d.equipped); for (const [w, f] of Object.entries(p.equipped)) if (w !== '_faca' && !p.items.includes(w + ':' + f)) delete p.equipped[w];
   return p;
 }
@@ -8192,6 +8319,7 @@ document.querySelectorAll('#menu .tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('#menu .tabs button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('#menu [data-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab));
   if (b.dataset.tab === 'skins') skinsUI();
+  if (b.dataset.tab === 'armory') armoryUI();
 });
 const getHostForm = matchForm($('#hostForm'), lastSt);
 settingsForm($('#menuSettings'));
@@ -8278,9 +8406,10 @@ function tick(dt) {
   // câmera
   const w = W[G.cur];
   const adsT = G.adsHold && me.alive && !G.reloadEnd && !me.sprinting && now >= G.switchEnd && w && !w.scope && (w.slot === 'primary' || w.slot === 'secondary') ? 1 : 0;
-  G.ads = lerp(G.ads || 0, adsT, Math.min(1, dt * 11)); if (G.ads < .002) G.ads = 0;
-  $('#xhair').style.opacity = G.ads > .5 ? 0 : 1; // mirando: a mira de ferro substitui a cruz
-  let fov = (me.alive && w?.scope && G.scope > 0) ? w.scope[G.scope - 1] : CFG.fov * (1 - .2 * G.ads) + me.sprintK * 7; // mirar dá um zoom leve; correr abre um pouco
+  G.ads = lerp(G.ads || 0, adsT, Math.min(1, dt * 11 * attStat(G.cur, 'adsSpd'))); if (G.ads < .002) G.ads = 0;
+  $('#xhair').style.opacity = G.ads > .5 ? 0 : 1;
+  { const rd = $('#reddot'), dk = G.ads > .6 && me.alive ? attOn(G.cur).map(a => ATT[a].dot).find(Boolean) : 0; rd.className = !dk ? 'hidden' : dk > 1 ? 'holo' : ''; } // retícula da mira do Armeiro // mirando: a mira de ferro substitui a cruz
+  let fov = (me.alive && w?.scope && G.scope > 0) ? w.scope[G.scope - 1] : CFG.fov * (1 - (1 - 1 / (1.25 * attStat(G.cur, 'zoom'))) * G.ads) + me.sprintK * 7; // mirar dá um zoom leve; correr abre um pouco
   fov = Math.round(fov * 10) / 10;
   if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
   me.shake = Math.max(0, me.shake - dt * 1.5);
