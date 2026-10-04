@@ -2218,7 +2218,7 @@ ATMOS_POST.push((mapId, AT, M) => {
   // janelas acesas: luz de vela lá dentro; na casa, de vez em quando uma sombra passa (ninguém sabe quem)
   MAP_ANIM.push(() => {
     const t = now, a = pool.instanceColor.array, b = winH.instanceColor.array;
-    wins.forEach((w, j) => {
+    for (let j = 0; j < wins.length; j++) { const w = wins[j]; // laço simples: nada alocado por quadro (fase 4)
       let k = 1 + .08 * Math.sin(t * 1.7 + w.ph) + .05 * Math.sin(t * 4.3 + w.ph * 2) + .03 * Math.sin(t * 11 + w.ph);
       if (w.casa) {
         if (!w.nt) w.nt = t + rand(G.winSombra[0] * .3, G.winSombra[1]);
@@ -2229,7 +2229,7 @@ ATMOS_POST.push((mapId, AT, M) => {
       const f = k * luzFade(w.x, w.z), h = f * (w.casa ? G.win : G.winVit), p = f * G.winSpill, q = poolL.length + j;
       b[j * 3] = w.c0.r * h; b[j * 3 + 1] = w.c0.g * h; b[j * 3 + 2] = w.c0.b * h;
       a[q * 3] = w.c0.r * p; a[q * 3 + 1] = w.c0.g * p; a[q * 3 + 2] = w.c0.b * p;
-    });
+    }
     winH.instanceColor.needsUpdate = true; if (LUZ) LUZ.sujo = true;
   });
 });
@@ -5363,7 +5363,7 @@ ATMOS.vila.c3 = A => {
   // fontes da campainha: atrás de muros altos, do lado oposto à mesa
   const src = []; for (const b of tall) { const d = Math.hypot(b.x - MX, b.z - MZ); if (d < 8 || d > 32) continue; const ax = b.w > b.d, s = ax ? Math.sign(b.z - MZ) || 1 : Math.sign(b.x - MX) || 1; src.push([ax ? b.x : b.x + s * 1.4, 1.2, ax ? b.z + s * 1.4 : b.z]); }
   // ---- animações e a campainha
-  const rg = { on: false, t: 0, cyc: -1, src: null, d0: 0, chunk: 0, next: 0, sock: 0 };
+  const rg = { on: false, t: 0, cyc: -1, src: null, d0: 0, chunk: 0, next: 0, sock: 0, lx: 0, ly: 0, lt: 0, look: false };
   let dustT = 0, dn = 0;
   A.anim((dt, t) => {
     const p = me.pos;
@@ -5378,14 +5378,15 @@ ATMOS.vila.c3 = A => {
     for (const D of dust) if (D.t >= 0) { D.t += dt / 1.8; D.s.position.set(D.x + D.t * .3, D.y - D.y * D.t * D.t, D.z); D.s.material.opacity = .5 * Math.sin(D.t * Math.PI); if (D.t >= 1) { D.t = -1; D.s.visible = false; } }
     // campainha de telefone onde não há telefone
     const dm = Math.hypot(p.x - MX, p.z - MZ);
-    if (!rg.on) { if (!rg.next) rg.next = t + 20 + Math.random() * 25; if (dm < 30 && t > rg.next && src.length) { rg.on = true; rg.t = 0; rg.cyc = -1; rg.src = src[Math.floor(Math.random() * src.length)]; rg.d0 = Math.hypot(p.x - rg.src[0], p.z - rg.src[2]); rg.sock = Math.floor(Math.random() * 60); } }
+    if (!rg.on) { if (!rg.next) rg.next = t + 20 + Math.random() * 25; if (dm < 30 && t > rg.next && src.length) { rg.on = true; rg.t = 0; rg.cyc = -1; rg.src = src[Math.floor(Math.random() * src.length)]; rg.d0 = Math.hypot(p.x - rg.src[0], p.z - rg.src[2]); rg.sock = Math.floor(Math.random() * 60); const sw = sockW(rg.sock); rg.lx = sw[0]; rg.ly = sw[1]; rg.lt = 0; rg.look = false; } }
     else {
       rg.t += dt; const cyc = Math.floor(rg.t / 3), ph3 = rg.t - cyc * 3;
       if (cyc !== rg.cyc) { rg.cyc = cyc; const d = Math.hypot(p.x - rg.src[0], p.z - rg.src[2]); if (cyc > 0 && d < rg.d0 - 3) { let o = src[Math.floor(Math.random() * src.length)]; if (o === rg.src) o = src[(src.indexOf(o) + 1) % src.length]; rg.src = o; } rg.d0 = Math.hypot(p.x - rg.src[0], p.z - rg.src[2]); }
-      const ringing = ph3 < 1.2, [lx, ly] = sockW(rg.sock);
-      lamp.position.set(lx, ly, MZ + .31); lamp.visible = ringing;
+      const ringing = ph3 < 1.2;
+      lamp.position.set(rg.lx, rg.ly, MZ + .31); lamp.visible = ringing;
       if (ringing && t > rg.chunk) { rg.chunk = t + .1; A.sound(o => { for (let i = 0; i < 4; i++) tn(o, .022, i % 2 ? 470 : 420, i % 2 ? 470 : 420, .05, 'triangle', i * .025); }, rg.src); }
-      const look = ringing && A.looking(MX, 1, MZ, 20, true);
+      if (ringing && t >= rg.lt) { rg.lt = t + .2; rg.look = A.looking(MX, 1, MZ, 20, true); } // raio só 5x/s (fase 4)
+      const look = ringing && rg.look;
       if (look || cyc >= 3 || dm > 34) { rg.on = false; lamp.visible = false; rg.next = t + 60 + Math.random() * 60; if (look) ph.v += 1.4; }
     }
   }, 15);
@@ -5645,11 +5646,11 @@ const _g6M = new THREE.Matrix4(), _g6P = new V3(), _g6Q = new THREE.Quaternion()
     for (let i = 0; i < NP; i++) pg.push({ x: 0, y: -1, z: 0, vy: 0, ph: R(0, 6.3), rest: 0 });
     // --- procissão de brasas (assinatura)
     const NB = 12, bz = []; for (let i = 0; i < NB; i++) bz.push(spr(A, 0xff7a30, 2.2, .5));
-    const pr = { z: 0, x: 0, fade: -1, t: 0 };
+    const pr = { z: 0, x: 0, fade: -1, t: 0 }, prD = [50, 45, 55, 42, 58];
     A.trigger({
       dentro: true, espera: 120, dur: 9.5, segurar: .3,
       quando: () => { const p = A.playerPos(); if (p.x < -210 || p.x > -190) return false; const f = fwd(), h = Math.hypot(f.x, f.z); if (h < .3 || Math.abs(f.z) / h < Math.cos(25 * Math.PI / 180)) return false;
-        for (const d of [50, 45, 55, 42, 58]) { const z = p.z + Math.sign(f.z) * d; if (z > Z0 + 4 && z < Z1 - 4) { pr.z = z; return true; } } return false; },
+        for (const d of prD) { const z = p.z + Math.sign(f.z) * d; if (z > Z0 + 4 && z < Z1 - 4) { pr.z = z; return true; } } return false; },
       start: () => { pr.fade = -1; pr.t = 0; for (const s of bz) s.visible = true;
         A.sound(o => { for (let r = 0; r < 3; r++) for (let i = 0; i < 12; i++) nz(o, .02, 900, 850, .05, 'bandpass', 3, r * 2.1 + i * .07 + Math.random() * .02); }, [-200, 1.5, pr.z]); },
       update: (k, dt) => { const t = k * 9.5, p = A.playerPos(), hx = -196 + t * 1.2;
@@ -6981,7 +6982,9 @@ ATMOS.vila.b21 = A => {
   // som ambiente: marola contra as estacas + apito de navio muito longe, sempre do mesmo ponto
   A.amb({ every: [3, 3.6], at: [px, .2, pz], som: o => H.ruido(o, 2, 'lowpass', 300, .7, .06, .7) });
   A.amb({ every: [40, 70], at: null, som: o => { H.osc(o, 'sawtooth', 110, 109, 4, .025, 1.5, 0, ['lowpass', 500, 1]); H.osc(o, 'sawtooth', 165, 164, 4, .018, 1.5, 0, ['lowpass', 600, 1]); } });
-  if (cab) { const pm = H.pegada(A); pm.color.set(0x5a4a34); H.rastro(A, H.trilha(cab[0] + .4, cab[1] - 2.2, cab[0] + 6, 223.6, .7, .13, A.r), .15, .3, pm); } // pés descalços da cabana até a água, sem volta
+  if (cab) { // fase 4: tamancos de madeira deixados na beira da água, virados para o mar (sem volta); o rastro de pés descalços até a água é só do Pântano
+    const tx = cab[0] + 6, tz = 222.9, ry = Math.atan2(tx - cab[0] - .4, tz - cab[1] + 2.2), sola = A.mat('wood', 0x7a5a3a), tira = A.flat(0x3a2418);
+    for (const s of [-1, 1]) { const g = A.group(tx + Math.cos(ry) * .09 * s, 0, tz - Math.sin(ry) * .09 * s, ry + s * .06); A.box(0, 0, 0, .1, .05, .26, sola, 0, g); A.box(0, .05, .06, .11, .03, .06, tira, 0, g); } }
   A.look({ tint: [.96, .98, 1.0], sat: .74, vig: .4, fog: .72, con: 1.06, grain: 1.9, ca: 1.7, shadowTint: [.95, .98, 1.04] });
   // ---- 3A-12 (v12) animação de props (borda, movimento "errado"): a tampa da caixa de mantimentos bate duas vezes, como se algo empurrasse por dentro ----
   { let tp = null; A.root.traverse(o => { if (!tp && o.isMesh && Math.abs(o.position.x - cxM) < .01 && Math.abs(o.position.y - .62) < .01 && Math.abs(o.position.z - czM - .42) < .01) tp = o; });
