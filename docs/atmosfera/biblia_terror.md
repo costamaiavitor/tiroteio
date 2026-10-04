@@ -1307,7 +1307,7 @@ As fichas seguem a ordem de desbloqueio. Os números (famílias, pulseiras, gave
   5. **Placa pintada "LABORTERAPIA — O TRABALHO CURA"**, alegre, com florzinhas pintadas, em dois postes. (só visual)
   6. **Banco verde de ripas** com um casaco de lã cinza dobrado e uma laranja mordida (miolo cinza) no assento. (colisão baixa 0,5 m, encostado no muro)
   7. **Gaiola de passarinho com pássaro de corda de lata**, pendurada num galho da laranjeira a 2,4 m. O pássaro é pintado de amarelo e tem a chave nas costas. (só visual)
-  8. **Três colmeias de caixa branca numeradas** ("1", "2", "3"), sobre tijolos, com um tapete de abelhas mortas no chão em volta (decalque). (só visual)
+  8. **Três colmeias de caixa branca numeradas** ("4", "5", "6": o "1" é só do Dr. Aurélio), sobre tijolos, com um tapete de abelhas mortas no chão em volta (decalque). (só visual)
   9. **Canaletas de rega de cimento** entre as sebes, com uma comporta de tábua. A água parece limpa, mas tem um brilho escuro (plano com `specular`). (só visual)
 - **Momento de assinatura (o canto):**
   - **Gatilho:** o canto de pássaro toca o tempo todo enquanto o jogador está no Pomar. O evento dispara quando ele olha para a gaiola (dentro de 12°, a até 15 m) por 3 s.
@@ -1429,7 +1429,7 @@ As fichas seguem a ordem de desbloqueio. Os números (famílias, pulseiras, gave
   1. **Baú de ambulância destacado sobre calços**: caixa branca de 3,9 × 2,2 × 2,4 m, com portas duplas abertas. A cruz vermelha foi raspada e por cima pintaram o selo do Programa (círculo "S.I." com uma cruz de cal). Dentro: um banco dobrável de madeira com duas cintas de couro afiveladas, uma luminária de teto e um negatoscópio na parede do fundo. (fica sobre o colisor do carro do tema, que tem 1,8 m)
   2. **Cilindros de éter tombados em pilha**: 10 cilindros verdes e pretos com a etiqueta "ÉTER — PROGRAMA", instanciados. (só visual)
   3. **Tambores brancos de resíduo**: 6 tambores de 200 L com o estêncil preto "RESÍDUO — NÃO ABRIR — Nº 0xx", três tombados. De um deles escorre uma pasta cinza (decalque que cresce). (só visual)
-  4. **Porta de carro usada como quadro de placas**: uma porta solta encostada num contêiner, com 9 placas da vila pregadas ("SL-031", "SL-047"…), uma por família levada. (só visual)
+  4. **Porta de carro usada como quadro de placas**: uma porta solta encostada num contêiner, com 9 placas da vila pregadas ("SL-036", "SL-049"…; lista em §6), uma por família levada. (só visual)
   5. **Maletas de médico de couro abertas sobre um capô**: duas maletas e uma toalha branca com instrumentos enfileirados (caixas finas e cilindros, cerca de 20, instanciados). (só visual)
   6. **Girafa de oficina com rolos de sonda de borracha**: guincho de oficina de ferro, com a corrente segurando um rolo de tubos de borracha vermelha pendurados. (só visual)
   7. **Placas de vila nos carros**: as 13 sucatas do tema ganham placas instanciadas com os números das famílias, ligando os carros ao quadro de placas. (só visual)
@@ -1981,7 +1981,7 @@ As fichas seguem a ordem de desbloqueio. Os números (famílias, pulseiras, gave
 - **Pulseira de paciente.** Número da família, hífen, número da pessoa na família: `117-2` é a segunda pessoa da família 117.
 - **A lista acaba na 412.** Quem chega depois é a **família 413: os jogadores**. A Recepção escreve "Família 413 · (nº de jogadores)"; o Crematório tem as linhas 413-1 a 413-4 em branco.
 - **Nº 1 é só do Dr. Aurélio.** Nenhum outro objeto usa o número 1 como identidade (a pulseira do Cristo da Capela é em branco).
-- **Séries que não são número de família** (para não confundir): chapas da mina (001 a 048), lote de fabricação 0356 (março de 1956), celas do Anexo (C-01 a C-10), linhas da lista do Hospital (1 a 41), baias do Estábulo (A-01…), leitos do Pomar, horas pós-óbito do Laboratório. A passagem 0412 da Estação é exceção de propósito: é o número da família 412.
+- **Séries que não são número de família** (para não confundir): chapas da mina (001 a 048), lote de fabricação 0356 (março de 1956), celas do Anexo (C-01 a C-10), linhas da lista do Hospital (1 a 41), baias do Estábulo (A-01…), leitos do Pomar ("PAVILHÃO 3 — LEITO 12" a 16), colmeias do Pomar (4, 5 e 6), horas pós-óbito do Laboratório, tambores do Ferro-velho ("RESÍDUO — Nº 011, 024, 039, 052, 063, 080"), lotes riscados nas setas dos Túneis (L. 18, L. 42, L. 45), baldes da Torre d'água (T-02 a T-13). A passagem 0412 da Estação é exceção de propósito: é o número da família 412.
 
 ### Números que se repetem de propósito
 | Número | Quem é | Onde aparece, na ordem do caminho |
@@ -1990,17 +1990,17 @@ As fichas seguem a ordem de desbloqueio. Os números (famílias, pulseiras, gave
 | **chapa 17** | O único mineiro que subiu da **Galeria 7** em 14/03/1956. Foi o primeiro a beber o Veio e o primeiro sujeito do Laboratório, de antes da lista (por isso é identificado pela chapa, e não por família). | Mina (gancho 17 vazio; o 17 sem tique na chamada a fuligem), Laboratório (Pote 1: "chapa 17 (G7) · 36 h") |
 | **61** | Família que fugiu da lista e se escondeu na cabana do lenhador: pai, mãe e três filhos. Foram levados mesmo assim. | Floresta da Vila (roupas, "61" na porta, cruz de cal pela metade), Enfermaria (chinelos 61; prancheta 61-2) |
 | **77** | Família de cinco que tentou sair pela serra e depois pelo pântano. | Encosta ("FAMÍLIA 77 PASSOU AQUI" no pilar), Pântano (guarda-chuva com etiqueta 77; lençol "SOMOS 5"), Enfermaria (prancheta 77-1) |
-| **101 a 140** | O lote de agosto de 1958. A 101 foi a primeira levada naquela semana, na manhã da festa. | Praça (mural: "Famílias chamadas esta semana: 101, 102, 104…"), Castelo (lista "PROGRAMA — famílias 101 a 140" com tiques) |
+| **101 a 140** | O lote de agosto de 1958. A 101 foi a primeira levada naquela semana, na manhã da festa. | Praça (mural: "Famílias chamadas esta semana: 101, 102, 104…"), Castelo (lista "PROGRAMA — famílias 101 a 140" com tiques), Recepção (linhas 102 e 104 do livro), Refeitório (canecas 103, 108, 112, 125, 133 e 139, uma por mesa), Portaria (números pintados nas vagas: 101 a 140, salteados) |
 | **117** | Família de cinco que deu entrada em 14/08/1958. | Hospital de campanha (balança: "Família 117 — 5 pessoas — peso total: 0 kg"), Recepção (última linha do livro, copos-de-leite, mala), Laboratório (Pac. 117-3; lâmina 117-2), Necrotério (gaveta 117, com o pé cinzento) |
 | **118** | **Os Morais.** Seu Morais bebeu da cisterna, dormiu no meio da colheita e ficou no sítio: o espantalho veste o macacão dele. A mulher e os filhos foram levados. | Fazenda (espantalho com "118" no peito, etiqueta no batente), Enfermaria (prancheta 118-1: a mulher) |
-| **203 a 211** | Famílias cujas toras e caixotes a Serraria marcou. | Serraria (ferros de marcar; caixotes-esquife 207, 208, 209) |
-| **214 a 216** | Famílias lidas do púlpito pelo Padre Anselmo, na missa das sete. | Igreja (quadro de cânticos), Enfermaria (prancheta 214-3), Laboratório (Pac. 214-1), **Necrotério (gaveta 214, que bate de dentro)** |
-| **233** | Adulto caçado pelos enfermeiros no Bosque. | Bosque (laço "ADULTO — Nº 233") |
-| **301 a 346** | Famílias "não salvas" enterradas pelo número em 1957, no Cemitério do Programa. | Cemitério do Sanatório (marcos 301 a 346) |
-| **347** | A família seguinte a ser enterrada: a cova está sempre aberta. **Antônio**, da 347, tem o nome bordado pela mãe e riscado pelo carimbo. | Cemitério do Sanatório (cova 347, ciclo 347 a 352), Lavanderia (camisolas 347 a 360; a primeira, "Antônio") |
+| **203 a 211** | Famílias cujas toras e caixotes a Serraria marcou. | Serraria (ferros de marcar; caixotes-esquife 207, 208, 209), Recepção (linha 203 do livro, 6 pessoas), Crematório (urna 208-2) |
+| **214 a 216** | Famílias lidas do púlpito pelo Padre Anselmo, na missa das sete. | Igreja (quadro de cânticos), Recepção (linhas 214, 215 e 216 do livro), Enfermaria (prancheta 214-3), Laboratório (Pac. 214-1, 215-2, 216-1), **Necrotério (gaveta 214, que bate de dentro)**, Biblioteca (pulseira 216-2 na alça do carrinho de devolução), Crematório (urnas 214-1, 214-3, 216-1) |
+| **233** | Adulto caçado pelos enfermeiros no Bosque. | Bosque (laço "ADULTO — Nº 233"), Crematório (urna 233-1) |
+| **301 a 346** | Famílias "não salvas" enterradas pelo número em 1957, no Cemitério do Programa. | Cemitério do Sanatório (marcos 301 a 346), Crematório (urnas 301-1 e 320-2) |
+| **347** | A família seguinte a ser enterrada: a cova está sempre aberta. **Antônio**, da 347, tem o nome bordado pela mãe e riscado pelo carimbo. | Cemitério do Sanatório (cova 347, ciclo 347 a 352), Lavanderia (camisolas 347 a 360 nos trilhos, a primeira "Antônio"; pilhas dobradas 361 a 378, as famílias depois dela), Crematório (urna 347-1) |
 | **401 a 408** | Os oito meninos da **Patrulha Lobo**, vizinhos da Rua de Cima. | Acampamento (mochilas e lenços) |
-| **412** | A última família do recenseamento. Comprou passagem no trem das 17h12, que nunca saiu; deixou o filho na roda do convento. | Estação (passagem e bilhetes 0412), Ruínas da cidade (teclas da caixa registradora em 0·4·1·2), Ruínas do convento ("recebido — 412"; ladainha "pelo 1… pelo 412"), Crematório (última linha riscada) |
-| **413** | **Os jogadores**, a família seguinte. | Recepção (assinatura: "Família 413"), Crematório (linhas 413-1 a 413-4 em branco) |
+| **412** | A última família do recenseamento. Comprou passagem no trem das 17h12, que nunca saiu; deixou o filho na roda do convento. | Estação (passagem e bilhetes 0412), Ruínas da cidade (teclas da caixa registradora em 0·4·1·2), Ruínas do convento ("recebido — 412"; ladainha "pelo 1… pelo 412"), Crematório (última linha riscada; urna 412-1; caixões 412-2 a 412-4) |
+| **413** | **Os jogadores**, a família seguinte. | Recepção (assinatura: "Família 413"), Portaria (a vaga 413, vazia, na fileira das vagas numeradas), Crematório (linhas 413-1 a 413-4 em branco) |
 | **41** | A linha em branco da lista de transferência do Hospital: é o jogador que está lendo. | Hospital de campanha (assinatura "a vaga 41") |
 | **22** | Os corpos do turno de dia do Crematório. | Túneis ("CARGA 22 → FORNO"), Crematório (lousa "6 h – 18 h: 22") |
 | **C-07 / 7** | A criança da cela 7 do Anexo. | Teatro (Joãozinho, com o 7 costurado no peito), Anexo (só a etiqueta C-07, sem sapatos; escova C-07 seca e nova) |
@@ -2010,6 +2010,28 @@ As fichas seguem a ordem de desbloqueio. Os números (famílias, pulseiras, gave
 Números que aparecem uma vez só, sem continuação (famílias de passagem): 12 a 15 (canoa da Margem do rio), 12 e 40 (velas da Capela), 31 e 66 (canteiros da Estufa), 44 e 51 (caderno do Jardim), 62 a 75 (cestinhos do Vinhedo), 88 (bilhete do Pátio). Não reutilizar esses números em outra área sem decidir uma ligação.
 
 **Colisões removidas nesta consolidação:** lápides 301/302/305/309 do Cemitério da Vila (batiam com o Cemitério do Sanatório); "Família 112" do Hospital (virou 117); "Família 118 · 4" escrita pela Recepção (118 já eram os Morais; virou 413); cestinhos 61 a 74 do Vinhedo (a família 61 estava escondida na Floresta; viraram 62 a 75); "Pac. 3" e "Pac. 9" do Laboratório (viraram pulseiras de família); "LOTE 17" dos Túneis (17 é a chapa do mineiro; virou CARGA 22); "AMOSTRA 7" do Lago e "RELATÓRIO Nº 7" do Laboratório (o 7 fica para a Galeria e para a cela C-07; viraram 3 e 31); marretas "7" do Estaleiro (viraram "S.L."); baia A-07 do Estábulo (virou A-04); "Fam. 64" da Estufa (batia com os 64 kg da balança do Porto; virou 66); pulseira "Nº 1" do Cristo da Capela (ficou em branco); linhas 413 a 416 do Crematório (viraram 413-1 a 413-4, a mesma família).
+
+### Números novos da fase 5 (Sanatório)
+Criados pelos grupos s1 a s8 (fase 5A) e conferidos no código na validação final (04/10/2026). Todos seguem as regras acima: pulseira = família-pessoa; nenhum usa o Nº 1.
+
+| Número | O que é | Área |
+|---|---|---|
+| **156-2, 162-1, 171-3, 189-1** | Camisas de força com o número costurado nas costas, fivelas abertas. As famílias 156, 162 e 171 são as dos contêineres do Cais da Vila (b20: 156, 162, 171, 185, 249, 263, 278, 290): parte da família foi embarcada, um ficou na Ala. | Ala Psiquiátrica (J) |
+| **216-2** | Pulseira na alça do carrinho de devolução: segunda pessoa da família 216 (lida do púlpito). | Biblioteca (N) |
+| **143-2, 151-1, 168-4, 177-1, 192-3, 224-2, 239-1, 257-5** | Chapinhas batidas ao lado das 8 argolas chumbadas na rocha (isolamento de 1957). | Pedreira (r3) |
+| **196-1, 228-3, 244-2, 261-1** | Números riscados a prego nas tampas das marmitas, junto com os das chapinhas. | Pedreira (r3) |
+| **SL-023, 058, 079, 093, 104, 126, 152, 174, 198, 226, 251, 273, 296** | Placas da vila ("S. LÁZARO") nos carros da sucata: o número da placa é o da família dona do carro (104 e 126 são as do livro da Recepção e do Laboratório). | Ferro-velho (r12) |
+| **SL-036, 049, 085, 109, 131, 163, 187, 219, 268** | As 9 placas pregadas na porta de carro, "uma por família levada". | Ferro-velho (r12) |
+| **347 a 352** | Plaquetas de lata das covas que andam (o caixote de plaquetas prontas tem a 347 por cima). | Cemitério (r1) |
+| **347 a 378** | Camisolas carimbadas: 347 a 360 nos trilhos (a fila da assinatura), 361 a 378 nas pilhas dobradas. | Lavanderia (r9) |
+| **413** | Vaga vazia pintada no meio-fio, ao lado da vaga da ambulância. | Portaria (r2) |
+| **101 a 140 (salteados)** | Números pintados no meio-fio das outras vagas: 101, 102, 104, 106, 109, 111, 113, 115, 117, 120, 122, 125, 127, 130, 133, 136, 138, 140. | Portaria (r2) |
+| **103, 108, 112, 125, 133, 139** | Número das canecas de cada mesa do Refeitório (muda de mesa para mesa, não de lugar para lugar). | Refeitório (G) |
+| **4, 5, 6** | Colmeias do Pomar (série, não família). | Pomar (r10) |
+| **A-01 a A-11 (sem A-07)** | Fichas das baias do Estábulo, com datas de óbito e de "acordou" de março de 1957. | Estábulo (r11) |
+| **409-1 a 412-4 (salteados)** | Números a carvão nos 10 caixões de pinho: 409-1, 409-2, 410-1, 410-3, 411-1, 411-2, 411-4, 412-2, 412-3, 412-4 (as últimas famílias da lista). | Crematório (r7) |
+
+**Colisões conferidas na validação final:** grep no código do Sanatório (blocos `ATMOS.sanatorio.*` e `// ===== 5B-n`) e da Vila pelos números acima. Duas colisões corrigidas no jogo: a balança de gado do Estábulo marcava "peso antes 412 kg" (412 é a última família; virou 418 kg) e duas setas dos Túneis tinham os lotes "L. 31" e "L. 40" (31 é o relatório do Laboratório e o canteiro da Estufa; 40, a vela da Capela; viraram L. 42 e L. 45). Ficam como ligação, e não como colisão: 156, 162 e 171 (Cais e Ala Psiquiátrica), 104, 109 e 126 (placas do Ferro-velho, vagas da Portaria, livro da Recepção, Laboratório), as urnas do Crematório (repetem de propósito covas, camisolas e pulseiras), 112 (a "Família 112" saiu do Hospital na consolidação; agora é só uma família do lote de agosto no Refeitório). Os tambores "Nº 052" do Ferro-velho e a "MSG Nº 52" do Pico da Vila são séries diferentes, sem ligação.
 
 ### Linha do tempo
 | Data | Fato | Onde aparece |

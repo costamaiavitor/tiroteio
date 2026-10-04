@@ -1,6 +1,6 @@
 # Mapa das áreas do modo Zumbis (Fase 0: reconhecimento)
 
-Levantado em 02/10/2026 sobre a `main` no commit `5ee0def` (a coluna de estado visual da Vila foi atualizada na fase 4, em 04/10/2026, branch `atmosfera`); as linhas citadas são de `index.html` e foram conferidas de novo no mesmo dia, depois das fichas da bíblia (arquivo com 8.630 linhas).
+Levantado em 02/10/2026 sobre a `main` no commit `5ee0def` (a coluna de estado visual da Vila foi atualizada na fase 4 e a do Sanatório na validação final, ambas em 04/10/2026, branch `atmosfera`); as linhas citadas são de `index.html` e foram conferidas de novo no mesmo dia, depois das fichas da bíblia (arquivo com 8.630 linhas).
 
 Os dados de cada área (área em m², janelas, objetos) foram extraídos do jogo carregado num navegador automático (Playwright). O script, `areas.mjs`, fica fora do repositório, em `C:\dev\tiroteio-notas\work\inventario\`.
 
@@ -96,37 +96,39 @@ Todas as áreas têm uma arma de parede e um lugar da Caixa.
 
 ### Sanatório (29 áreas, 40 portas; o jogo começa na Recepção)
 
-| Ordem | Área (id) | Custo | Portas | Via | m² | Janelas / zumbis do chão | Estado visual hoje |
+Estado depois da fase 5 (conteúdo 5A em `ed2a517`, visual 5B em `918270f`). Vale para todas as salas do núcleo: paredes clínicas por sala (barra de azulejo, lambri, tinta a óleo ou cimento, desgaste crescendo da Recepção às Caldeiras), forro a 4,46 m nas salas cobertas, batentes descascando, pisos próprios por área, luminária e personalidade de luz por área com a escalada de escuridão, luar pelas janelas, luz de emergência nas áreas fundas, névoa e partículas por área, desgaste e decalques, céu encoberto e o pós que piora até o Crematório (ver §7).
+
+| Ordem | Área (id) | Custo | Portas | Via | m² | Janelas / zumbis do chão | Estado visual (depois da fase 5) |
 |---|---|---|---|---|---|---|---|
-| 0 | Recepção (A) | 0 | 0 | — | 288 | 2 / 0 | 1 balcão; armadilha na porta para a Enfermaria |
-| 1 | Capela (F) | 750 | 1 | AF | 288 | 1 / 0 | 3 bancos |
-| 1 | Enfermaria (B) | 750 | 1 | AB | 288 | 0 / 0 | 4 macas de metal |
-| 1 | Pátio (C) | 1000 | 1 | AC | 288 | 1 / 3 | 1 fonte de pedra |
-| 2 | Laboratório (D) | 1750 | 2 | BD | 288 | 0 / 0 | 2 bancadas |
-| 2 | Refeitório (G) | 2000 | 2 | FG | 1008 | 2 / 0 | 6 mesas compridas, balcão de servir, 2 colunas |
-| 2 | Teatro (E) | 2000 | 2 | BE | 288 | 0 / 0 | 3 fileiras de poltronas |
-| 2 | Ala Psiquiátrica (J) | 2250 | 2 | BJ | 720 | 2 / 0 | 3 divisórias de cela, 4 camas com lençol, posto de enfermagem |
-| 2 | Jardim (K) | 2250 | 2 | CK | 1152 | 2 / 6 | chafariz com água, sebes, 2 bancos, árvores, 2 postes |
-| 3 | Biblioteca (N) | 3000 | 3 | GN | 1008 | 3 / 0 | 8 estantes cheias de livros coloridos, mesa de leitura |
-| 3 | Cozinha (H) | 3000 | 3 | GH | 864 | 2 / 0 | fogões, bancadas, geladeiras |
-| 3 | Necrotério (I) | 3000 | 3 | DI | 360 | 1 / 0 | gavetas frias, 3 mesas de autópsia com lençol |
-| 3 | Estufa (L) | 3250 | 3 | KL | 720 | 2 / 0 | 4 canteiros com plantas, armação de vidro |
-| 3 | Torre d'água (M) | 3750 | 3 | KM | 1008 | 3 / 5 | torre de madeira com caixa d'água, escada, caixotes; Pack-a-Punch |
-| 4 | Caldeiras (P) | 4500 | 4 | HP | 720 | 3 / 0 | 2 caldeiras com brilho de fornalha, canos no alto, tanque; energia |
-| 4 | Cemitério (r1) | 5000 | 4 | Nr1 | 2196 | 3 / 6 | tema `graves`: 46 lápides, 1 árvore seca (os 2 mausoléus do tema não aparecem) |
-| 4 | Túneis de serviço (r5) | 5250 | 4 | Nr5 | 2920 | 5 / 3 | tema `tunnels`: paredes formando corredores, canos no chão |
-| 4 | Brejo (r13) | 5250 | 4 | Ir13 | 2040 | 3 / 6 | tema `swamp`: 2 poças, 7 árvores secas (a cabana do tema não aparece) |
-| 4 | Pedreira (r3) | 5750 | 4 | Mr3 | 2196 | 3 / 6 | tema `rocks`: 5 pedras grandes e o pilar de 12 m (a laje de metal do tema não aparece) |
-| 4 | Pomar (r10) | 5750 | 4 | Lr10 | 2440 | 4 / 6 | tema `field`: 11 sebes, 2 árvores (o celeiro do tema não aparece) |
-| 4 | Lavanderia (r9) | 6000 | 4 | Mr9 | 2920 | 5 / 3 | tema `laundry`: 68 máquinas em fileiras |
-| 5 | Ferro-velho (r12) | 7000 | 5 | Pr12 | 2000 | 3 / 6 | tema `junk`: carros, contêineres |
-| 5 | Portaria (r2) | 7500 | 5 | r1r2 | 2112 | 4 / 6 | tema `parking`: carros nas vagas |
-| 5 | Anexo do asilo (r6) | 7750 | 5 | r5r6 | 2400 | 4 / 3 | tema `cells`: celas dos dois lados de um corredor, camas |
-| 5 | Ruínas do convento (r4) | 8000 | 5 | r1r4 | 2112 | 4 / 6 | tema `ruins`: 18 muros de tijolo, 10 pedras (o pilar central do tema não aparece) |
-| 5 | Ilha do lago (r14) | 8250 | 5 | r13r14 | 1960 | 4 / 6 | tema `island`: água em volta e píer (a torre e a cabana do tema não aparecem) |
-| 5 | Floresta (r8) | 8750 | 5 | r3r8 | 2112 | 4 / 6 | tema `forest`: 21 árvores, 6 toras (o bloco central do tema não aparece) |
-| 5 | Estábulo (r11) | 8750 | 5 | r10r11 | 2400 | 4 / 3 | tema `stables`: baias, feno |
-| 6 | Crematório (r7) | 11000 | 6 | r12r7 | 2400 | 4 / 3 | tema `ovens`: 4 fornos em fila (2 dos 6 do tema não aparecem), 10 caixões, 2 chaminés |
+| 0 | Recepção (A) | 0 | 0 | — | 288 | 2 / 0 | lambri envernizado e forro, luz quente (a sala mais clara): retrato do Dr. Aurélio "DIRETOR · 1949", livro de admissões aberto (a última linha vira "Família 413" na assinatura), copos-de-leite, quadro de 40 pulseiras, cartaz do Programa, banco com a mala 117, relógio parado às 03:17, rádio de válvula tocando a valsa, samambaia viva demais; poeira nos fachos de luar |
+| 1 | Capela (F) | 750 | 1 | AF | 288 | 1 / 0 | parede caiada com barra azulada, forro: Cristo cinzento com pulseira em branco, atril com a Bíblia e a campainha, galheta escorrendo o Veio, genuflexório com correias, 30 velas votivas numeradas (22 acesas), Via-Sacra do Programa (14 quadrinhos), missais numerados nos bancos; assinatura "a bênção" (sombra da mão erguida) |
+| 1 | Enfermaria (B) | 750 | 1 | AB | 288 | 0 / 0 | azulejo branco-esverdeado até 1,5 m, calhas fluorescentes: biombos cujo pano respira, colchão de oleado que afunda (assinatura "alguém se deita"), soro do Veio no pedestal, pranchetas 61-2/77-1/118-1/214-3, seringas "dose 3", painéis de chamada, chinelos "61", quadro de febre |
+| 1 | Pátio (C) | 1000 | 1 | AC | 288 | 1 / 3 | embasamento de cimento, céu encoberto: cacos de garrafa nos muros, chapéu de palha preso no muro sul, fonte seca com crosta preta e caneca acorrentada, trilha gasta em volta da fonte, bilhetes em pedras (família 88), relógio de sol raspado, campainha de recolhimento, escada sem os degraus de cima; redemoinho de areia; assinatura "os muros calam" |
+| 2 | Laboratório (D) | 1750 | 2 | BD | 288 | 0 / 0 | branco clínico até 1,8 m, o mais limpo do prédio: potes de formol com mãos (Pote 1: chapa 17, a mão que bate), quadro-negro da "curva do despertar", microscópio com a lâmina 117-2, destilador e Erlenmeyer no Bunsen, quimógrafo girando, armário "VEIO — LOTE 12", relatório Nº 31, ralo de inox limpo |
+| 2 | Refeitório (G) | 2000 | 2 | FG | 1008 | 2 / 0 | barra verde a óleo, forro, calhas: 48 lugares postos iguais (bandeja, colher, caneca numerada por mesa com água preta), mural dos "recuperados" e cardápio de giz, 40 pares de pés na fila, pianola de rolo rasgado em loop de 3,2 s, panelão com vapor e três moscas; assinatura "a hora da sopa" |
+| 2 | Teatro (E) | 2000 | 2 | BE | 288 | 0 / 0 | lambri vermelho com moldura dourada gasta, forro: teatrinho de fantoches (o Doutor, a Enfermeira, Joãozinho com o 7), programas mimeografados roxos, caixotes de leite com nomes a giz, balões murchos, pote "PRÊMIO PARA QUEM DORMIR"; assinatura "a lanterna mágica"; flauta doce desafinada |
+| 2 | Ala Psiquiátrica (J) | 2250 | 2 | BJ | 720 | 2 / 0 | barra verde de lona, forro, lâmpada do posto verde-acinzentada: colchões de crina nas divisórias, tubos acústicos de latão até o posto, gravador de fio, aparelho de eletroconvulsão, metrônomo que se adianta, camisas de força 156-2/162-1/171-3/189-1, pauta riscada a unha, amarras nas camas; assinatura "os tubos falam" |
+| 2 | Jardim (K) | 2250 | 2 | CK | 1152 | 2 / 6 | mato seco e sebes com buracos de espiar: busto do Dr. Aurélio cuja cabeça segue o jogador, espelhos convexos nos cantos, placas esmaltadas, caderno de observação (nº 44 e 51), corujas anilhadas nos postes, silhuetas de enfermeira nas janelas altas; assinatura "as sebes olham" |
+| 3 | Biblioteca (N) | 3000 | 3 | GN | 1008 | 3 / 0 | estantes com 30% de livros-prontuário cinzentos, fichário com a gaveta que anda, escada de rodinhas que desliza, abajur verde rachado, "Do sono sem sonho" com os óculos, cadeiras "S.I.", carrinho de devolução com a pulseira 216-2; luz de emergência sobre a porta; assinatura "a cadeira que vem ler" |
+| 3 | Cozinha (H) | 3000 | 3 | GH | 864 | 2 / 0 | o alto tomado: vigas e grade de ganchos baixa com panelas, coifa de cobre a 2,1 m, câmara fria com unhas e avental na fresta, monta-pratos com o sapato, caixotes "DOAÇÃO DO PROGRAMA", marmita amarrada que bate, carrinho térmico ainda soltando vapor; vapor rasteiro; assinatura "a cozinha encolhe" |
+| 3 | Necrotério (I) | 3000 | 3 | DI | 360 | 1 / 0 | azulejo frio, calhas, névoa fria: gavetas numeradas (214 amassada de dentro, 117 aberta com o pé cinzento), corpos sob lençóis (uma mão pende), pia de mármore com fio preto, ralo com crosta, livro de óbitos, ataduras e mordaças, carrinho-maca com correias que esticam, bacia de pulseiras cortadas; assinatura: a gaveta 214 bate três vezes |
+| 3 | Estufa (L) | 3250 | 3 | KL | 720 | 2 / 0 | tudo cresce bem demais: tomates quase pretos, plaquinhas de canteiro (Fam. 31, 66), regadores de água preta "TORRE · IRRIGAÇÃO", farinha de osso, nebulização a 3,6 m, bolo de fubá morno, aquário com peixinho vivo, mudas com raízes de dedo, termômetro em 37,0 °C; assinatura "a rega" |
+| 3 | Torre d'água (M) | 3750 | 3 | KM | 1008 | 3 / 5 | escorrimentos pretos no tanque e poça ao pé, cano do Veio com régua de nível, marcas de mãos subindo, 12 baldes de esmalte numerados com água preta, caixotes "CLORO · MINISTÉRIO DA SAÚDE" vazios, galo do cata-vento girando ao contrário, cadeado cortado; Pack-a-Punch; assinatura "alguém sobe a escada" |
+| 4 | Caldeiras (P) | 4500 | 4 | HP | 720 | 3 / 0 | lâmpadas de gaiola, calor: painel de seis manômetros (ANEXO e FORNO no vermelho), volantes vermelhos, carvão com ficha meio queimada, óculos do foguista ("ainda não acabou"), tanque "NÃO BEBER", grade do túnel com arrasto atrás, apito de vapor; ar quente ondulando; energia; assinatura "a caldeira respira" |
+| 4 | Cemitério (r1) | 5000 | 4 | Nr1 | 2196 | 3 / 6 | lápides de concreto lavado com os marcos 301 a 346, plaquetas de lata 347 a 352 e a cova aberta que anda (assinatura "a cova seguinte"), sulco de carrinho de mão em volta, lâmpada nua de extensão, carrinho de cal, demarcação das próximas covas, seis pás iguais; golpes de pá a cada 14 s |
+| 4 | Túneis de serviço (r5) | 5250 | 4 | Nr5 | 2920 | 5 / 3 | forro de concreto a 3,3 m, trilho aéreo com ganchos, cano-mestre do Veio vazando num ralo, setas de cal (ANEXO, CONVENTO, FORNO), portinholas ao rés do chão, padiola "CARGA 22 → FORNO", canos com amianto, 14 lâmpadas de gaiola; assinatura "o apagar em fila" |
+| 4 | Brejo (r13) | 5250 | 4 | Ir13 | 2040 | 3 / 6 | água oleosa quase preta com bordas de concreto, manilha de esgoto escorrendo, frascos âmbar boiando que andam (assinatura "os frascos chegam"), bote do serviço meio afundado, estacas de sondagem, tripé de dragagem, aguapés cinzentos, barba-de-velho nas 7 árvores secas, canaleta até o Necrotério; sem sapos |
+| 4 | Pedreira (r3) | 5750 | 4 | Mr3 | 2196 | 3 / 6 | granito talhado com furos de broca, argolas com chapinhas (143-2…257-5), riscos de contagem e "ainda não acabou", pau-de-carga com cesto no alto do pilar, marmitas numeradas, escada de corda cortada, ninho de pedras com estopa; cascalho escorrendo; assinatura "a refeição" (o cesto desce) |
+| 4 | Pomar (r10) | 5750 | 4 | Lr10 | 2440 | 4 / 6 | laranjeiras caiadas com copa lustrosa e laranjas de miolo cinza, pitangueiras, placa "LABORTERAPIA", escada de colheita, gaiola com o pássaro de corda, cestos etiquetados (leitos 12–16), banco com casaco, colmeias 4–6 com abelhas mortas, canaletas de rega; assinatura "o canto" (20 s de silêncio) |
+| 4 | Lavanderia (r9) | 6000 | 4 | Mr9 | 2920 | 5 / 3 | 68 máquinas com tambor girando, dois trilhos de camisolas 347–360 (a primeira, "Antônio"), pilhas carimbadas 361–378, calandra, rol de roupa e carimbo, tina de anil, cestos de roupa cinza, luvas de borracha, véu de vapor alto; assinatura "a fila das camisolas" |
+| 5 | Ferro-velho (r12) | 7000 | 5 | Pr12 | 2000 | 3 / 6 | sucata desbotada com placas "SL-…" da vila, porta de carro com 9 placas de famílias levadas, baú da ambulância sobre calços com o negatoscópio (assinatura), cilindros de éter, tambores de resíduo vazando, maletas de médico, girafa com sondas, porta que bate com o vento; flocos de ferrugem |
+| 5 | Portaria (r2) | 7500 | 5 | r1r2 | 2112 | 4 / 6 | ambulância branca com o motor ligado, guarita com cúpula de vigia, prancheta, quadro de 20 crachás em ENTRADA, números das famílias nas vagas (101–140) e a vaga 413 vazia, cadeira de rodas de vime, bomba de gasolina pingando preto, mudança no teto de 5 carros, placa no muro sul |
+| 5 | Anexo do asilo (r6) | 7750 | 5 | r5r6 | 2400 | 4 / 3 | divisórias com azulejo até 1,5 m, calhas: amarelinha C-01 a C-10 com a pedrinha que avança, sapatinhos à porta (C-07 só a etiqueta), caminhas de grade, desenhos de giz de cera, pia com dez escovas, balanço de tábua, quadro "DIAS PARA IR PARA CASA", tigelas de mingau intactas; caixinha de música |
+| 5 | Ruínas do convento (r4) | 8000 | 5 | r1r4 | 2112 | 4 / 6 | tijolo caiado descascado e cantaria, arcos do claustro, roda dos expostos ("recebido — 412"), esteira com livro de horas, hábito pendurado, sineta da portaria com fita roxa, nichos de santas de rosto caiado, terços numerados, campas das irmãs (as 3 últimas em branco), ~40 tocos de vela; pó de reboco caindo |
+| 5 | Ilha do lago (r14) | 8250 | 5 | r13r14 | 1960 | 4 / 6 | água lisa e espelhada, píer envernizado, gramofone (colisão baixa) com a valsa, chá posto para dois, cadeira de vime com charuto fumegando, cavalete com a aquarela do Sanatório, barco "REPOUSO", sinos de vento de vidro parados, lanternas de papel, partituras boiando; assinatura: a música corta no píer |
+| 5 | Floresta (r8) | 8750 | 5 | r3r8 | 2112 | 4 / 6 | tiras de camisola listrada marcando a fuga, cocho dos cães e guia cortada, armadilha sobre um tamanco, cerca farpada tombada, quepe e lanterna acesa no musgo, folhiço, covinha de cal com o sapato do guarda, vaga-lumes; assinatura: pegadas descalças que acompanham |
+| 5 | Estábulo (r11) | 8750 | 5 | r10r11 | 2400 | 4 / 3 | tábuas escuras arranhadas, feno manchado, cavalo sob a lona que respira (o casco escorrega), fichas de baia A-01…A-11, tronco de contenção com cintas, cocho de leite talhado, ferraduras "1956", cabrestos com eletrodos, balança de gado "peso antes / depois"; moscas |
+| 6 | Crematório (r7) | 11000 | 6 | r12r7 | 2400 | 4 / 3 | tijolo refratário com fuligem, lâmpadas de gaiola, neve de cinza: portas de ferro com visor de mica (forno 3 entreaberto com a pulseira Nº 1), mesas de rolos, carrinho de cinzas, arquibancada de urnas numeradas, livro da lista (413-1 a 413-4 em branco), caixões de pinho, painel em 900 °C, fumaça das chaminés; assinatura "a chamada" |
 
 **Itens por área**
 
@@ -267,3 +269,128 @@ A fase 3 não acrescentou colisor (só trocou o material da cabine telefônica d
 - Bancos de neblina em pé (3A-9) têm opacidade 0,32 de longe: deixam ver o zumbi atrás, mas apagam um pouco. Medir em jogo na fase 5.
 - O relógio da Estação dá um estalo (0,5, passa-banda curto) a cada 60 s para quem está a menos de 20 m: é o loop da área, mas pode cansar.
 - `MAP_ANIM` da fogueira do Acampamento (código do Vitor, fora da atmosfera) ainda cria uma closure por quadro (`fl.forEach`).
+
+## 7. Fase 5B (visual do Sanatório)
+
+Integrada no commit `918270f` (branch `atmosfera`), sobre o conteúdo da 5A (`ed2a517`). Como na 3A, cada domínio é um bloco próprio marcado `// ===== 5B-n` que entra por `ATMOS_POST` com `mapId === 'sanatorio'`; a Vila e os mapas PvP não mudam (texturas novas pela variante `s:` do `genTex`). As linhas são do `index.html` em `918270f` (23.974 linhas).
+
+| Domínio | O que faz | Onde fica no código |
+|---|---|---|
+| 5B-1 arquitetura | paredes clínicas por sala (azulejo, lambri, barra a óleo, embasamento de cimento; desgaste da Recepção às Caldeiras), forro a 4,46 m em A, F, B, D, G, E, J, N, H, I e P (estuque ou tábuas, vigas, infiltração, buracos), batentes descascando | `SAN1`, `genSan` (texturas `s:`), `san1Parede`, `san1Teto`; bloco 15127–15390 |
+| 5B-2 pisos e materiais | piso próprio por cômodo e região, preso ao mundo, com caminho gasto entre portas e itens, sujeira junto das paredes, mancha úmida perto de ralos e janelas e abandono crescendo até o Crematório; materiais `san_*` nas caixas de metal; 2ª amostra do piso (`PISO_MIX`) só no Alto | `SANP_TEX`, `genPisoSan`, `SANP_ZONA`; bloco 13606–13901 |
+| 5B-3 luz | personalidade da lâmpada por área, luminárias visíveis (calha fluorescente, prato, gaiola, capa), escalada de escuridão pela ordem de desbloqueio, luar pelas janelas, luz de emergência vermelha nas áreas fundas, arma na mão com a cor da área | `SAN_LUZ` e o seu `ATMOS_POST`; bloco 2238–2387 |
+| 5B-4 névoa e volume | cor da névoa por área, névoa que fecha nas bordas das regiões, rasteira, véus de vapor e fumaça, 20 fachos de luar | `NEV.cor/baixa/fecha.sanatorio`, `NEV.san`, `nevFecha`; bloco 12014–12091 |
+| 5B-5 partículas | o campo de pontos da 3A-10 com a mistura de cada área (poeira, cal, esporos, moscas, mariposas, ferrugem, cinza); sem partículas no Baixo | `PART.sanatorio`; bloco 12158–12198 |
+| 5B-6 desgaste e decalques | mofo, infiltração (abaixo do forro), ferrugem, umidade brilhante, rodas de maca, arrasto, pegadas de cal, unhas, sangue velho, azulejos faltando; densidade crescendo com a ordem; nada sobre o que a 5A já desenhou | `DESG_SAN`, `desgSanAtlas`; bloco 20391–20777 |
+| 5B-7 shaders especiais | o ramo do Sanatório da 3A-13: azulejo que sua (Enfermaria; Necrotério com estrias do Veio; só a camada transparente, o azulejo é o do 5B-1), vidro das janelas quebrado e embaçado, mofo que respira nos Túneis, o Veio vivo nas poças e no Brejo, metal em brasa nas Caldeiras, fendas e ar tremendo no Crematório; mesma troca do Baixo e o mesmo `sfxTick` | `SAN_SUOR`, `SAN_VIDRO`; bloco 14812–15014 |
+| 5B-8 céu e pós | noite encoberta; o pós (tint, saturação, vinheta, grão) piora pela ordem de desbloqueio até o Crematório; o Sanatório passa pelo passe de cor leve do Médio (`posLeve`) | `ceuNublado` 12947, `SAN_PIORA`/`sanPiora` 12985–13014 |
+| 5B-9 exterior e vegetação | mato seco, hera morta, árvores secas retorcidas, muros, cerca, postes tortos e fachadas vistas pelas janelas, em pedaços com distância de desenho e o LOD do miúdo da 3A-15 | `VSAN`, `vsHeraGeo`, `vsArvGeo`; bloco 14060–14597 |
+| 5B-10 revisor | conflitos entre domínios (fio da luminária com o forro, faixa de azulejo duplicada do 5B-7, infiltração acima do forro, fachos do 5B-3 iguais aos do 5B-4) e desempenho (grão sem ler o canvas, piso sala a sala, `PISO_MIX` só no Alto, sem partículas no Baixo, raios do desgaste só no alcance) | marcas "5B-10" espalhadas pelos blocos acima |
+
+## 8. Validação final (fase 4 dos dois mapas)
+
+Feita em 04/10/2026 sobre `918270f`, com um navegador por vez e nenhum outro agente rodando. Scripts e dados em `C:\dev\tiroteio-notas\work\valfinal\` (`perf.cjs`, `run2.sh`, `run3.sh`, `md.py`, `pvp2.cjs`; resultados em `perf2`, `perf2c`, `perf3`, `pvp`).
+
+**Como foi medido.** Chromium sem janela (Playwright) com a placa de vídeo da máquina (ANGLE D3D11, **Intel UHD Graphics integrada**), tela 1280 × 720, sem vsync e sem limite de quadros (`--disable-gpu-vsync --disable-frame-rate-limit`), então o intervalo entre quadros é o custo real do quadro (lógica + desenho). Todas as portas abertas, sem zumbis. Tomadas fixas: 5 por área (4 dentro da área, olhando para o centro, e 1 de cima), em 8 áreas da Vila (A, B, F, J, L, c1, c3, b01) e 10 do Sanatório (A, B, G, I, H, P, r5, r9, r7, r2); em cada tomada, 120 quadros. Duas rodadas alternadas (antes, conteúdo, final, final, conteúdo, antes); na Vila em Baixo vale só a primeira rodada (a segunda coincidiu com um build de outro projeto na mesma máquina; refeita depois, com a máquina mais lenta, deu a mesma ordem: 8,8 → 27,4 → 19,5 ms). "Quadro mediano" é a mediana das medianas das tomadas; "p90" é a mediana dos p90 das tomadas (mede os engasgos). "Montagem" é o `startHost` do mapa; "aquecimento" é o tempo até sumir o "Carregando o mapa…" (`warmUp`).
+
+Versões comparadas (todas tiradas com `git show <commit>:index.html`): **antes de tudo** = `27301df` na Vila (o `4eded8b` pedido já tem a fase 2: só difere do `de6057e` por 2 linhas, o gancho `ATMOS_POST`) e `5ea2142` no Sanatório; **só conteúdo** = `de6057e` (fase 2) na Vila e `ed2a517` (5A) no Sanatório; **final** = `918270f` nos dois.
+
+Uma primeira série foi descartada: um laço de medição anterior continuou rodando em paralelo e as duas medições disputaram a placa (os números saíam quase o dobro). Tudo abaixo é da série limpa.
+
+### Desempenho
+
+| Mapa | Gráfico | Versão | Quadro mediano (ms) | p90 (ms) | FPS (mediana) | Draw calls (mediana / máx.) | Montagem (s) | Aquecimento (s) |
+|---|---|---|---|---|---|---|---|---|
+| Vila | Médio | antes de tudo (`27301df`) | 4,4 | 6,7 | 227 | 226 / 416 | 0,7 | 2,0 |
+| Vila | Médio | só conteúdo (`de6057e`) | 8,9 | 13,4 | 112 | 502 / 946 | 2,2 | 6,8 |
+| Vila | Médio | final (`918270f`) | 12,2 | 18,4 | 82 | 580 / 1084 | 5,8 | 9,7 |
+| Vila | Alto | antes de tudo (`27301df`) | 9,6 | 17,1 | 104 | 524 / 785 | 1,7 | 2,0 |
+| Vila | Alto | só conteúdo (`de6057e`) | 16,4 | 113,0 | 61 | 723 / 1343 | 2,2 | 7,7 |
+| Vila | Alto | final (`918270f`) | 19,8 | 103,8 | 51 | 758 / 1383 | 5,7 | 9,9 |
+| Vila | Baixo | antes de tudo (`27301df`) | 4,5 | 6,6 | 220 | 370 / 859 | 0,6 | 2,0 |
+| Vila | Baixo | só conteúdo (`de6057e`) | 10,9 | 15,1 | 92 | 946 / 2010 | 1,4 | 4,1 |
+| Vila | Baixo | final (`918270f`) | 8,9 | 12,4 | 112 | 548 / 1022 | 5,4 | 4,9 |
+| Sanatório | Médio | antes de tudo (`5ea2142`) | 3,0 | 5,0 | 333 | 113 / 203 | 0,5 | 3,1 |
+| Sanatório | Médio | só conteúdo (`ed2a517`) | 9,8 | 14,8 | 103 | 376 / 754 | 2,8 | 10,3 |
+| Sanatório | Médio | final (`918270f`) | 9,4 | 13,2 | 106 | 470 / 834 | 3,4 | 8,7 |
+| Sanatório | Alto | antes de tudo (`5ea2142`) | 4,8 | 7,9 | 208 | 194 / 309 | 0,7 | 2,4 |
+| Sanatório | Alto | só conteúdo (`ed2a517`) | 12,9 | 23,2 | 77 | 465 / 866 | 1,8 | 6,4 |
+| Sanatório | Alto | final (`918270f`) | 14,1 | 107,3 | 71 | 552 / 961 | 3,3 | 9,2 |
+| Sanatório | Baixo | antes de tudo (`5ea2142`) | 4,4 | 5,6 | 227 | 113 / 199 | 1,3 | 3,4 |
+| Sanatório | Baixo | só conteúdo (`ed2a517`) | 13,9 | 19,6 | 72 | 374 / 743 | 3,0 | 8,9 |
+| Sanatório | Baixo | final (`918270f`) | 16,0 | 20,2 | 62 | 424 / 794 | 5,8 | 10,2 |
+
+
+**Vila, Médio, quadro mediano por área (ms): antes → só conteúdo → final (sem corte)**
+
+| Área | A | B | F | J | L | c1 | c3 | b01 |
+|---|---|---|---|---|---|---|---|---|
+| ms | 7,0 → 12,9 → 16,2 | 5,0 → 12,1 → 16,4 | 4,8 → 10,8 → 15,2 | 3,2 → 7,9 → 10,9 | 4,0 → 8,1 → 12,2 | 4,0 → 7,7 → 11,3 | 3,4 → 8,1 → 11,1 | 3,0 → 6,5 → 8,8 |
+
+**Sanatório, Médio, quadro mediano por área (ms): antes → só conteúdo → final (sem corte)**
+
+| Área | A | B | G | I | H | P | r5 | r9 | r7 | r2 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ms | 4,6 → 18,9 → 13,1 | 3,1 → 11,4 → 12,0 | 3,3 → 11,2 → 11,4 | 3,3 → 11,8 → 10,4 | 2,5 → 11,9 → 9,9 | 3,2 → 9,0 → 8,8 | 2,4 → 7,1 → 6,5 | 2,2 → 6,7 → 7,2 | 2,2 → 6,0 → 6,7 | 2,0 → 8,1 → 7,9 |
+
+### Cortes do Médio
+
+A meta era ficar abaixo de ~12 ms de mediana e de 16,7 ms de p90 no Médio. O Sanatório ficou abaixo (9,4 / 13,2 ms) e não teve corte. A Vila ficou acima nas três séries em que o final foi medido (mediana 12,2 a 13,1 ms; p90 17,5 a 19,9 ms) e recebeu os cortes já identificados, medidos um a um (Vila, Médio, duas rodadas alternadas, `perf3`):
+
+| Variante | Quadro mediano (ms) | p90 (ms) | Praça (A) | Igreja (B) |
+|---|---|---|---|---|
+| final, sem corte | 12,6 | 17,5 | 15,6 | 15,7 |
+| V1: vegetação do Médio com 75% da densidade e distância de desenho no meio do caminho até a do Baixo | 11,8 | 16,8 | 15,8 | 15,1 |
+| V2: sem o passe de cor do Médio na Vila | **10,7** | **14,4** | 15,3 | 15,6 |
+| V1 + V2 | 10,5 | 14,2 | 13,8 | 14,4 |
+
+- **Aplicado: só o V2** (`POS_MEDIO_FORA = { vila: 1 }`, junto de `posLeve`). Sozinho ele já põe a Vila dentro da meta (−15% de mediana, −18% de p90). O look por área da Vila (tint, saturação, vinheta, granulação) passa a existir só no Alto, como antes da integração da fase 3; o Sanatório continua com o passe no Médio.
+- **Não aplicado: V1.** Ganho de 0,2 ms sobre o V2, dentro do ruído, tirando mato e árvores.
+- **Sanatório, testados e não aplicados:** piso do 5B-2 em Lambert no Médio e superfícies vivas (5B-7/3A-13) desligadas no Médio. Juntos deram 9,8 ms contra 9,4 do final (sem ganho; `perf2c`).
+
+### Conclusões
+
+- **60 FPS nesta máquina (Intel UHD integrada).**
+  - **Médio:** cabe. Sanatório com 9,4 ms de mediana (106 FPS) e p90 de 13,2 ms. Vila, com o corte, 10,7 ms (93 FPS) e p90 de 14,4 ms. A folga é pequena nas áreas mais carregadas: Praça e Igreja ficam em ~15,5 ms de mediana, logo abaixo dos 16,7 ms.
+  - **Alto:** não cabe na Vila (19,8 ms, 51 FPS). No Sanatório a mediana cabe (14,1 ms, 71 FPS), mas o p90 passa de 100 ms nos dois mapas: há engasgos longos no Alto que já existem desde o "só conteúdo" (no "antes de tudo" o p90 era 17 ms na Vila e 8 ms no Sanatório). O Alto não é para esta placa.
+  - **Baixo:** na Vila cabe (8,9 ms, 112 FPS, p90 12,4 ms; a fase 3 até baixou o custo do Baixo, de 10,9 para 8,9 ms, ao tirar bancos de neblina e feixes e reduzir o miúdo). No Sanatório o Baixo fica **mais lento que o Médio**: 16,0 ms (62 FPS) e p90 de 20,2 ms, no limite. Isso já vem do conteúdo (a 5A no Baixo dá 13,9 ms, contra 9,8 no Médio). Fica como pendência investigar o motivo: o Baixo usa Lambert e escala 0,8, e mesmo assim desenha mais devagar.
+- **De onde vem o custo.** O visual (fases 3 e 5B) custa pouco perto do conteúdo das áreas (fases 2 e 5A):
+  - na Vila, no Médio: 4,4 → 8,9 ms com o conteúdo e → 12,2 ms com o visual (10,7 ms depois do corte);
+  - no Sanatório: 3,0 → 9,8 ms com o conteúdo, e o 5B fica empatado (9,4 ms; as otimizações do revisor 5B-10 pagaram o próprio domínio).
+
+  O que pesa é o número de chamadas de desenho: na Vila, de ~230 para ~500 com o conteúdo e ~580 com o visual; no Sanatório, de ~110 para ~380 e ~470. Nesta placa, o custo cresce com as chamadas, e não com os shaders: os cortes de shader e de pós do Sanatório não mudaram nada.
+  - O próximo ganho grande é juntar as malhas paradas de cada área por material. Fica como recomendação: é mudança de estrutura, não um corte barato.
+- **Montagem e aquecimento:**
+  - a montagem do mapa sobe de 0,7 s para 5,8 s na Vila (Médio) e de 0,5 s para 3,4 s no Sanatório;
+  - o aquecimento de shaders sobe de 2 s para ~10 s na Vila e de 3 s para ~9 s no Sanatório.
+
+  Os dois acontecem atrás da tela "Carregando o mapa…", e nenhuma tomada teve erro de página.
+- **Meta de +8%.** Contra o "só conteúdo", no Médio:
+  - a Vila final fica em +36%, e em +20% com o corte;
+  - o Sanatório fica em −3%.
+
+  A meta só não foi atingida na Vila, e o que sobra depois do corte é o próprio visual da fase 3 (paredes, telhados, vegetação, desgaste e luz), sem outro corte barato.
+
+### PvP e menu (contra `4eded8b`)
+
+Smoke com `pvp2.cjs`: host local, câmera fixa no primeiro ponto de nascimento, 4 direções, gráfico Médio, duas rodadas alternadas por versão (`4eded8b` e o `index.html` final com as correções desta validação).
+
+| Mapa / modo | Erros de página | Quadro (ms, as 4 direções) | Draw calls | Imagem |
+|---|---|---|---|---|
+| Arena, mata-mata (`dm`) | 0 nas duas | 1,3–2,2 (4eded8b 1,4–2,2) | 10–33 nas duas | cenário igual |
+| Duna, Rodadas (`rounds`) | 0 nas duas | 1,4–2,8 (4eded8b 1,7–2,7) | 9–69 nas duas | cenário igual |
+| Menu (sem partida) | 0 nas duas | — | — | idêntico (diferença 0 pixel) |
+
+As diferenças de imagem entre versões ficam na mesma faixa que entre duas rodadas da mesma versão. Elas vêm de duas coisas:
+- as texturas de canvas (rachaduras), sorteadas a cada carga;
+- a arma na mão, que mudou de propósito na fase 3B (a pose de repouso do 4eded8b ainda tinha o braço esquerdo cobrindo a tela, corrigido pelo a15).
+
+As únicas falhas de rede são os 4 recursos externos que o script de teste bloqueia, iguais nas duas versões.
+
+### Números (bíblia §6)
+
+Duas colisões corrigidas no jogo:
+- balança do Estábulo: "412 kg" virou "418 kg";
+- setas dos Túneis: os lotes "L. 31" e "L. 40" viraram "L. 42" e "L. 45".
+
+Os números novos da fase 5 foram registrados em `biblia_terror.md` §6.

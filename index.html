@@ -9879,8 +9879,8 @@ ATMOS.sanatorio.r5 = A => {
   const JZ = -19; A.cyl(-100, CY - .27, JZ, .3, .3, .54, new THREE.MeshPhongMaterial({ color: 0x0a0b0a, specular: 0x667766, shininess: 120 }), 12).rotation.x = PI / 2;
   // atlas: setas de cal (6), marcas de arrasto, ralo, mancha, portinhola, etiqueta da padiola
   const SETA = [ // [x, z, normal x, normal z, texto, alvo x, alvo z, lote riscado]
-    [-105.25, 6, 1, 0, 'ANEXO', -97, 14, 'L. 31'], [-97, -35.89, 0, 1, 'CONVENTO', -97, -46, 'L. 18'], [-84.97, -18, -1, 0, 'FORNO', -97, 14, ''],
-    [-96, -1.67, 0, -1, 'ANEXO', -97, 14, 'L. 40'], [-113.21, -26, 1, 0, 'CONVENTO', -97, -46, ''], [-91, -7.89, 0, -1, 'FORNO', -97, 14, 'SAÍDA']];
+    [-105.25, 6, 1, 0, 'ANEXO', -97, 14, 'L. 42'], [-97, -35.89, 0, 1, 'CONVENTO', -97, -46, 'L. 18'], [-84.97, -18, -1, 0, 'FORNO', -97, 14, ''],
+    [-96, -1.67, 0, -1, 'ANEXO', -97, 14, 'L. 45'], [-113.21, -26, 1, 0, 'CONVENTO', -97, -46, ''], [-91, -7.89, 0, -1, 'FORNO', -97, 14, 'SAÍDA']];
   const seta = SETA.map(([x, z, nx, nz, , tx, tz]) => { const dx = tx - x, dz = tz - z, f = -(dx * nx + dz * nz), rt = dx * nz - dz * nx; return f > Math.abs(rt) ? '↑' : rt > 0 ? '→' : '←'; });
   const atlT = A.tex(512, 512, g => {
     g.clearRect(0, 0, 512, 512);
@@ -11575,7 +11575,7 @@ ATMOS.sanatorio.r11 = A => {
       for (let k = 0; k <= 20; k++) { const a = -2.4 + k * 4.8 / 20; g.lineWidth = k % 5 ? 1 : 2.5; g.beginPath(); g.moveTo(cx + Math.sin(a) * 52, cy - Math.cos(a) * 52); g.lineTo(cx + Math.sin(a) * (k % 5 ? 46 : 42), cy - Math.cos(a) * (k % 5 ? 46 : 42)); g.stroke(); }
       S.txt(g, 'kg', cx, cy + 26, 'bold 13px Georgia', '#2a2a2a'); S.txt(g, '0', cx - 36, cy + 30, '10px Georgia', '#2a2a2a'); S.txt(g, '1000', cx + 34, cy + 30, '10px Georgia', '#2a2a2a'); }
     { g.fillStyle = '#e2dcc6'; g.fillRect(132, 344, 120, 164); g.save(); g.translate(192, 360);
-      S.txt(g, 'A-04', 0, 6, 'bold 16px Courier New', '#1a1a1a'); S.txt(g, 'peso antes', 0, 34, 'italic 14px Georgia', '#1a1a2a'); S.txt(g, '412 kg', 0, 54, '15px Courier New', '#1a1a2a');
+      S.txt(g, 'A-04', 0, 6, 'bold 16px Courier New', '#1a1a1a'); S.txt(g, 'peso antes', 0, 34, 'italic 14px Georgia', '#1a1a2a'); S.txt(g, '418 kg', 0, 54, '15px Courier New', '#1a1a2a');
       S.txt(g, 'peso depois', 0, 86, 'italic 14px Georgia', '#1a1a2a'); S.txt(g, '388 kg', 0, 106, '15px Courier New', '#1a1a2a'); S.txt(g, '(acordou mais leve)', 0, 132, 'italic 11px Georgia', '#5a1a14'); g.restore(); }
     { const cx = 320, cy = 430; g.fillStyle = '#4a3420'; g.fillRect(256, 340, 128, 172); g.fillStyle = '#ece6d4'; g.beginPath(); g.arc(cx, cy, 50, 0, TAU); g.fill();
       g.strokeStyle = '#1a1a1a'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, 40, -2.4 - PI / 2, 2.4 - PI / 2); g.stroke(); for (let k = 0; k <= 10; k++) { const a = -2.4 + k * .48; g.beginPath(); g.moveTo(cx + Math.sin(a) * 40, cy - Math.cos(a) * 40); g.lineTo(cx + Math.sin(a) * 33, cy - Math.cos(a) * 33); g.stroke(); }
@@ -13040,7 +13040,10 @@ composer.addPass(new RenderPass(scene, camera)); composer.addPass(vmPass); compo
 // direto para a tela como antes (com o antisserrilhado do canvas), é copiada para uma textura de 8 bits (já em tom e sRGB,
 // como a saída do OutputPass) e o gradePass desenha por cima. Bem mais barato que um alvo HalfFloat com MSAA.
 // Baixo e os mapas sem áreas (PvP) continuam sem pós; o Sanatório (29 áreas) também passa por aqui (5B-8).
-const posLeve = () => CFG.gfx === 'medio' && AT?.areas.length > 0;
+// Validação final (04/10/2026): a Vila saiu do passe no Médio (POS_MEDIO_FORA). Medido limpo nesta máquina (Intel UHD): quadro
+// mediano 12,6 -> 10,7 ms e p90 17,5 -> 14,5 ms; o look por área da Vila fica só no Alto. O Sanatório continua (9,4 ms no Médio).
+const POS_MEDIO_FORA = { vila: 1 };
+const posLeve = () => CFG.gfx === 'medio' && AT?.areas.length > 0 && !POS_MEDIO_FORA[AT.map];
 let gradeTex = null; const _gradeV = new THREE.Vector2(), _gradeS = new THREE.Vector2();
 const composerMSize = () => { // a textura da cópia só existe no Médio, do tamanho da tela
   renderer.getDrawingBufferSize(_gradeS); const w = CFG.gfx === 'medio' ? _gradeS.x : 0, h = CFG.gfx === 'medio' ? _gradeS.y : 0;
@@ -23910,7 +23913,7 @@ function frame() {
 function renderScene() {
   sky.position.copy(camera.position); if (CULL.length) zCull();
   if (CFG.gfx === 'alto') { gradePass.uniforms.time.value = now % 100; composer.render(); }
-  else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); if (posLeve()) gradeMedio(); } // Médio na Vila: cor da área
+  else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); if (posLeve()) gradeMedio(); } // Médio no Sanatório: cor da área (a Vila saiu na validação final)
 }
 function tick(dt) {
   if (NET.isHost) srvTick(dt);

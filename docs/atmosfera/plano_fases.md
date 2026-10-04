@@ -1,6 +1,6 @@
 # Plano das fases (atmosfera + armas)
 
-Atualizado em 03/10/2026, depois do merge da `main` do Vitor (`6df6338`): Armeiro, menu novo, lobby e segurança. Estado das fases revisto em 04/10/2026, na fase 4.
+Atualizado em 03/10/2026, depois do merge da `main` do Vitor (`6df6338`): Armeiro, menu novo, lobby e segurança. Estado das fases revisto em 04/10/2026, na validação final (todas as fases feitas).
 
 | Fase | O quê | Estado |
 |---|---|---|
@@ -9,8 +9,9 @@ Atualizado em 03/10/2026, depois do merge da `main` do Vitor (`6df6338`): Armeir
 | 2 | Conteúdo da Vila: 9 agentes, 3–4 áreas cada, código em `ATMOS.vila.<id>` | feita (`de6057e`): as 33 áreas com cenário, assinatura, animações, som e aparência próprios |
 | 3A | Visual e realismo do cenário: 15 agentes (texturas, desgaste, materiais, luz, névoa, partículas, pós, animação, shaders, vegetação, revisor) | feita e integrada (`c2717a9`), com o revisor v15 (desempenho); texturas novas só nos mapas de zumbi; domínios em `mapa_areas.md` §5 |
 | **3B** | **Armas na mão: 15 agentes (abaixo)** | **feita e integrada (`c2717a9`), com o revisor a15; pendências no fim deste arquivo** |
-| 4 | Integração e validação (cenário + armas) | feita em 04/10/2026: cenário da Vila validado por código e scripts node (portas e custos iguais, 16 colisores ok, gatilhos, repetições; 4 correções no jogo), resultado em `mapa_areas.md` §6; armas: regressão de zumbis da integração ok (`log_fase3_*`) |
-| 5 | Sanatório (repete 2 a 4 com mais intensidade) | começou: marcadores `@@ATMOS_SAN@@` (`5ea2142`) |
+| 4 | Integração e validação (cenário + armas) | feita em 04/10/2026 (`f9db2bb`): cenário da Vila validado por código e scripts node (portas e custos iguais, 16 colisores ok, gatilhos, repetições; 4 correções no jogo), resultado em `mapa_areas.md` §6; armas: regressão de zumbis da integração ok (`log_fase3_*`) |
+| 5 | Sanatório (repete 2 a 4 com mais intensidade) | feita: marcadores `@@ATMOS_SAN@@` (`5ea2142`); 5A, conteúdo das 29 áreas em 8 grupos (`ed2a517`); 5B, visual em 9 domínios + revisor (`918270f`), domínios em `mapa_areas.md` §7 |
+| 4 (dois mapas) | Validação final: desempenho limpo (Médio, Alto e Baixo, nos dois mapas), decisão de corte, smoke do PvP e do menu, registro de números | feita em 04/10/2026 (sem commit; o coordenador faz): resultado em `mapa_areas.md` §8 |
 
 ## O que mudou com o trabalho do Vitor e como o plano se adapta
 
@@ -58,9 +59,21 @@ Atualizado em 03/10/2026, depois do merge da `main` do Vitor (`6df6338`): Armeir
 - Não quebra a validação do host.
 - Segue o estilo do código do Vitor (`FPG`, `GRIP`, `FRAME`, `attParts`, `tools/blender` quando o ajuste for no modelo).
 
-## Pendências depois da fase 4
+## Validação final (04/10/2026)
 
-- **Decisão do Caio:** gráfico Médio ficou cerca de 15% mais lento por quadro com a fase 3.
-- **Armas (do revisor a15):** penetração de 8 a 21 mm na recarga vazia de LMG, AK e M4; antebraços das escopetas no estilo CS cobrem a parte de baixo na mira; Python sem mão de apoio; SMG e Winter's Howl perto do olho (`FRAME`); cache das mãos procedurais (`compileAsync`).
-- **Cenário:** opacidade dos bancos de neblina, estalo do relógio da Estação a cada 60 s e a closure por quadro da fogueira do Acampamento (código do Vitor); ver `mapa_areas.md` §6, "Em aberto".
-- **Para a fase 5:** a tampa da caixa da Ilha do porto que "bate por dentro" usa o motivo das batidas de dentro, que fica no Necrotério.
+- **Desempenho medido limpo** (um navegador por vez, placa de vídeo da máquina, quadro sem vsync), nos dois mapas, em Médio, Alto e Baixo, contra "antes de tudo" e "só conteúdo": tabelas e conclusões em `mapa_areas.md` §8.
+- **Corte aplicado:** a Vila saiu do passe de cor do Médio (`POS_MEDIO_FORA`, perto de `posLeve`). Os outros cortes testados (densidade e distância da vegetação da Vila no Médio; piso do 5B-2 em Lambert e 5B-7 desligado no Médio do Sanatório) não deram ganho mensurável e não foram aplicados.
+- **Números:** duas colisões corrigidas no jogo (balança do Estábulo 412 kg → 418 kg; lotes "L. 31"/"L. 40" dos Túneis → "L. 42"/"L. 45"); números novos registrados em `biblia_terror.md` §6.
+- **PvP e menu:** smoke contra `4eded8b` (ver `mapa_areas.md` §8).
+
+## Pendências conhecidas (depois da validação final)
+
+- **Desempenho na máquina de teste (Intel UHD integrada):** o custo maior não é o visual (fases 3 e 5B) e sim o conteúdo das áreas (fases 2 e 5A): as chamadas de desenho passam de ~230 para ~500 na Vila e de ~110 para ~380 no Sanatório, e o envio delas domina o quadro. Juntar as malhas paradas de cada área (por material) é o próximo ganho grande; não foi feito aqui por ser uma mudança de estrutura.
+- **Baixo mais lento que o Médio no Sanatório** (16,0 ms contra 9,4 ms; vem do conteúdo da 5A): investigar.
+- **Engasgos no Alto:** p90 acima de 100 ms nos dois mapas desde o conteúdo (fases 2 e 5A); a mediana cabe no Sanatório e não na Vila.
+- **Decisão do Caio:** no Médio, a Vila ficou sem o look por área (só no Alto), em troca de ~15% de quadro. Voltar é tirar `vila` de `POS_MEDIO_FORA`.
+- **Picos de quadro ao entrar numa área** (p90 bem acima da mediana nas tomadas logo depois de mudar de lugar): o aquecimento (`warmUp`) já cobre os materiais da montagem, mas texturas e materiais criados depois (assinaturas, `A.dyn`) ainda compilam na hora.
+- **Armas (do revisor a15):** penetração de 8 a 21 mm na recarga vazia de LMG, AK e M4; antebraços das escopetas no estilo CS na mira; Python sem mão de apoio; SMG e Winter's Howl perto do olho (`FRAME`); cache das mãos procedurais (`compileAsync`).
+- **Cenário da Vila:** opacidade dos bancos de neblina, estalo do relógio da Estação a cada 60 s, closure por quadro da fogueira do Acampamento (código do Vitor); ver `mapa_areas.md` §6, "Em aberto".
+- **Sanatório:** a tampa da caixa da Ilha do porto (Vila) que "bate por dentro" repete o motivo das batidas de dentro do Necrotério (gaveta 214); decidir se fica como eco ou troca. Fichas da bíblia que o jogo implementou diferente (colmeias 4–6, placas SL-…) já foram acertadas na bíblia.
+- **Rede:** nada da atmosfera viaja pela rede; o smoke de PvP foi feito só com o host local (sem segundo jogador).
