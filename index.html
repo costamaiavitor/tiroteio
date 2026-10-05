@@ -6,7 +6,7 @@
      conexões só com o pareamento do PeerJS e o Firebase; um script injetado não consegue falar com outro servidor. 'unsafe-inline' é
      necessário pelos scripts inline (importmap e o módulo do jogo); jsdelivr/unpkg só são usados quando o arquivo é aberto do disco (file://).
      Ao ligar o App Check, acrescentar www.google.com e firebaseappcheck.googleapis.com. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com https://cdn.jsdelivr.net https://unpkg.com; worker-src blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: https://www.gstatic.com https://cdn.jsdelivr.net https://0.peerjs.com wss://0.peerjs.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com wss://firestore.googleapis.com https://www.googleapis.com https://tiroteio-237ee.firebaseapp.com; frame-src https://tiroteio-237ee.firebaseapp.com https://accounts.google.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com https://cdn.jsdelivr.net https://unpkg.com; worker-src blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: https:; connect-src 'self' blob: https://www.gstatic.com https://cdn.jsdelivr.net https://0.peerjs.com wss://0.peerjs.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com wss://firestore.googleapis.com https://www.googleapis.com https://tiroteio-237ee.firebaseapp.com; frame-src https://tiroteio-237ee.firebaseapp.com https://accounts.google.com https://www.youtube-nocookie.com">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dan of Duty</title>
@@ -562,7 +562,7 @@ const PROTO = 3; // versão do protocolo de rede: subir quando mensagens, armas 
 const CFG = {
   name: String(load('name', 'Jogador' + Math.floor(rand(100, 999)))).replace(/[<>]/g, '').slice(0, 16) || 'Jogador', // mesmo filtro do campo (o localStorage é editável)
   sens: load('sens', 1), fov: load('fov', 85), vol: load('vol', 0.6), shadows: load('shadows', true), gfx: load('gfx', null),
-  bright: load('bright', 1), xh: load('xh', 'padrao'), xhc: load('xhc', 'verde'), zmarks: load('zmarks', true), lant: load('lant', false), autofull: load('autofull', true),
+  bright: load('bright', 1), mvol: load('mvol', .5), xh: load('xh', 'padrao'), xhc: load('xhc', 'verde'), zmarks: load('zmarks', true), lant: load('lant', false), autofull: load('autofull', true),
 };
 
 // ================================================================
@@ -19499,6 +19499,7 @@ function srvOnData(conn, d) {
     if (S.banidos?.has(chaveLeft) || S.banidos?.has('nome:' + nome0)) { conn.pid = null; NET.conns.delete(id); return recusa('Você foi removido desta sala pelo host'); }
     for (let n = 2; [...S.players.values()].some(p => p.name === name); n++) name = nome0.slice(0, 12) + ' (' + n + ')';
     const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk); np.chaveLeft = chaveLeft; np.nome0 = nome0;
+    if (S.music) setTimeout(() => { try { if (S.music) conn.send({ t: 'music', url: S.music.url, el: musEl() }); } catch (e) { } }, 800); // música tema já tocando
     conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code, hk: NET.hostKey, lobby: S.lobby ? 1 : 0 });
     if (S.lobby) { lobbySync(); return; }
     broadcast({ t: 'info', txt: name + ' entrou na sala' });
@@ -22900,6 +22901,7 @@ function onMsgInner(m) {
     case 'msg': centerMsg(String(m.txt ?? '').slice(0, 80), String(m.sub ?? '').slice(0, 160), finN(m.dur) ? clamp(m.dur, 0, 30) : 3); if (typeof m.snd === 'string') play(m.snd); break;
     case 'err': toast(String(m.txt ?? '').slice(0, 160), 2); play('empty'); break;
     case 'info': toast(String(m.txt ?? '').slice(0, 160), 3); break;
+    case 'music': if (!NET.isHost) { const u = String(m.url ?? '').slice(0, 400); if (u) musPlay(u, +m.el || 0); else musStop(); } break;
     case 'chat': chatAdd((m.tm ? '<span style="color:#8fd">(time)</span> ' : '') + `<b style="color:${esc(colorOf(m.id))}">${esc(nameOf(m.id))}:</b> ${esc(String(m.txt ?? '').slice(0, 120))}`); play('chat'); break;
     case 'bye': removeRemote(m.id); C.players.delete(m.id); break;
   }
@@ -23109,7 +23111,7 @@ $('#buy').addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('keydown', e => {
   if (!inGame) return;
   if (C.chatOpen) {
-    if (e.code === 'Enter') { const v = $('#chatin').value.trim(); if (v) sendToHost({ t: 'chat', txt: v, tm: C.chatTeam ? 1 : 0 }); closeChat(); }
+    if (e.code === 'Enter') { const v = $('#chatin').value.trim(), mc = v.match(/^\/m[uú]sica\b\s*(.*)$/i); if (mc) { if (NET.isHost) hostMusic(/^(parar|stop)$/i.test(mc[1]) ? '' : mc[1]); else toast('Só o host escolhe a música', 2); } else if (v) sendToHost({ t: 'chat', txt: v, tm: C.chatTeam ? 1 : 0 }); closeChat(); }
     else if (e.code === 'Escape') closeChat();
     return;
   }
@@ -23278,6 +23280,7 @@ function settingsForm(el) {
     <label>Sensibilidade <span class="v" data-v="sens"></span><input type="range" data-k="sens" min="0.1" max="4" step="0.05"></label>
     <label>Campo de visão <span class="v" data-v="fov"></span><input type="range" data-k="fov" min="60" max="110" step="1"></label>
     <label>Volume <span class="v" data-v="vol"></span><input type="range" data-k="vol" min="0" max="1" step="0.05"></label>
+    <label>Volume da música tema <span class="v" data-v="mvol"></span><input type="range" data-k="mvol" min="0" max="1" step="0.05"></label>
     <label>Brilho <span class="v" data-v="bright"></span><input type="range" data-k="bright" min="0.6" max="1.8" step="0.05"></label>
     <div class="row" style="align-items:flex-end;gap:10px"><label style="flex:1">Mira <select data-k="xh">${Object.entries(XH).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('')}</select></label>
       <label style="flex:1">Cor da mira <select data-k="xhc">${Object.entries(XHC).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('')}</select></label><div class="xhprev" data-xhp></div></div>
@@ -23289,7 +23292,7 @@ function settingsForm(el) {
   xhApply();
   const gq = el.querySelector('[data-k="gfx"]'); gq.value = CFG.gfx;
   gq.onchange = () => { CFG.gfx = gq.value; save('gfx', CFG.gfx); applySettings(); };
-  for (const k of ['sens', 'fov', 'vol', 'bright']) {
+  for (const k of ['sens', 'fov', 'vol', 'bright', 'mvol']) {
     const i = el.querySelector(`[data-k="${k}"]`), v = el.querySelector(`[data-v="${k}"]`);
     i.value = CFG[k]; v.textContent = CFG[k];
     i.oninput = () => { CFG[k] = +i.value; v.textContent = i.value; save(k, CFG[k]); applySettings(); };
@@ -23553,6 +23556,57 @@ function lobbyStart() {
   broadcast({ t: 'start', st }, C.myId); // os outros montam o mapa antes do primeiro "spawn"
   buildMap(st.map); enterGame(); srvStartMatch(); lobbyUI();
 }
+// ---------- música tema da sala ----------
+// O host põe um link (YouTube ou arquivo de áudio em https) e todos ouvem a mesma música, em loop, a partir do mesmo ponto.
+// O host guarda o link e a hora em que começou; quem entra depois recebe quantos segundos já tocaram.
+// Cada jogador ajusta o volume em Configurações (Volume da música tema). Do YouTube só vale o id do vídeo (player youtube-nocookie).
+const MUS = { url: '', el: null, kind: '' };
+function musParse(u) {
+  u = String(u || '').trim().slice(0, 400); if (!u) return null;
+  let url; try { url = new URL(u); } catch (e) { return null; }
+  if (url.protocol !== 'https:') return null;
+  const h = url.hostname.replace(/^(www|m|music)\./, '');
+  let id = null;
+  if (h === 'youtu.be') id = url.pathname.slice(1, 12);
+  else if (h === 'youtube.com' || h === 'youtube-nocookie.com') id = url.searchParams.get('v') || (url.pathname.match(/\/(?:embed|shorts|live)\/([\w-]{11})/) || [])[1];
+  if (id) return /^[\w-]{11}$/.test(id) ? { kind: 'yt', id, url: 'https://youtu.be/' + id } : null;
+  return { kind: 'audio', url: url.href };
+}
+function musStop() { if (MUS.el) { try { MUS.el.pause?.(); } catch (e) { } MUS.el.remove(); } MUS.el = null; MUS.url = ''; MUS.kind = ''; }
+function musicVol() {
+  if (!MUS.el) return;
+  const v = Math.max(0, Math.min(1, CFG.mvol ?? .5));
+  if (MUS.kind === 'audio') MUS.el.volume = v;
+  else try { MUS.el.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [Math.round(v * 100)] }), 'https://www.youtube-nocookie.com'); } catch (e) { }
+}
+function musPlay(u, el = 0) { // toca (ou troca) a música; el = segundos que já tocaram no host
+  const m = musParse(u); if (!m) { musStop(); return; }
+  if (MUS.url === m.url && MUS.el) return;
+  musStop(); MUS.url = m.url; MUS.kind = m.kind; el = Math.max(0, +el || 0);
+  if (m.kind === 'audio') {
+    const a = document.createElement('audio'); a.src = m.url; a.loop = true; a.preload = 'auto'; a.style.display = 'none';
+    a.onloadedmetadata = () => { if (isFinite(a.duration) && a.duration > 0) a.currentTime = el % a.duration; };
+    a.onerror = () => { if (MUS.el === a) toast('Não deu para tocar a música: o link precisa ser de um arquivo de áudio', 4); };
+    document.body.appendChild(a); MUS.el = a; musicVol();
+    a.play().catch(() => { const go = () => { removeEventListener('pointerdown', go); if (MUS.el === a) a.play().catch(() => { }); }; addEventListener('pointerdown', go); }); // navegador só toca depois de um clique
+  } else {
+    const f = document.createElement('iframe'); f.allow = 'autoplay'; f.title = 'música tema';
+    f.style.cssText = 'position:fixed;width:2px;height:2px;left:-10px;top:-10px;opacity:0;pointer-events:none;border:0';
+    f.src = `https://www.youtube-nocookie.com/embed/${m.id}?autoplay=1&loop=1&playlist=${m.id}&start=${Math.floor(el)}&enablejsapi=1&controls=0`;
+    f.onload = () => { if (MUS.el === f) { musicVol(); setTimeout(musicVol, 1500); setTimeout(musicVol, 4000); } };
+    document.body.appendChild(f); MUS.el = f;
+  }
+}
+// host: escolhe a música da sala e manda para todos (link vazio para a música)
+function hostMusic(u) {
+  if (!NET.isHost) return;
+  const m = u ? musParse(u) : null;
+  if (u && !m) { toast('Link inválido: use https (YouTube ou arquivo .mp3/.ogg)', 4); return; }
+  S.music = m ? { url: m.url, t0: performance.now() / 1000 } : null;
+  broadcast({ t: 'music', url: m ? m.url : '', el: 0 }); musPlay(m ? m.url : '');
+  toast(m ? 'Música tema tocando para todos' : 'Música tema parada', 2);
+}
+const musEl = () => S.music ? performance.now() / 1000 - S.music.t0 : 0;
 function lobbyUI() {
   const el = $('#lobby'); if (!el) return;
   const on = LB.on && !inGame, host = NET.isHost;
@@ -23561,12 +23615,13 @@ function lobbyUI() {
   if (el.dataset.k !== (host ? 'h' : 'c')) { // esqueleto (o formulário do host não é redesenhado a cada mudança)
     el.dataset.k = host ? 'h' : 'c';
     el.innerHTML = `<h3 id="lbHead"></h3><div class="lbcols"><div><div class="lbl" style="margin-top:0">Jogadores</div><div id="lbPl"></div>${host ? '<div class="lbl">Convidar amigos</div><div id="lbFr"></div>' : ''}</div>
-      <div>${host ? '<div id="lbForm"></div>' : '<div id="lbInfo"></div>'}</div></div>
+      <div>${host ? '<div id="lbForm"></div><div class="lbl">Música tema (todos ouvem)</div><div style="display:flex;gap:8px"><input id="lbMus" placeholder="Link do YouTube ou de um .mp3" maxlength="400" style="flex:1"><button id="lbMusGo">Tocar</button><button id="lbMusX">Parar</button></div><div class="hint">Na partida, o host também pode digitar no chat: /musica link (ou /musica parar).</div>' : '<div id="lbInfo"></div>'}</div></div>
       <div class="actbar">${host ? '<button id="lbGo" class="big">Começar partida</button>' : ''}<button id="lbOut" class="big">${host ? 'Fechar sala' : 'Sair do lobby'}</button></div>`;
     if (host) {
       LB.getForm = matchForm($('#lbForm'), S.st);
       $('#lbForm').addEventListener('click', () => setTimeout(() => { S.st = C.st = LB.getForm(); lobbySync(); }));
       $('#lbGo').onclick = lobbyStart;
+      $('#lbMus').value = S.music?.url || load('music', ''); $('#lbMusGo').onclick = () => { const v = $('#lbMus').value.trim(); save('music', v); hostMusic(v); }; $('#lbMusX').onclick = () => hostMusic('');
     }
     $('#lbOut').onclick = leaveGame;
     frPing();
@@ -23807,6 +23862,7 @@ function skinsInit() {
 }
 function applySettings() {
   if (MASTER) MASTER.gain.value = CFG.vol;
+  musicVol();
   applyQuality(); visApply();
 }
 const lastSt = load('lastSt', { map: 'arena', mode: 'rounds', rounds: 8, frags: 20, bots: 0, diff: 1, zmap: 'vila', zdiff: 1 });
