@@ -6,7 +6,7 @@
      conexões só com o pareamento do PeerJS e o Firebase; um script injetado não consegue falar com outro servidor. 'unsafe-inline' é
      necessário pelos scripts inline (importmap e o módulo do jogo); jsdelivr/unpkg só são usados quando o arquivo é aberto do disco (file://).
      Ao ligar o App Check, acrescentar www.google.com e firebaseappcheck.googleapis.com. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com https://cdn.jsdelivr.net https://unpkg.com; worker-src blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: https:; connect-src 'self' blob: https://www.gstatic.com https://cdn.jsdelivr.net https://0.peerjs.com wss://0.peerjs.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com wss://firestore.googleapis.com https://www.googleapis.com https://tiroteio-237ee.firebaseapp.com; frame-src https://tiroteio-237ee.firebaseapp.com https://accounts.google.com https://www.youtube-nocookie.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com https://cdn.jsdelivr.net https://unpkg.com; worker-src blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: https:; connect-src 'self' blob: https://www.gstatic.com https://cdn.jsdelivr.net https://0.peerjs.com wss://0.peerjs.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com wss://firestore.googleapis.com https://www.googleapis.com https://tiroteio-237ee.firebaseapp.com; frame-src https://tiroteio-237ee.firebaseapp.com https://accounts.google.com https://www.youtube-nocookie.com https://open.spotify.com">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dan of Duty</title>
@@ -97,6 +97,8 @@ button.card.on{border-color:var(--acc);background:rgba(255,176,32,.1);box-shadow
 .playgrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
 @media(max-width:900px){.playgrid{grid-template-columns:1fr}.mtop{flex-wrap:wrap;height:auto;padding:8px 14px;gap:10px}.mplayer{min-width:0}}
 #hostForm{counter-reset:st}
+#spMus{position:fixed;left:12px;bottom:12px;width:300px;z-index:60;background:#121418;border-radius:12px;overflow:hidden;box-shadow:0 4px 18px #0008;transition:transform .2s}
+#spMus.hid{transform:translateX(-340px)}#spMus .spHd{font-size:12px;color:#cfd5dc;padding:5px 10px}#spMus iframe{display:block;width:100%;height:80px;border:0}
 #hostForm>.lbl,#lbForm>.lbl{font-size:13px;letter-spacing:2.5px;color:#cfd5dc;margin:20px 0 10px;display:flex;align-items:center;gap:10px}
 #hostForm>.lbl::before{counter-increment:st;content:counter(st);width:22px;height:22px;border-radius:50%;background:rgba(255,176,32,.16);color:var(--acc);display:inline-flex;align-items:center;justify-content:center;font-size:13px;letter-spacing:0}
 #hostForm>.lbl:first-child{margin-top:4px}
@@ -23560,12 +23562,20 @@ function lobbyStart() {
 // O host põe um link (YouTube ou arquivo de áudio em https) e todos ouvem a mesma música, em loop, a partir do mesmo ponto.
 // O host guarda o link e a hora em que começou; quem entra depois recebe quantos segundos já tocaram.
 // Cada jogador ajusta o volume em Configurações (Volume da música tema). Do YouTube só vale o id do vídeo (player youtube-nocookie).
+// Spotify: o player do Spotify não toca sozinho nem aceita volume pelo jogo. Aparece um mini player no canto (nos menus e na pausa)
+// e cada jogador clica em play. A música inteira só toca para quem está logado no Spotify no navegador; os outros ouvem 30 s.
 const MUS = { url: '', el: null, kind: '' };
 function musParse(u) {
   u = String(u || '').trim().slice(0, 400); if (!u) return null;
   let url; try { url = new URL(u); } catch (e) { return null; }
+  const sp = u.match(/^spotify:(track|album|playlist|episode|show|artist):([A-Za-z0-9]{22})$/);
+  if (sp) return { kind: 'sp', path: sp[1] + '/' + sp[2], url: `https://open.spotify.com/${sp[1]}/${sp[2]}` };
   if (url.protocol !== 'https:') return null;
   const h = url.hostname.replace(/^(www|m|music)\./, '');
+  if (h === 'open.spotify.com') {
+    const q = url.pathname.match(/^\/(?:intl-[a-z-]+\/)?(?:embed\/)?(track|album|playlist|episode|show|artist)\/([A-Za-z0-9]{22})/);
+    return q ? { kind: 'sp', path: q[1] + '/' + q[2], url: `https://open.spotify.com/${q[1]}/${q[2]}` } : null;
+  }
   let id = null;
   if (h === 'youtu.be') id = url.pathname.slice(1, 12);
   else if (h === 'youtube.com' || h === 'youtube-nocookie.com') id = url.searchParams.get('v') || (url.pathname.match(/\/(?:embed|shorts|live)\/([\w-]{11})/) || [])[1];
@@ -23577,13 +23587,17 @@ function musicVol() {
   if (!MUS.el) return;
   const v = Math.max(0, Math.min(1, CFG.mvol ?? .5));
   if (MUS.kind === 'audio') MUS.el.volume = v;
-  else try { MUS.el.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [Math.round(v * 100)] }), 'https://www.youtube-nocookie.com'); } catch (e) { }
+  else if (MUS.kind === 'yt') try { MUS.el.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [Math.round(v * 100)] }), 'https://www.youtube-nocookie.com'); } catch (e) { }
 }
 function musPlay(u, el = 0) { // toca (ou troca) a música; el = segundos que já tocaram no host
   const m = musParse(u); if (!m) { musStop(); return; }
   if (MUS.url === m.url && MUS.el) return;
   musStop(); MUS.url = m.url; MUS.kind = m.kind; el = Math.max(0, +el || 0);
-  if (m.kind === 'audio') {
+  if (m.kind === 'sp') { // mini player visível: o Spotify exige um clique em play
+    const w = document.createElement('div'); w.id = 'spMus';
+    w.innerHTML = `<div class="spHd">♪ Música tema · clique em play</div><iframe title="música tema" allow="autoplay; encrypted-media" src="https://open.spotify.com/embed/${m.path}?utm_source=generator&theme=0"></iframe>`;
+    document.body.appendChild(w); MUS.el = w; spMusPos(); toast('Música tema do Spotify: clique em play no player do canto', 4);
+  } else if (m.kind === 'audio') {
     const a = document.createElement('audio'); a.src = m.url; a.loop = true; a.preload = 'auto'; a.style.display = 'none';
     a.onloadedmetadata = () => { if (isFinite(a.duration) && a.duration > 0) a.currentTime = el % a.duration; };
     a.onerror = () => { if (MUS.el === a) toast('Não deu para tocar a música: o link precisa ser de um arquivo de áudio', 4); };
@@ -23601,11 +23615,13 @@ function musPlay(u, el = 0) { // toca (ou troca) a música; el = segundos que j�
 function hostMusic(u) {
   if (!NET.isHost) return;
   const m = u ? musParse(u) : null;
-  if (u && !m) { toast('Link inválido: use https (YouTube ou arquivo .mp3/.ogg)', 4); return; }
+  if (u && !m) { toast('Link inválido: use um link do Spotify, do YouTube ou de um arquivo .mp3/.ogg', 4); return; }
   S.music = m ? { url: m.url, t0: performance.now() / 1000 } : null;
   broadcast({ t: 'music', url: m ? m.url : '', el: 0 }); musPlay(m ? m.url : '');
   toast(m ? 'Música tema tocando para todos' : 'Música tema parada', 2);
 }
+function spMusPos() { const w = $('#spMus'); if (w) w.classList.toggle('hid', !!document.pointerLockElement); } // na partida o player sai da tela (continua tocando)
+document.addEventListener('pointerlockchange', spMusPos);
 const musEl = () => S.music ? performance.now() / 1000 - S.music.t0 : 0;
 function lobbyUI() {
   const el = $('#lobby'); if (!el) return;
@@ -23615,7 +23631,7 @@ function lobbyUI() {
   if (el.dataset.k !== (host ? 'h' : 'c')) { // esqueleto (o formulário do host não é redesenhado a cada mudança)
     el.dataset.k = host ? 'h' : 'c';
     el.innerHTML = `<h3 id="lbHead"></h3><div class="lbcols"><div><div class="lbl" style="margin-top:0">Jogadores</div><div id="lbPl"></div>${host ? '<div class="lbl">Convidar amigos</div><div id="lbFr"></div>' : ''}</div>
-      <div>${host ? '<div id="lbForm"></div><div class="lbl">Música tema (todos ouvem)</div><div style="display:flex;gap:8px"><input id="lbMus" placeholder="Link do YouTube ou de um .mp3" maxlength="400" style="flex:1"><button id="lbMusGo">Tocar</button><button id="lbMusX">Parar</button></div><div class="hint">Na partida, o host também pode digitar no chat: /musica link (ou /musica parar).</div>' : '<div id="lbInfo"></div>'}</div></div>
+      <div>${host ? '<div id="lbForm"></div><div class="lbl">Música tema (todos ouvem)</div><div style="display:flex;gap:8px"><input id="lbMus" placeholder="Link do Spotify, do YouTube ou de um .mp3" maxlength="400" style="flex:1"><button id="lbMusGo">Tocar</button><button id="lbMusX">Parar</button></div><div class="hint">Na partida, o host também pode digitar no chat: /musica link (ou /musica parar).</div>' : '<div id="lbInfo"></div>'}</div></div>
       <div class="actbar">${host ? '<button id="lbGo" class="big">Começar partida</button>' : ''}<button id="lbOut" class="big">${host ? 'Fechar sala' : 'Sair do lobby'}</button></div>`;
     if (host) {
       LB.getForm = matchForm($('#lbForm'), S.st);
