@@ -16,9 +16,24 @@ Como a conexão funciona: posições (30 por segundo), bots e zumbis (20 por seg
 
 ## Modos
 
-- **Rodadas:** estilo CS. Uma vida por rodada, dinheiro, compra no começo da rodada.
+- **Rodadas:** competitivo do CS2, Ataque x Defesa com bomba. Detalhes abaixo.
 - **Mata-mata:** renasce, tudo grátis.
 - **Zumbis:** cooperativo (até 4), inspirado no CoD Zombies. Veja abaixo.
+
+## Modo Rodadas (competitivo do CS2)
+
+- **Partida:** primeiro a 13 (MR12, dá para escolher outro número no lobby). Troca de lado depois da rodada 12 ($800 para todos). Empate em 12 x 12 vai para a **prorrogação**: vence quem fizer 4 de 6 rodadas, com $10.000 para todos e troca de lado a cada 3 rodadas.
+- **Tempos:** 15 s de congelamento (compra), 20 s de compra depois que a rodada começa, 1:55 de rodada, 40 s de bomba, 7 s entre rodadas. Depois de plantar o relógio some e fica só o C4 piscando, como no CS.
+- **Bomba:** plantar em 3,2 s (E), desarmar em 10 s ou 5 s com kit. Vitória do Ataque por eliminação ou explosão; da Defesa por eliminação antes de plantar, desarme ou tempo.
+- **Economia:** $800 no início, máximo $16.000. Vitória $3.250 (bomba explodida ou desarmada: $3.500). Bônus de derrota $1.400 → $1.900 → $2.400 → $2.900 → $3.400; ao vencer, o bônus cai só um nível (CS2). Plantar: +$800 para o Ataque mesmo perdendo. Quem planta ou desarma ganha +$300. Ataque vivo que deixa o tempo acabar não ganha nada. Abate: $300 (rifles e pistolas), $600 (SMGs), $900 (escopetas), $100 (AWP e CZ75), $1.500 (faca). Matar aliado: -$300.
+- **Armas do CS2 por lado** (todas com modelo realista): pistolas Glock/USP-S, P250, Tec-9 (A), Five-SeveN (D), CZ75-Auto, Desert Eagle, R8; SMGs MAC-10 (A), MP9 (D), MP5-SD, UMP-45, P90; pesadas Nova, XM1014, Sawed-Off (A), MAG-7 (D), Negev, M249; rifles Galil AR (A), FAMAS (D), AK-47 (A), M4A4 e M4A1-S (D), SG 553 (A), AUG (D); snipers SSG 08, AWP, G3SG1 (A), SCAR-20 (D). Colete $650, colete + capacete $1.000 (só o capacete: $350), kit $400.
+- **Granadas:** HE $300, flash $200 (cega de acordo com a distância e para onde você olha), fumaça $300 (apaga o fogo e corta a visão dos bots), molotov $400 (A) / incendiária $500 (D) com fogo no chão por 7 s, decoy $50 (imita tiros). Máximo de 4, com até 2 flashes.
+- **Compra:** só na base do seu time; comprar outra arma larga a antiga no chão.
+- **Armas no chão:** quem morre larga a melhor arma (e o kit). **G** larga a arma da mão (com a faca na mão, larga a bomba). Passar por cima pega se o espaço estiver vazio; **E** troca pela do chão.
+- **Fogo amigo** (opção no lobby, ligado por padrão): aliado leva 33% das balas e 85% das granadas.
+- **Placar (Tab):** um bloco por time com $ do seu time, abates, assistências (mais de 40 de dano), mortes e MVPs, e o histórico das rodadas (eliminação, bomba, desarme, tempo). No fim da rodada aparece o relatório de dano dado e levado.
+- **Comunicação:** **U** chat do time; morto só fala com morto durante a rodada; **Z** ou o botão do meio marca um ponto para o time (aparece no mundo e no mini mapa).
+- **Tiro:** levar tiro deixa lento por um instante (tagging); andar com Shift não faz barulho de passo.
 
 ## Modo Zumbis
 
