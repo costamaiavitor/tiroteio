@@ -536,6 +536,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
         <b>G</b><span>Rodadas: largar a arma (com a faca na mão, larga a bomba)</span>
         <b>E</b><span>Rodadas: trocar pela arma do chão (passar por cima pega se o espaço estiver vazio)</span>
         <b>M</b><span>Rodadas: mapa inteiro com o nome dos lugares</span>
+        <b>K</b><span>Rodadas: trocar de time (também no Esc)</span>
         <b>Z / botão do meio</b><span>Rodadas: marcar um ponto para o time</span>
         <b>4</b><span>Granadas: HE, flash, fumaça, molotov/incendiária e decoy</span>
         <b>Shift + W</b><span>Zumbis: correr (fôlego limitado; atirar interrompe)</span>
@@ -552,6 +553,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
     <h2>PAUSA</h2>
     <div id="pRoom" class="box" style="margin-bottom:12px"></div>
     <button id="btnResume" class="big">Continuar</button>
+    <button id="btnTeam" class="big" style="margin-top:8px;display:none"></button>
     <div class="box" id="pMusic" style="margin-top:12px"><h3>Música da sala (todos ouvem juntos)</h3>
       <div style="display:flex;gap:8px"><input id="musIn" maxlength="400" placeholder="Link do Spotify, do YouTube ou de um .mp3" style="flex:1"><button id="musGo">Tocar</button></div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button id="musPP">Pausar</button><button id="musX">Parar</button><small id="musNow" style="opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></small></div></div>
@@ -19596,7 +19598,7 @@ function joinRoom(code) {
   });
   peer.on('error', err => { clearTimeout(timer); if (err.type === 'peer-unavailable') fail('Sala não encontrada: ' + code); else if (welcomed) console.warn(err); else fail('Erro de conexão: ' + err.type); });
 }
-// cliente: "estou vivo" a cada 1 s (com a hora, para medir o ping); se o host sumir por 12 s, avisa.
+// cliente: "estou vivo" a cada 1 s (com a hora, para medir o ping); se o host sumir por 20 s, avisa.
 // Roda no tick (que o worker mantém em aba escondida): no setInterval o Chrome passa a 1 vez por minuto
 // depois de 5 min escondido, e o host derrubava quem estava morto/assistindo com a aba em segundo plano.
 function clientHeartbeat(dt) {
@@ -19604,7 +19606,7 @@ function clientHeartbeat(dt) {
   const pn = performance.now(); if (NET.hbAt && pn - NET.hbAt > 2000 && NET.lastHost) NET.lastHost = Math.max(NET.lastHost, pn - 2000); NET.hbAt = pn; // esta aba ficou travada (não o host): as mensagens da fila ainda chegam
   NET.pingT = (NET.pingT || 0) - dt; if (NET.pingT > 0) return; NET.pingT = 1;
   sendToHostFast({ t: 'ping', c: Math.round(performance.now()) });
-  if (NET.lastHost && performance.now() - NET.lastHost > 12000) lostConnection();
+  if (NET.lastHost && performance.now() - NET.lastHost > 20000) lostConnection();
 }
 function lostConnection() {
   if (LB.on && !inGame) { LB.on = false; lobbyUI(); $('#joinStatus').textContent = 'O host fechou a sala'; setTimeout(leaveGame, 2500); return; }
@@ -19650,6 +19652,7 @@ function srvOnData(conn, d) {
     for (let n = 2; [...S.players.values()].some(p => p.name === name); n++) name = nome0.slice(0, 12) + ' (' + n + ')';
     const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk); np.chaveLeft = chaveLeft; np.nome0 = nome0;
     if (S.music) setTimeout(() => { try { if (S.music) conn.send({ t: 'music', url: S.music.url, el: srvMusPos(), paused: S.music.paused ? 1 : 0 }); } catch (e) { } }, 800); // música da sala já tocando
+    conn.grace = performance.now() + GRACE_MAPA; // quem entra no meio monta o mapa antes de mandar o primeiro sinal
     conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code, hk: NET.hostKey, lobby: S.lobby ? 1 : 0 });
     if (S.lobby) { lobbySync(); return; }
     broadcast({ t: 'info', txt: name + ' entrou na sala' });
@@ -19898,6 +19901,7 @@ function srvHandle(pid, m) {
       for (const q of S.players.values()) if ((!cm.tm || q.team === p.team) && (!cm.dd || !q.alive || S.phase !== 'live')) sendTo(q.id, cm);
       break;
     }
+    case 'team': srvSwitchTeam(p, m.tm); break;
     case 'suicide': if (p.alive && !p.downed && S.phase !== 'over') srvKill(p, null, 'world', false); break; // caído nos zumbis não pula o sangramento
   }
 }
@@ -20066,6 +20070,30 @@ function isR() { return S.st?.mode === 'rounds'; }
 function csMode() { return S.st?.mode === 'rounds' || S.st?.mode === 'dm'; } // modos estilo CS: armas no chão
 function teamPick() { let t = 0, ct = 0; for (const q of S.players.values()) if (q.team === 't') t++; else if (q.team === 'ct') ct++; return t <= ct ? 't' : 'ct'; }
 function setTeam(p, tm) { p.team = tm; p.color = TEAMC[tm]; }
+// troca de time no meio da partida (como o "trocar de time" do CS): vivo na rodada = morre e volta no próximo round; no aquecimento e no
+// congelamento nasce já no lado novo. Equilíbrio: um bot do time novo passa para o antigo; sem bot, não deixa um time com 2 a mais.
+function srvSwitchTeam(p, tm) {
+  if (!isR() || (tm !== 't' && tm !== 'ct') || p.team === tm || S.phase === 'over') return;
+  const tell = txt => { if (!p.isBot) sendTo(p.id, { t: 'info', txt }); };
+  if (now - (p.teamAt ?? -99) < 5) return tell('Espere uns segundos para trocar de time de novo');
+  const old = p.team, n = t => [...S.players.values()].filter(q => q !== p && q.team === t).length, bot = [...S.players.values()].find(q => q.isBot && q.team === tm);
+  if (!bot && n(tm) > n(old)) return tell(`O time ${TEAMN[tm]} já tem mais jogadores`);
+  p.teamAt = now; srvMoveTeam(p, tm); if (bot) srvMoveTeam(bot, old);
+  broadcast({ t: 'info', txt: `${p.name} foi para ${TEAMN[tm]}` + (bot ? ` (${bot.name} foi para ${TEAMN[old]})` : '') }); srvState();
+}
+function srvMoveTeam(p, tm) {
+  const B = S.bomb, carrier = B?.st === 'carried' && B.by === p.id;
+  if (S.phase === 'warmup' || S.phase === 'freeze') { // ainda dá para jogar a rodada: nasce no lado novo com a pistola do time (o dinheiro fica)
+    if (carrier) { const o = [...S.players.values()].filter(q => q !== p && q.team === 't' && q.alive); if (o.length) B.by = o[Math.floor(Math.random() * o.length)].id; else S.bomb = null; }
+    setTeam(p, tm); p.inv = defInv(); if (tm === 'ct') p.inv.secondary = 'usp'; p.act = null; p.kit = false;
+    const taken = [...S.players.values()].filter(q => q !== p && q.alive).map(q => q.pos);
+    srvSpawn(p, S.phase === 'warmup' ? pickSpawn(null, []) : pickSpawn(tm === 'ct' ? 'b' : 'a', taken), true); if (p.isBot) botBuy(p);
+    if (tm === 't' && !S.bomb && S.phase === 'freeze') S.bomb = { st: 'carried', by: p.id, pos: p.pos.slice(), end: 0, pl: false };
+    return;
+  }
+  if (p.alive) { srvKill(p, null, 'world', false); p.deaths--; } // rodada valendo: sai dela (como no CS), sem contar morte
+  setTeam(p, tm); p.alive = false; p.inv = defInv(); if (tm === 'ct') p.inv.secondary = 'usp'; p.armor = 0; p.helmet = false; p.kit = false;
+}
 function inSite(x, z) { const st = curMap?.sites; if (st) for (const k in st) { const r = st[k]; if (x > r[0] && x < r[1] && z > r[2] && z < r[3]) return k; } return null; }
 function bombDrop(p) { const B = S.bomb; if (p && B?.st === 'carried' && B.by === p.id) { B.st = 'dropped'; B.pos = p.pos.slice(); } }
 function bombTick() {
@@ -20165,11 +20193,13 @@ function srvState() {
   for (const conn of NET.conns.values()) if (conn.open) try { conn.send(conn.v >= 2 ? lean : msg); } catch (e) { }
   onMsg(lean);
 }
-// quem fechou a aba sem avisar (o WebRTC às vezes demora pra perceber) sai depois de 12s sem mandar nada
+// quem fechou a aba sem avisar (o WebRTC às vezes demora pra perceber) sai depois de 20 s sem mandar nada (12 s derrubava PC fraco que travava carregando)
 let dropCheckT = 0;
+const GRACE_MAPA = 45000; // ms extras de tolerância para montar o mapa (PC fraco/celular) ao começar ou entrar na partida
 function srvCheckTimeouts() {
-  if (performance.now() < dropCheckT) return; dropCheckT = performance.now() + 1000;
-  for (const conn of [...NET.conns.values()]) if (conn.lastSeen && performance.now() - conn.lastSeen > 12000) { try { conn.close(); } catch (e) { } srvDrop(conn); }
+  const pn = performance.now(); if (dropCheckT && pn - dropCheckT > 3000) for (const c of NET.conns.values()) c.lastSeen = Math.max(c.lastSeen || 0, pn); // o host é que travou (montando o mapa): não culpa os outros
+  if (pn < dropCheckT) return; dropCheckT = pn + 1000;
+  for (const conn of [...NET.conns.values()]) if (conn.lastSeen && pn - conn.lastSeen > 20000 && pn > (conn.grace || 0)) { try { conn.close(); } catch (e) { } srvDrop(conn); }
 }
 function srvTick(dt) {
   srvCheckTimeouts();
@@ -23137,7 +23167,7 @@ function onMsgInner(m) {
     }
     case 'lobby': m.st = saneSt(m.st); if (!Array.isArray(m.pl)) m.pl = []; for (const q of m.pl) { if (q && typeof q === 'object') { q.id = String(q.id); q.n = String(q.n ?? '').slice(0, 20); q.c = /^#[0-9a-f]{3,8}$/i.test(q.c) ? q.c : '#cccccc'; q.tm = q.tm === 't' || q.tm === 'ct' ? q.tm : ''; } } LB.data = m; C.st = m.st; lobbyUI(); break;
     case 'tolobby': LB.on = true; toMenu(); lobbyUI(); break;
-    case 'start': LB.on = false; C.st = saneSt(m.st); ZC.snapTs = 0; buildMap(C.st.map); enterGame(); lobbyUI(); break;
+    case 'start': NET.lastHost = performance.now() + GRACE_MAPA; LB.on = false; C.st = saneSt(m.st); ZC.snapTs = 0; buildMap(C.st.map); enterGame(); lobbyUI(); break;
     case 'deny': toast(m.txt, 4); LB.on = false; lobbyUI(); $('#joinStatus').textContent = m.txt; setTimeout(leaveGame, 2500); break;
     case 'bboom': { const p = new V3(m.p[0], m.p[1] + .6, m.p[2]); boomFx(p); for (let i = 0; i < 6; i++) puff(p.clone().add(new V3(rand(-3, 3), rand(0, 3), rand(-3, 3))), 0x555555, 4, 3); break; }
     case 'nade': spawnNade(m.id, m.k, m.p, m.v); break;
@@ -23667,6 +23697,7 @@ addEventListener('keydown', e => {
     case 'KeyG': if (C.st?.mode !== 'zombies' && me.alive) { if (G.cur === 'knife' && !(C.bomb?.s === 'carried' && C.bomb.by === C.myId)) toast('Não dá para largar a faca', 1.5); else if (W[G.cur]?.slot === 'nade') toast('Granada não se larga: jogue com o clique', 1.5); else sendToHost({ t: 'drop', w: G.cur }); } break;
     case 'KeyE': if (C.st?.mode !== 'zombies' && me.alive && !C.eTip) sendToHost({ t: 'pick' }); break;
     case 'KeyZ': sendMark(); break;
+    case 'KeyK': if (C.st?.mode === 'rounds') switchTeam(); break;
     case 'KeyL': if (ZC.on) { CFG.lant = !CFG.lant; save('lant', CFG.lant); play('empty'); toast(CFG.lant ? 'Lanterna ligada (L)' : 'Lanterna desligada (L)'); } break;
     case 'Space': if (!me.alive) cycleSpec(); break;
   }
@@ -24082,6 +24113,7 @@ function toMenu() {
 }
 function lobbyStart() {
   const st = LB.getForm(); save('lastSt', st); S.st = C.st = st; S.lobby = false; LB.on = false; S.fromLobby = true;
+  for (const c of NET.conns.values()) c.grace = performance.now() + GRACE_MAPA; // cada um monta o mapa no seu PC: quem demora não cai
   broadcast({ t: 'start', st }, C.myId); // os outros montam o mapa antes do primeiro "spawn"
   buildMap(st.map); enterGame(); srvStartMatch(); lobbyUI();
 }
@@ -24505,6 +24537,10 @@ nameSync();
 $('#btnJoin').onclick = () => { audioInit(); joinRoom($('#inCode').value); };
 $('#inCode').addEventListener('keydown', e => { if (e.code === 'Enter') $('#btnJoin').click(); });
 $('#btnResume').onclick = () => requestLock();
+const myTm = () => C.players.get(C.myId)?.tm;
+function teamBtn() { const b = $('#btnTeam'), tm = myTm(), ok = C.st?.mode === 'rounds' && (tm === 't' || tm === 'ct'); b.style.display = ok ? '' : 'none'; if (ok) b.textContent = 'Trocar para ' + TEAMN[tm === 't' ? 'ct' : 't'] + ' (K)'; }
+function switchTeam() { const tm = myTm(); if (C.st?.mode !== 'rounds' || !tm) return; sendToHost({ t: 'team', tm: tm === 't' ? 'ct' : 't' }); }
+$('#btnTeam').onclick = () => { switchTeam(); setTimeout(teamBtn, 400); };
 $('#click').onclick = () => requestLock();
 $('#btnLeave').onclick = () => leaveGame();
 $('#btnFull').onclick = async () => {
@@ -24520,7 +24556,7 @@ $('#btnApply').onclick = () => {
 function showPause() {
   $('#pause').classList.remove('hidden');
   settingsForm($('#pauseSettings')); musMenu();
-  $('#pHostBox').style.display = NET.isHost ? '' : 'none';
+  $('#pHostBox').style.display = NET.isHost ? '' : 'none'; teamBtn();
   if (NET.isHost) { getPauseForm = matchForm($('#pauseForm'), S.st); renderKick(); }
   updateRoomInfo();
 }
@@ -24627,7 +24663,7 @@ fpLoad('p:ak'); fpLoad('m:knife'); fpLoad('m:karambit'); FPC['k:pack'] = new GLT
 setTimeout(() => { let q = Promise.resolve(); for (const k of Object.keys(FPM)) q = q.then(() => fpLoad('m:' + k)); }, 8000); // modelos das armas aos poucos (mundo e mãos dos outros)
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos); só em desenvolvimento (DEBUG), nunca no site publicado
-if (DEBUG) window.__T = { get NOW() { return now; }, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, ZMM, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
+if (DEBUG) window.__T = { get NOW() { return now; }, showPause, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, ZMM, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>

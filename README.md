@@ -22,6 +22,8 @@ Como a conexão funciona: posições (30 por segundo), bots e zumbis (20 por seg
 
 ## Modo Rodadas (competitivo do CS2)
 
+- **Trocar de time no meio da partida:** tecla **K** ou o botão no menu de pausa (Esc). No aquecimento e no tempo de compra você nasce já no lado novo; com a rodada valendo, sai dela e volta na próxima. Um bot do time novo passa para o outro lado para manter o equilíbrio (sem bot, não dá para deixar um time com mais jogadores). Espera de 5 s entre trocas.
+
 - **Partida:** primeiro a 13 (MR12, dá para escolher outro número no lobby). Troca de lado depois da rodada 12 ($800 para todos). Empate em 12 x 12 vai para a **prorrogação**: vence quem fizer 4 de 6 rodadas, com $10.000 para todos e troca de lado a cada 3 rodadas.
 - **Tempos:** 15 s de congelamento (compra), 20 s de compra depois que a rodada começa, 1:55 de rodada, 40 s de bomba, 7 s entre rodadas. Depois de plantar o relógio some e fica só o C4 piscando, como no CS.
 - **Bomba:** plantar em 3,2 s (E), desarmar em 10 s ou 5 s com kit. Vitória do Ataque por eliminação ou explosão; da Defesa por eliminação antes de plantar, desarme ou tempo.
