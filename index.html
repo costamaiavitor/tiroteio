@@ -19843,14 +19843,14 @@ function srvHandle(pid, m) {
     }
     case 'buy': srvBuy(p, m.it); break;
     case 'drop': { // G: larga a arma da mão; com a faca na mão, larga a bomba (para um aliado pegar)
-      if (!isR() || !p.alive || S.phase === 'warmup') return;
+      if (!csMode() || !p.alive) return;
       const B = S.bomb, f = [-Math.sin(p.yaw || 0), -Math.cos(p.yaw || 0)], at = [p.pos[0] + f[0] * 1.6, p.pos[1], p.pos[2] + f[1] * 1.6];
       if (m.w === 'knife') { if (B?.st === 'carried' && B.by === pid) { B.st = 'dropped'; B.pos = at; B.dropBy = pid; B.dropT = now; sendTo(pid, { t: 'info', txt: 'Você largou a bomba' }); } return; }
       if (!isW(m.w) || !(p.inv.primary === m.w || p.inv.secondary === m.w)) return;
       p.inv[W[m.w].slot] = null; srvDropW(p, m.w, at, pid); srvInvSync(p); break;
     }
     case 'pick': { // E perto de uma arma no chão: troca pela da mesma categoria
-      if (!isR() || !p.alive || !S.drops?.size) return;
+      if (!csMode() || !p.alive || !S.drops?.size) return;
       let best = null, bd = 2.2; for (const d of S.drops.values()) { const dd = Math.hypot(p.pos[0] - d.pos[0], p.pos[2] - d.pos[2]); if (d.w !== 'kit' && dd < bd && Math.abs(p.pos[1] - d.pos[1]) < 1.8) { bd = dd; best = d; } }
       if (!best) return; const sl = W[best.w].slot, old = p.inv[sl]; S.drops.delete(best.id);
       if (old) srvDropW(p, old, best.pos, pid); p.inv[sl] = best.w; srvInvSync(p, best.w); break;
@@ -20004,6 +20004,7 @@ function srvDeathDrop(v) {
 }
 function srvInvSync(p, got) { if (p.isBot) { p.bot.mag = 0; p.bot.magW = null; return; } sendTo(p.id, { t: 'inv', inv: p.inv, m: p.money, ar: p.armor, hm: p.helmet ? 1 : 0, got }); }
 function dropTick() { // passar por cima pega (só se o espaço da arma estiver vazio; o kit só a defesa pega)
+  if (!isR()) for (const d of S.drops.values()) if (now - d.t > 30) S.drops.delete(d.id); // Mata-mata: arma largada some em 30 s
   for (const d of [...S.drops.values()]) for (const p of S.players.values()) {
     if (!p.alive || Math.hypot(p.pos[0] - d.pos[0], p.pos[2] - d.pos[2]) > 1.1 || Math.abs(p.pos[1] - d.pos[1]) > 1.6 || now - d.t < (d.by === p.id ? 2 : .3)) continue;
     if (d.w === 'kit') { if (p.team !== 'ct' || p.kit) continue; p.kit = true; }
@@ -20032,6 +20033,7 @@ const RC = { freeze: 15, buy: 20, round: 115, end: 7, otMoney: 10000 }; // tempo
 const TEAMC = { t: '#e0a030', ct: '#4a90e2' }, TEAMN = { t: 'Ataque', ct: 'Defesa' };
 const BOMB = { plant: 3.2, defuse: 10, kit: 5, timer: 40, r: 22 };
 function isR() { return S.st?.mode === 'rounds'; }
+function csMode() { return S.st?.mode === 'rounds' || S.st?.mode === 'dm'; } // modos estilo CS: armas no chão
 function teamPick() { let t = 0, ct = 0; for (const q of S.players.values()) if (q.team === 't') t++; else if (q.team === 'ct') ct++; return t <= ct ? 't' : 'ct'; }
 function setTeam(p, tm) { p.team = tm; p.color = TEAMC[tm]; }
 function inSite(x, z) { const st = curMap?.sites; if (st) for (const k in st) { const r = st[k]; if (x > r[0] && x < r[1] && z > r[2] && z < r[3]) return k; } return null; }
@@ -20121,7 +20123,8 @@ function srvState() {
   }
   const full = (S.stN = (S.stN || 0) + 1) % 8 === 1;
   const msg = { t: 'state', ph: S.phase, tl: r2(Math.max(0, S.phaseEnd - now)), r: S.round, pl, win: S.winner, pre: S.pre ? r2(Math.max(0, S.pre - now)) : 0, st: full ? S.st : undefined };
-  if (isR()) { const B = S.bomb; msg.sc = S.score; msg.drops = S.drops ? [...S.drops.values()].map(d => [d.id, d.w, r2(d.pos[0]), r2(d.pos[1]), r2(d.pos[2])]) : []; msg.hist = S.hist; msg.ot = S.ot; msg.bomb = B ? { s: B.st, p: B.pos.map(r2), by: B.by, site: B.site } : null; }
+  if (csMode()) msg.drops = S.drops ? [...S.drops.values()].map(d => [d.id, d.w, r2(d.pos[0]), r2(d.pos[1]), r2(d.pos[2])]) : [];
+  if (isR()) { const B = S.bomb; msg.sc = S.score; msg.hist = S.hist; msg.ot = S.ot; msg.bomb = B ? { s: B.st, p: B.pos.map(r2), by: B.by, site: B.site } : null; }
   if (zmode && Z.on) { // mundo dos zumbis: só quando muda algo (ou 1 vez por segundo, por garantia); portas e compras já vão como evento
     const z = zWorldState(), k = [z.r, z.ph, z.pw, z.d.length, z.box[0], z.box[1], z.box[2], z.pap[0], z.pap[1], z.qr, z.dog, z.dr.map(d => d[0]).join(), z.tr.map(t => t[0]).join(), z.cm.map(c => c[0]).join()].join('|');
     if (full || k !== S.zKey || S.stN % 4 === 1) msg.z = z; S.zKey = k;
@@ -20142,7 +20145,7 @@ function srvTick(dt) {
   srvCheckTimeouts();
   if (S.st.mode === 'zombies') { zTick(dt); S.stateT -= dt; if (S.stateT <= 0) { S.stateT = .25; srvState(); } return; }
   for (const p of S.players.values()) if (p.isBot) botThink(p, dt);
-  if (isR() && S.drops?.size && S.phase !== 'warmup') dropTick();
+  if (csMode() && S.drops?.size) dropTick();
   const st = S.st, n = S.players.size;
   if (st.mode === 'dm') {
     if (S.phase === 'live') {
@@ -23258,7 +23261,7 @@ function updateHud(dt) {
 let BMESH = null, beepT = 0, mmT = 0;
 const DROPM = new Map(), MARKS = [];
 function dropsDraw() { // armas e kits no chão (modelo realista deitado)
-  const list = C.st?.mode === 'rounds' && inGame ? C.drops || [] : [], ids = new Set(list.map(d => d[0]));
+  const list = C.st?.mode !== 'zombies' && inGame ? C.drops || [] : [], ids = new Set(list.map(d => d[0]));
   for (const [id, o] of DROPM) if (!ids.has(id)) { scene.remove(o); DROPM.delete(id); }
   for (const [id, w, x, y, z] of list) {
     let o = DROPM.get(id);
@@ -23299,7 +23302,7 @@ function bombHud(dt) {
     if (keys.KeyE && tip && C.actEnd <= now && now > (C.eT || 0)) { C.eT = now + .4; sendToHost({ t: 'bomb', on: 1 }); }
   }
   C.eTip = !!tip;
-  if (!tip && me.alive && C.st?.mode === 'rounds') { let best = null, bd = 2.2; for (const d of C.drops || []) { const dd = Math.hypot(me.pos.x - d[2], me.pos.z - d[4]); if (d[1] !== 'kit' && dd < bd) { bd = dd; best = d; } }
+  if (!tip && me.alive && C.st?.mode !== 'zombies') { let best = null, bd = 2.2; for (const d of C.drops || []) { const dd = Math.hypot(me.pos.x - d[2], me.pos.z - d[4]); if (d[1] !== 'kit' && dd < bd) { bd = dd; best = d; } }
     if (best) { const sl = W[best[1]].slot; tip = G.inv[sl] ? `<b>E</b>: trocar ${esc(W[G.inv[sl]].name)} por ${esc(W[best[1]].name)}` : `Ande por cima para pegar ${esc(W[best[1]].name)}`; } }
   dropsDraw();
   const prog = C.actEnd > now ? clamp(1 - (C.actEnd - now) / C.actDur, 0, 1) : 0;
@@ -23585,8 +23588,8 @@ addEventListener('keydown', e => {
     case 'KeyB': openBuy(); break;
     case 'KeyY': case 'Enter': openChat(); e.preventDefault(); break;
     case 'KeyU': openChat(true); e.preventDefault(); break;
-    case 'KeyG': if (C.st?.mode === 'rounds' && me.alive) sendToHost({ t: 'drop', w: G.cur }); break;
-    case 'KeyE': if (C.st?.mode === 'rounds' && me.alive && !C.eTip) sendToHost({ t: 'pick' }); break;
+    case 'KeyG': if (C.st?.mode !== 'zombies' && me.alive) { if (G.cur === 'knife' && !(C.bomb?.s === 'carried' && C.bomb.by === C.myId)) toast('Não dá para largar a faca', 1.5); else if (W[G.cur]?.slot === 'nade') toast('Granada não se larga: jogue com o clique', 1.5); else sendToHost({ t: 'drop', w: G.cur }); } break;
+    case 'KeyE': if (C.st?.mode !== 'zombies' && me.alive && !C.eTip) sendToHost({ t: 'pick' }); break;
     case 'KeyZ': sendMark(); break;
     case 'KeyL': if (ZC.on) { CFG.lant = !CFG.lant; save('lant', CFG.lant); play('empty'); toast(CFG.lant ? 'Lanterna ligada (L)' : 'Lanterna desligada (L)'); } break;
     case 'Space': if (!me.alive) cycleSpec(); break;
