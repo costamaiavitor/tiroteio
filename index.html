@@ -246,6 +246,12 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #feed .hs{color:var(--red)}
 #room{position:absolute;top:10px;left:12px;font-size:16px;color:#ccc}
 #mmLbl{position:absolute;top:240px;left:12px;width:200px;text-align:center;font-size:17px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000}
+#zmm{position:absolute;top:34px;left:12px;width:220px;height:220px;border-radius:50%;display:none;box-shadow:0 0 0 2px rgba(255,255,255,.22),0 4px 14px rgba(0,0,0,.6)}
+#zmmLbl{position:absolute;top:258px;left:12px;width:220px;text-align:center;font-size:17px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000}
+#zmmLbl small{display:block;font-size:13px;font-weight:600;color:#c8ccd0;line-height:1.25}
+#zbig{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.8)}
+#zprompt span{display:inline-block;max-width:min(760px,92vw)}
+#zprompt small{display:block;font-size:17px;font-weight:600;color:#e6e6e6;margin-top:3px}
 #mmap{position:absolute;top:36px;left:12px;width:200px;height:200px;border:1px solid #fff3;border-radius:6px;display:none}
 #bombui{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);text-align:center;font-size:18px;color:#fff;text-shadow:0 1px 3px #000}
 #bombui .bar{width:260px;height:8px;background:#0008;margin:6px auto 0;border-radius:4px;overflow:hidden}#bombui .bar i{display:block;height:100%;background:#ffb020}
@@ -407,6 +413,9 @@ summary{cursor:pointer;color:#fff;font-weight:700}
   <div id="room"></div>
   <canvas id="mmap" width="200" height="200"></canvas>
   <div id="mmLbl"></div>
+  <canvas id="zmm" width="440" height="440"></canvas>
+  <div id="zmmLbl"></div>
+  <canvas id="zbig"></canvas>
   <div id="bombui"></div>
   <div id="top"><div id="score"></div><div id="timer"></div></div>
   <div id="feed"></div>
@@ -21801,7 +21810,7 @@ function zInteract(dt) {
     else if (ZC.perks.includes(pk.k)) { txt = `${P.name} (já tem)`; ok = false; }
     else if (ZC.perks.length >= ZMAXPERKS) { txt = `Limite de ${ZMAXPERKS} bebidas`; ok = false; }
     else txt = `${P.name} [${cost}]`;
-    cand(dist, { k: 'perk', id: pk.k, txt, ok, cost });
+    cand(dist, { k: 'perk', id: pk.k, txt, ok, cost, sub: P.desc }); // sub: o que a bebida faz, embaixo do preço
   }
   { const L = ZD.boxes[ZC.box.loc], dist = dd(L.x, L.z);
     if (dist < 2.3) {
@@ -21898,7 +21907,7 @@ function zHud(dt) {
   const sm = zPerk('stam') ? 8 : 4, sf = clamp((me.stamina ?? sm) / sm, 0, 1), sb = $('#zstam'); // fôlego
   sb.style.opacity = me.alive && !me.downed && sf < .999 ? 1 : 0; sb.firstElementChild.style.width = (sf * 100).toFixed(1) + '%'; sb.classList.toggle('low', sf < .3);
   const a = ZC.act;
-  setHTML('zprompt', a ? `<span class="${a.ok === false || (a.cost && a.cost > me.money) ? 'no' : ''}">${a.hold ? '' : '<b>F</b> — '}${esc(a.txt)}</span>` : '');
+  setHTML('zprompt', a ? `<span class="${a.ok === false || (a.cost && a.cost > me.money) ? 'no' : ''}">${a.hold ? '' : '<b>F</b> — '}${esc(a.txt)}${a.sub ? `<small>${esc(a.sub)}</small>` : ''}</span>` : '');
   let bar = 0;
   if (a?.k === 'rev' && ZC.revLocal > 0) bar = Math.min(ZC.revLocal / (zPerk('qr') ? 2 : 4), (C.players.get(a.id)?.rv || 0) + .3); // não passa do que o host contou
   if (me.downed && mine?.rv) bar = mine.rv;
@@ -23055,7 +23064,186 @@ function bombHud(dt) {
   }
   const prog = C.actEnd > now ? clamp(1 - (C.actEnd - now) / C.actDur, 0, 1) : 0;
   setHTML('bombui', tip + (prog ? `<div class="bar"><i style="width:${(prog * 100) | 0}%"></i></div>` : ''));
-  drawMinimap(dt);
+  drawMinimap(dt); zMinimap(dt);
+}
+// ---------- mini mapa do modo Zumbi ----------
+// Círculo no canto de cima à esquerda, 45 m de raio, que gira com o jogador (para cima é para onde você olha; o N marca o norte).
+// Fundo desenhado uma vez por mapa (e de novo quando abre uma porta): áreas liberadas em cinza, áreas ainda fechadas bem escuras,
+// paredes claras e obstáculos baixos mais escuros. Por cima, a cada quadro:
+//  - portas e entulhos ainda fechados (traço laranja); janelas: laranja com tábuas faltando, vermelha quando já não tem tábua;
+//  - bebidas (cor e letra da máquina; apagadas sem energia; anel verde nas que você já tem), armas de parede, armadilha;
+//  - Caixa Misteriosa onde ela está agora, Pack-a-Punch e alavanca da energia; power-ups no chão;
+//  - zumbis (vermelho; cães em laranja), aliados (seta na cor do jogador) e aliado caído (cruz piscando).
+// Caixa, Pack-a-Punch, energia desligada e aliado caído que estão fora do círculo ficam presos na borda, apontando a direção.
+// Embaixo: nome da área e distância até a caixa e a energia. Tecla M: mapa grande, norte para cima, com nomes das áreas, preço das
+// portas, nomes das bebidas e das armas de parede, e legenda ao lado. 1º M: 180 m em volta de você; 2º M: mapa inteiro; 3º M: fecha.
+// Os nomes pequenos (preços, armas de parede) só aparecem quando há espaço na tela para eles.
+const ZMM = { key: null, bg: null, S: 2, cw: 0, ch: 0, cen: null, big: 0, t: 0, tb: 0, labs: [] };
+function zmmRoomsOpen() { // áreas onde dá para ir: a inicial e as ligadas a ela por portas abertas; área sem porta conta como aberta
+  const open = new Set([ZD.start || 'A']), withDoor = new Set();
+  for (const d of ZD.doors) for (const r of d.rooms) withDoor.add(r);
+  for (let ch = true; ch;) { ch = false; for (const d of ZD.doors) if (ZC.doors.has(d.id)) { const [a, b] = d.rooms; if (open.has(a) !== open.has(b)) { open.add(a); open.add(b); ch = true; } } }
+  return r => !withDoor.has(r) || open.has(r);
+}
+function zmmBuild(key) {
+  const M = curMap, S = ZMM.S, cw = Math.ceil(M.w), ch = Math.ceil(M.d), W2 = M.w / 2, D2 = M.d / 2;
+  if (ZMM.cells?.map !== curMapId) { // em que área fica cada metro quadrado (uma vez por mapa)
+    const cells = new Array(cw * ch), cen = {};
+    for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
+      const r = ZD.zoneAt(-W2 + i + .5, -D2 + j + .5) || null; cells[j * cw + i] = r;
+      if (r) { const c = cen[r] ||= [0, 0, 0]; c[0] += i; c[1] += j; c[2]++; }
+    }
+    for (const r in cen) { const c = cen[r]; let x = c[0] / c[2] | 0, z = c[1] / c[2] | 0; // nome no meio da área (se o meio cair fora dela, no metro mais perto que é dela)
+      if (cells[z * cw + x] !== r) { let best = 1e9; for (let j = 0; j < ch; j += 2) for (let i = 0; i < cw; i += 2) if (cells[j * cw + i] === r) { const d = (i - x) ** 2 + (j - z) ** 2; if (d < best) { best = d; c[3] = i; c[4] = j; } } x = c[3]; z = c[4]; }
+      cen[r] = [x - W2 + .5, z - D2 + .5, c[2]]; }
+    ZMM.cells = { map: curMapId, a: cells }; ZMM.cen = cen;
+  }
+  const cells = ZMM.cells.a, isOpen = zmmRoomsOpen();
+  const t = document.createElement('canvas'); t.width = cw; t.height = ch; const tg = t.getContext('2d'), im = tg.createImageData(cw, ch), px = im.data;
+  for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
+    const r = cells[j * cw + i], o = (j * cw + i) * 4; if (!r) continue;
+    const edge = (i + 1 < cw && cells[j * cw + i + 1] !== r) || (j + 1 < ch && cells[(j + 1) * cw + i] !== r);
+    const c = edge ? [20, 22, 26, 255] : isOpen(r) ? [64, 74, 84, 235] : [30, 33, 38, 235];
+    px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = c[3];
+  }
+  tg.putImageData(im, 0, 0);
+  const b = ZMM.bg = document.createElement('canvas'); b.width = cw * S; b.height = ch * S; const g = b.getContext('2d');
+  g.imageSmoothingEnabled = false; g.drawImage(t, 0, 0, cw * S, ch * S);
+  for (const c of COL) { // paredes e obstáculos na altura do corpo
+    if (c.maxY < .45 || c.minY > 2.2) continue;
+    const w = (c.maxX - c.minX) * S, d = (c.maxZ - c.minZ) * S; if (w > 120 * S && d > 120 * S) continue;
+    g.fillStyle = c.maxY - c.minY > 1.6 ? '#b4bcc4' : '#737b83';
+    g.fillRect((c.minX + W2) * S, (c.minZ + D2) * S, Math.max(1.2, w), Math.max(1.2, d));
+  }
+  ZMM.key = key; ZMM.cw = cw; ZMM.ch = ch;
+}
+const zmmRoomName = (x, z) => { const r = ZD.zoneAt(x, z); return r ? ZD.roomNames?.[r] || '' : ''; };
+// ícones (em pixels da tela; f = tamanho)
+function zmmIcon(g, kind, x, y, f, o = {}) {
+  g.save(); g.globalAlpha = o.a ?? 1; g.lineWidth = Math.max(1.5, f * .18); g.textAlign = 'center'; g.textBaseline = 'middle';
+  const txt = (t, sz, col) => { g.font = `700 ${sz}px Rajdhani,sans-serif`; g.fillStyle = col; g.fillText(t, x, y + sz * .05); };
+  if (kind === 'perk') { g.beginPath(); g.arc(x, y, f, 0, 7); g.fillStyle = o.col; g.fill(); g.strokeStyle = o.own ? '#5dff7a' : 'rgba(0,0,0,.7)'; g.lineWidth = o.own ? f * .3 : f * .15; g.stroke(); txt(o.ab, f * (o.ab.length > 1 ? .95 : 1.25), '#fff'); }
+  else if (kind === 'box') { g.fillStyle = '#f2c230'; g.strokeStyle = '#5a3b00'; g.fillRect(x - f, y - f * .8, f * 2, f * 1.6); g.strokeRect(x - f, y - f * .8, f * 2, f * 1.6); txt('?', f * 1.5, '#3a2600'); }
+  else if (kind === 'pap') { g.fillStyle = '#9b4dff'; g.strokeStyle = '#e6d0ff'; g.beginPath(); g.moveTo(x, y - f * 1.1); g.lineTo(x + f, y); g.lineTo(x, y + f * 1.1); g.lineTo(x - f, y); g.closePath(); g.fill(); g.stroke(); txt('P', f * 1.1, '#fff'); }
+  else if (kind === 'power') { g.fillStyle = o.on ? '#6a6f75' : '#ffd23a'; g.beginPath(); g.moveTo(x + f * .2, y - f * 1.2); g.lineTo(x - f * .7, y + f * .15); g.lineTo(x - f * .05, y + f * .15); g.lineTo(x - f * .25, y + f * 1.2); g.lineTo(x + f * .75, y - f * .2); g.lineTo(x + f * .1, y - f * .2); g.closePath(); g.fill(); g.strokeStyle = 'rgba(0,0,0,.7)'; g.lineWidth = 1.5; g.stroke(); }
+  else if (kind === 'wall') { g.fillStyle = '#d8e2ea'; g.strokeStyle = 'rgba(0,0,0,.7)'; g.fillRect(x - f, y - f * .35, f * 2, f * .7); g.fillRect(x - f * .2, y, f * .45, f * .7); g.strokeRect(x - f, y - f * .35, f * 2, f * .7); }
+  else if (kind === 'trap') { g.strokeStyle = '#4fd0ff'; g.lineWidth = f * .3; g.beginPath(); g.moveTo(x - f, y - f * .4); g.lineTo(x - f * .2, y + f * .4); g.lineTo(x + f * .2, y - f * .4); g.lineTo(x + f, y + f * .4); g.stroke(); }
+  else if (kind === 'drop') { g.fillStyle = '#4dff6a'; g.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? f * .45 : f, a = i * Math.PI / 5 - Math.PI / 2; g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } g.closePath(); g.fill(); g.strokeStyle = '#063'; g.lineWidth = 1.5; g.stroke(); }
+  else if (kind === 'down') { const on = (now * 3 | 0) % 2; g.fillStyle = on ? '#ff3030' : '#ffffff'; g.fillRect(x - f * .3, y - f, f * .6, f * 2); g.fillRect(x - f, y - f * .3, f * 2, f * .6); g.strokeStyle = '#000'; g.lineWidth = 1; g.strokeRect(x - f * .3, y - f, f * .6, f * 2); }
+  g.restore();
+}
+function zmmScene(g, toS, k, big) { // desenha tudo por cima do fundo; toS(x, z) devolve [x, y, dentro]
+  const f = big ? Math.max(6, Math.min(11, k * 2.6)) : 11, W = ZMM.edge;
+  // portas fechadas
+  for (const d of ZD.doors) { if (ZC.doors.has(d.id)) continue;
+    const h = d.kind === 'debris' ? 1.8 : 1.6, a = d.axis === 'x' ? toS(d.x - h, d.z) : toS(d.x, d.z - h), b = d.axis === 'x' ? toS(d.x + h, d.z) : toS(d.x, d.z + h);
+    g.strokeStyle = d.kind === 'debris' ? '#c08850' : '#ff9a2a'; g.lineWidth = big ? Math.max(3, k * .9) : 6; g.lineCap = 'round'; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+    if (big && k >= 2.2) { const c = toS(d.x, d.z); zmmLab(g, String(d.cost), c[0], c[1] - 9, '700 12px Rajdhani,sans-serif', '#ffc070'); } }
+  // janelas
+  ZD.windows.forEach((w, i) => { const n = ZC.boards[i] ?? 6, [x, y] = toS(w.x, w.z);
+    g.fillStyle = n >= 6 ? 'rgba(160,170,180,.55)' : n > 0 ? '#ff9a2a' : '#ff2a2a'; const r = n >= 6 ? (big ? 1.6 : 2.5) : (big ? 3 : 4.5); g.fillRect(x - r, y - r, r * 2, r * 2); });
+  for (const t of ZD.traps || []) { const [x, y] = toS(t.x, t.z); zmmIcon(g, 'trap', x, y, f * .8); }
+  for (const wb of ZD.wall) { const [x, y] = toS(wb.x, wb.z); zmmIcon(g, 'wall', x, y, f * .75);
+    if (big && k >= 3) { const nm = { he: 'Granadas', semtex: 'Semtex', clay: 'Claymores', bowie: 'Faca Bowie' }[wb.w] || W_NAME(wb.w); zmmLab(g, `${nm} ${wb.cost}`, x, y + 14, '600 11px Rajdhani,sans-serif', '#dfe8ef'); } }
+  for (const pk of ZD.perks) { const P = ZPERKS[pk.k]; if (!P) continue; const [x, y] = toS(pk.x, pk.z);
+    zmmIcon(g, 'perk', x, y, f, { col: P.css, ab: P.ab, own: ZC.perks.includes(pk.k), a: ZC.power ? 1 : .5 });
+    if (big && k >= 1.6) { zmmLab(g, P.name, x, y + f + 10, '700 12px Rajdhani,sans-serif', '#fff'); } }
+  for (const d of ZC.drops.values()) { const p = d.g?.position; if (!p) continue; const [x, y] = toS(p.x, p.z); zmmIcon(g, 'drop', x, y, f * .85); }
+  // zumbis
+  for (const z of ZC.zs.values()) { if (z.dead || !z.pos) continue; const [x, y, ins] = toS(z.pos.x, z.pos.z); if (!ins) continue;
+    g.fillStyle = z.dog ? '#ff9a2a' : '#ff3b30'; g.beginPath(); g.arc(x, y, big ? 2.6 : 4, 0, 7); g.fill(); }
+  // pontos importantes (presos na borda quando estão longe)
+  const L = ZD.boxes[ZC.box.loc]; if (L) W(toS(L.x, L.z), (x, y, a) => zmmIcon(g, 'box', x, y, f, { a }));
+  if (ZD.pap) W(toS(ZD.pap.x, ZD.pap.z), (x, y, a) => zmmIcon(g, 'pap', x, y, f, { a: ZC.power ? a : a * .55 }), !ZC.power);
+  if (ZD.power) W(toS(ZD.power.x, ZD.power.z), (x, y, a) => zmmIcon(g, 'power', x, y, f, { on: ZC.power, a }), !!ZC.power);
+  // aliados
+  for (const rp of R.values()) { if (!rp.alive || !rp.pos) continue;
+    if (rp.downed) { W(toS(rp.pos.x, rp.pos.z), (x, y) => zmmIcon(g, 'down', x, y, f * .9)); continue; }
+    const fx = -Math.sin(rp.yaw || 0), fz = -Math.cos(rp.yaw || 0), s0 = big ? 8 / k : 1.6; // seta com uns 8 px
+    const tip = toS(rp.pos.x + fx * s0 * 1.4, rp.pos.z + fz * s0 * 1.4), l = toS(rp.pos.x - fx * s0 * .7 - fz * s0 * .8, rp.pos.z - fz * s0 * .7 + fx * s0 * .8), r = toS(rp.pos.x - fx * s0 * .7 + fz * s0 * .8, rp.pos.z - fz * s0 * .7 - fx * s0 * .8);
+    if (!toS(rp.pos.x, rp.pos.z)[2]) continue;
+    g.fillStyle = colorOf(rp.id); g.strokeStyle = '#000'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(...tip); g.lineTo(l[0], l[1]); g.lineTo(r[0], r[1]); g.closePath(); g.fill(); g.stroke();
+    if (big) { g.font = '700 12px Rajdhani,sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = '#000'; const [x, y] = toS(rp.pos.x, rp.pos.z); g.strokeText(nameOf(rp.id), x, y - 12); g.fillStyle = colorOf(rp.id); g.fillText(nameOf(rp.id), x, y - 12); } }
+}
+const W_NAME = id => W[id]?.name || id;
+function zmmLab(g, t, x, y, font, col) { // escreve o nome só se não cobrir outro já escrito
+  g.font = font; const w = g.measureText(t).width + 4, hh = parseInt(font.match(/(\d+)px/)[1]) + 2, r = [x - w / 2, y - hh / 2, x + w / 2, y + hh / 2];
+  if (ZMM.labs.some(o => r[0] < o[2] && r[2] > o[0] && r[1] < o[3] && r[3] > o[1])) return; ZMM.labs.push(r);
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.9)'; g.strokeText(t, x, y); g.fillStyle = col; g.fillText(t, x, y);
+}
+function zMinimap(dt) {
+  const cv = $('#zmm'), bigC = $('#zbig'), on = !!(ZC.on && inGame && ZC.world && ZD?.zoneAt && curMap?.z === ZD);
+  cv.style.display = on && !ZMM.big ? 'block' : 'none'; bigC.style.display = on && ZMM.big ? 'block' : 'none'; $('#zmmLbl').style.display = on && !ZMM.big ? '' : 'none';
+  if (!on) return;
+  const key = curMapId + ':' + ZC.doors.size; if (ZMM.key !== key) zmmBuild(key);
+  if ((ZMM.t -= dt) > 0) return; ZMM.t = 1 / 20;
+  const S = ZMM.S, W2 = curMap.w / 2, D2 = curMap.d / 2, mx = me.pos.x, mz = me.pos.z;
+  { // nome da área e distâncias
+    const L = ZD.boxes[ZC.box.loc], dist = (x, z) => Math.round(Math.hypot(x - mx, z - mz)), extra = [];
+    if (L) extra.push(`Caixa ${dist(L.x, L.z)} m`);
+    if (!ZC.power && ZD.power) extra.push(`Energia desligada · ${dist(ZD.power.x, ZD.power.z)} m`);
+    const dn = [...R.values()].filter(rp => rp.alive && rp.downed); if (dn.length) extra.push(`<span style="color:#ff6a6a">${dn.length > 1 ? dn.length + ' aliados caídos' : esc(nameOf(dn[0].id)) + ' caído'} · ${dist(dn[0].pos.x, dn[0].pos.z)} m</span>`);
+    setHTML('zmmLbl', `${esc(zmmRoomName(mx, mz))}<small>${extra.join(' · ')}</small><small style="opacity:.6">M — mapa inteiro</small>`);
+  }
+  // mini mapa (gira com o jogador)
+  const N = cv.width, c = N / 2, Rm = 45, k = c / Rm, th = me.yaw, cs = Math.cos(th), sn = Math.sin(th), g = cv.getContext('2d');
+  const toS = (x, z) => { const dx = (x - mx) * k, dz = (z - mz) * k, X = dx * cs - dz * sn, Y = dx * sn + dz * cs; return [c + X, c + Y, X * X + Y * Y < (c - 6) ** 2]; };
+  ZMM.edge = (p, draw, skip) => { // dentro do círculo: desenha no lugar; fora: na borda, um pouco apagado
+    if (p[2]) return draw(p[0], p[1], 1); if (skip) return;
+    const dx = p[0] - c, dy = p[1] - c, d = Math.hypot(dx, dy), r = c - 16; draw(c + dx / d * r, c + dy / d * r, .8);
+  };
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, N, N);
+  g.save(); g.beginPath(); g.arc(c, c, c - 1, 0, 7); g.clip();
+  g.fillStyle = 'rgba(10,12,14,.85)'; g.fillRect(0, 0, N, N);
+  g.save(); g.translate(c, c); g.rotate(th); g.scale(k / S, k / S); g.translate(-(mx + W2) * S, -(mz + D2) * S); g.drawImage(ZMM.bg, 0, 0); g.restore();
+  zmmScene(g, toS, k, false);
+  // você: seta no meio, apontando para cima, e o cone de visão
+  g.fillStyle = 'rgba(255,255,255,.08)'; g.beginPath(); g.moveTo(c, c); g.arc(c, c, c, -Math.PI / 2 - .6, -Math.PI / 2 + .6); g.closePath(); g.fill();
+  g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(c, c - 13); g.lineTo(c - 8, c + 8); g.lineTo(c, c + 3); g.lineTo(c + 8, c + 8); g.closePath(); g.fill(); g.stroke();
+  g.restore();
+  g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 3; g.beginPath(); g.arc(c, c, c - 2, 0, 7); g.stroke();
+  { const nx = c + sn * (c - 16), ny = c - cs * (c - 16); g.fillStyle = 'rgba(0,0,0,.7)'; g.beginPath(); g.arc(nx, ny, 12, 0, 7); g.fill(); g.font = '700 18px Rajdhani,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffd23a'; g.fillText('N', nx, ny + 1); }
+  if (ZMM.big && (ZMM.tb -= 1 / 20) <= 0) { ZMM.tb = .1; zmmBig(bigC); }
+}
+function zmmBig(cv) { // mapa grande (tecla M), norte para cima; legenda num painel à direita
+  const S = ZMM.S, M = curMap, W2 = M.w / 2, D2 = M.d / 2, span = 180, whole = ZMM.big === 2 || Math.max(M.w, M.d) <= span * 1.2;
+  const vw = whole ? M.w : span, vd = whole ? M.d : span;
+  const vx0 = whole ? -W2 : Math.max(-W2, Math.min(W2 - vw, me.pos.x - vw / 2)), vz0 = whole ? -D2 : Math.max(-D2, Math.min(D2 - vd, me.pos.z - vd / 2));
+  const pw = 250, sc = Math.min((innerWidth * .94 - pw) / vw, innerHeight * .88 / vd), dpr = Math.min(2, devicePixelRatio || 1);
+  const w = Math.round(vw * sc), h = Math.round(vd * sc), cw = w + pw;
+  if (cv.width !== cw * dpr || cv.height !== h * dpr) { cv.width = cw * dpr; cv.height = h * dpr; cv.style.width = cw + 'px'; cv.style.height = h + 'px'; }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = 'rgba(8,10,12,.94)'; g.fillRect(0, 0, cw, h);
+  g.save(); g.beginPath(); g.rect(0, 0, w, h); g.clip();
+  g.drawImage(ZMM.bg, (vx0 + W2) * S, (vz0 + D2) * S, vw * S, vd * S, 0, 0, w, h);
+  const toS = (x, z) => [(x - vx0) * sc, (z - vz0) * sc, x >= vx0 && x <= vx0 + vw && z >= vz0 && z <= vz0 + vd];
+  ZMM.edge = (p, draw, skip) => { if (p[2]) return draw(p[0], p[1], 1); if (!skip) draw(Math.max(12, Math.min(w - 12, p[0])), Math.max(12, Math.min(h - 12, p[1])), .8); };
+  // nomes das áreas
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  const isOpen = zmmRoomsOpen(); ZMM.labs = [];
+  for (const r in ZMM.cen) { const nm = ZD.roomNames?.[r]; if (!nm) continue; const [x, z, n] = ZMM.cen[r], [sx, sy, ins] = toS(x, z); if (!ins) continue;
+    zmmLab(g, nm.toUpperCase(), sx, sy, `700 ${Math.round(Math.max(12, Math.min(22, Math.sqrt(n) * sc * .22)))}px Rajdhani,sans-serif`, isOpen(r) ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.45)'); }
+  zmmScene(g, toS, sc, true);
+  { const [x, y] = toS(me.pos.x, me.pos.z); g.save(); g.translate(x, y); g.rotate(-me.yaw); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -12); g.lineTo(-8, 8); g.lineTo(0, 3); g.lineTo(8, 8); g.closePath(); g.fill(); g.stroke(); g.restore(); }
+  g.restore();
+  g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 1; g.strokeRect(.5, .5, w - 1, h - 1);
+  // painel: título, área atual e legenda
+  const lx = w + 18; let y = 30; g.textAlign = 'left'; g.textBaseline = 'middle';
+  g.font = '700 20px Rajdhani,sans-serif'; g.fillStyle = '#ffd23a'; g.fillText(whole ? 'MAPA INTEIRO' : 'EM VOLTA DE VOCÊ', lx, y); y += 22;
+  g.font = '600 14px Rajdhani,sans-serif'; g.fillStyle = '#bbb'; g.fillText(whole ? 'M — fechar' : 'M — ver o mapa inteiro', lx, y); y += 26;
+  g.font = '700 16px Rajdhani,sans-serif'; g.fillStyle = '#fff'; g.fillText('Você está em: ' + (zmmRoomName(me.pos.x, me.pos.z) || '—'), lx, y); y += 30;
+  const leg = [['box', 'Caixa Misteriosa (agora)'], ['pap', 'Pack-a-Punch'], ['power', 'Energia (amarela: desligada)'], ['perk', 'Bebida · anel verde: você tem'], ['wall', 'Arma de parede'], ['trap', 'Armadilha elétrica'], ['drop', 'Power-up no chão'], ['door', 'Porta fechada (com preço)'], ['win2', 'Janela com tábuas faltando'], ['win', 'Janela aberta (zumbi entra)'], ['zed', 'Zumbi'], ['dog', 'Cão do inferno'], ['ally', 'Aliado'], ['down', 'Aliado caído: reanime!']];
+  leg.forEach(([kd, t]) => { const x = lx + 9;
+    if (kd === 'door') { g.strokeStyle = '#ff9a2a'; g.lineWidth = 4; g.lineCap = 'round'; g.beginPath(); g.moveTo(x - 7, y); g.lineTo(x + 7, y); g.stroke(); }
+    else if (kd === 'win' || kd === 'win2') { g.fillStyle = kd === 'win' ? '#ff2a2a' : '#ff9a2a'; g.fillRect(x - 3.5, y - 3.5, 7, 7); }
+    else if (kd === 'zed' || kd === 'dog') { g.fillStyle = kd === 'dog' ? '#ff9a2a' : '#ff3b30'; g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); }
+    else if (kd === 'ally') { g.fillStyle = '#4fb6e6'; g.strokeStyle = '#000'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y - 8); g.lineTo(x - 6, y + 6); g.lineTo(x + 6, y + 6); g.closePath(); g.fill(); g.stroke(); }
+    else zmmIcon(g, kd, x, y, 7, kd === 'perk' ? { col: '#c0201c', ab: 'J' } : {});
+    g.font = '600 14px Rajdhani,sans-serif'; g.fillStyle = '#e8e8e8'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(t, x + 16, y); y += 22; });
+  // bebidas do mapa e o que fazem (as que você tem em verde)
+  y += 8; g.font = '700 15px Rajdhani,sans-serif'; g.fillStyle = '#ffd23a'; g.fillText(ZC.power ? 'Bebidas' : 'Bebidas (ligue a energia)', lx, y); y += 20;
+  for (const pk of ZD.perks) { const P = ZPERKS[pk.k]; if (!P || y > h - 10) continue; zmmIcon(g, 'perk', lx + 9, y, 7, { col: P.css, ab: P.ab, own: ZC.perks.includes(pk.k) });
+    g.font = '600 13px Rajdhani,sans-serif'; g.fillStyle = ZC.perks.includes(pk.k) ? '#7dff95' : '#ddd'; g.textAlign = 'left'; g.fillText(`${P.name} ${pk.k === 'qr' ? '' : P.cost}`, lx + 25, y); y += 19; }
 }
 function drawMinimap(dt) {
   const cv = $('#mmap'), M = curMap, on = !!(C.st?.mode === 'rounds' && inGame && M?.sites);
@@ -23138,6 +23326,7 @@ addEventListener('keydown', e => {
   if (G.cur === 'dmach' && hasW('dmach') && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ'].includes(e.code)) return; // Máquina da Morte: não troca até acabar
   switch (e.code) {
     case 'KeyF': if (ZC.on) zUse(); else knifeInspect(); break;
+    case 'KeyM': if (ZC.on) { ZMM.big = (ZMM.big + 1) % 3; ZMM.tb = 0; } break; // mapa grande do modo Zumbi: 1 = em volta de você, 2 = inteiro, 0 = fecha
     case 'KeyV': if (ZC.on && me.alive && !me.sprinting && !(ZC.revLocal > 0) && now >= G.nextFire && now >= G.switchEnd) knifeAttack(false); break;
     case 'Digit1': G.inv.primary && equip(G.inv.primary); break;
     case 'Digit2': G.inv.secondary && equip(G.inv.secondary); break;
@@ -24108,7 +24297,7 @@ fpLoad('p:ak'); fpLoad('m:knife'); fpLoad('m:karambit'); FPC['k:pack'] = new GLT
 setTimeout(() => { let q = Promise.resolve(); for (const k of Object.keys(FPM)) q = q.then(() => fpLoad('m:' + k)); }, 8000); // modelos das armas aos poucos (mundo e mãos dos outros)
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos); só em desenvolvimento (DEBUG), nunca no site publicado
-if (DEBUG) window.__T = { startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
+if (DEBUG) window.__T = { startHost, ZMM, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>
