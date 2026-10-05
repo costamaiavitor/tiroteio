@@ -245,14 +245,15 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #feed .w{color:#aaa;margin:0 6px}
 #feed .hs{color:var(--red)}
 #room{position:absolute;top:10px;left:12px;font-size:16px;color:#ccc}
-#mmLbl{position:absolute;top:240px;left:12px;width:200px;text-align:center;font-size:17px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000}
+#mmLbl{position:absolute;top:262px;left:12px;width:220px;text-align:center;font-size:17px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000}
 #zmm{position:absolute;top:34px;left:12px;width:220px;height:220px;border-radius:50%;display:none;box-shadow:0 0 0 2px rgba(255,255,255,.22),0 4px 14px rgba(0,0,0,.6)}
 #zmmLbl{position:absolute;top:258px;left:12px;width:220px;text-align:center;font-size:17px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000}
 #zmmLbl small{display:block;font-size:13px;font-weight:600;color:#c8ccd0;line-height:1.25}
 #zbig{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.8)}
 #zprompt span{display:inline-block;max-width:min(760px,92vw)}
 #zprompt small{display:block;font-size:17px;font-weight:600;color:#e6e6e6;margin-top:3px}
-#mmap{position:absolute;top:36px;left:12px;width:200px;height:200px;border:1px solid #fff3;border-radius:6px;display:none}
+#mmap{position:absolute;top:34px;left:12px;width:220px;height:220px;border-radius:50%;display:none;box-shadow:0 0 0 2px rgba(255,255,255,.22),0 4px 14px rgba(0,0,0,.6)}
+#rbig{position:absolute;left:50%;top:calc(50% + 28px);transform:translate(-50%,-50%);display:none;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.8)}
 #bombui{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);text-align:center;font-size:18px;color:#fff;text-shadow:0 1px 3px #000}
 #bombui .bar{width:260px;height:8px;background:#0008;margin:6px auto 0;border-radius:4px;overflow:hidden}#bombui .bar i{display:block;height:100%;background:#ffb020}
 #room b{color:var(--acc);letter-spacing:2px}
@@ -428,7 +429,8 @@ summary{cursor:pointer;color:#fff;font-weight:700}
     <div id="zinfo"></div>
   </div>
   <div id="room"></div>
-  <canvas id="mmap" width="200" height="200"></canvas>
+  <canvas id="mmap" width="440" height="440"></canvas>
+  <canvas id="rbig"></canvas>
   <div id="mmLbl"></div>
   <div id="drep" class="hidden"></div>
   <div id="flashov"></div>
@@ -533,6 +535,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
         <b>U</b><span>Rodadas: chat só do time</span>
         <b>G</b><span>Rodadas: largar a arma (com a faca na mão, larga a bomba)</span>
         <b>E</b><span>Rodadas: trocar pela arma do chão (passar por cima pega se o espaço estiver vazio)</span>
+        <b>M</b><span>Rodadas: mapa inteiro com o nome dos lugares</span>
         <b>Z / botão do meio</b><span>Rodadas: marcar um ponto para o time</span>
         <b>4</b><span>Granadas: HE, flash, fumaça, molotov/incendiária e decoy</span>
         <b>Shift + W</b><span>Zumbis: correr (fôlego limitado; atirar interrompe)</span>
@@ -23516,30 +23519,76 @@ function zmmBig(cv) { // mapa grande (tecla M), norte para cima; legenda num pai
   for (const pk of ZD.perks) { const P = ZPERKS[pk.k]; if (!P || y > h - 10) continue; zmmIcon(g, 'perk', lx + 9, y, 7, { col: P.css, ab: P.ab, own: ZC.perks.includes(pk.k) });
     g.font = '600 13px Rajdhani,sans-serif'; g.fillStyle = ZC.perks.includes(pk.k) ? '#7dff95' : '#ddd'; g.textAlign = 'left'; g.fillText(`${P.name} ${pk.k === 'qr' ? '' : P.cost}`, lx + 25, y); y += 19; }
 }
-function drawMinimap(dt) {
-  const cv = $('#mmap'), M = curMap, on = !!(C.st?.mode === 'rounds' && inGame && M?.sites);
-  cv.style.display = on ? 'block' : 'none';
-  const ar = on && me.alive ? (M.areas || []).find(a => me.pos.x >= a[1] && me.pos.x <= a[2] && me.pos.z >= a[3] && me.pos.z <= a[4]) : null; setHTML('mmLbl', ar ? esc(ar[0]) : '');
-  if (!on || (mmT -= dt) > 0) return; mmT = 1 / 15;
-  const N = cv.width, k = N / Math.max(M.w, M.d), P = (x, z) => [N / 2 + x * k, N / 2 + z * k], g = cv.getContext('2d');
-  if (MM.key !== curMapId) { // fundo: paredes e caixas vistas de cima, desenhado uma vez por mapa
-    MM.key = curMapId; const b = MM.bg = document.createElement('canvas'); b.width = b.height = N; const h = b.getContext('2d');
-    h.fillStyle = 'rgba(20,24,28,.8)'; h.fillRect(0, 0, N, N); h.font = 'bold 18px Rajdhani,sans-serif'; h.textAlign = 'center'; h.textBaseline = 'middle';
-    for (const [s, r] of Object.entries(M.sites)) { const [x0, z0] = P(r[0], r[2]), w = (r[1] - r[0]) * k, d = (r[3] - r[2]) * k; h.fillStyle = 'rgba(230,60,50,.3)'; h.fillRect(x0, z0, w, d); h.fillStyle = '#ff6a5a'; h.fillText(s, x0 + w / 2, z0 + d / 2); }
-    for (const c of COL) { if (c.maxY < .5 || c.minY > 2) continue; const [x0, z0] = P(c.minX, c.minZ); h.fillStyle = c.maxY - c.minY > 2.5 ? '#9aa0a6' : '#60666b'; h.fillRect(x0, z0, Math.max(1, (c.maxX - c.minX) * k), Math.max(1, (c.maxZ - c.minZ) * k)); }
+// ---------- radar do modo Rodadas (como o do CS2): redondo, centrado em você e girando com a visão; M abre o mapa inteiro ----------
+const RMM = { key: null, bg: null, S: 4, t: 0, tb: 0, big: false };
+function rmmBuild(M) { // fundo: chão, paredes, coberturas, passagens cobertas, bombs e bases (4 px por metro), pintado uma vez por mapa
+  const S = RMM.S, W2 = M.w / 2, D2 = M.d / 2, b = document.createElement('canvas'); b.width = M.w * S; b.height = M.d * S; const g = b.getContext('2d');
+  const Rc = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect((x0 + W2) * S, (z0 + D2) * S, (x1 - x0) * S, (z1 - z0) * S); };
+  Rc(-W2, -D2, W2, D2, '#5c636c');
+  for (const r of Object.values(M.sites)) Rc(r[0], r[2], r[1], r[3], '#7d4c47');
+  for (const [list, col] of [[M.spawns, 'rgba(224,160,48,.28)'], [M.spawnsB, 'rgba(74,144,226,.28)']]) for (const [x, z] of list || []) Rc(x - 1.5, z - 1.5, x + 1.5, z + 1.5, col);
+  for (const c of COL) {
+    if (c.maxY <= .3) continue;
+    if (c.minY > 2) { Rc(c.minX, c.minZ, c.maxX, c.maxZ, 'rgba(18,20,24,.38)'); continue; } // teto (túnel, apartamento): mais escuro
+    Rc(c.minX, c.minZ, c.maxX, c.maxZ, c.maxY - c.minY > 2.5 ? '#16191d' : '#363b43');
   }
-  g.clearRect(0, 0, N, N); g.drawImage(MM.bg, 0, 0);
-  const myT = C.players.get(C.myId)?.tm, eye = new V3(me.pos.x, me.pos.y + 1.5, me.pos.z);
-  const dot = (x, z, col) => { const [px, pz] = P(x, z); g.fillStyle = col; g.beginPath(); g.arc(px, pz, 3.5, 0, 7); g.fill(); };
-  for (const rp of R.values()) { // aliados sempre; inimigo só quando você vê
+  RMM.bg = b; RMM.key = curMapId;
+}
+function rmmScene(g, toS, edge, big) { // bombs, pings, bomba, aliados e inimigos à vista (letras sempre em pé)
+  const M = curMap, myT = C.players.get(C.myId)?.tm, eye = camera.position.clone(), B = C.bomb, u = big ? 1 : 2; // u: o radar é desenhado em dobro (tela nítida)
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (const [k, r] of Object.entries(M.sites)) edge(toS((r[0] + r[1]) / 2, (r[2] + r[3]) / 2), (x, y, a) => { g.globalAlpha = a; g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.arc(x, y, 11 * u, 0, 7); g.fill(); g.fillStyle = '#ff6a5a'; g.font = `700 ${16 * u}px Rajdhani,sans-serif`; g.fillText(k, x, y + u); g.globalAlpha = 1; });
+  for (const mk of MARKS) edge(toS(mk.pos[0], mk.pos[2]), (x, y, a) => { g.globalAlpha = a; g.strokeStyle = mk.c; g.lineWidth = 2.5 * u; const s = 7 * u; g.beginPath(); g.moveTo(x, y - s); g.lineTo(x + s, y); g.lineTo(x, y + s); g.lineTo(x - s, y); g.closePath(); g.stroke(); g.globalAlpha = 1; });
+  if (B?.p && (B.s === 'planted' || (myT === 't' && (B.s === 'dropped' || B.s === 'carried')))) {
+    const bp = B.s === 'carried' ? (B.by === C.myId ? [me.pos.x, me.pos.z] : R.get(B.by) ? [R.get(B.by).pos.x, R.get(B.by).pos.z] : [B.p[0], B.p[2]]) : [B.p[0], B.p[2]];
+    edge(toS(bp[0], bp[1]), (x, y, a) => { g.globalAlpha = a; const s = 6 * u; g.fillStyle = B.s === 'planted' ? ((now * 4 | 0) % 2 ? '#ff2a2a' : '#7a0000') : '#ffb020'; g.strokeStyle = '#000'; g.lineWidth = u; g.fillRect(x - s, y - s, s * 2, s * 2); g.strokeRect(x - s, y - s, s * 2, s * 2); g.globalAlpha = 1; });
+  }
+  for (const rp of R.values()) {
     const info = C.players.get(rp.id); if (!rp.alive || !info) continue;
-    if (info.tm === myT) dot(rp.pos.x, rp.pos.z, TEAMC[info.tm]);
-    else if (me.alive && losClear(eye, new V3(rp.pos.x, rp.pos.y + 1.3, rp.pos.z))) dot(rp.pos.x, rp.pos.z, '#ff3030');
+    const mate = info.tm === myT, [x, y, ins] = toS(rp.pos.x, rp.pos.z); if (!ins) continue;
+    if (!mate && !losClear(eye, new V3(rp.pos.x, rp.pos.y + 1.3, rp.pos.z))) continue; // inimigo só aparece quando você vê
+    g.fillStyle = mate ? TEAMC[info.tm] : '#ff3030'; g.strokeStyle = '#000'; g.lineWidth = 1.5 * u; g.beginPath(); g.arc(x, y, 6.5 * u, 0, 7); g.fill(); g.stroke();
+    if (mate) { g.fillStyle = '#111'; g.font = `700 ${9 * u}px Rajdhani,sans-serif`; g.fillText((info.n || '?').replace(/^Bot /, '')[0].toUpperCase(), x, y + .5 * u); }
+    if (big) { g.fillStyle = mate ? '#fff' : '#ff8080'; g.font = '600 12px Rajdhani,sans-serif'; g.fillText(info.n, x, y - 13); }
   }
-  for (const mk of MARKS) { const [px, pz] = P(mk.pos[0], mk.pos[2]); g.strokeStyle = mk.c; g.lineWidth = 2; g.beginPath(); g.moveTo(px, pz - 6); g.lineTo(px + 6, pz); g.lineTo(px, pz + 6); g.lineTo(px - 6, pz); g.closePath(); g.stroke(); }
-  const B = C.bomb;
-  if (B?.p && (B.s === 'planted' || (myT === 't' && B.s !== 'exploded' && B.s !== 'defused'))) { const [px, pz] = P(B.p[0], B.p[2]); g.fillStyle = B.s === 'planted' && (now * 4 | 0) % 2 ? '#ff2020' : '#ffb020'; g.fillRect(px - 3.5, pz - 3.5, 7, 7); }
-  if (me.alive) { const [px, pz] = P(me.pos.x, me.pos.z), fx = -Math.sin(me.yaw), fz = -Math.cos(me.yaw); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(px + fx * 8, pz + fz * 8); g.lineTo(px - fz * 4.5 - fx * 4, pz + fx * 4.5 - fz * 4); g.lineTo(px + fz * 4.5 - fx * 4, pz - fx * 4.5 - fz * 4); g.closePath(); g.fill(); }
+}
+function drawMinimap(dt) {
+  const cv = $('#mmap'), big = $('#rbig'), M = curMap, on = !!(C.st?.mode === 'rounds' && inGame && M?.sites);
+  cv.style.display = on && !RMM.big ? 'block' : 'none'; big.style.display = on && RMM.big ? 'block' : 'none';
+  const ar = on && me.alive ? (M.areas || []).find(a => me.pos.x >= a[1] && me.pos.x <= a[2] && me.pos.z >= a[3] && me.pos.z <= a[4]) : null; setHTML('mmLbl', ar && !RMM.big ? esc(ar[0]) : '');
+  if (!on) return;
+  if (RMM.key !== curMapId) rmmBuild(M);
+  if ((RMM.t -= dt) > 0) return; RMM.t = 1 / 20;
+  const S = RMM.S, W2 = M.w / 2, D2 = M.d / 2, mx = camera.position.x, mz = camera.position.z, th = camera.rotation.y; // segue a câmera (morto: quem você assiste)
+  const N = cv.width, c = N / 2, Rm = 34, k = c / Rm, cs = Math.cos(th), sn = Math.sin(th), g = cv.getContext('2d');
+  const toS = (x, z) => { const dx = (x - mx) * k, dz = (z - mz) * k, X = dx * cs - dz * sn, Y = dx * sn + dz * cs; return [c + X, c + Y, X * X + Y * Y < (c - 18) ** 2]; };
+  const edge = (p, draw) => { if (p[2]) return draw(p[0], p[1], 1); const dx = p[0] - c, dy = p[1] - c, d = Math.hypot(dx, dy) || 1, r = c - 26; draw(c + dx / d * r, c + dy / d * r, .7); };
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, N, N);
+  g.save(); g.beginPath(); g.arc(c, c, c - 1, 0, 7); g.clip();
+  g.fillStyle = '#121418'; g.fillRect(0, 0, N, N);
+  g.save(); g.translate(c, c); g.rotate(th); g.scale(k / S, k / S); g.translate(-(mx + W2) * S, -(mz + D2) * S); g.drawImage(RMM.bg, 0, 0); g.restore();
+  rmmScene(g, toS, edge, false);
+  g.fillStyle = 'rgba(255,255,255,.1)'; g.beginPath(); g.moveTo(c, c); g.arc(c, c, c, -Math.PI / 2 - .55, -Math.PI / 2 + .55); g.closePath(); g.fill(); // cone de visão
+  g.fillStyle = me.alive ? '#fff' : '#aaa'; g.strokeStyle = '#000'; g.lineWidth = 3; g.beginPath(); g.moveTo(c, c - 18); g.lineTo(c - 11, c + 11); g.lineTo(c, c + 5); g.lineTo(c + 11, c + 11); g.closePath(); g.fill(); g.stroke();
+  g.restore();
+  g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 5; g.beginPath(); g.arc(c, c, c - 3, 0, 7); g.stroke();
+  { const nx = c + sn * (c - 26), ny = c - cs * (c - 26); g.fillStyle = 'rgba(0,0,0,.75)'; g.beginPath(); g.arc(nx, ny, 17, 0, 7); g.fill(); g.font = '700 24px Rajdhani,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.fillText('N', nx, ny + 1); }
+  if (RMM.big && (RMM.tb -= 1 / 20) <= 0) { RMM.tb = .1; rmmBig(big); }
+}
+function rmmBig(cv) { // M: mapa inteiro, norte para cima, com o nome de cada lugar
+  const M = curMap, S = RMM.S, W2 = M.w / 2, D2 = M.d / 2, sc = Math.min(innerWidth * .8 / M.w, (innerHeight - 170) / M.d), dpr = Math.min(2, devicePixelRatio || 1);
+  const w = Math.round(M.w * sc), h = Math.round(M.d * sc);
+  if (cv.width !== w * dpr || cv.height !== h * dpr) { cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = '#0d0f12'; g.fillRect(0, 0, w, h); g.drawImage(RMM.bg, 0, 0, M.w * S, M.d * S, 0, 0, w, h);
+  const toS = (x, z) => [(x + W2) * sc, (z + D2) * sc, true], edge = (p, draw) => draw(p[0], p[1], 1);
+  g.textAlign = 'center'; g.textBaseline = 'middle'; const done = new Set();
+  for (const a of M.areas || []) { if (done.has(a[0]) || /^Bomb /.test(a[0])) continue; done.add(a[0]); const [x, y] = toS((a[1] + a[2]) / 2, (a[3] + a[4]) / 2);
+    g.font = '700 13px Rajdhani,sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.8)'; const t = a[0].toUpperCase(), tw = g.measureText(t).width / 2 + 4, cx = Math.max(tw, Math.min(w - tw, x)); g.strokeText(t, cx, y); g.fillStyle = 'rgba(255,255,255,.8)'; g.fillText(t, cx, y); }
+  rmmScene(g, toS, edge, true);
+  { const [x, y] = toS(me.pos.x, me.pos.z); g.save(); g.translate(x, y); g.rotate(-camera.rotation.y); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -11); g.lineTo(-7, 7); g.lineTo(0, 3); g.lineTo(7, 7); g.closePath(); g.fill(); g.stroke(); g.restore(); }
+  g.font = '700 16px Rajdhani,sans-serif'; g.textAlign = 'left'; g.fillStyle = '#ffd23a'; g.strokeStyle = 'rgba(0,0,0,.85)'; g.lineWidth = 3; g.strokeText((M.name || '').toUpperCase() + ' · M fecha', 12, h - 14); g.fillText((M.name || '').toUpperCase() + ' · M fecha', 12, h - 14);
+  g.strokeStyle = 'rgba(255,255,255,.2)'; g.lineWidth = 1; g.strokeRect(.5, .5, w - 1, h - 1);
 }
 // ---------- loja estilo Valorant: tela por cima do jogo, colunas por categoria, clica e compra ----------
 const BUY_COLS = [[['Pistolas', ['glock', 'usp', 'p250', 'tec9', 'five7', 'cz75a', 'deagle', 'r8']]], [['SMGs', ['mac10', 'mp9', 'mp5', 'ump45', 'p90']]], [['Pesadas', ['nova', 'xm1014', 'mag7', 'sawedoff', 'negev', 'm249']]],
@@ -23603,7 +23652,7 @@ addEventListener('keydown', e => {
   if (G.cur === 'dmach' && hasW('dmach') && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ'].includes(e.code)) return; // Máquina da Morte: não troca até acabar
   switch (e.code) {
     case 'KeyF': if (ZC.on) zUse(); else knifeInspect(); break;
-    case 'KeyM': if (ZC.on) { ZMM.big = (ZMM.big + 1) % 3; ZMM.tb = 0; } break; // mapa grande do modo Zumbi: 1 = em volta de você, 2 = inteiro, 0 = fecha
+    case 'KeyM': if (ZC.on) { ZMM.big = (ZMM.big + 1) % 3; ZMM.tb = 0; } else if (C.st?.mode === 'rounds') { RMM.big = !RMM.big; RMM.tb = 0; } break; // mapa grande do modo Zumbi: 1 = em volta de você, 2 = inteiro, 0 = fecha
     case 'KeyV': if (ZC.on && me.alive && !me.sprinting && !(ZC.revLocal > 0) && now >= G.nextFire && now >= G.switchEnd) knifeAttack(false); break;
     case 'Digit1': G.inv.primary && equip(G.inv.primary); break;
     case 'Digit2': G.inv.secondary && equip(G.inv.secondary); break;
