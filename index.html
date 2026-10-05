@@ -97,7 +97,7 @@ button.card.on{border-color:var(--acc);background:rgba(255,176,32,.1);box-shadow
 .playgrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
 @media(max-width:900px){.playgrid{grid-template-columns:1fr}.mtop{flex-wrap:wrap;height:auto;padding:8px 14px;gap:10px}.mplayer{min-width:0}}
 #hostForm{counter-reset:st}
-#spMus{position:fixed;left:12px;bottom:12px;width:300px;z-index:60;background:#121418;border-radius:12px;overflow:hidden;box-shadow:0 4px 18px #0008;transition:transform .2s}
+#spMus{position:fixed;left:12px;bottom:12px;width:300px;z-index:9999;background:#121418;border-radius:12px;overflow:hidden;box-shadow:0 4px 18px #0008;transition:transform .2s}
 #spMus.hid{transform:translateX(-340px)}#spMus .spHd{font-size:12px;color:#cfd5dc;padding:5px 10px}#spMus iframe{display:block;width:100%;height:80px;border:0}
 #hostForm>.lbl,#lbForm>.lbl{font-size:13px;letter-spacing:2.5px;color:#cfd5dc;margin:20px 0 10px;display:flex;align-items:center;gap:10px}
 #hostForm>.lbl::before{counter-increment:st;content:counter(st);width:22px;height:22px;border-radius:50%;background:rgba(255,176,32,.16);color:var(--acc);display:inline-flex;align-items:center;justify-content:center;font-size:13px;letter-spacing:0}
@@ -517,6 +517,9 @@ summary{cursor:pointer;color:#fff;font-weight:700}
     <h2>PAUSA</h2>
     <div id="pRoom" class="box" style="margin-bottom:12px"></div>
     <button id="btnResume" class="big">Continuar</button>
+    <div class="box" id="pMusic" style="margin-top:12px"><h3>Música da sala (todos ouvem juntos)</h3>
+      <div style="display:flex;gap:8px"><input id="musIn" maxlength="400" placeholder="Link do Spotify, do YouTube ou de um .mp3" style="flex:1"><button id="musGo">Tocar</button></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button id="musPP">Pausar</button><button id="musX">Parar</button><small id="musNow" style="opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></small></div></div>
     <div class="cols2 rev" style="margin-top:14px">
       <div class="box"><h3>Configurações</h3><div id="pauseSettings"></div>
         <button id="btnFull" style="margin-top:6px">Tela cheia</button></div>
@@ -19501,7 +19504,7 @@ function srvOnData(conn, d) {
     if (S.banidos?.has(chaveLeft) || S.banidos?.has('nome:' + nome0)) { conn.pid = null; NET.conns.delete(id); return recusa('Você foi removido desta sala pelo host'); }
     for (let n = 2; [...S.players.values()].some(p => p.name === name); n++) name = nome0.slice(0, 12) + ' (' + n + ')';
     const np = srvAddPlayer(id, name, false); np.skins = cleanSk(d.sk); np.chaveLeft = chaveLeft; np.nome0 = nome0;
-    if (S.music) setTimeout(() => { try { if (S.music) conn.send({ t: 'music', url: S.music.url, el: musEl() }); } catch (e) { } }, 800); // música tema já tocando
+    if (S.music) setTimeout(() => { try { if (S.music) conn.send({ t: 'music', url: S.music.url, el: srvMusPos(), paused: S.music.paused ? 1 : 0 }); } catch (e) { } }, 800); // música da sala já tocando
     conn.send({ t: 'welcome', you: id, st: S.st, code: NET.code, hk: NET.hostKey, lobby: S.lobby ? 1 : 0 });
     if (S.lobby) { lobbySync(); return; }
     broadcast({ t: 'info', txt: name + ' entrou na sala' });
@@ -19727,6 +19730,7 @@ function srvHandle(pid, m) {
     case 'skins': p.skins = cleanSk(m.sk); S.skDirty = true; break;
     case 'nade': if (!p.alive || p.downed || !isW(m.k) || W[m.k].slot !== 'nade' || m.k === 'clay' || !vec3(m.p) || !vec3(m.v) || !(p.inv[m.k] > 0)
       || Math.hypot(m.p[0] - p.pos[0], m.p[1] - p.pos[1] - 1.5, m.p[2] - p.pos[2]) > 4 || Math.hypot(m.v[0], m.v[1], m.v[2]) > 30) return; p.inv[m.k]--; broadcast({ t: 'nade', id: pid, k: m.k, p: m.p, v: m.v }, pid); break;
+    case 'musReq': if (tNow() - (p.musT ?? -9) < 1) return; p.musT = tNow(); srvMusic(pid, m); break; // no máximo um pedido por segundo
     case 'chat': { const cm = { t: 'chat', id: pid, txt: String(m.txt || '').slice(0, 120), tm: m.tm && isR() ? 1 : 0 }; if (cm.tm) { for (const q of S.players.values()) if (q.team === p.team) sendTo(q.id, cm); } else broadcast(cm); break; }
     case 'suicide': if (p.alive && !p.downed && S.phase !== 'over') srvKill(p, null, 'world', false); break; // caído nos zumbis não pula o sangramento
   }
@@ -22903,7 +22907,11 @@ function onMsgInner(m) {
     case 'msg': centerMsg(String(m.txt ?? '').slice(0, 80), String(m.sub ?? '').slice(0, 160), finN(m.dur) ? clamp(m.dur, 0, 30) : 3); if (typeof m.snd === 'string') play(m.snd); break;
     case 'err': toast(String(m.txt ?? '').slice(0, 160), 2); play('empty'); break;
     case 'info': toast(String(m.txt ?? '').slice(0, 160), 3); break;
-    case 'music': if (!NET.isHost) { const u = String(m.url ?? '').slice(0, 400); if (u) musPlay(u, +m.el || 0); else musStop(); } break;
+    case 'music': {
+      musApply(String(m.url ?? '').slice(0, 400), +m.el || 0, !!m.paused);
+      const o = { url: 'tocou uma música', play: 'continuou a música', pause: 'pausou a música', stop: 'parou a música' }[m.op];
+      if (o && m.by != null) toast(`♪ ${nameOf(m.by)} ${o}`, 3);
+      break; }
     case 'chat': chatAdd((m.tm ? '<span style="color:#8fd">(time)</span> ' : '') + `<b style="color:${esc(colorOf(m.id))}">${esc(nameOf(m.id))}:</b> ${esc(String(m.txt ?? '').slice(0, 120))}`); play('chat'); break;
     case 'bye': removeRemote(m.id); C.players.delete(m.id); break;
   }
@@ -23113,7 +23121,7 @@ $('#buy').addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('keydown', e => {
   if (!inGame) return;
   if (C.chatOpen) {
-    if (e.code === 'Enter') { const v = $('#chatin').value.trim(), mc = v.match(/^\/m[uú]sica\b\s*(.*)$/i); if (mc) { if (NET.isHost) hostMusic(/^(parar|stop)$/i.test(mc[1]) ? '' : mc[1]); else toast('Só o host escolhe a música', 2); } else if (v) sendToHost({ t: 'chat', txt: v, tm: C.chatTeam ? 1 : 0 }); closeChat(); }
+    if (e.code === 'Enter') { const v = $('#chatin').value.trim(), mc = v.match(/^\/m[uú]sica\b\s*(.*)$/i); if (mc) { const a = mc[1].trim(); if (/^(parar|stop)$/i.test(a)) musReq('stop'); else if (/^pausar$/i.test(a)) musReq('pause'); else if (/^(continuar|tocar)$/i.test(a)) musReq('play'); else musReq('url', a); } else if (v) sendToHost({ t: 'chat', txt: v, tm: C.chatTeam ? 1 : 0 }); closeChat(); }
     else if (e.code === 'Escape') closeChat();
     return;
   }
@@ -23558,13 +23566,16 @@ function lobbyStart() {
   broadcast({ t: 'start', st }, C.myId); // os outros montam o mapa antes do primeiro "spawn"
   buildMap(st.map); enterGame(); srvStartMatch(); lobbyUI();
 }
-// ---------- música tema da sala ----------
-// O host põe um link (YouTube ou arquivo de áudio em https) e todos ouvem a mesma música, em loop, a partir do mesmo ponto.
-// O host guarda o link e a hora em que começou; quem entra depois recebe quantos segundos já tocaram.
-// Cada jogador ajusta o volume em Configurações (Volume da música tema). Do YouTube só vale o id do vídeo (player youtube-nocookie).
-// Spotify: o player do Spotify não toca sozinho nem aceita volume pelo jogo. Aparece um mini player no canto (nos menus e na pausa)
-// e cada jogador clica em play. A música inteira só toca para quem está logado no Spotify no navegador; os outros ouvem 30 s.
-const MUS = { url: '', el: null, kind: '' };
+// ---------- música da sala ----------
+// Qualquer jogador põe um link (Spotify, YouTube ou arquivo de áudio em https) no menu de pausa (Esc), no lobby ou no chat
+// (/musica link, /musica pausar, /musica continuar, /musica parar). O pedido vai ao host, que guarda a música, a posição e se está
+// pausada, e manda para todos. Cada um toca no próprio navegador a partir da mesma posição; quem entra depois recebe a posição atual.
+// A cada 5 s o player é conferido contra o relógio e, se escorregou mais de 2 s, volta para a posição certa (áudio e Spotify).
+// Spotify: só toca a música inteira para quem está logado no Spotify no navegador (os outros ouvem 30 s) e não aceita volume pelo jogo;
+// o player aparece no canto nos menus. YouTube: só o id do vídeo (player youtube-nocookie); pode ter propaganda.
+const MUS = { url: '', kind: '', el: null, ctl: null, el0: 0, at: 0, paused: false };
+const tNow = () => performance.now() / 1000;
+const musPos = () => MUS.paused ? MUS.el0 : MUS.el0 + tNow() - MUS.at; // segundos desde o começo da música
 function musParse(u) {
   u = String(u || '').trim().slice(0, 400); if (!u) return null;
   let url; try { url = new URL(u); } catch (e) { return null; }
@@ -23582,47 +23593,103 @@ function musParse(u) {
   if (id) return /^[\w-]{11}$/.test(id) ? { kind: 'yt', id, url: 'https://youtu.be/' + id } : null;
   return { kind: 'audio', url: url.href };
 }
-function musStop() { if (MUS.el) { try { MUS.el.pause?.(); } catch (e) { } MUS.el.remove(); } MUS.el = null; MUS.url = ''; MUS.kind = ''; }
+function musStop() {
+  if (MUS.el) { try { MUS.el.pause?.(); } catch (e) { } MUS.el.remove(); }
+  Object.assign(MUS, { url: '', kind: '', el: null, ctl: null, spAt: null, spSeek: 0, spPaused: undefined });
+}
+const ytCmd = (func, args = []) => { try { MUS.el?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), 'https://www.youtube-nocookie.com'); } catch (e) { } };
 function musicVol() {
-  if (!MUS.el) return;
   const v = Math.max(0, Math.min(1, CFG.mvol ?? .5));
   if (MUS.kind === 'audio') MUS.el.volume = v;
-  else if (MUS.kind === 'yt') try { MUS.el.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [Math.round(v * 100)] }), 'https://www.youtube-nocookie.com'); } catch (e) { }
+  else if (MUS.kind === 'yt') ytCmd('setVolume', [Math.round(v * 100)]);
 }
-function musPlay(u, el = 0) { // toca (ou troca) a música; el = segundos que já tocaram no host
-  const m = musParse(u); if (!m) { musStop(); return; }
-  if (MUS.url === m.url && MUS.el) return;
-  musStop(); MUS.url = m.url; MUS.kind = m.kind; el = Math.max(0, +el || 0);
-  if (m.kind === 'sp') { // mini player visível: o Spotify exige um clique em play
-    const w = document.createElement('div'); w.id = 'spMus';
-    w.innerHTML = `<div class="spHd">♪ Música tema · clique em play</div><iframe title="música tema" allow="autoplay; encrypted-media" src="https://open.spotify.com/embed/${m.path}?utm_source=generator&theme=0"></iframe>`;
-    document.body.appendChild(w); MUS.el = w; spMusPos(); toast('Música tema do Spotify: clique em play no player do canto', 4);
-  } else if (m.kind === 'audio') {
-    const a = document.createElement('audio'); a.src = m.url; a.loop = true; a.preload = 'auto'; a.style.display = 'none';
-    a.onloadedmetadata = () => { if (isFinite(a.duration) && a.duration > 0) a.currentTime = el % a.duration; };
-    a.onerror = () => { if (MUS.el === a) toast('Não deu para tocar a música: o link precisa ser de um arquivo de áudio', 4); };
-    document.body.appendChild(a); MUS.el = a; musicVol();
-    a.play().catch(() => { const go = () => { removeEventListener('pointerdown', go); if (MUS.el === a) a.play().catch(() => { }); }; addEventListener('pointerdown', go); }); // navegador só toca depois de um clique
-  } else {
-    const f = document.createElement('iframe'); f.allow = 'autoplay'; f.title = 'música tema';
-    f.style.cssText = 'position:fixed;width:2px;height:2px;left:-10px;top:-10px;opacity:0;pointer-events:none;border:0';
-    f.src = `https://www.youtube-nocookie.com/embed/${m.id}?autoplay=1&loop=1&playlist=${m.id}&start=${Math.floor(el)}&enablejsapi=1&controls=0`;
-    f.onload = () => { if (MUS.el === f) { musicVol(); setTimeout(musicVol, 1500); setTimeout(musicVol, 4000); } };
-    document.body.appendChild(f); MUS.el = f;
+let musClickW = false;
+function musNeedClick() { // o navegador bloqueou o som: tenta de novo no próximo clique
+  if (musClickW) return; musClickW = true;
+  const go = () => { removeEventListener('pointerdown', go, true); musClickW = false; musSync(true); };
+  addEventListener('pointerdown', go, true);
+}
+const spNow = () => MUS.spPaused ? MUS.spPos : MUS.spPos + tNow() - MUS.spAt;
+function musSync(force) { // leva o player para a posição e o estado (tocando/pausado) da sala
+  if (!MUS.el) return;
+  const pos = musPos();
+  if (MUS.kind === 'audio') {
+    const a = MUS.el; if (!(a.duration > 0) || !isFinite(a.duration)) return;
+    const t = pos % a.duration; if (force || Math.abs(a.currentTime - t) > 2) a.currentTime = t;
+    if (MUS.paused) a.pause(); else a.play().catch(musNeedClick);
+  } else if (MUS.kind === 'yt') { ytCmd('seekTo', [pos, true]); ytCmd(MUS.paused ? 'pauseVideo' : 'playVideo'); }
+  else if (MUS.kind === 'sp' && MUS.ctl) {
+    if (MUS.paused) { if (MUS.spPaused === false) spCmd('pause'); return; }
+    if (MUS.spPaused === undefined) { spCmd('play'); return; }
+    if (MUS.spPaused) spCmd('resume');
+    const t = MUS.spDur ? pos % MUS.spDur : pos;
+    if (force || Math.abs(spNow() - t) > 2) spCmd('seek', { timestamp: t });
   }
 }
-// host: escolhe a música da sala e manda para todos (link vazio para a música)
-function hostMusic(u) {
-  if (!NET.isHost) return;
-  const m = u ? musParse(u) : null;
-  if (u && !m) { toast('Link inválido: use um link do Spotify, do YouTube ou de um arquivo .mp3/.ogg', 4); return; }
-  S.music = m ? { url: m.url, t0: performance.now() / 1000 } : null;
-  broadcast({ t: 'music', url: m ? m.url : '', el: 0 }); musPlay(m ? m.url : '');
-  toast(m ? 'Música tema tocando para todos' : 'Música tema parada', 2);
-}
+setInterval(() => { if (MUS.kind === 'audio' || MUS.kind === 'sp') musSync(false); }, 5000);
+// Spotify: o jogo fala direto com o player embutido por postMessage (comandos play, pause, resume, seek em segundos; o player
+// responde 'ready' e 'playback_update' com posição e duração em ms). A API oficial do Spotify usa eval, que a CSP do jogo bloqueia.
+const SP_ORIGIN = 'https://open.spotify.com';
+function spCmd(command, extra) { try { MUS.el?.querySelector('iframe')?.contentWindow?.postMessage({ command, ...extra }, SP_ORIGIN); } catch (e) { } }
+addEventListener('message', e => {
+  if (e.origin !== SP_ORIGIN || MUS.kind !== 'sp' || e.source !== MUS.el?.querySelector('iframe')?.contentWindow) return;
+  const d = e.data || {};
+  if (d.type === 'ready') { MUS.ctl = true; musSync(true); }
+  else if (d.type === 'playback_update' && d.payload) {
+    const q = d.payload; MUS.spPos = (+q.position || 0) / 1000; MUS.spDur = (+q.duration || 0) / 1000; MUS.spPaused = !!q.isPaused; MUS.spAt = tNow();
+    if (!MUS.spSeek && !q.isPaused && !q.isBuffering && MUS.spDur) { MUS.spSeek = 1; musSync(true); } // começou a tocar: pula para a posição da sala
+  }
+});
 function spMusPos() { const w = $('#spMus'); if (w) w.classList.toggle('hid', !!document.pointerLockElement); } // na partida o player sai da tela (continua tocando)
 document.addEventListener('pointerlockchange', spMusPos);
-const musEl = () => S.music ? performance.now() / 1000 - S.music.t0 : 0;
+function musApply(u, el, paused) { // estado vindo do host
+  const m = musParse(u);
+  if (!m) { musStop(); musMenu(); return; }
+  MUS.el0 = Math.max(0, +el || 0) + (NET.isHost ? 0 : (NET.rtt || 0) / 2000); MUS.at = tNow(); MUS.paused = !!paused;
+  if (MUS.url === m.url && MUS.el) { musSync(true); musMenu(); return; }
+  musStop(); MUS.url = m.url; MUS.kind = m.kind; MUS.el0 = Math.max(0, +el || 0) + (NET.isHost ? 0 : (NET.rtt || 0) / 2000); MUS.at = tNow(); MUS.paused = !!paused;
+  if (m.kind === 'sp') {
+    const w = document.createElement('div'); w.id = 'spMus';
+    w.innerHTML = `<div class="spHd">♪ Música da sala (Spotify)</div><iframe title="música da sala" allow="autoplay; encrypted-media" src="${SP_ORIGIN}/embed/${m.path}"></iframe>`;
+    document.body.appendChild(w); MUS.el = w; spMusPos();
+    setTimeout(() => { if (MUS.el === w && !MUS.paused && MUS.spPaused !== false) toast('Spotify: aperte Esc e clique em play no player do canto', 5); }, 6000);
+  } else if (m.kind === 'audio') {
+    const a = document.createElement('audio'); a.src = m.url; a.loop = true; a.preload = 'auto'; a.style.display = 'none';
+    a.onloadedmetadata = () => musSync(true);
+    a.onerror = () => { if (MUS.el === a) toast('Não deu para tocar a música: o link precisa ser de um arquivo de áudio', 4); };
+    document.body.appendChild(a); MUS.el = a; musicVol();
+  } else {
+    const f = document.createElement('iframe'); f.allow = 'autoplay'; f.title = 'música da sala';
+    f.style.cssText = 'position:fixed;width:2px;height:2px;left:-10px;top:-10px;opacity:0;pointer-events:none;border:0';
+    f.src = `https://www.youtube-nocookie.com/embed/${m.id}?autoplay=${MUS.paused ? 0 : 1}&loop=1&playlist=${m.id}&start=${Math.floor(musPos())}&enablejsapi=1&controls=0`;
+    f.onload = () => setTimeout(() => { if (MUS.el === f) { musicVol(); musSync(true); } }, 1200);
+    document.body.appendChild(f); MUS.el = f;
+  }
+  musMenu();
+}
+// pedido de qualquer jogador (op: url, play, pause, stop)
+function musReq(op, url) {
+  if (op === 'url' && !musParse(url)) { toast('Link inválido: use um link do Spotify, do YouTube ou de um arquivo .mp3/.ogg', 4); return; }
+  sendToHost({ t: 'musReq', op, url: op === 'url' ? String(url).trim().slice(0, 400) : '' });
+}
+const srvMusPos = () => !S.music ? 0 : S.music.paused ? S.music.el0 : S.music.el0 + tNow() - S.music.at;
+function srvMusic(pid, m) { // host: aplica o pedido e manda o estado para todos
+  let u = S.music?.url || '', pos = srvMusPos(), paused = !!S.music?.paused;
+  if (m.op === 'url') { const q = musParse(m.url); if (!q) return; u = q.url; pos = 0; paused = false; }
+  else if (m.op === 'pause' || m.op === 'play') { if (!S.music) return; paused = m.op === 'pause'; }
+  else if (m.op === 'stop') { if (!S.music) return; u = ''; }
+  else return;
+  S.music = u ? { url: u, el0: pos, at: tNow(), paused } : null;
+  broadcast({ t: 'music', url: u, el: pos, paused: paused ? 1 : 0, by: pid, op: m.op });
+}
+function musMenu() { // controles no menu de pausa
+  const b = $('#musPP'); if (!b) return;
+  b.textContent = MUS.paused ? 'Continuar' : 'Pausar'; b.disabled = !MUS.url; $('#musX').disabled = !MUS.url;
+  $('#musNow').textContent = MUS.url ? (MUS.paused ? 'Pausada: ' : 'Tocando: ') + MUS.url : 'Nenhuma música tocando';
+  const go = () => { const v = $('#musIn').value.trim(); if (v) { musReq('url', v); $('#musIn').value = ''; } };
+  $('#musGo').onclick = go; $('#musIn').onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') go(); };
+  b.onclick = () => musReq(MUS.paused ? 'play' : 'pause'); $('#musX').onclick = () => musReq('stop');
+}
 function lobbyUI() {
   const el = $('#lobby'); if (!el) return;
   const on = LB.on && !inGame, host = NET.isHost;
@@ -23631,13 +23698,13 @@ function lobbyUI() {
   if (el.dataset.k !== (host ? 'h' : 'c')) { // esqueleto (o formulário do host não é redesenhado a cada mudança)
     el.dataset.k = host ? 'h' : 'c';
     el.innerHTML = `<h3 id="lbHead"></h3><div class="lbcols"><div><div class="lbl" style="margin-top:0">Jogadores</div><div id="lbPl"></div>${host ? '<div class="lbl">Convidar amigos</div><div id="lbFr"></div>' : ''}</div>
-      <div>${host ? '<div id="lbForm"></div><div class="lbl">Música tema (todos ouvem)</div><div style="display:flex;gap:8px"><input id="lbMus" placeholder="Link do Spotify, do YouTube ou de um .mp3" maxlength="400" style="flex:1"><button id="lbMusGo">Tocar</button><button id="lbMusX">Parar</button></div><div class="hint">Na partida, o host também pode digitar no chat: /musica link (ou /musica parar).</div>' : '<div id="lbInfo"></div>'}</div></div>
+      <div>${host ? '<div id="lbForm"></div><div class="lbl">Música tema (todos ouvem)</div><div style="display:flex;gap:8px"><input id="lbMus" placeholder="Link do Spotify, do YouTube ou de um .mp3" maxlength="400" style="flex:1"><button id="lbMusGo">Tocar</button><button id="lbMusX">Parar</button></div><div class="hint">Na partida, qualquer jogador troca a música no menu (Esc) ou no chat: /musica link, /musica pausar, /musica parar.</div>' : '<div id="lbInfo"></div>'}</div></div>
       <div class="actbar">${host ? '<button id="lbGo" class="big">Começar partida</button>' : ''}<button id="lbOut" class="big">${host ? 'Fechar sala' : 'Sair do lobby'}</button></div>`;
     if (host) {
       LB.getForm = matchForm($('#lbForm'), S.st);
       $('#lbForm').addEventListener('click', () => setTimeout(() => { S.st = C.st = LB.getForm(); lobbySync(); }));
       $('#lbGo').onclick = lobbyStart;
-      $('#lbMus').value = S.music?.url || load('music', ''); $('#lbMusGo').onclick = () => { const v = $('#lbMus').value.trim(); save('music', v); hostMusic(v); }; $('#lbMusX').onclick = () => hostMusic('');
+      $('#lbMus').value = S.music?.url || load('music', ''); $('#lbMusGo').onclick = () => { const v = $('#lbMus').value.trim(); save('music', v); musReq('url', v); }; $('#lbMusX').onclick = () => musReq('stop');
     }
     $('#lbOut').onclick = leaveGame;
     frPing();
@@ -23933,7 +24000,7 @@ $('#btnApply').onclick = () => {
 };
 function showPause() {
   $('#pause').classList.remove('hidden');
-  settingsForm($('#pauseSettings'));
+  settingsForm($('#pauseSettings')); musMenu();
   $('#pHostBox').style.display = NET.isHost ? '' : 'none';
   if (NET.isHost) { getPauseForm = matchForm($('#pauseForm'), S.st); renderKick(); }
   updateRoomInfo();
