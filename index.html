@@ -19265,6 +19265,7 @@ function nadeStick(n, h) { // Semtex: gruda na primeira coisa que tocar (parede,
   }
 }
 function updateNades(dt) {
+  updateFires(dt); // fogo e decoy rodam mesmo sem granada voando
   const h = 1 / 120;
   let lure = null;
   for (let i = nades.length - 1; i >= 0; i--) {
@@ -19276,7 +19277,6 @@ function updateNades(dt) {
       if (n.t > .4) lure = [n.pos.x, n.pos.z];
     }
     if (boom) { fxGroup.remove(n.mesh); nades.splice(i, 1); n.type === 'he' || n.type === 'semtex' ? explodeHE(n) : n.type === 'monkey' ? explodeMonkey(n) : n.type === 'flash' ? flashBang(n) : n.type === 'molotov' || n.type === 'inc' ? startFire(n) : n.type === 'decoy' ? startDecoy(n) : startSmoke(n); }
-  updateFires(dt);
   }
   if (NET.isHost && Z.on) Z.lure = lure;
   for (let i = smokes.length - 1; i >= 0; i--) {
@@ -19541,7 +19541,8 @@ function joinRoom(code) {
   try { NET.peer?.destroy(); } catch (e) { }
   const peer = new Peer({ config: ICE, debug: 1 }); NET.peer = peer;
   let welcomed = false, stage = 'server';
-  const fail = txt => { if (welcomed) return; clearTimeout(timer); NET.joining = false; $('#btnJoin').disabled = false; status.textContent = txt; status.className = 'status err'; try { peer.destroy(); } catch (e) { } };
+  let failed = false;
+  const fail = txt => { if (welcomed || failed) return; failed = true; clearTimeout(timer); /* só o primeiro motivo vale: o 'close' que vem depois não apaga o motivo da recusa */ NET.joining = false; $('#btnJoin').disabled = false; status.textContent = txt; status.className = 'status err'; try { peer.destroy(); } catch (e) { } };
   const timer = setTimeout(() => fail(
     stage === 'server' ? 'Tempo esgotado: não deu pra falar com o servidor de pareamento. Confere a internet.'
     : stage === 'linking' ? 'Tempo esgotado: a sala existe, mas a rede bloqueou a ligação com o host (firewall, VPN ou Wi-Fi com isolamento).'
@@ -19606,7 +19607,7 @@ function srvOnData(conn, d) {
   if (typeof d.t !== 'string') return;
   if (d.t === 'ping') { if (conn.pid && finN(d.c) && d.c > 0 && d.c < 1e12 && taxaOk(conn, 'ping')) sendFastTo(conn, { t: 'pong', c: d.c }); return; } // só depois do join: conexão sem jogador não ganha resposta
   if (d.t === 'join' && !conn.pid) {
-    const recusa = txt => { try { conn.send({ t: 'err', txt }); } catch (e) { } setTimeout(() => { try { conn.close(); } catch (e) { } }, 200); };
+    const recusa = txt => { try { conn.send({ t: 'err', txt }); } catch (e) { } setTimeout(() => { try { conn.close(); } catch (e) { } }, 1500); }; // fechar logo perdia o motivo no caminho (o amigo via só "Conexão recusada")
     if ((d.pv | 0) !== PROTO) return recusa('Sua versão do jogo é diferente da do host: recarregue a página com Ctrl+F5 e tente de novo'); // tabelas de armas/mapas e mensagens precisam bater
     if ([...S.players.values()].filter(p => !p.isBot).length >= MAX_JOGADORES) return recusa('Sala cheia');
     if (LB.priv && !LB.allow.has(normUser(d.u))) return recusa('Essa sala é só com convite: peça para o host te convidar');
@@ -24387,7 +24388,7 @@ function applySettings() {
   musicVol();
   applyQuality(); visApply();
 }
-const lastSt = load('lastSt', { map: 'arena', mode: 'rounds', rounds: 8, frags: 20, bots: 0, diff: 1, zmap: 'vila', zdiff: 1 });
+const lastSt = load('lastSt', { map: 'arena', mode: 'rounds', rounds: 13, frags: 20, bots: 0, diff: 1, zmap: 'vila', zdiff: 1 });
 skinsInit();
 document.querySelectorAll('#menu .tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('#menu .tabs button').forEach(x => x.classList.toggle('on', x === b));
@@ -24547,7 +24548,7 @@ fpLoad('p:ak'); fpLoad('m:knife'); fpLoad('m:karambit'); FPC['k:pack'] = new GLT
 setTimeout(() => { let q = Promise.resolve(); for (const k of Object.keys(FPM)) q = q.then(() => fpLoad('m:' + k)); }, 8000); // modelos das armas aos poucos (mundo e mãos dos outros)
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos); só em desenvolvimento (DEBUG), nunca no site publicado
-if (DEBUG) window.__T = { openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, ZMM, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
+if (DEBUG) window.__T = { get NOW() { return now; }, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, ZMM, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>
