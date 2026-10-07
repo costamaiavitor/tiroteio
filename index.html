@@ -15942,6 +15942,42 @@ function a34Mostra(gs) { // o que estava escondido (menos o que tem luz dentro)
   const L = []; for (const g of gs) g.traverse(o => { if (o.visible) return; let luz = false; o.traverse(c => { if (c.isLight) luz = true; }); if (!luz) { L.push(o); o.visible = true; } }); return L;
 }
 // ===== O1-A34 fim =====
+// ===== O1-B04: mapas PvP, armas baixadas (glTF) compiladas antes do 1º desenho =====
+// Medido (B04, perfil por quadro no Médio): os picos de 0,3 a 2 s dos mapas PvP eram programas compilados no meio da partida, no 1º
+// desenho de uma arma baixada: a do bot que renasce com outra arma (molde da mão dos outros), a da própria mão ao renascer (pacote
+// com braços) e as que chegam depois (os modelos baixam aos poucos, 8 s depois da carga). Cada um esperava 300-950 ms o programa
+// (getProgramInfoLog) e 30-110 ms as texturas. Agora os glTF já baixados são compilados desde o início do aquecimento (modelos na
+// cena, pacotes na cena da arma; o modelo na própria mão, mais raro, fica de fora: o dobro de programas pesava na placa) e cada glTF
+// que chega depois logo que chega, aos poucos no ócio e sem esperar (KHR_parallel_shader_compile: a placa compila em paralelo; o
+// aquecimento não espera por eles, então a carga não cresce). O molde e a arma da mão clonam esses materiais
+// (mesmos parâmetros): no 1º desenho o programa já está pronto. As texturas NÃO sobem antes (~374 MB se fossem todas).
+const B04 = { feito: new Set(), fila: [], tm: 0 };
+const b04PvP = () => !!curMap && !curMap.zombie && C.st?.mode !== 'zombies'; // no modo Zumbi as armas são as feitas no código (fpw)
+function b04Itens(k, items, seen) { // malhas do glTF k, com a cena e a câmera onde ele vai ser desenhado
+  B04.feito.add(k); const alvos = k[0] === 'm' ? [[camera, scene]] : [[vmCam, vmScene]]; // modelo: a mão dos outros (bots trocam de arma a cada vida); pacote: a própria mão
+  FPC[k].scene.traverse(o => {
+    if (!o.isMesh || !o.material) return; const ga = o.geometry?.attributes || {};
+    for (const [cam, g] of alvos) { const kk = [o.material].flat().map(m => m.uuid).join() + o.type + !!ga.color + !!ga.tangent + g.uuid; if (!seen.has(kk)) { seen.add(kk); items.push([o, cam, g]); } }
+  });
+}
+function b04Aquecer() { B04.feito.clear(); B04.fila.length = 0; if (b04PvP()) b04Agenda(); } // mapa novo (luzes e névoa podem mudar a chave): refaz a lista
+function b04Passo() { // ócio: compila (sem esperar) os glTF que chegaram, ~6 ms por vez
+  B04.tm = 0; if (!b04PvP() || !(inGame || WARM)) { B04.fila.length = 0; return; }
+  const t = performance.now();
+  if (!B04.fila.length) {
+    const seen = new Set(); for (const k of Object.keys(FPC)) if (fpReady(k) && !B04.feito.has(k)) b04Itens(k, B04.fila, seen);
+    if (!B04.fila.length) return; warmLuzes(scene); warmLuzes(vmScene);
+  }
+  while (B04.fila.length && performance.now() - t < 6) {
+    const [o, cam, g] = B04.fila.shift(); renderer.setRenderTarget(CFG.gfx === 'alto' ? composer.readBuffer : null); // como no warmUp: no Alto a cena vai para o alvo do pós
+    try { renderer.compile(o, cam, warmAlvo(g)); } finally { renderer.setRenderTarget(null); }
+  }
+  if (B04.fila.length) b04Agenda();
+}
+function b04Agenda() { if (!B04.tm) B04.tm = (window.requestIdleCallback ? requestIdleCallback(b04Passo, { timeout: 200 }) : setTimeout(b04Passo, 20)) || 1; }
+const B04_ESPERA = new WeakSet(); // glTF ainda baixando: compila logo que chega (a compilação na placa leva ~0,3 s; quanto antes, melhor)
+setInterval(() => { for (const v of Object.values(FPC)) if (v instanceof Promise && !B04_ESPERA.has(v)) { B04_ESPERA.add(v); v.then(b04Agenda, () => { }); } if (inGame) b04Agenda(); }, 500);
+// ===== O1-B04 fim =====
 // Aquecimento: compila os shaders agora. Senão cada material novo que entra na tela ao girar compila na hora e
 // trava a câmera por alguns frames. Vai em pedaços (um material por vez, ~12 ms por tarefa): de uma vez só, a
 // entrada na partida travava a aba por segundos nos mapas grandes. Com KHR_parallel_shader_compile a placa
@@ -15970,6 +16006,7 @@ function warmUp(M) {
   const tex = new Set(); for (const [o] of items) for (const m of [o.material].flat()) for (const v of Object.values(m)) if (v?.isTexture && !v.isRenderTargetTexture && v.image) tex.add(v);
   const texs = [...tex], W = WARM = { i: 0, pend: [], tm: 0, n: items.length + texs.length, t0: performance.now() };
   warmGrade(W); // 6-g07
+  b04Aquecer(); // O1-B04: glTF já baixados compilam junto, sem segurar o fim do aquecimento
   W.end = () => {
     clearTimeout(W.tm); scene.remove(warm); vmScene.remove(vmWarm); if (WARM === W) WARM = null; warmMsg();
     for (const px of espelhos) warm.remove(px); // O1-A34
