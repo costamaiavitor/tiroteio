@@ -17908,9 +17908,10 @@ function fpTwoBone(a) { // braço e antebraço: o pulso (a.wr) vai para a.tw, co
   fpRot(a.fa, I.w.clone().sub(I.e), a.tw.clone().sub(I.e));
 }
 function vmSetWeapon(id) {
-  if (vmGun) { vmRoot.remove(vmGun); vmGun.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); }
+  if (vmGun) { vmRoot.remove(vmGun); if (!VMC.dono.has(vmGun)) vmGun.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); } // 6-w17: a guardada no cache fica inteira
   if (ARMS.knife) { ARMS.knife.removeFromParent(); ARMS.knife = null; } // a faca antiga sai do soquete dos braços
   if (ARMS.gunC) ARMS.gunC.removeFromParent();
+  const vck = vmcChave(id); if (vck && vmcUsar(vck)) return; // 6-w17: arma já montada (troca sem refazer modelo, mãos e enquadramento)
   vmGun = new THREE.Group();
   const mid = knifeModelOf(id, PROF.data?.equipped), gun = (GM_VM = true, gunModel(mid, true, skinOf(mid))), ud = gun.userData, A = armMats(); vmGun.add(gun);
   const tp0 = attOn(mid).length ? armsTipPts(gun) : null; // (a13) ponta da arma antes dos acessórios (enquadramento)
@@ -17946,11 +17947,11 @@ function vmSetWeapon(id) {
     else if (!kn) { karambitPose(gun, ud, A); rh = null; }
     else rh = knifeHand(A);
     if (rh) { rh.quaternion.copy(qz).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), -.45)); rh.position.copy(ud.rh).applyQuaternion(gun.quaternion); vmGun.add(rh); } // mão de 3/4, lâmina de perfil
-  } else { rh = rightHand(A); rh.position.copy(ud.rh); gun.add(rh); }
+  } else { rh = vmMao(rightHand, A); rh.position.copy(ud.rh); gun.add(rh); }
   const armsOn = ARMS.root && !['knife', 'karambit', 'nade', 'smoke', 'monkey', 'semtex', 'clay'].includes(m);
   if (armsOn) rh.traverse(o => { if (o.isMesh) o.visible = false; }); // a mão procedural vira só o alvo do IK
   if (!['knife', 'karambit', 'nade', 'smoke', 'monkey', 'semtex', 'clay'].includes(m)) {
-    const lh = leftHand(A); lh.position.copy(ud.lh); gun.add(lh);
+    const lh = vmMao(leftHand, A); lh.position.copy(ud.lh); gun.add(lh);
     if (armsOn) {
       lh.traverse(o => { if (o.isMesh) o.visible = false; });
       const rt = new THREE.Group();
@@ -17979,7 +17980,57 @@ function vmSetWeapon(id) {
   vmGun.scale.setScalar(1.18); ud.baseYaw = vmGun.rotation.y = ud.armsGun ? (W[mid]?.slot === 'primary' ? GRIP.yaw : GRIP.yawP) : .05; // arma maior e virada para dentro (com os braços, bem mais, como no CS: guarda-mão à esquerda da mão do gatilho)
   vmRoot.add(vmGun);
   if (ud.armsGun) frameArms(ud, { ...(W[mid]?.slot === 'primary' ? FRAME.primary : FRAME.pistol), ...FRAME.model[m] });
+  if (vck) vmcGuardar(vck, vmGun);
 }
+// ===== 6-w17: troca de arma sem engasgo (cache da arma na mão, molde das mãos, aquecimento das armas compradas) =====
+// A troca refazia tudo a cada saque: o modelo (gunModel, 3-17 ms), as duas mãos procedurais (5-8 ms, ~60 malhas), os acessórios, o olho
+// da mira e o enquadramento (frameArms, 2-5 ms). No modo Zumbi a arma montada fica guardada por chave (arma, skin, acessórios, gráfico,
+// braços 3D) e volta inteira: a cada quadro o gunAnim já devolve carregador, ferrolho, mão etc. ao lugar de descanso. As mãos saem de um
+// molde (clone: geometria e material compartilhados, marcados keep para o descarte não apagar o molde). As armas do inventário que
+// ainda não estão no cache são montadas num momento ocioso, uma por vez (vmcAquecer), e não no meio da troca.
+const VMC = { m: new Map(), dono: new Map(), max: 6, fila: 0 }; // m: chave → arma montada (ordem = uso, LRU); dono: arma → chave
+const VMC_FORA = ['knife', 'karambit', 'nade', 'smoke', 'monkey', 'semtex', 'clay']; // facas (braços/pacote próprios) e itens de arremesso: sempre montados na hora
+function vmcChave(id) {
+  if (!ZC.on || !id || !W[id]) return null; const mid = knifeModelOf(id, PROF.data?.equipped);
+  if (VMC_FORA.includes(W[mid]?.model) || fpw(mid)) return null;
+  return mid + '|' + (skinOf(mid) || '') + '|' + attOn(mid).join('+') + '|' + CFG.gfx + '|' + (ARMS.root ? 1 : 0);
+}
+function vmcGuardar(k, g) {
+  const old = VMC.m.get(k); if (old && old !== g) vmcSoltar(k);
+  VMC.m.set(k, g); VMC.dono.set(g, k);
+  for (const [k2, g2] of VMC.m) { if (VMC.m.size <= VMC.max) break; if (g2 !== vmGun) vmcSoltar(k2); } // o mais antigo sai (nunca o da mão)
+}
+function vmcSoltar(k) {
+  const g = VMC.m.get(k); if (!g) return; VMC.m.delete(k); VMC.dono.delete(g);
+  if (g !== vmGun) g.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); });
+}
+function vmcUsar(k) {
+  const g = VMC.m.get(k); if (!g) return false;
+  VMC.m.delete(k); VMC.m.set(k, g); // usado agora: vai para o fim da fila
+  vmGun = g; const ud = g.userData;
+  vmFlash.material.color.setHex(ud.flashC ?? 0xffd27a); // (o gunModel fazia isso ao montar)
+  if (ud.armsGun) { vmRoot.add(ARMS.gunC); ARMS.gunC.position.set(-.165, .145, .43); ARMS.gunC.add(ARMS.holder); ARMS.kind = 'gun'; armsGunBase(); }
+  if (ud.baseYaw != null) g.rotation.y = ud.baseYaw;
+  vmRoot.add(g); return true;
+}
+const VM_MAO = new Map(); // molde de cada mão (por função + materiais)
+function vmMao(fn, A) {
+  let t = VM_MAO.get(fn); if (!t || t.A !== A) { t = { A, h: fn(A) }; t.h.traverse(o => { if (o.geometry) o.geometry.userData.keep = true; }); VM_MAO.set(fn, t); }
+  return t.h.clone();
+}
+function vmcAquecer() { // monta, num momento ocioso, as armas do inventário que ainda não estão no cache (uma por vez)
+  if (VMC.fila || !ZC.on) return;
+  const ric = window.requestIdleCallback || (f => setTimeout(() => f({ timeRemaining: () => 8 }), 200));
+  const passo = dl => {
+    VMC.fila = 0; if (!ZC.on || !inGame || !vmGun || !VMC.dono.has(vmGun) || !hasW(G.cur)) return; // a da mão precisa estar guardada (volta sem custo)
+    if (now < G.switchEnd || G.reloadEnd || G.reload || G.ads > 0 || G.scope) { VMC.fila = setTimeout(() => { VMC.fila = 0; vmcAquecer(); }, 500); return; } // sacando, recarregando ou mirando: depois
+    const id = ['primary', 'secondary', 'third'].map(s => G.inv[s]).find(w => w && w !== G.cur && hasW(w) && vmcChave(w) && !VMC.m.has(vmcChave(w)));
+    if (!id) return; if (dl.timeRemaining() < 6) { vmcAquecer(); return; } // sem folga neste quadro: tenta no próximo ocioso
+    const cur = G.cur; vmSetWeapon(id); vmSetWeapon(cur); vmcAquecer(); // monta a outra e devolve a da mão (do cache, no mesmo instante: nada é desenhado no meio)
+  };
+  VMC.fila = ric(passo, { timeout: 3000 }) || 1;
+}
+if (DEBUG) window.__W17 = { VMC, vmcChave, vmcAquecer, applyInv }; // testes (só em localhost)
 // ---------- animações da arma (tiro, bomba, ferrolho, recargas) ----------
 const smooth = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 const seg = (t, a, b) => smooth((t - a) / (b - a));
@@ -18558,6 +18609,7 @@ function applyInv(inv, refill, got) {
   if (G.cur === 'dmach' && hasW('dmach')) { if (got && W[got]?.slot !== 'nade') C.dmPrev = got; return; } // Máquina da Morte na mão: a arma nova espera
   if (got && (W[got]?.slot === 'primary' || W[got]?.slot === 'secondary')) equip(got, true);
   else if (refill || !hasW(G.cur)) equip(me.downed ? zDownGun() : bestW(), true);
+  vmcAquecer(); // 6-w17: a outra arma do inventário já fica montada para a troca
 }
 // ---------- Armeiro: nível das armas e acessórios no modo Zumbi (como o Gunsmith do Black Ops 6) ----------
 // Cada arma ganha XP própria matando zumbis (tiro na cabeça vale mais) e sobe de nível; cada nível libera um acessório, numa ordem
