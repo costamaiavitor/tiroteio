@@ -15920,6 +15920,28 @@ function buildMap(id) {
   warmUp(M);
   MAPA_FRESCO = curMapId; queueMicrotask(() => { MAPA_FRESCO = null; }); // 6-g06
 }
+// ===== O1-A34: picos de "primeira vez" adiantados para o aquecimento =====
+// Medido (Vila e Sanatório, Médio): depois do aquecimento, os picos de 70-200 ms que se repetiam só na 1ª vez eram programas que o
+// aquecimento compilava (renderer.compile) mas nunca desenhava: o 1º uso de verdade (getUniforms/checagem) esperava a placa. Dois casos:
+// - peça invisível no quadro final do aquecimento: o clarão da arma (vmFlash, só no 1º tiro), pools de efeitos, sangue, decalques;
+// - instanciadas que o O1-B01 juntou e que a animação da área mexe depois (b01Volta): a InstancedMesh volta para a cena com a variante de
+//   instância (e de cor por instância) do programa, que ninguém tinha compilado, e sobe a geometria na hora.
+// No quadro final: tudo o que não é luz fica visível (luz não: mudaria a conta de luzes dos programas) e cada instanciada da junção entra
+// como espelho (Object.create: mesma geometria, material e instâncias; matrizes próprias) dentro do grupo do aquecimento. Depois volta tudo.
+const A34 = { b01: null };
+{ const fim = b01Fim; b01Fim = F => { A34.b01 = F; return fim(F); }; } // guarda a lista da junção do mapa atual (montada antes do warmUp)
+function a34Espelhos(warm) { // espelhos das instanciadas da junção que ainda não voltaram
+  const L = []; for (const f of A34.b01 || []) { if (f.ok || f.o.parent) continue;
+    const o = f.o, px = Object.create(o), v = x => ({ configurable: true, value: x }); // as matrizes do Object3D não aceitam atribuição
+    Object.defineProperties(px, { matrix: v(o.matrix.clone()), matrixWorld: v(o.matrixWorld.clone()), modelViewMatrix: v(new THREE.Matrix4()), normalMatrix: v(new THREE.Matrix3()) });
+    Object.assign(px, { children: [], matrixAutoUpdate: false, matrixWorldAutoUpdate: false });
+    warm.add(px); L.push(px); }
+  A34.b01 = null; return L;
+}
+function a34Mostra(gs) { // o que estava escondido (menos o que tem luz dentro)
+  const L = []; for (const g of gs) g.traverse(o => { if (o.visible) return; let luz = false; o.traverse(c => { if (c.isLight) luz = true; }); if (!luz) { L.push(o); o.visible = true; } }); return L;
+}
+// ===== O1-A34 fim =====
 // Aquecimento: compila os shaders agora. Senão cada material novo que entra na tela ao girar compila na hora e
 // trava a câmera por alguns frames. Vai em pedaços (um material por vez, ~12 ms por tarefa): de uma vez só, a
 // entrada na partida travava a aba por segundos nos mapas grandes. Com KHR_parallel_shader_compile a placa
@@ -15936,6 +15958,7 @@ function warmUp(M) {
   warm.add(new THREE.Mesh(new THREE.SphereGeometry(.1), new THREE.MeshBasicMaterial({ transparent: true })));
   const vmWarm = new THREE.Group(); for (const id of ['m4', 'ak47', 'm1911_pap', 'awp', 'raygun', 'knife']) vmWarm.add(gunModel(id, true)); // armas PBR da primeira pessoa
   warm.visible = vmWarm.visible = false; scene.add(warm); vmScene.add(vmWarm);
+  const espelhos = a34Espelhos(warm); // O1-A34
   const items = [], seen = new Set(), par = renderer.extensions.has('KHR_parallel_shader_compile');
   for (const [g, cam] of [[scene, camera], [vmScene, vmCam]]) g.traverse(o => {
     if (!o.material) return; const ga = o.geometry?.attributes || {};
@@ -15949,6 +15972,7 @@ function warmUp(M) {
   warmGrade(W); // 6-g07
   W.end = () => {
     clearTimeout(W.tm); scene.remove(warm); vmScene.remove(vmWarm); if (WARM === W) WARM = null; warmMsg();
+    for (const px of espelhos) warm.remove(px); // O1-A34
     vmWarm.traverse(o => o.geometry?.dispose()); for (const d of sombraMats) d.dispose(); // 6-g06
     warm.traverse(o => { o.skeleton?.dispose(); if (!o.geometry?.userData.keep) o.geometry?.dispose(); if (o.material?.map && o.material.map !== SOFT && !Object.values(GTX || {}).includes(o.material.map)) o.material.map.dispose(); });
   };
@@ -15976,9 +16000,10 @@ function warmUp(M) {
     warm.visible = vmWarm.visible = true;
     renderer.compile(new THREE.Object3D(), camera, scene); // 6-g06: monta as luzes do estado de render da cena (o passe de sombra usa o da cena, não o do espelho)
     const fc = [], inW = new Set(), dr = new Map(); warm.traverse(o => inW.add(o)); // o mapa inteiro também, sem recorte: sobe todas as malhas
-    for (const g of [scene, vmWarm]) g.traverse(o => { fc.push([o, o.frustumCulled, o.castShadow]); o.frustumCulled = false; if (inW.has(o) && o.isMesh && !o.material.transparent) o.castShadow = true; if (o.geometry && !dr.has(o.geometry)) dr.set(o.geometry, o.geometry.drawRange.count); });
+    const ocultos = a34Mostra([scene, vmScene]); // O1-A34
+    for (const g of [scene, vmScene]) g.traverse(o => { fc.push([o, o.frustumCulled, o.castShadow]); o.frustumCulled = false; if (inW.has(o) && o.isMesh && !o.material.transparent) o.castShadow = true; if (o.geometry && !dr.has(o.geometry)) dr.set(o.geometry, o.geometry.drawRange.count); });
     try { for (const g of dr.keys()) g.drawRange.count = 0; renderer.shadowMap.needsUpdate = true; cullTodo = true; renderScene(); renderer.clear(); }
-    finally { cullTodo = false; for (const [g, n] of dr) g.drawRange.count = n; for (const [o, f, c] of fc) { o.frustumCulled = f; o.castShadow = c; } }
+    finally { cullTodo = false; for (const [g, n] of dr) g.drawRange.count = n; for (const [o, f, c] of fc) { o.frustumCulled = f; o.castShadow = c; } for (const o of ocultos) o.visible = false; } // O1-A34: ocultos
     renderer.shadowMap.needsUpdate = true;
     W.end();
   };
