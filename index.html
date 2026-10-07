@@ -24428,6 +24428,49 @@ try {
     bgLast = t; now = t; tick(dt);
   };
 } catch (e) { }
+// ===== O1-A15: transparente de dois lados sem reavaliar o programa a cada quadro =====
+// O three desenha material transparente DoubleSide em duas passadas (verso e frente) trocando material.side e marcando
+// needsUpdate nas duas: a cada quadro, 2 reavaliações de programa (getParameters + chave) por objeto, ~20 na Vila e ~34 no
+// Sanatório (quase tudo do atmos). Aqui as mesmas duas passadas saem sem needsUpdate: o verso vai num clone fixo com side
+// BackSide (desenhado no material.onBeforeRender, com os mesmos uniforms) e a frente no próprio material, virado para
+// FrontSide só durante o desenho (o onAfterRender do objeto devolve DoubleSide). Mesmos programas, mesma ordem: mesmos pixels.
+// Passada única (forceSinglePass) foi descartada: muda pixels (sombra e luz do verso).
+const A15 = { t: 0, ok: new WeakSet(), no: new WeakSet(),
+  campos: ['opacity', 'alphaTest', 'map', 'alphaMap', 'emissiveMap', 'emissiveIntensity', 'bumpMap', 'bumpScale', 'normalMap', 'lightMap', 'lightMapIntensity', 'aoMap', 'aoMapIntensity',
+    'envMap', 'specularMap', 'reflectivity', 'refractionRatio', 'shininess', 'roughness', 'metalness', 'roughnessMap', 'metalnessMap', 'displacementMap', 'displacementScale', 'displacementBias',
+    'depthWrite', 'depthTest', 'depthFunc', 'blending', 'blendSrc', 'blendDst', 'blendEquation', 'premultipliedAlpha', 'colorWrite', 'polygonOffset', 'polygonOffsetFactor', 'polygonOffsetUnits',
+    'fog', 'toneMapped', 'vertexColors', 'flatShading', 'wireframe', 'dithering', 'alphaToCoverage', 'alphaHash', 'clipShadows', 'clippingPlanes', 'clipIntersection'],
+  cores: ['color', 'emissive', 'specular'] };
+// assinatura do que muda o programa: antes o three reavaliava todo quadro; se o jogo trocar um mapa sem needsUpdate, reavalia aqui
+const a15Sig = m => (m.map ? 1 : 0) | (m.alphaMap ? 2 : 0) | (m.emissiveMap ? 4 : 0) | (m.bumpMap ? 8 : 0) | (m.envMap ? 16 : 0) | (m.aoMap ? 32 : 0) | (m.lightMap ? 64 : 0) | (m.normalMap ? 128 : 0)
+  | (m.vertexColors ? 256 : 0) | (m.flatShading ? 512 : 0) | (m.alphaTest > 0 ? 1024 : 0) | (m.fog ? 2048 : 0) | (m.toneMapped ? 4096 : 0) | (m.wireframe ? 8192 : 0) | (m.dithering ? 16384 : 0)
+  | (m.alphaHash ? 32768 : 0) | (m.specularMap ? 65536 : 0) | (m.premultipliedAlpha ? 131072 : 0) | (m.map?.colorSpace === THREE.SRGBColorSpace ? 262144 : 0);
+function a15Liga(m) {
+  const b = m.clone(); b.side = THREE.BackSide; b.onBeforeCompile = m.onBeforeCompile; b.customProgramCacheKey = m.customProgramCacheKey; b.defines = m.defines; b.userData = m.userData;
+  m.addEventListener('dispose', () => b.dispose()); // o clone sai junto (programa e uniforms do verso)
+  m.needsUpdate = true; const st = { b, v: m.version, sig: a15Sig(m) }; // uma vez: a frente passa a usar o programa FrontSide
+  m.onBeforeRender = function (r, sc, cam, g, o, grp) {
+    if (o.onAfterRender !== a15Volta || !(m.transparent && m.side === THREE.DoubleSide && !m.forceSinglePass)) return; // fora disso o three faz as duas passadas
+    const sg = a15Sig(m); if (m.version !== st.v || sg !== st.sig) { st.sig = sg; m.needsUpdate = true; b.needsUpdate = true; st.v = m.version; }
+    for (const k of A15.campos) if (k in m && b[k] !== m[k]) b[k] = m[k];
+    for (const k of A15.cores) if (m[k]) b[k].copy(m[k]);
+    r.renderBufferDirect(cam, sc, g, b, o, grp); // verso, como a 1ª passada do three
+    m.side = THREE.FrontSide; o.userData.a15m = m; // frente: o renderObject desenha sem trocar o programa
+  };
+}
+function a15Volta(r, sc, cam, g, m) { const k = this.userData.a15m; if (k) { k.side = THREE.DoubleSide; this.userData.a15m = null; } }
+function a15Passe() { // varre a cena a cada ~1 s (o atmos monta objetos depois do mapa)
+  if (now - A15.t < 1) return; A15.t = now;
+  scene.traverse(o => {
+    const m = o.material; if (!m || Array.isArray(m) || !o.isMesh || !m.transparent || m.side !== THREE.DoubleSide || m.forceSinglePass) return;
+    if (A15.no.has(m)) return;
+    if (!A15.ok.has(m)) { // só material comum (sem ShaderMaterial nem gancho próprio)
+      if (m.isShaderMaterial || m.onBeforeRender !== THREE.Material.prototype.onBeforeRender) { A15.no.add(m); return; }
+      a15Liga(m); A15.ok.add(m);
+    }
+    if (o.onAfterRender === THREE.Object3D.prototype.onAfterRender) o.onAfterRender = a15Volta; // objeto com gancho próprio fica com as passadas do three
+  });
+}
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), .05);
@@ -24452,7 +24495,7 @@ function tick(dt) {
     if (!C.spec && now - C.deadAt > 2.5) cycleSpec();
   }
   updateRemotes(dt);
-  if (ZC.on) { updateZombies(dt); zUpdateWorld(dt); zInteract(dt); }
+  if (ZC.on) { updateZombies(dt); zUpdateWorld(dt); zInteract(dt); a15Passe(); } // O1-A15
   visTick();
   updateNades(dt);
   updateFx();
