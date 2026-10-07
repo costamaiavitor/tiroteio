@@ -12845,6 +12845,7 @@ VIS.fill.position.set(0, .25, .2); VIS.lant.position.set(.18, -.12, 0); VIS.lant
 // cor da neblina/horizonte: nos mapas de zumbi a neblina escura clareia um pouco (o zumbi longe vira silhueta em vez de sumir no preto)
 function visFogC(M, c) { const col = new THREE.Color(c ?? M.fogC ?? M.sky); if (!M.zombie) return col; const h = {}; col.getHSL(h); if (h.l < VIS.k.fogL) col.setHSL(h.h, h.s, h.l + (VIS.k.fogL - h.l) * .6); return col; }
 function visMap(M) { // mapas de zumbi: neblina mais longe e menos preta, mais luz ambiente (o zumbi não vira só silhueta preta)
+  g02SombraTam(M); // 6-g02: mapa PvP depois do Alto do Sanatório (sem recarregar) volta ao tamanho padrão
   if (!M.zombie) return visApply();
   const fc = visFogC(M);
   scene.background.copy(fc); skyMat.uniforms.hor.value.set(M.fogC ?? M.sky).lerp(fc, .5); skyMat.uniforms.bot.value.copy(fc).multiplyScalar(.6); // céu clareia só metade: a noite continua noite
@@ -12858,8 +12859,9 @@ function visMap(M) { // mapas de zumbi: neblina mais longe e menos preta, mais l
 // sombra fixa é redesenhada só a cada degrau, e no Alto a borda não tremula com o andar (o centro fica parado).
 VIS.sh = { r: 0, step: 20, x: NaN, z: NaN, off: new V3() };
 function visShadowMap(M) {
-  const r = VIS.sh.r = M.zombie && M.shR || 0; VIS.sh.x = VIS.sh.z = NaN;
-  if (!r) { sun.shadow.bias = -.0005; sun.shadow.normalBias = .03; return; } // padrão dos outros mapas
+  g02SombraTam(M); // 6-g02
+  const r = VIS.sh.r = M.zombie && (g02ShR(M) || M.shR) || 0; VIS.sh.x = VIS.sh.z = NaN; // 6-g02: g02ShR = raio só do Alto
+  if (!r) { sun.shadow.bias = -.0005; sun.shadow.normalBias = .03; g02SombraCheia(M); return; } // padrão dos outros mapas
   const s = M.sun || [30, 50, 20], sc = sun.shadow.camera; VIS.sh.off.set(s[0], s[1], s[2]).normalize().multiplyScalar(r * 2.2);
   sc.left = sc.bottom = -r; sc.right = sc.top = r; sc.near = 1; sc.far = r * 4.4; sc.updateProjectionMatrix();
   sun.shadow.bias = VIS.k.shBias; sun.shadow.normalBias = VIS.k.shNBias;
@@ -12871,6 +12873,24 @@ function visShadowTick(force) {
   if (!force && x === S.x && z === S.z) return;
   S.x = x; S.z = z; sun.target.position.set(x, 0, z); sun.position.set(x, 0, z).add(S.off);
   sun.updateMatrixWorld(); sun.target.updateMatrixWorld(); if (sun.castShadow) renderer.shadowMap.needsUpdate = true;
+}
+// ===== 6-g02: engasgos do Alto do Sanatório (sombra do luar) =====
+// Medido na fase 6 (g02, Sanatório no Alto, depois do g01): no Alto a sombra é redesenhada a cada quadro (personagens fazem
+// sombra) e o Sanatório usava a câmera da sombra do mapa inteiro (260 m) num mapa de 4096: 16,7 M de texels limpos e
+// preenchidos a cada quadro (~6 ms de placa de 20). No Alto, a sombra passa a seguir o jogador (o mesmo VIS.sh da Vila) num
+// quadrado de 2r: r = 80 deixa a borda sempre além do fim da neblina (~70 m) e 2560 texels mantêm a mesma nitidez de antes
+// (6,25 cm por texel) com 39% dos texels. No Médio/Baixo nada muda (sombra fixa do mapa inteiro, desenhada uma vez).
+MAPS.sanatorio.shAlto = { r: 80, mapa: 2560 };
+const g02ShR = M => CFG.gfx === 'alto' && M.shAlto ? M.shAlto.r : 0;
+function g02SombraTam(M) { // tamanho do mapa de sombra por qualidade e mapa (o applyQuality põe o padrão: 4096 no Alto)
+  const n = CFG.gfx === 'alto' ? (M?.shAlto?.mapa || 4096) : 2048, ms = sun.shadow.mapSize; if (ms.x === n) return;
+  ms.set(n, n); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } renderer.shadowMap.needsUpdate = true;
+}
+function g02SombraCheia(M) { // sem sombra que segue: a câmera da sombra volta a cobrir o mapa inteiro (a mesma conta do buildMap)
+  if (!M.shAlto) return; // só quem pode trocar de um modo para o outro (Alto <-> Médio no meio da partida)
+  const s = M.sun || [30, 50, 20], ext = Math.max(M.w, M.d) / 2 + 8, sc = sun.shadow.camera; sun.position.set(s[0], s[1], s[2]); sun.target.position.set(0, 0, 0);
+  sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.near = 1; sc.far = Math.max(220, Math.hypot(s[0], s[1], s[2]) + ext * 1.6); sc.updateProjectionMatrix();
+  sun.updateMatrixWorld(); sun.target.updateMatrixWorld(); renderer.shadowMap.needsUpdate = true;
 }
 function visApply() { // brilho (configuração) e luzes extras; roda ao montar o mapa e ao mudar as configurações
   const M = curMap; if (!M) return;
@@ -13074,6 +13094,7 @@ function applyQuality() {
   sun.castShadow = CFG.shadows && q !== 'baixo';
   sun.shadow.mapSize.set(q === 'alto' ? 4096 : 2048, q === 'alto' ? 4096 : 2048); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
   renderer.shadowMap.autoUpdate = q === 'alto'; renderer.shadowMap.needsUpdate = true;
+  if (curMap?.zombie) visShadowMap(curMap); // 6-g02: raio e tamanho da sombra dependem da qualidade (Alto do Sanatório)
   const dyn = q === 'alto'; // personagens projetam sombra no Alto
   for (const rp of R.values()) rp.model.traverse(o => { if (o.isMesh) o.castShadow = dyn; });
   for (const zc of ZC.zs.values()) zc.model.traverse(o => { if (o.isMesh) o.castShadow = dyn; });
@@ -15104,7 +15125,7 @@ function mergeParts(root, skip, cache) {
 let CULL = [], cullT = 0, cullTodo = false; // cullTodo (3A-15): o aquecimento mostra tudo de uma vez (sobe todas as malhas)
 function zCull(force) {
   // 3A-15: sem luz que projete sombra (Baixo) o three nunca baixa o needsUpdate: antes o Baixo mostrava o mapa inteiro em todo quadro
-  const sh = renderer.shadowMap.needsUpdate && sun.castShadow; if (!force && !sh && !cullTodo && now < cullT) return;
+  const sh = renderer.shadowMap.needsUpdate && sun.castShadow && !renderer.shadowMap.autoUpdate; if (!force && !sh && !cullTodo && now < cullT) return; // 6-g02: no Alto (autoUpdate) a sombra já é refeita a cada quadro com o que está à vista: porta aberta não mostra mais o mapa inteiro por um quadro
   cullT = sh ? 0 : now + .2; const f = (scene.fog?.far ?? 1e9) + 5, cx = camera.position.x, cz = camera.position.z;
   // 3A-15: com a sombra que segue o jogador (VIS.sh.r), o degrau dela só precisa do que está perto; antes cada degrau (20 m) mostrava o mapa
   // inteiro num quadro (pico de 100+ ms ao andar entre as áreas no Médio). Raio: a caixa da sombra mais a sombra de uma peça alta (~30 m)
