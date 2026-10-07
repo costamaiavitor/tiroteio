@@ -16548,6 +16548,7 @@ function gunModel(id, fp = false, skin = null) {
       if (awp) for (let i = 0; i < 3; i++) add(g, new THREE.BoxGeometry(.034, .004, .008), M.metal, 0, .032, -.13 - bl - .01 + i * .01);
       if (kar) irons(.058, .02, -(.13 + bl - .015), { notch: 1, base: .02, fbase: .022 }); else if (bid === 'dragunov') scope(g, -.01, .09, -.03, .2, .016, 1); else scope(g, dmr ? -.004 : 0, .088, -.04, psg || l96 ? .3 : .26, psg || l96 ? .02 : .017);
       if (dmr) { const bolt = grp(g, .026, .03, -.03); add(bolt, CY(.004, .012, 8), M.metal, .006, 0, 0, 0, Math.PI / 2); add(bolt, RB(.014, .012, .016, .004), M.metal, .014, 0, 0); ud.bolt = bolt; }
+      else if (kar) { const bolt = grp(g, .016, .036, .05), ka = -.8, kc = Math.cos(ka), ks = Math.sin(ka); add(bolt, new THREE.CylinderGeometry(.0034, .0034, .036, 8), M.metal, .018 * kc, .018 * ks, 0, 0, 0, ka + Math.PI / 2); add(bolt, new THREE.SphereGeometry(.0068, 12, 10), M.metal, .039 * kc, .039 * ks, 0); ud.bolt = bolt; ud.boltAction = 1; ud.boltKnob = [.039 * kc, .039 * ks]; } // 6-w08: Kar98k com a alavanca dobrada para baixo (a bola reta e grande enchia o lado direito da mira)
       else { const bolt = grp(g, .02, .038, .05); add(bolt, new THREE.CylinderGeometry(.0045, .0045, .045, 8), M.metal, .022, 0, 0, 0, 0, Math.PI / 2); add(bolt, new THREE.SphereGeometry(.0095, 12, 10), M.metal, .046, -.004, 0); ud.bolt = bolt; ud.boltAction = 1; }
       if (kar) { // pente-clipe da Kar98k (a6): lâmina de aço na base das balas, balas deitadas apontando para a frente, escondido fora da recarga
         const cl = grp(g, 0, .084, .03), rd = grp(cl, 0, 0, 0); add(cl, RB(.011, .05, .004, .001), M.steel, 0, -.022, .002);
@@ -16557,6 +16558,7 @@ function gunModel(id, fp = false, skin = null) {
       guard(g, -.02, -.035, .048);
       if (awp) for (const s of [-1, 1]) add(g, CY(.004, .17, 8), M.metal, s * .014, -.02, -.3, -.08);
       ud.lh = new V3(-.005, -.035, -.2); ud.vm = [.005, -.008, .02];
+      if (dmr) ud.lh.y = -.016; // 6-w08: Dragunov/PSG1: o guarda-mão termina em y -0,016 (a mão de apoio ficava 2 cm abaixo dele, segurando o ar)
       break;
     }
     case 'raygun': {
@@ -18121,9 +18123,9 @@ function boltAnim(ud, k, o) { // ferrolho: levanta, puxa, empurra, abaixa (k de 
   const c = clamp(k, 0, 1), up = seg(c, 0, .18) * (1 - seg(c, .82, 1)), back = seg(c, .2, .42) * (1 - seg(c, .55, .78)), s = Math.sin(c * Math.PI);
   ud.bolt.rotation.z = up * B.lift; ud.bolt.position.z = ud.boltRest.z + back * B.pull;
   const hw = smooth(k < 0 ? 1 + k / B.reach : 1 - (k - 1) / B.ret); // mão no ferrolho
-  const S = ud.scopeEye ? B.show : B.showF;
+  const S = ud.boltKnob ? W08.show : ud.scopeEye ? B.show : B.showF; // 6-w08: Kar98k
   o.x += S[0] * hw; o.y += S[1] * hw - .012 * s; o.z += S[2] * hw; o.rx += S[3] * hw + .05 * s - .03 * back; o.ry += S[4] * hw; o.rz += S[5] * hw - .1 * s; // puxada: a arma vem um pouco para trás
-  if (ud.rhG) { _boltV.set(B.knob[0], B.knob[1], 0).applyAxisAngle(_boltZ, ud.bolt.rotation.z).add(ud.bolt.position).add(_ik3.set(...B.hand)); ud.rhG.position.lerp(_boltV, hw); }
+  if (ud.rhG) { _boltV.set((ud.boltKnob || B.knob)[0], (ud.boltKnob || B.knob)[1], 0).applyAxisAngle(_boltZ, ud.bolt.rotation.z).add(ud.bolt.position).add(_ik3.set(...B.hand)); ud.rhG.position.lerp(_boltV, hw); }
 }
 const _ik3 = new V3();
 const CLIPR = { giro: -.8 }; // a12: giro (rad, em volta do cano) da mão esquerda que empurra o pente-clipe por cima (Kar98k); a15: -1,3 -> -0,8 (com -1,3 o antebraço cruzava a tela deitado, grande, com o cotovelo no meio)
@@ -18562,6 +18564,19 @@ const W06 = { pe: .056, g11Vai: [-.12, -.3, .12] };
 ADS.recuo.stg44 = .06; // a STG-44 usa a caixa e a tampa da AK: na mira a tampa enchia a metade de baixo da tela (olho a 0,066 m; com .035 ainda enchia um terço)
 function w06Vai(ud, gp, R, Gp) { const v = ud.rVai; return v ? [[.38, Gp.x + v[0], Gp.y + v[1], Gp.z + v[2]], [.46, Gp.x + v[0], Gp.y + v[1], Gp.z + v[2]]] : [gp(.38, R, -.08, .1), gp(.46, R, -.08, .1)]; }
 // ===== fim 6-w06 =====
+// ===== 6-w08: precisão (AWP, SSG, Dragunov, Kar98k, L96, PSG1) =====
+// Entrada na luneta: a ocular ia ao olho em linha reta, e como a distância cai junto, ela continuava à direita da tela até a arma sumir (G.scR .74)
+// e a vinheta acender no meio: a imagem pulava. Agora o lado e a altura chegam antes (lat: fração da entrada), a profundidade segue o ritmo antigo.
+// Kar98k na mira de ferro: a caixa da culatra ficava a 0,076 m do olho (cúpula preta no pé da tela): recuo como nas irmãs.
+const W08 = { lat: .55, show: [-.065, .035, -.02, 0, -.14, .1] }; // show: pose do ferrolho da Kar98k (como BOLT.show; com a showF o ferrolho e a mão ficavam na borda direita da tela)
+ADS.recuo.kar98k = .045;
+function lunetaCentro(o, ud, ak, hx, hy, tx, ty) {
+  const kl = smooth(Math.min(1, (G.scR || 0) / W08.lat)); if (kl <= ak) return;
+  const r = ak < 1 ? 1 / (1 - ak) : 0, ry0 = (o.ry + .05 * ak) * r;
+  o.x = lerp(hx, tx, kl); o.y = lerp(hy, ty, kl); o.ry = lerp(ry0, -.05, kl); o.rx *= (1 - kl) * r; o.rz *= (1 - kl) * r;
+  if (vmGun && ud.baseYaw != null) vmGun.rotation.y = lerp(ud.baseYaw, .05, kl);
+}
+// ===== fim 6-w08 =====
 const _adsV = new V3();
 function adsEye(gun, ud) {
   const sp = ud.sight; ud.adsZ = null; if (!sp) return;
@@ -18666,6 +18681,7 @@ function updateViewmodel(dt) {
     hx = o.x; hy = o.y; hz = o.z;
     const sp = ud.sight || (w?.scope ? ud.scopeEye : null), ay = -(sp ? sp.y : (ud.sightY ?? .05)) * ADS.esc, az = ud.adsZ != null ? -ud.adsZ * ADS.esc : sp && !ud.sight ? -(sp.z + SCOPE.olho) * ADS.esc : -.34; // olho atrás da alça e da caixa da culatra (ver adsEye)
     o.x = lerp(o.x, -(sp ? sp.x : 0) * ADS.esc, ak); o.y = lerp(o.y, ay, ak); o.z = lerp(o.z, az, ak); o.ry = lerp(o.ry, -.05, ak); o.rx *= 1 - ak; o.rz *= 1 - ak;
+    if (w?.scope && sp && !ud.sight && (G.scR || 0) > (G.ads || 0)) lunetaCentro(o, ud, ak, hx, hy, -sp.x * ADS.esc, ay); // 6-w08
   }
   // mirando: a raiz dos braços (ombros, clavículas, mangas) fica onde estava no quadril; só as mãos vão com a arma (senão a manga entra na frente do olho)
   if (ud.armsGun && ARMS.gunC) ARMS.gunC.position.set(-.165 + (ak > 0 ? hx - o.x : 0), .145 + (ak > 0 ? hy - o.y : 0), .43 + (ak > 0 ? hz - o.z : 0));
