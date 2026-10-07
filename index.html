@@ -23970,7 +23970,7 @@ setTimeout(() => { let q = Promise.resolve(); for (const k of Object.keys(FPM)) 
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos); só em desenvolvimento (DEBUG), nunca no site publicado
 if (DEBUG) window.__T = { startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
-  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
+  CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zKill, zDrop, zEndRound, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 </script>
 </body>
