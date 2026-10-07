@@ -16107,6 +16107,7 @@ function warmUp(M) {
     if (!seen.has(k)) { seen.add(k); items.push([o, cam, g]); }
   });
   warmBracos(items, seen); // 6-g07
+  b08Aquecer(M); // O1-B08: pede as armas baixadas da partida (bots e inventário)
   const sombraMats = warmSombras(items, warm); // 6-g06
   const tex = new Set(); for (const [o] of items) for (const m of [o.material].flat()) for (const v of Object.values(m)) if (v?.isTexture && !v.isRenderTargetTexture && v.image) tex.add(v);
   const texs = [...tex], W = WARM = { i: 0, pend: [], tm: 0, n: items.length + texs.length, t0: performance.now() };
@@ -16134,6 +16135,7 @@ function warmUp(M) {
       do renderer.initTexture(texs[W.i++ - items.length]); while (W.i < W.n && performance.now() - t < 12);
       warmMsg(W); W.tm = setTimeout(step, 0); return;
     }
+    if (b08Falta(W)) { warmMsg(W); W.tm = setTimeout(step, 30); return; } // O1-B08: as armas baixadas da partida ficam prontas ainda na tela de carga
     W.pend = W.pend.filter(pg => !pg.isReady()); if (W.pend.length && performance.now() - W.t0 < 2e4) { W.tm = setTimeout(step, 10); return; } // contexto perdido nunca fica pronto: desiste em 20 s
     // e passa um quadro de verdade por tudo isso (sem recorte, projetando sombra): compila as variantes que o compile()
     // não pega (sombra com e sem ossos, passes do composer) e já sobe as malhas. Sem isso o primeiro quadro da partida
@@ -17444,6 +17446,7 @@ function dlGun(g, id, M) {
   const fw = fpw(id), D = fw?.m && FPM[fw.m], key = D && 'm:' + fw.m;
   if (!D) return;
   if (!fpReady(key)) { if (!FPC[key]) fpLoad(key); return; }
+  if (B08.gate && !b08Ok('c|' + key)) { b08Pedir('c|' + key); return; } // O1-B08: na mão dos outros só entra pronta (programas e texturas)
   const ms = SkeletonUtils.clone(FPC[key].scene);
   ms.traverse(o => { if (o.isMesh && D.hide?.includes(o.name)) o.visible = false; }); ms.updateMatrixWorld(true);
   const pts = fpPts(ms, () => true), Mf = fpFit(D, pts, new THREE.Matrix4()), Mi = Mf.clone().invert(), t = fpTips(pts.map(p => p.applyMatrix4(Mi))), sc = D.L / t.L;
@@ -17453,6 +17456,7 @@ function dlGun(g, id, M) {
   h.matrix.copy(F).multiply(Mi);
   g.traverse(o => { if (o.isMesh) o.visible = false; });
   ms.traverse(o => { if (o.isMesh) { o.castShadow = true; o.material = o.material.clone(); } });
+  if (B08.gate) { b08Leves(ms); ud.b08 = 'c|' + key; } // O1-B08: texturas reduzidas
   if (M) fpSkin(ms, { a: M.metal, b: M.polymer }, t.L, D.lens);
   if (D.lens) ms.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) Object.assign(o.material, { roughness: .08, metalness: .4 }).color?.set(0x14232c); });
   h.add(ms); g.add(h); ud.muzzle = t.muzzle.clone().applyMatrix4(F); ud.dl = true;
@@ -18125,6 +18129,76 @@ function fpLoad(key) {
   return (FPC[key] = new GLTFLoader().loadAsync(url).then(g => (FPC[key] = g), e => { console.warn('fps', key, e); delete FPC[key]; }));
 }
 const fpReady = k => FPC[k] && !(FPC[k] instanceof Promise);
+// ===== O1-B08: armas baixadas (glTF) prontas antes do 1º desenho =====
+// Medido (B08, Médio, partida logo depois de abrir a página): mesmo com o B04 compilando no ócio, o 1º desenho de cada arma baixada
+// esperava 100 ms a 1,4 s no getProgramInfoLog com o programa já pronto na placa (o 1º uso termina o programa no processo da placa,
+// mesmo segundos depois de compilado) e as texturas subiam naquele quadro (a P90: 21 de 1024 px). Agora:
+// - as armas que a partida vai usar (as dos bots e as do inventário) baixam logo no aquecimento do mapa (não 8 s depois da carga) e o
+//   aquecimento espera por elas (até B08_ESPERA): programas compilados e já usados uma vez, texturas subidas, ainda na tela de carga;
+// - a arma baixada só vai para a tela pronta assim no mapa atual; as outras (compradas por outros jogadores) se preparam no ócio
+//   quando aparecem e até lá fica a de antes (a procedural, ou a que estava na mão), como já acontecia enquanto o glTF baixava;
+// - na mão dos outros (pequena na tela) as texturas acima de 512 px vão reduzidas: a P90 ocupa 26 MB e não 104; a própria mão fica igual.
+const B08 = { mapa: 0, ok: new Map(), job: new Map(), fila: [], tm: 0, gate: false, n: 0, aq: new Set(), leve: new WeakMap(), mat: new WeakMap() };
+const B08_BOTS = { dm: ['m4', 'p90', 'awp', 'mp5', 'deagle'], rounds: ['awp', 'm4', 'mp5', 'scout', 'deagle', 'glock'] }; // armas com modelo baixado que os bots usam (srvSpawnDM; botBuy e o inventário padrão)
+const B08_ESPERA = 4e3; // ms (desde o início do aquecimento): depois disso a partida começa e o que falta fica pronto no ócio
+const b08Ok = id => B08.ok.get(id) === B08.mapa;
+function b08Leve(g) { // versão reduzida (para a mão dos outros) de cada textura grande do glTF (só das armas pedidas para a mão dos outros)
+  const L = []; if (!window.createImageBitmap) return g;
+  g.scene.traverse(o => { if (o.isMesh) for (const m of [o.material].flat()) for (const k in m) { const t = m[k], im = t?.isTexture && t.image;
+    if (!im || B08.leve.has(t) || !(im.width > 512 || im.height > 512)) continue; B08.leve.set(t, null); const f = 512 / Math.max(im.width, im.height);
+    L.push(createImageBitmap(im, { resizeWidth: Math.round(im.width * f), resizeHeight: Math.round(im.height * f), resizeQuality: 'high', premultiplyAlpha: 'none' })
+      .then(b => { const t2 = t.clone(); t2.source = new THREE.Source(b); t2.needsUpdate = true; B08.leve.set(t, t2); }, () => B08.leve.delete(t))); } });
+  return Promise.all(L).then(() => g);
+}
+function b08Leves(root) { root.traverse(o => { if (o.isMesh) for (const m of [o.material].flat()) for (const k in m) { const t2 = m[k]?.isTexture && B08.leve.get(m[k]); if (t2) m[k] = t2; } }); }
+function b08Cena(m) { let c = B08.mat.get(m); if (!c) { const o = { isMesh: true, material: c = m.clone() }; b08Leves({ traverse: f => f(o) }); B08.mat.set(m, c); } return c; }
+function b08Itens(id) { // malhas que vão ser desenhadas: 'c|m:x' arma na mão dos outros; 'v|p:pacote|m:modelo|p:braços' a própria mão
+  const [tipo, a, b, c] = id.split('|'), L = [], vis = new Set();
+  const px = (o, m, cam, g) => { const ga = o.geometry?.attributes || {}, k = m.uuid + o.isSkinnedMesh + !!ga.color + !!ga.tangent + !!o.morphTargetInfluences + cam.uuid;
+    if (vis.has(k)) return; vis.add(k); const p = Object.create(o); p.material = m; p.children = []; L.push([p, cam, g]); };
+  if (tipo === 'c') { const D = FPM[a.slice(2)]; FPC[a].scene.traverse(o => { if (o.isMesh && o.material && !D?.hide?.includes(o.name)) px(o, b08Cena(o.material), camera, scene); }); return L; }
+  const D = b && FPM[b.slice(2)];
+  FPC[a].scene.traverse(o => { if (o.isMesh && o.material && (fpArmsMesh(o) ? !c : fpArm(o) || !D || o.material.name === '12ge')) px(o, o.material, vmCam, vmScene); }); // como no fpBuild
+  if (D) FPC[b].scene.traverse(o => { if (o.isMesh && o.material && !D.hide?.includes(o.name)) px(o, o.material, vmCam, vmScene); });
+  if (c) { let s = null; FPC[c].scene.traverse(o => { if (!s && fpArmsMesh(o)) s = o; }); if (s) px(s, s.material, vmCam, vmScene); } // braços trocados (fpArmsSwap)
+  return L;
+}
+const b08Chaves = id => id.split('|').slice(1).filter(Boolean);
+function b08Fim(j, ok) { if (ok) { if (!b08Ok(j.id)) B08.n++; B08.ok.set(j.id, j.mapa); } else if (B08.job.get(j.id) === j) B08.job.delete(j.id); B08.aq.delete(j); j.r(); }
+function b08Pedir(id) { // prepara no ócio; j.p resolve quando ficar pronta (ou quando o mapa mudar)
+  let j = B08.job.get(id); if (j && j.mapa === B08.mapa) return j;
+  j = { id, mapa: B08.mapa }; j.p = new Promise(r => j.r = r); B08.job.set(id, j);
+  if (b08Ok(id)) { j.r(); return j; }
+  Promise.all(b08Chaves(id).map(k => fpLoad(k))).then(() => id[0] === 'c' && fpReady(id.slice(2)) && b08Leve(FPC[id.slice(2)])).then(() => { if (j.mapa !== B08.mapa || !b08Chaves(id).every(fpReady)) return b08Fim(j); B08.fila.push(j); b08Agenda(0); });
+  return j;
+}
+function b08Passo() { // aos poucos (~6 ms; 12 no aquecimento): compila sem esperar a placa, sobe uma textura por vez, espera a placa e faz o 1º uso
+  B08.tm = 0; const t = performance.now(), fat = WARM ? 12 : 6; let espera = 0;
+  while (B08.fila.length && performance.now() - t < fat) {
+    const j = B08.fila[0];
+    if (j.mapa !== B08.mapa) { B08.fila.shift(); b08Fim(j); continue; }
+    if (!j.itens) { j.itens = b08Itens(j.id); j.i = 0; j.pend = []; j.usa = new Set(); j.t0 = performance.now(); const tx = new Set(); for (const [o] of j.itens) for (const k in o.material) { const v = o.material[k]; if (v?.isTexture && !v.isRenderTargetTexture && v.image) tx.add(v); } j.tex = [...tx]; warmLuzes(scene); warmLuzes(vmScene); }
+    if (j.i < j.itens.length) { const [o, cam, g] = j.itens[j.i++]; renderer.setRenderTarget(CFG.gfx === 'alto' ? composer.readBuffer : null); // como no warmUp
+      try { for (const m of renderer.compile(o, cam, warmAlvo(g))) { const pg = renderer.properties.get(m).currentProgram; if (pg) { j.pend.push(pg); j.usa.add(pg); } } } finally { renderer.setRenderTarget(null); } continue; }
+    if (j.tex.length) { renderer.initTexture(j.tex.pop()); continue; }
+    j.pend = j.pend.filter(pg => !pg.isReady());
+    if (j.pend.length && performance.now() - j.t0 < 2e4) { B08.fila.push(B08.fila.shift()); if (++espera >= B08.fila.length) break; continue; } // a placa ainda compila: vê os outros e volta depois
+    if (j.usa.size) { const pg = j.usa.values().next().value; j.usa.delete(pg); pg.getUniforms(); continue; } // 1º uso (log e uniforms): o custo fica aqui, não no 1º desenho
+    B08.fila.shift(); b08Fim(j, 1);
+  }
+  if (B08.fila.length) b08Agenda(espera ? 30 : 0);
+}
+function b08Agenda(ms) { if (!B08.tm) B08.tm = setTimeout(() => { B08.tm = (window.requestIdleCallback ? requestIdleCallback(b08Passo, { timeout: 100 }) : setTimeout(b08Passo, 0)) || 1; }, ms) || 1; }
+function b08Aquecer(M) { // aquecimento do mapa: refaz tudo (luzes e névoa mudam a chave dos programas) e pede as armas da partida
+  B08.mapa++; B08.aq.clear(); B08.job.clear(); for (const j of B08.fila.splice(0)) j.r();
+  if (M.zombie) return; // no modo Zumbis as armas são as feitas no código
+  const dm = C.st?.mode === 'dm', ids = B08_BOTS[dm ? 'dm' : 'rounds'].map(m => 'c|m:' + m), inv = G.inv || {};
+  for (const w of [inv.primary || (dm ? 'ak47' : null), inv.secondary || (dm ? 'deagle' : 'glock')]) { const f = w && fpw(w), P = f && FPK[f.pack]; if (P) ids.push('v|p:' + f.pack + '|' + (f.m ? 'm:' + f.m : '') + '|' + (P.armsFrom ? 'p:' + P.armsFrom : '')); }
+  for (const id of ids) { const j = b08Pedir(id); if (!b08Ok(id)) B08.aq.add(j); }
+}
+const b08Falta = W => B08.aq.size > 0 && performance.now() - W.t0 < B08_ESPERA; // o aquecimento espera as armas da partida
+if (DEBUG) window.__B08 = q => q ? B08 : [...B08.ok].filter(([, m]) => m === B08.mapa).map(([k]) => k).join(' ') + ' fila ' + B08.fila.length; // medição (só em localhost)
+// ===== O1-B08 fim =====
 const fpAx = s => { const v = new V3(); v.setComponent('xyz'.indexOf(s[1]), s[0] === '-' ? -1 : 1); return v; };
 // referencial da arma: Z = cano, Y = topo, origem no gatilho
 function fpFrame(T, fwd, up) {
@@ -18173,6 +18247,8 @@ function fpBuild(id, ud) {
     Promise.all([fpLoad(pk), mk && fpLoad(mk), ak && fpLoad(ak)]).then(() => { if (fpReady(pk) && (!mk || fpReady(mk)) && (!ak || fpReady(ak)) && vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); });
     return false;
   }
+  const b8 = 'v|' + pk + '|' + (mk || '') + '|' + (ak || ''); // O1-B08: só entra pronta (programas e texturas); até lá fica a de antes
+  if (!b08Ok(b8)) { b08Pedir(b8).p.then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; }
   const g = FPC[pk], root = SkeletonUtils.clone(g.scene);
   if (ak) fpArmsSwap(root, FPC[ak].scene);
   const mixer = new THREE.AnimationMixer(root), clips = {};
@@ -20143,9 +20219,10 @@ function getRemote(id) {
 // Montar a arma (procedural + modelo baixado) a cada troca de arma de outro jogador travava o quadro.
 const RGUN = new Map();
 function remoteGunTpl(mid, skin) {
-  const k = mid + '|' + (skin || '') + (C.st?.mode === 'zombies' ? '|z' : ''), nl = Object.keys(FPC).filter(fpReady).length; let t = RGUN.get(k);
+  const k = mid + '|' + (skin || '') + (C.st?.mode === 'zombies' ? '|z' : ''), nl = Object.keys(FPC).filter(fpReady).length + B08.n; let t = RGUN.get(k); // O1-B08: + armas que ficaram prontas
   if (t && !t.userData.dl && nl > t.userData.nl) t = null; // chegou modelo baixado depois do molde: refaz
-  if (!t) { t = gunModel(mid, false, skin); t.scale.setScalar(1.1); t.userData.nl = nl; RGUN.set(k, t); }
+  if (t?.userData.b08 && !b08Ok(t.userData.b08)) t = null; // O1-B08: mapa novo e o modelo baixado ainda não ficou pronto nele: volta à procedural
+  if (!t) { B08.gate = true; try { t = gunModel(mid, false, skin); } finally { B08.gate = false; } t.scale.setScalar(1.1); t.userData.nl = nl; RGUN.set(k, t); }
   return t;
 }
 function cloneShared(t) { // o three copia userData por JSON (aqui ele guarda malhas): fica de fora da cópia
