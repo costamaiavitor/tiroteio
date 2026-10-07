@@ -16438,6 +16438,7 @@ function play(name, pos) {
 }
 function updateListener() {
   if (!AC) return;
+  const p0 = camera.position; if (!(isFinite(p0.x) && isFinite(p0.y) && isFinite(p0.z))) return; // O1: posição não finita fazia o AudioParam lançar exceção e parava o laço de quadros
   const L = AC.listener, p = camera.position, f = new V3(0, 0, -1).applyQuaternion(camera.quaternion);
   if (L.positionX) { L.positionX.value = p.x; L.positionY.value = p.y; L.positionZ.value = p.z; L.forwardX.value = f.x; L.forwardY.value = f.y; L.forwardZ.value = f.z; L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
   else { L.setPosition(p.x, p.y, p.z); L.setOrientation(f.x, f.y, f.z, 0, 1, 0); }
