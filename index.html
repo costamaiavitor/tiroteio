@@ -15217,14 +15217,187 @@ function mergeParts(root, skip, cache) {
 let CULL = [], cullT = 0, cullTodo = false; // cullTodo (3A-15): o aquecimento mostra tudo de uma vez (sobe todas as malhas)
 function zCull(force) {
   // 3A-15: sem luz que projete sombra (Baixo) o three nunca baixa o needsUpdate: antes o Baixo mostrava o mapa inteiro em todo quadro
-  const sh = renderer.shadowMap.needsUpdate && sun.castShadow && !renderer.shadowMap.autoUpdate; if (!force && !sh && !cullTodo && now < cullT) return; // 6-g02: no Alto (autoUpdate) a sombra já é refeita a cada quadro com o que está à vista: porta aberta não mostra mais o mapa inteiro por um quadro
+  const sh = renderer.shadowMap.needsUpdate && sun.castShadow && !renderer.shadowMap.autoUpdate; if (!force && !sh && !cullTodo && now < cullT && !oclMudou()) return; // 6-g02: no Alto (autoUpdate) a sombra já é refeita a cada quadro com o que está à vista: porta aberta não mostra mais o mapa inteiro por um quadro
   cullT = sh ? 0 : now + .2; const f = (scene.fog?.far ?? 1e9) + 5, cx = camera.position.x, cz = camera.position.z;
   // 3A-15: com a sombra que segue o jogador (VIS.sh.r), o degrau dela só precisa do que está perto; antes cada degrau (20 m) mostrava o mapa
   // inteiro num quadro (pico de 100+ ms ao andar entre as áreas no Médio). Raio: a caixa da sombra mais a sombra de uma peça alta (~30 m)
   const todo = cullTodo || (sh && !VIS.sh.r), lim = VIS.sh.r ? Math.max(f, VIS.sh.r * 1.5 + 30) : f;
-  for (const c of CULL) c.o.visible = (todo || Math.hypot(c.x - cx, c.z - cz) - c.r < (sh ? lim : f)) && !(c.d && c.d.done && c.d.d.kind !== 'gate'); // porta aberta continua escondida
+  if (cullTodo && OCL.bx) for (const c of CULL) if (c.oc == null && !c.d) oclReg(c); // O1-B03: o aquecimento já registra as peças (sem pico no 1º quadro)
+  const oc = !sh && !todo && oclCalc(cx, camera.position.y, cz, f); // O1-B03: oclusão pelas paredes
+  for (const c of CULL) c.o.visible = (todo || Math.hypot(c.x - cx, c.z - cz) - c.r < (sh ? lim : f)) && !(c.d && c.d.done && c.d.d.kind !== 'gate') && !(oc && !c.d && oclTapa(c)); // porta aberta continua escondida
 }
 const cullAdd = (o, x, z, r, d) => CULL.push({ o, x, z, r, d }); // peça fixa do mundo zumbi (porta, placa, lâmpada, máquina)
+// ===== O1-B03: oclusão por área nos mapas zumbis =====
+// O que está atrás das paredes (inclusive das portas de madeira ainda fechadas) não é desenhado. Na reavaliação do zCull, um raio
+// por fatia (720 em volta) sai do olho no plano do chão e guarda as paredes que corta (caixas opacas do mapa e portas fechadas) que
+// cobrem a altura do olho. Uma peça do CULL some se, em todas as fatias que ocupa, uma dessas paredes fica antes dela e tapa a
+// visada do olho até o topo e até o pé dela. Janela (peitoril abaixo do olho), portão, entulho, vão e vidro não tapam.
+// Só nos quadros sem sombra a refazer (a sombra continua com tudo) e fora do Alto; reavalia quando a câmera anda DL (50 cm)
+// ou uma porta abre. A fresta de 5 cm em volta da porta fechada conta como tapada.
+const OCL = { on: true, N: 720, K: 4, DL: .5, n: 0, bx: null, d: null, su: null, sl: null, c: null, cs: null, sn: null, px: 1e9, py: 0, pz: 0, nd: -1, rr: 0, ver: 0, ok: false, verga: new Map() };
+function oclMontar(M, boxes) {
+  const L = [];
+  for (const b of boxes) {
+    if (b.mat === 'inv' || b.mat === 'col' || b.mat === 'floor' || (b.h < 1.5 && b.y < 3) || Math.max(b.w, b.d) < 1) continue; // invisível, chão e peça miúda (a verga das portas fica)
+    if (PROP[M.theme[b.mat]?.[0]]?.op) continue; // vidro deixa ver
+    L.push(b.x - b.w / 2, b.x + b.w / 2, b.z - b.d / 2, b.z + b.d / 2, b.y, b.y + b.h);
+  }
+  // ponta livre (vão, janela, fim de muro; a porta conta como vão) recua DL no comprimento: a conta vale com o olho a até DL
+  // do ponto em que foi feita (a borda da parede muda de lugar no máximo isso). Ponta encostada noutra parede fica.
+  const DL = OCL.DL, n = L.length / 6, G = new Map(), alto = j => L[j * 6 + 4] <= .5 && L[j * 6 + 5] >= 2.5, E = Float32Array.from(L);
+  for (let j = 0; j < n; j++) if (alto(j)) for (let i = Math.floor(L[j * 6] / 8); i <= Math.floor(L[j * 6 + 1] / 8); i++) for (let k = Math.floor(L[j * 6 + 2] / 8); k <= Math.floor(L[j * 6 + 3] / 8); k++) { const q = i * 4096 + k; let g = G.get(q); if (!g) G.set(q, g = []); g.push(j); }
+  const toca = (j0, x0, x1, z0, z1) => { for (let i = Math.floor(x0 / 8); i <= Math.floor(x1 / 8); i++) for (let k = Math.floor(z0 / 8); k <= Math.floor(z1 / 8); k++) for (const j of G.get(i * 4096 + k) || []) if (j !== j0 && L[j * 6] < x1 && L[j * 6 + 1] > x0 && L[j * 6 + 2] < z1 && L[j * 6 + 3] > z0) return true; return false; };
+  for (let j = 0, o = 0; j < n; j++, o += 6) {
+    const [x0, x1, z0, z1] = L.slice(o, o + 4);
+    if (x1 - x0 > 2 * DL + .2) { if (!toca(j, x0 - .06, x0, z0, z1)) E[o] += DL; if (!toca(j, x1, x1 + .06, z0, z1)) E[o + 1] -= DL; }
+    if (z1 - z0 > 2 * DL + .2) { if (!toca(j, x0, x1, z0 - .06, z0)) E[o + 2] += DL; if (!toca(j, x0, x1, z1, z1 + .06)) E[o + 3] -= DL; }
+    else if (x1 - x0 <= 2 * DL + .2 && !(toca(j, x0 - .06, x0, z0, z1) && toca(j, x1, x1 + .06, z0, z1) && toca(j, x0, x1, z0 - .06, z0) && toca(j, x0, x1, z1, z1 + .06))) E[o + 4] = 1e9; // pilar ou caixote solto: não tapa (o olho anda até DL)
+  }
+  const N = OCL.N, NK = N * OCL.K; OCL.bx = E; OCL.n = n;
+  if (!OCL.d) { OCL.d = new Float32Array(NK); OCL.su = new Float32Array(NK); OCL.sl = new Float32Array(NK); OCL.c = new Uint8Array(N); OCL.cs = new Float32Array(N); OCL.sn = new Float32Array(N);
+    for (let k = 0; k < N; k++) { const p = 4 * k / N, q = p % 1, s = Math.floor(p), x = s === 0 ? 1 - q : s === 1 ? -q : s === 2 ? q - 1 : q, z = s === 0 ? q : s === 1 ? 1 - q : s === 2 ? -q : q - 1, l = Math.hypot(x, z); OCL.cs[k] = x / l; OCL.sn[k] = z / l; } } // raio da borda k (a fatia k vai da borda k à k + 1; ver oclPa)
+  OCL.tetos = M === MAPS.sanatorio ? Object.keys(SAN1.forro).map(id => M.z.rooms[id]).filter(Boolean).map(q => [q[0] - .5, q[1] + .5, q[2] - .5, q[3] + .5, SAN1.y]) : []; // forro das salas cobertas (5B-1)
+  OCL.px = 1e9; OCL.nd = -1; OCL.ok = false; OCL.verga.clear();
+}
+const oclMudou = () => !!OCL.bx && OCL.on && !renderer.shadowMap.autoUpdate && (Math.abs(camera.position.x - OCL.px) + Math.abs(camera.position.z - OCL.pz) > OCL.DL || Math.abs(camera.position.y - OCL.py) > .15 || (ZC.doors?.size ?? 0) !== OCL.nd);
+// distância em que o raio (dx, dz) que sai do olho entra na caixa (-1 se não entra)
+function oclEntra(ex, ez, dx, dz, x0, x1, z0, z1) {
+  let ta = -1e9, tb = 1e9;
+  if (Math.abs(dx) < 1e-9) { if (ex < x0 || ex > x1) return -1; } else { let a = (x0 - ex) / dx, b = (x1 - ex) / dx; if (a > b) { const t = a; a = b; b = t; } ta = a; tb = b; }
+  if (Math.abs(dz) < 1e-9) { if (ez < z0 || ez > z1) return -1; } else { let a = (z0 - ez) / dz, b = (z1 - ez) / dz; if (a > b) { const t = a; a = b; b = t; } if (a > ta) ta = a; if (b < tb) tb = b; }
+  return ta > tb || tb < 0 ? -1 : Math.max(ta, 0);
+}
+// direção (dx, dz) em fatias, de 0 a N: "ângulo de losango" (cresce com o ângulo como o atan2, sem trigonometria)
+function oclPa(dx, dz) {
+  const a = Math.abs(dx) + Math.abs(dz); if (!a) return 0;
+  return (dz >= 0 ? (dx >= 0 ? dz / a : 1 - dx / a) : (dx < 0 ? 2 - dz / a : 3 + dx / a)) * OCL.N / 4;
+}
+// faixa da caixa vista do olho, em fatias: [centro, menor e maior desvio dos cantos]
+const _oclAng = [0, 0, 0];
+function oclAng(ex, ez, x0, x1, z0, z1) {
+  const N = OCL.N, tc = oclPa((x0 + x1) / 2 - ex, (z0 + z1) / 2 - ez); let mn = N, mx = -N;
+  for (let i = 0; i < 4; i++) { let a = oclPa((i & 1 ? x1 : x0) - ex, (i & 2 ? z1 : z0) - ez) - tc; a -= Math.round(a / N) * N; if (a < mn) mn = a; if (a > mx) mx = a; }
+  _oclAng[0] = tc; _oclAng[1] = mn; _oclAng[2] = mx; return _oclAng;
+}
+// parede (caixa alinhada aos eixos) vista do olho (ex, ez; altura entre e0 e e1): em cada fatia que ela cobre inteira (os dois
+// raios da borda entram nela), guarda (distância maior das duas bordas, inclinação do topo vista do olho mais alto, do pé vista do mais baixo)
+function oclParede(ex, e0, e1, ez, R, x0, x1, z0, z1, y0, y1, T) {
+  if (y0 > e0 || y1 < e1 || (ex >= x0 && ex <= x1 && ez >= z0 && ez <= z1)) return; // só tapa o que cobre a altura do olho
+  const qx = Math.max(x0 - ex, 0, ex - x1), qz = Math.max(z0 - ez, 0, ez - z1); if (qx * qx + qz * qz > R * R) return;
+  const { N, K, d, su, sl, c, cs, sn } = OCL, [tc, mn, mx] = oclAng(ex, ez, x0, x1, z0, z1);
+  const k0 = Math.ceil(tc + mn), k1 = Math.floor(tc + mx); // bordas das fatias dentro da parede
+  const teto = T && y1 >= T[4] - .1, dentro = (t, k) => { const hx = ex + cs[k] * t, hz = ez + sn[k] * t; return hx >= T[0] && hx <= T[1] && hz >= T[2] && hz <= T[3]; };
+  let tp = -1, kp = 0;
+  for (let k = k0; k <= k1; k++) {
+    const ke = ((k % N) + N) % N, t = oclEntra(ex, ez, cs[ke], sn[ke], x0, x1, z0, z1);
+    if (k > k0 && t > .05 && tp > .05) {
+      const ta = Math.max(t, tp); let s1 = (y1 - e1) / ta; const s0 = y0 <= .05 ? -1e9 : (y0 - e0) / ta; // parede no chão: abaixo dela é chão (visada por baixo não passa)
+      if (teto && dentro(t, ke) && dentro(tp, kp)) s1 = 1e9; // olho sob o forro: a parede debaixo dele vai até o teto
+      const o = kp * K; let n = c[kp], w = 0, dom = false;
+      for (let j = 0; j < n; j++) if (d[o + j] <= ta && su[o + j] >= s1 && sl[o + j] <= s0) { dom = true; break; }
+      if (!dom) {
+        for (let j = 0; j < n; j++) if (!(ta <= d[o + j] && s1 >= su[o + j] && s0 <= sl[o + j])) { d[o + w] = d[o + j]; su[o + w] = su[o + j]; sl[o + w] = sl[o + j]; w++; } // tira as que ela supera
+        n = w; let m = n;
+        if (n < K) n++; else { m = 0; for (let j = 1; j < K; j++) if (d[o + j] > d[o + m]) m = j; if (d[o + m] <= ta) m = -1; } // cheia: troca a mais longe, se esta vier antes
+        if (m >= 0) { d[o + m] = ta; su[o + m] = s1; sl[o + m] = s0; } c[kp] = n;
+      }
+    }
+    tp = t; kp = ke;
+  }
+}
+// monta as fatias para o olho atual (devolve false se não há oclusão: fora dos mapas zumbis ou desligada)
+function oclCalc(ex, ey, ez, R) {
+  if (!OCL.on || !OCL.bx || renderer.shadowMap.autoUpdate) return false; // Alto: a sombra é refeita a cada quadro com o que está à vista (peça escondida perderia a sombra)
+  if (OCL.ok && !oclMudou()) return true;
+  const e0 = ey - .2, e1 = ey + .3; // folga para o passo, o agachar e o começo do pulo entre duas reavaliações
+  OCL.px = ex; OCL.py = ey; OCL.pz = ez; OCL.nd = ZC.doors?.size ?? 0; OCL.ok = true; OCL.e0 = e0; OCL.e1 = e1; OCL.ver++; OCL.c.fill(0);
+  if (CULL.length) CULL[OCL.rr++ % CULL.length].oc = null; // refaz uma peça por vez
+  const T = OCL.tetos.find(t => ex >= t[0] && ex <= t[1] && ez >= t[2] && ez <= t[3] && e1 < t[4] - .05) || null; // sala com forro em que o olho está
+  const b = OCL.bx; for (let i = 0; i < OCL.n * 6; i += 6) oclParede(ex, e0, e1, ez, R, b[i], b[i + 1], b[i + 2], b[i + 3], b[i + 4], b[i + 5], T);
+  const Wd = ZC.world; if (Wd) for (const o of Wd.doors.values()) { // porta de madeira fechada tapa o vão inteiro (com a verga de cima e o recuo das pontas ao lado)
+    const dd = o.d; if (o.open || dd.kind !== 'door' || dd.rot != null) continue;
+    const hx = dd.axis === 'z' ? .125 : 2 + OCL.DL, hz = dd.axis === 'z' ? 2 + OCL.DL : .125; let y1 = OCL.verga.get(dd.id);
+    if (y1 == null) { y1 = 3.15; for (let i = 0; i < OCL.n * 6; i += 6) if (Math.abs(b[i + 4] - 3.2) < .15 && b[i] < dd.x + hx && b[i + 1] > dd.x - hx && b[i + 2] < dd.z + hz && b[i + 3] > dd.z - hz) y1 = Math.max(y1, b[i + 5]); OCL.verga.set(dd.id, y1); }
+    oclParede(ex, e0, e1, ez, R, dd.x - hx, dd.x + hx, dd.z - hz, dd.z + hz, 0, y1, T);
+  }
+  return true;
+}
+// peça do CULL vista como retângulos no chão (um por quadra de 8 m com o que ela desenha), cada um com o pé e o topo. A malha que
+// se mexe (userData.dyn) ganha folga; a guardada fora da área (escondida, sem tamanho ou longe) vale a área inteira. Guarda a
+// matriz de cada malha: a que mudou e saiu dos retângulos faz a peça ser refeita (oclMexeu). Também refeita aos poucos (uma por reavaliação).
+const _oclB = new THREE.Box3(), _oclV = new V3(), OCL_M = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14];
+const oclVer = m => m.isInstancedMesh ? m.instanceMatrix.version : m.geometry?.attributes.position?.version ?? 0; // muda quando os vértices/instâncias mudam
+function oclCaixa(m) { // caixa da malha no mundo em _oclB (false se não tem); refaz a caixa da geometria que mudou
+  if (m.isSprite) { m.getWorldPosition(_oclV); const s = Math.max(Math.abs(m.scale.x), Math.abs(m.scale.y)); _oclB.min.set(_oclV.x - s, _oclV.y - s, _oclV.z - s); _oclB.max.set(_oclV.x + s, _oclV.y + s, _oclV.z + s); return true; }
+  const g = m.geometry; if (!g) return false; const v = oclVer(m), o = m.isInstancedMesh ? m : g;
+  if (!o.boundingBox || o.userData.oclV !== v) { o.computeBoundingBox(); o.userData.oclV = v; }
+  const bb = o.boundingBox; if (!bb || bb.isEmpty()) return false; _oclB.copy(bb).applyMatrix4(m.matrixWorld); return true;
+}
+const oclMostra = (m, top) => { for (let p = m; p && p !== top; p = p.parent) if (!p.visible) return false; return !(m.material?.transparent && m.material.opacity === 0); }; // acesa (a peça em si não conta)
+function oclGuardada(m, top) { // malha que não aparece onde está (escondida, sem tamanho, enterrada ou longe); caixa em _oclB
+  const { min: a, max: b } = _oclB, cx = (a.x + b.x) / 2, cz = (a.z + b.z) / 2;
+  return !oclMostra(m, top) || Math.max(b.x - a.x, b.y - a.y, b.z - a.z) < .01 || b.y < -1 || Math.abs(cx) > 900 || Math.abs(cz) > 900;
+}
+function oclReg(c) {
+  const cel = new Map(), ar = AT?.areas.find(q => q.root === c.o), om = []; let ruim = false, nt = 0; c.o.updateMatrixWorld(true);
+  c.o.traverse(m => {
+    if (ruim || !(m.isMesh || m.isPoints || m.isLine || m.isSprite)) return; nt++; if (!oclCaixa(m)) return;
+    const { min: a, max: b } = _oclB; if (![a.x, a.y, a.z, b.x, b.y, b.z].every(Number.isFinite)) { ruim = true; return; }
+    om.push(m); let k = Math.floor((a.x + b.x) / 16) * 4096 + Math.floor((a.z + b.z) / 16);
+    const cx = (a.x + b.x) / 2, cz = (a.z + b.z) / 2, bb = ar?.bbox, dyn = m.userData.dyn;
+    if (bb && oclGuardada(m, c.o) && (cx < bb[0] - 2 || cx > bb[1] + 2 || cz < bb[2] - 2 || cz > bb[3] + 2)) { // guardada fora da área (para um efeito): vale a área inteira
+      k = -1 - cel.size; a.set(bb[0], Math.min(a.y, 0) - 1, bb[2]); b.set(bb[1], Math.max(b.y, 4) + 1, bb[3]); }
+    else if (dyn || m.isPoints) { const h = Math.hypot(b.x - a.x, b.z - a.z) / 2 + (m.isPoints ? 4 : 1.5); /* partícula anda no shader: folga maior */ k = -1 - cel.size; a.set(cx - h, a.y - 1, cz - h); b.set(cx + h, b.y + 1, cz + h); } // gira ou balança: o quadrado da diagonal e mais 1,5 m
+    let e = cel.get(k);
+    if (!e) cel.set(k, [a.x, b.x, a.y, b.y, a.z, b.z]); else { e[0] = Math.min(e[0], a.x); e[1] = Math.max(e[1], b.x); e[2] = Math.min(e[2], a.y); e[3] = Math.max(e[3], b.y); e[4] = Math.min(e[4], a.z); e[5] = Math.max(e[5], b.z); }
+  });
+  c.oc = ruim ? 0 : [...cel.values()].map(e => [e[0] - .05, e[1] + .05, e[4] - .05, e[5] + .05, e[2] - .1, e[3] + .1]); // x0 x1 z0 z1 y0 y1 (a caixa já é a exata)
+  c.om = om; c.on = nt; c.ow = new Float32Array(om.length * 12); c.ov = om.map(oclVer); c.oz = om.map(m => oclMostra(m, c.o)); om.forEach((m, i) => { for (let j = 0; j < 12; j++) c.ow[i * 12 + j] = m.matrixWorld.elements[OCL_M[j]]; });
+}
+// alguma malha entrou, saiu ou mudou (de lugar, de vértices, de instâncias ou acendeu) e saiu dos retângulos? (a que ficou dentro só atualiza o guardado)
+function oclMexeu(c) {
+  const L = c.om, W = c.ow, V = c.ov, Z = c.oz; let nt = 0; c.o.traverse(m => { if (m.isMesh || m.isPoints || m.isLine || m.isSprite) nt++; }); if (nt !== c.on) return true; // malha nova (ou tirada)
+  for (let i = 0; i < L.length; i++) {
+    const m = L[i], e = m.matrixWorld.elements, o = i * 12, v = oclVer(m), z = oclMostra(m, c.o); let j = 0;
+    while (j < 12 && Math.abs(e[OCL_M[j]] - W[o + j]) < 1e-4) j++;
+    if ((j === 12 && v === V[i] && z === Z[i]) || !oclCaixa(m)) continue;
+    const { min: a, max: b } = _oclB;
+    if (!oclGuardada(m, c.o) && !c.oc.some(q => a.x >= q[0] && b.x <= q[1] && a.z >= q[2] && b.z <= q[3] && a.y >= q[4] && b.y <= q[5])) return true;
+    for (j = 0; j < 12; j++) W[o + j] = e[OCL_M[j]]; V[i] = v; Z[i] = z;
+  }
+  return false;
+}
+// true = o retângulo está todo atrás das paredes vistas por oclCalc: em cada fatia que ele toca, uma parede vem antes do ponto
+// dele mais perto naquela fatia e tapa a visada até o topo e até o pé
+function oclRet(q) {
+  const ex = OCL.px, ez = OCL.pz, [x0, x1, z0, z1, y0, y1] = q;
+  const nx = Math.min(Math.max(ex, x0), x1), nz = Math.min(Math.max(ez, z0), z1), Dm = Math.hypot(nx - ex, nz - ez); if (Dm < 1) return false;
+  const { N, K, d, su, sl, c: cn, cs, sn } = OCL, [tc, mn, mx] = oclAng(ex, ez, x0, x1, z0, z1);
+  const jn = Math.floor(oclPa(nx - ex, nz - ez)) % N; // fatia do ponto mais perto
+  { const o = jn * K, n = cn[jn], A = Math.max(0, (y1 - OCL.e1) / Dm), B = Math.min(0, (y0 - OCL.e0) / Dm); let tapa = false; // ela primeiro: quase sempre é a que mostra
+    for (let i = 0; i < n; i++) if (d[o + i] < Dm && su[o + i] >= A && sl[o + i] <= B) { tapa = true; break; }
+    if (!tapa) return false; }
+  const j0 = Math.floor(tc + mn), j1 = Math.floor(tc + mx);
+  let tp = oclEntra(ex, ez, cs[((j0 % N) + N) % N], sn[((j0 % N) + N) % N], x0, x1, z0, z1);
+  for (let j = j0; j <= j1; j++) {
+    const kk = ((j % N) + N) % N, k2 = (kk + 1) % N, t = oclEntra(ex, ez, cs[k2], sn[k2], x0, x1, z0, z1), o = kk * K, n = cn[kk]; if (!n) return false;
+    const ta = tp < 0 || t < 0 || kk === jn ? Dm : Math.min(t, tp); tp = t; // borda que não pega o retângulo: vale o ponto mais perto
+    const A = Math.max(0, (y1 - OCL.e1) / ta), B = Math.min(0, (y0 - OCL.e0) / ta); let tapa = false;
+    for (let i = 0; i < n; i++) if (d[o + i] < ta && su[o + i] >= A && sl[o + i] <= B) { tapa = true; break; }
+    if (!tapa) return false;
+  }
+  return true;
+}
+function oclTapa(c) {
+  for (let i = 0; i < 2; i++) {
+    if (c.oc == null) { oclReg(c); c.ocV = -1; } if (!c.oc) return false;
+    if (c.ocV !== OCL.ver) { c.ocV = OCL.ver; c.ocR = c.oc.every(oclRet); } // mesmas fatias da última vez: mesma resposta
+    if (!c.ocR || !oclMexeu(c)) return c.ocR; // só a escondida precisa conferir se algo dela saiu do lugar
+    c.oc = null;
+  }
+  return false;
+}
+// ===== fim O1-B03 =====
 function mergeStatic() {
   const all = []; world.updateMatrixWorld(true); world.traverse(o => all.push(o));
   const st = all.map(o => [o.position.clone(), o.quaternion.clone(), o.scale.clone(), o.visible]), now0 = now;
@@ -15707,6 +15880,7 @@ function buildMap(id) {
   if (M.zombie) mergeStatic();
   if (M.marcas) paredeMarcas(M, boxes); // marcas nas paredes (3A-1)
   CULL = []; if (AT) for (const a of AT.areas) cullAdd(a.root, a.cx, a.cz, a.rad); if (M.zombie) for (const o of world.children) if (o.userData.blk && o.isMesh && !o.isInstancedMesh) { const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); CULL.push({ o, x: g.boundingSphere.center.x, z: g.boundingSphere.center.z, r: g.boundingSphere.radius }); }
+  OCL.bx = null; if (M.zombie) oclMontar(M, boxes); // O1-B03
   if (M.zombie) for (const o of world.children) if (o.userData.blk) { o.updateMatrixWorld(true); o.matrixAutoUpdate = o.matrixWorldAutoUpdate = false; } // 3A-15: malhas juntadas (paradas) fora da conta de matrizes de todo quadro
   if (M.zombie) a30Congela(); // O1-A30
   SPAWNS.a = M.spawns.map(([x, z]) => [x, 0, z]);
