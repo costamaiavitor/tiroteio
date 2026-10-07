@@ -19229,6 +19229,33 @@ function attPartsProc(id, gun, ud) {
   }
   if (ret.length) ud.attRet = ret; // ponto/anel 3D da mira: some quando o do HUD aparece (mirando), para não ficarem dois
 }
+// ===== 6-w14: retícula da mira do Armeiro (ponto da Reflex, anel da Holográfica) =====
+// Antes: o #reddot do HUD acendia no centro da tela já em G.ads .6, com a janela da mira ainda 100-160 px à direita (o ponto boiava fora
+// da mira, sobre o cenário), e acendia também nas armas sem lugar para a mira (ATTV.sem: AUG/G11/Enfield), por cima do ponto da luneta
+// integrada. O anel tinha 30 px fixos: na janela da AK enchia 60% da altura, na da MP5 34%, e mudava de tamanho na troca do 3D pelo HUD.
+// Agora o HUD só acende com a mira montada (ud.attRet), fica em cima do ponto 3D (projetado pela vmCam; na mira parada é o centro exato da
+// tela) e o anel tem o tamanho do anel 3D. Não aloca: só escreve no estilo quando o valor muda (na mira parada, nada).
+const W14 = { de: .6, anel: [.0054, 14, 44], v: new V3(), x: 0, y: 0, d: 0, cls: 'hidden', ar: null }; // de: G.ads em que o HUD troca o 3D; anel: raio do anel 3D (m, meio do traço), diâmetro mínimo e máximo no HUD (px)
+// Armas de luneta (AWP, SSG, L96, Dragunov, PSG1) não usam a mira de ombro: a mira do Armeiro era montada medindo a arma sem ud.sight e
+// caía em cima da luneta (Dragunov, holográfica), dentro da caixa (PSG1, AWP) ou no carregador (Dragunov, reflex). Ficam sem a peça (o efeito vale).
+for (const id in W) if (W[id].scope && !W[id].base && !(ATTV.sem[id] || []).includes('optic')) ATTV.sem[id] = [...(ATTV.sem[id] || []), 'optic'];
+function w14Reticulo() {
+  const rd = $('#reddot'), ar = vmGun?.userData.attRet || null;
+  if (W14.ar && W14.ar !== ar) for (const o of W14.ar) o.visible = true; // arma trocada: a retícula 3D da outra volta (a arma fica no cache VMC)
+  W14.ar = ar;
+  const dk = ar && me.alive && vmRoot.visible && G.ads > W14.de ? (ar.length > 1 ? 2 : 1) : 0;
+  if (ar) for (const o of ar) o.visible = !dk;
+  const cls = !dk ? 'hidden' : dk > 1 ? 'holo' : '';
+  if (cls !== W14.cls) { rd.className = cls; W14.cls = cls; }
+  if (!dk) return;
+  const v = W14.v, hw = innerWidth / 2, hh = innerHeight / 2;
+  ar[0].updateWorldMatrix(true, false); v.setFromMatrixPosition(ar[0].matrixWorld).project(vmCam);
+  const x = Math.round(v.x * hw * 2) / 2, y = Math.round(-v.y * hh * 2) / 2; // de meio em meio px
+  let d = 0;
+  if (dk > 1) { ar[1].updateWorldMatrix(true, false); v.set(W14.anel[0], 0, 0).applyMatrix4(ar[1].matrixWorld).project(vmCam); d = Math.round(clamp(2 * Math.hypot(v.x * hw - x, v.y * hh + y), W14.anel[1], W14.anel[2])); }
+  if (x !== W14.x || y !== W14.y) { rd.style.transform = x || y ? 'translate(' + x + 'px,' + y + 'px)' : ''; W14.x = x; W14.y = y; }
+  if (d !== W14.d) { rd.style.width = rd.style.height = d ? d + 'px' : ''; rd.style.margin = d ? -d / 2 + 'px 0 0 ' + -d / 2 + 'px' : ''; W14.d = d; }
+}
 // tela do Armeiro (menu): nível, XP e acessórios de cada arma
 let ARM_SEL = null;
 function armoryUI() {
@@ -24351,7 +24378,6 @@ function tick(dt) {
   const adsT = G.adsHold && me.alive && !G.reloadEnd && !me.sprinting && now >= G.switchEnd && w && !w.scope && (w.slot === 'primary' || w.slot === 'secondary') ? 1 : 0;
   G.ads = lerp(G.ads || 0, adsT, Math.min(1, dt * 11 * attStat(G.cur, 'adsSpd'))); if (G.ads < .002) G.ads = 0;
   $('#xhair').style.opacity = G.ads > .5 ? 0 : 1;
-  { const rd = $('#reddot'), dk = G.ads > .6 && me.alive ? attOn(G.cur).map(a => ATT[a].dot).find(Boolean) : 0; rd.className = !dk ? 'hidden' : dk > 1 ? 'holo' : ''; const ar = vmGun?.userData.attRet; if (ar) for (const o of ar) o.visible = !dk; } // retícula da mira do Armeiro // mirando: a mira de ferro substitui a cruz
   scopeTick(dt, w);
   let fov = CFG.fov * (1 - (1 - 1 / (1.25 * attStat(G.cur, 'zoom'))) * G.ads) + me.sprintK * 7 + (me.lungeK || 0) * KNF.bote.fov; // mirar dá um zoom leve; correr abre um pouco
   if (w?.scope && G.scR > 0) fov = lerp(fov, G.scF || fov, seg(G.scR, SCOPE.zoom[0], SCOPE.zoom[1])); // luneta: o zoom chega junto com a ocular
@@ -24374,6 +24400,7 @@ function tick(dt) {
   }
   updateListener();
   updateViewmodel(dt);
+  w14Reticulo(); // 6-w14: retícula da mira do Armeiro (depois da arma posta neste quadro)
   updateHud(dt);
 }
 applyQuality();
