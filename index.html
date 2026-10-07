@@ -11963,6 +11963,54 @@ ATMOS_POST.push(mapId => {
   if (B02.on && !B02.hook) { B02.hook = true; const ob = scene.onBeforeRender; scene.onBeforeRender = function (r, s, c, rt) { ob.call(this, r, s, c, rt); b02Cull(c); }; }
 });
 // ===== O1-B02 fim =====
+// ===== O1-B16: Baixo leve: decoração miúda de longe não é desenhada =====
+// No Baixo o quadro é limitado pela CPU (chamadas de desenho): na Vila ~1/3 das chamadas eram peças do cenário com menos de
+// 4 px de raio na tela (parafusos, pedrinhas, folhas, placas e vidros pequenos de longe, quase sempre já dentro da névoa).
+// Só no Baixo e só no cenário montado até o fim da atmosfera (zumbis, itens, portas, janelas, máquinas, paredes juntadas e
+// vegetação, que tem distância própria, ficam de fora): peça cuja esfera, vista do ponto mais perto, tem menos de B16.px de
+// raio na tela (o zoom da mira conta; volta com B16.volta × para não piscar) não é desenhada (camada 0 desligada; visible fica
+// com o código do mapa). Conta só de distância (girar não muda nada): refeita a cada B16.passo s ou ao andar B16.mover m.
+// Vila -27% e Sanatório -18% de chamadas no Baixo, 0,001-0,013% de pixels diferentes. Trocar para o Baixo no meio do mapa só vale no próximo mapa.
+// Aquecimento e cullTodo mostram tudo. Com o O1-B02 (Sanatório): só volta a camada que ele também deixou ligada.
+const B16 = { px: 4, volta: 1.25, passo: .15, mover: 1, on: false, w: null, raiz: null, obj: null, t: 0, p: [1e9, 0, 0, 0], tudo: true, b02: null, b02o: null, hook: false };
+const _b16s = new THREE.Sphere();
+function b16Junta() { // na 1ª imagem depois da montagem: as peças do cenário (sem portas, máquinas e itens: zBuildWorld vem depois)
+  B16.obj = [];
+  for (const top of B16.raiz) { if (top.parent !== world || top.userData.blk || top.userData.veg) continue; // paredes juntadas e vegetação (que tem distância própria) ficam de fora
+    top.traverse(o => {
+      if (!(o.isMesh || o.isPoints || o.isSprite) || o.isSkinnedMesh || o.userData.veg || !o.geometry?.attributes.position) return;
+      B16.obj.push({ o, top, fora: false });
+    }); }
+}
+function b16Liga(e) { // devolve a camada, a não ser que o O1-B02 também a tenha tirado
+  e.fora = false; if (B02.obj && B16.b02o !== B02.obj) { B16.b02o = B02.obj; B16.b02 = new Map(B02.obj.map(x => [x.o, x])); }
+  const b = B02.on && B16.b02 ? B16.b02.get(e.o) : null; if (!(b && b.fora)) e.o.layers.enable(0);
+}
+function b16Cull(cam) {
+  if (!B16.on || cam !== camera) return;
+  if (B16.w !== world || CFG.gfx !== 'baixo') { if (B16.obj) for (const e of B16.obj) if (e.fora) b16Liga(e); B16.on = false; B16.obj = null; return; } // outro mapa ou saiu do Baixo
+  if (!B16.obj) { if (WARM || !AT) return; b16Junta(); }
+  if (WARM || cullTodo) { if (!B16.tudo) { B16.tudo = true; for (const e of B16.obj) if (e.fora) b16Liga(e); } return; }
+  const C = cam.matrixWorld.elements, px = C[12], py = C[13], pz = C[14], H = innerHeight / 2 / Math.tan(cam.fov * Math.PI / 360) * (cam.zoom || 1), P = B16.p;
+  if (!B16.tudo && now < B16.t && (px - P[0]) ** 2 + (py - P[1]) ** 2 + (pz - P[2]) ** 2 < B16.mover * B16.mover && Math.abs(H - P[3]) < P[3] * .05) return;
+  B16.tudo = false; B16.t = now + B16.passo; P[0] = px; P[1] = py; P[2] = pz; P[3] = H;
+  const lim = B16.px / H, lim2 = lim * B16.volta; // raio/distância
+  for (const e of B16.obj) {
+    const o = e.o; if (!e.top.visible) continue; // área escondida pelo zCull: fica como está
+    if (!o.frustumCulled) { if (e.fora) b16Liga(e); continue; } // esfera que não vale (o autor desligou o recorte)
+    const s = o.isInstancedMesh ? (o.boundingSphere || (o.computeBoundingSphere(), o.boundingSphere)) : (o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere)); // a mesma esfera do recorte do three
+    _b16s.copy(s).applyMatrix4(o.matrixWorld); const c = _b16s.center, d = Math.hypot(c.x - px, c.y - py, c.z - pz) - _b16s.radius;
+    const fora = d > 0 && _b16s.radius < d * (e.fora ? lim2 : lim);
+    if (fora) { e.fora = true; o.layers.disable(0); } // reafirma (o O1-B02 pode ter religado)
+    else if (e.fora) b16Liga(e);
+  }
+}
+ATMOS_POST.push(mapId => {
+  if (B16.obj) for (const e of B16.obj) if (e.fora) b16Liga(e); // mapa anterior
+  B16.on = CFG.gfx === 'baixo'; B16.w = world; B16.raiz = B16.on ? new Set(world.children) : null; B16.obj = null; B16.tudo = true;
+  if (B16.on && !B16.hook) { B16.hook = true; const ob = scene.onBeforeRender; scene.onBeforeRender = function (r, s, c, rt) { ob.call(this, r, s, c, rt); b16Cull(c); }; }
+});
+// ===== O1-B16 fim =====
 // ===== 3A-9: névoa, volume e atmosfera (cor da névoa por área, névoa rasteira, bancos de neblina, feixes sob as lâmpadas, respiração) =====
 // Só visual: planos transparentes poucos e grandes, sem colisão e sem sombra; tudo no grupo da área (some com o corte por distância).
 MAPS.vila.fogC = 0x363c4c; // noite de luar fria (antes 0x4a4152, lilás): névoa base e horizonte
