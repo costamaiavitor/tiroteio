@@ -15453,7 +15453,7 @@ function warmSombras(items, warm) {
     for (const m of [o.material].flat()) {
       if (!m.visible) continue;
       const lado = m.shadowSide != null ? m.shadowSide : WARM_LADO[m.side];
-      const k = [o.type, !!o.instanceColor, !!o.morphTargetInfluences, !!ga.uv1, !!ga.uv2, !!ga.uv3, o.receiveShadow, cust ? cust.uuid : [lado, m.map?.channel ?? -1, m.alphaMap?.channel ?? -1, m.alphaTest > 0, !!(m.displacementMap && m.displacementScale), m.wireframe, !!m.clipShadows].join()].join();
+      const k = [o.type, !!o.isInstancedMesh, !!o.instanceColor, !!o.morphTargetInfluences, !!ga.uv1, !!ga.uv2, !!ga.uv3, o.receiveShadow, cust ? cust.uuid : [lado, m.map?.channel ?? -1, m.alphaMap?.channel ?? -1, m.alphaTest > 0, !!(m.displacementMap && m.displacementScale), m.wireframe, !!m.clipShadows].join()].join();
       if (seen.has(k)) continue; seen.add(k);
       let d = cust;
       if (!d) {
@@ -15467,6 +15467,30 @@ function warmSombras(items, warm) {
   return temp;
 }
 function ctxLeitura(c) { return c.getContext('2d', { willReadFrequently: true }); }
+// ===== 6-g07: carregamento do Sanatório =====
+// O quadro final do aquecimento (desenho de tudo, sem recorte) compilava na hora, um por um e travando, os programas que a lista
+// do aquecimento não via (2,0 a 3,5 s no Sanatório Médio):
+// - malha instanciada: InstancedMesh tem type 'Mesh' no r160 e caía na chave da malha comum do mesmo material (variante de
+//   instância do material, e a da sombra); as duas chaves (aqui e em warmSombras) passam a separar isInstancedMesh;
+// - braços da primeira pessoa (ARMS): carregados à parte e só presos à cena da arma no enterGame, que vem depois do buildMap;
+// - passe de cor do Médio (gradeMedio): quadro de tela cheia desenhado sozinho (sem luzes, direto na tela).
+// - cliente: o host manda 'start' e, logo depois, 'zreset' (zStartGame); o cliente montava o mapa nos dois (o g06 resolveu só o host).
+//   MAPA_CLI marca o mapa montado pelo 'start'; o 'zreset' que chega antes de qualquer outra mensagem do host (só 'bye', dos bots
+//   tirados no syncBots, pode vir no meio) encontra o mapa no estado inicial e não monta de novo.
+var MAPA_CLI = null;
+function warmBracos(items, seen) {
+  if (!ARMS.root) return;
+  ARMS.root.traverse(o => {
+    if (!o.isMesh || !o.parent) return; const ga = o.geometry?.attributes || {};
+    const k = [o.material].flat().map(m => m.uuid).join() + o.type + !!o.isInstancedMesh + !!o.instanceColor + !!ga.color + !!ga.tangent + !!o.morphTargetInfluences;
+    if (!seen.has(k)) { seen.add(k); items.push([o, vmCam, vmScene]); }
+  });
+}
+function warmGrade(W) {
+  const q = posLeve() && gradePass.fsQuad?._mesh; if (!q) return;
+  renderer.setRenderTarget(null); // gradeMedio desenha na tela
+  try { for (const m of renderer.compile(q, camera)) { const pg = renderer.properties.get(m).currentProgram; if (pg) W.pend.push(pg); } } catch (e) { console.warn('aquecimento do passe de cor', e); }
+}
 function buildMap(id) {
   const M = MAPS[id] || MAPS.arena; curMapId = MAPS[id] ? id : 'arena'; curMap = M; texZ = curMapId === 'vila'; // texturas da fase 3 só na Vila (o Sanatório recebe as dele na fase 5)
   texS = curMapId === 'sanatorio'; // 5B-1
@@ -15545,12 +15569,14 @@ function warmUp(M) {
   const items = [], seen = new Set(), par = renderer.extensions.has('KHR_parallel_shader_compile');
   for (const [g, cam] of [[scene, camera], [vmScene, vmCam]]) g.traverse(o => {
     if (!o.material) return; const ga = o.geometry?.attributes || {};
-    const k = [o.material].flat().map(m => m.uuid).join() + o.type + !!o.instanceColor + !!ga.color + !!ga.tangent + !!o.morphTargetInfluences;
+    const k = [o.material].flat().map(m => m.uuid).join() + o.type + !!o.isInstancedMesh + !!o.instanceColor + !!ga.color + !!ga.tangent + !!o.morphTargetInfluences; // 6-g07: isInstancedMesh
     if (!seen.has(k)) { seen.add(k); items.push([o, cam, g]); }
   });
+  warmBracos(items, seen); // 6-g07
   const sombraMats = warmSombras(items, warm); // 6-g06
   const tex = new Set(); for (const [o] of items) for (const m of [o.material].flat()) for (const v of Object.values(m)) if (v?.isTexture && !v.isRenderTargetTexture && v.image) tex.add(v);
   const texs = [...tex], W = WARM = { i: 0, pend: [], tm: 0, n: items.length + texs.length, t0: performance.now() };
+  warmGrade(W); // 6-g07
   W.end = () => {
     clearTimeout(W.tm); scene.remove(warm); vmScene.remove(vmWarm); if (WARM === W) WARM = null; warmMsg();
     vmWarm.traverse(o => o.geometry?.dispose()); for (const d of sombraMats) d.dispose(); // 6-g06
@@ -22996,6 +23022,7 @@ function sanePl(pl) {
 function onMsg(m) { try { onMsgInner(m); } catch (e) { console.warn('mensagem inválida', m?.t, e); } }
 function onMsgInner(m) {
   if (!m || typeof m !== 'object') return;
+  if (MAPA_CLI && m.t !== 'zreset' && m.t !== 'bye') MAPA_CLI = null; // 6-g07: qualquer outra mensagem do host pode ter mexido no mapa
   switch (m.t) {
     case 'welcome': { C.myId = String(m.you); C.st = saneSt(m.st); NET.code = String(m.code || '').slice(0, 8); NET.hostKey = typeof m.hk === 'string' ? m.hk.slice(0, 16) : null;
       if (m.lobby) { LB.on = true; lobbyUI(); break; }
@@ -23043,7 +23070,8 @@ function onMsgInner(m) {
       break;
     // ----- modo zumbis -----
     case 'zreset':
-      if (curMapId && MAPA_FRESCO !== curMapId) buildMap(curMapId); // 6-g06: o mapa que acabou de ser montado nesta mesma tarefa já está no estado inicial
+      if (curMapId && MAPA_FRESCO !== curMapId && !(MAPA_CLI === curMapId && !me.alive)) buildMap(curMapId); // 6-g06: o mapa que acabou de ser montado nesta mesma tarefa já está no estado inicial
+      MAPA_CLI = null; // 6-g07
       me.alive = false; me.downed = false; C.spec = null;
       for (const rp of R.values()) { rp.alive = rp.dead = rp.downed = false; rp.buf = []; }
       break;
@@ -23149,7 +23177,7 @@ function onMsgInner(m) {
     case 'shot': remoteShot(m); break;
     case 'lobby': m.st = saneSt(m.st); if (!Array.isArray(m.pl)) m.pl = []; for (const q of m.pl) { if (q && typeof q === 'object') { q.id = String(q.id); q.n = String(q.n ?? '').slice(0, 20); q.c = /^#[0-9a-f]{3,8}$/i.test(q.c) ? q.c : '#cccccc'; q.tm = q.tm === 't' || q.tm === 'ct' ? q.tm : ''; } } LB.data = m; C.st = m.st; lobbyUI(); break;
     case 'tolobby': LB.on = true; toMenu(); lobbyUI(); break;
-    case 'start': LB.on = false; C.st = saneSt(m.st); ZC.snapTs = 0; buildMap(C.st.map); enterGame(); lobbyUI(); break;
+    case 'start': LB.on = false; C.st = saneSt(m.st); ZC.snapTs = 0; buildMap(C.st.map); MAPA_CLI = curMapId; enterGame(); lobbyUI(); break; // 6-g07: MAPA_CLI
     case 'deny': toast(m.txt, 4); LB.on = false; lobbyUI(); $('#joinStatus').textContent = m.txt; setTimeout(leaveGame, 2500); break;
     case 'bboom': { const p = new V3(m.p[0], m.p[1] + .6, m.p[2]); boomFx(p); for (let i = 0; i < 6; i++) puff(p.clone().add(new V3(rand(-3, 3), rand(0, 3), rand(-3, 3))), 0x555555, 4, 3); break; }
     case 'nade': spawnNade(m.id, m.k, m.p, m.v); break;
