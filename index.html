@@ -15986,17 +15986,38 @@ function muzzleFlash(pos, world, sz = .5) {
 const vmFx = [];
 function ejectShell(w, force) {
   if (!vmGun || CFG.gfx === 'baixo' || !w || w.thunder || w.wonder || w.slot === 'knife' || w.slot === 'nade' || w.model === 'raygun' || w.model === 'law' || w.model === 'xbow' || (w.splash && !force && w.model !== 'pistol')) return;
-  const shotgun = ['shotgun', 'dbarrel'].includes(w.model), big = w.model === 'launcher', A = armMats();
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(shotgun ? .0105 : big ? .02 : .005, shotgun ? .0105 : big ? .02 : .005, shotgun ? .05 : big ? .05 : .026, 8), shotgun ? A.shell : A.brass);
-  const p = vmGun.userData.muzzle.clone(); p.z *= .4; p.x += .025; p.applyMatrix4(vmRoot.matrixWorld); m.position.copy(p); m.rotation.set(rand(0, 3), rand(0, 3), 0);
-  vmScene.add(m); vmFx.push({ m, v: w.model === 'revolver' || w.model === 'dbarrel' ? new V3(rand(-.2, .2), rand(-1.2, -.6), rand(0, .3)) : new V3(rand(.9, 1.4), rand(.9, 1.5), rand(-.2, .3)), t: 0 });
+  const f = w19Capsula(w); vmScene.add(f.m); vmFx.push(f); // 6-w19: cápsula do pool, saindo da janela de ejeção da arma
   setTimeout(() => play('shell'), 350);
 }
 function updateVmFx(dt) {
   for (let i = vmFx.length - 1; i >= 0; i--) {
     const f = vmFx[i]; f.t += dt; f.v.y -= 6 * dt; f.m.position.addScaledVector(f.v, dt); f.m.rotation.x += dt * (f.shared ? 4 : 20); f.m.rotation.y += dt * (f.shared ? 2 : 12);
-    if (f.t > (f.shared ? .9 : .6)) { vmScene.remove(f.m); if (!f.shared) f.m.geometry.dispose(); vmFx.splice(i, 1); }
+    if (f.t > (f.shared ? .9 : .6)) { vmScene.remove(f.m); if (f.pool) f.pool.push(f); else if (!f.shared) f.m.geometry.dispose(); vmFx.splice(i, 1); } // 6-w19: cápsula volta ao pool
   }
+}
+// ===== 6-w19: tiro (clarão, cápsula e traçante saem da arma de verdade; cápsulas sem alocar) =====
+// ud.muzzle das armas feitas no código está no espaço da arma (gun), que fica dentro do vmGun (escala 1,18, giro baseYaw, endireita na mira).
+// O clarão na mão, a cápsula e a origem do traçante aplicavam só a matriz do vmRoot: o ponto caía 4-14 cm atrás e ao lado da boca, DENTRO
+// da arma (o clarão sumia atrás do guarda-mão/ferrolho e a cápsula nascia dentro da caixa da culatra). Braços prontos (fps2): a boca já é
+// convertida para o espaço do vmRoot a cada quadro. Só no Zumbi (no estilo CS fica como estava).
+function w19Arma(ud) { const g = vmGun?.children[0]; return ZC.on && !ud.fps2 && g && g.userData === ud ? g : vmRoot; }
+function w19Boca(ud, out) { return out.copy(ud.muzzle).applyMatrix4(w19Arma(ud).matrixWorld); }
+function w19Clarao(ud) { // chamado depois do vmRoot.updateMatrixWorld (antes usava a matriz do quadro anterior, com o coice)
+  if (vmGun && ud.muzzle && now < vmFlashUntil) { vmFlash.visible = vmRoot.visible; w19Boca(ud, vmFlash.position); vmFlash.material.rotation = Math.random() * 6; }
+  else vmFlash.visible = false;
+}
+// cápsulas: 3 geometrias fixas (pistola/fuzil, cartucho de escopeta, 40 mm) e malhas reaproveitadas; antes era uma CylinderGeometry nova por tiro
+const W19C = { geo: {}, pool: { p: [], s: [], b: [] } };
+function w19Capsula(w) {
+  const shotgun = ['shotgun', 'dbarrel'].includes(w.model), big = w.model === 'launcher', k = shotgun ? 's' : big ? 'b' : 'p', A = armMats(), P = W19C.pool[k];
+  const geo = W19C.geo[k] ||= new THREE.CylinderGeometry(shotgun ? .0105 : big ? .02 : .005, shotgun ? .0105 : big ? .02 : .005, shotgun ? .05 : big ? .05 : .026, 8);
+  const f = P.pop() || { m: new THREE.Mesh(geo, null), v: new V3(), t: 0, pool: P }; f.m.material = shotgun ? A.shell : A.brass; f.t = 0;
+  const ud = vmGun.userData, mz = ud.muzzle, g = w19Arma(ud), p = f.m.position;
+  if (g === vmRoot) { p.copy(mz); p.z *= .4; p.x += .025; } // estilo CS / braços prontos: como antes
+  else p.set(.03, mz.y + .018, ud.slide || !ud.magRest || ud.magRest.z > 0 ? mz.z * .4 : Math.max(mz.z * .5, ud.magRest.z - .02)); // janela de ejeção: lado direito, em cima, sobre o carregador (pistola: no ferrolho; bullpup: na frente do rosto, senão nasce fora da tela)
+  p.applyMatrix4(g.matrixWorld); f.m.rotation.set(rand(0, 3), rand(0, 3), 0);
+  if (w.model === 'revolver' || w.model === 'dbarrel') f.v.set(rand(-.2, .2), rand(-1.2, -.6), rand(0, .3)); else f.v.set(rand(.9, 1.4), rand(.9, 1.5), rand(-.2, .3));
+  return f;
 }
 
 // ================================================================
@@ -18888,13 +18909,12 @@ function updateViewmodel(dt) {
   const x = o.x, y = o.y, z = o.z, rx = o.rx, ry = o.ry, rz = o.rz;
   vmRoot.position.set(x, y, z); vmRoot.rotation.set(rx, ry, rz);
   vmRoot.visible = me.alive && !(w?.scope && G.scope > 0 && G.scR >= SCOPE.some); // dentro da luneta a arma não aparece
-  if (vmGun && now < vmFlashUntil) { vmFlash.visible = vmRoot.visible; vmFlash.position.copy(vmGun.userData.muzzle).applyMatrix4(vmRoot.matrixWorld); vmFlash.material.rotation = Math.random() * 6; }
-  else vmFlash.visible = false;
   vmRoot.updateMatrixWorld();
   if (ud.fps2 && ak > 0) { // mirando: a animação parada balança o corpo da arma; a mira (medida agora) volta para o centro da tela
     const F = ud.fps2, e = _adsV.copy(F.sl).applyMatrix4(F.body.matrixWorld); vmGun.position.x -= e.x * ak; vmGun.position.y -= e.y * ak; vmRoot.updateMatrixWorld();
   }
   if (ud.fps2) { ud.fps2.mz.updateMatrixWorld(true); ud.muzzle.setFromMatrixPosition(ud.fps2.mz.matrixWorld); vmRoot.worldToLocal(ud.muzzle); } // boca do cano segue a animação
+  w19Clarao(ud); // 6-w19
   if (ud.armsGun && vmRoot.visible) armsIK(ud);
   updateVmFx(dt);
 }
@@ -19313,7 +19333,7 @@ function remoteCands() {
 }
 function muzzleWorld() {
   // boca do cano de verdade: a cena da arma usa a mesma orientação da câmera
-  if (vmGun?.userData.muzzle && vmRoot.visible) return vmGun.userData.muzzle.clone().applyMatrix4(vmRoot.matrixWorld).applyQuaternion(camera.quaternion).add(camera.position);
+  if (vmGun?.userData.muzzle && vmRoot.visible) return w19Boca(vmGun.userData, new V3()).applyQuaternion(camera.quaternion).add(camera.position); // 6-w19
   const f = new V3(0, 0, -1).applyQuaternion(camera.quaternion), r = new V3(1, 0, 0).applyQuaternion(camera.quaternion), u = new V3(0, 1, 0).applyQuaternion(camera.quaternion);
   return camera.position.clone().addScaledVector(f, .7).addScaledVector(r, .18).addScaledVector(u, -.14);
 }
