@@ -16376,7 +16376,7 @@ function gunModel(id, fp = false, skin = null) {
       else if (m14) { add(mag, EX(banana(.1, 2, .062), .03), M.metal); ud.magGrab = new V3(0, -.12, -.1); }
       else { add(mag, EX(banana(.21, .34, .074, .066), .03), id.startsWith('ak47') ? M.bakelite : M.metal); for (let i = 0; i < 4; i++) add(mag, new THREE.BoxGeometry(.032, .004, .012), M.dark, 0, -.04 - i * .04, .012 + i * .012, .15 + i * .1); ud.magGrab = new V3(0, -.17, -.05); }
       ud.mag = mag;
-      if (/^(ak47|galil|rpk)/.test(id)) ud.rock = { z: lmg ? -.02 : -.037, a: lmg ? .3 : .42, cx: .036, cy: -.024 }; // a3: carregador de bico (rock-in), alavanca do lado direito
+      if (/^(ak47|ak74u|galil|rpk)/.test(id)) ud.rock = { z: lmg ? -.02 : -.037, a: lmg ? .3 : .42, cx: .036, cy: -.024 }; // a3: carregador de bico (rock-in), alavanca do lado direito (6-w02: a AK-74u também; antes o dela descia reto)
       if (m14) { add(g, EX([[-.02, -.006], [-.008, -.03], ['q', -.018, -.062, -.04, -.09], [-.095, -.084], ['q', -.13, -.05, -.16, -.02], [-.1, -.006]], .036, null, .004), woodM); ud.gripAx = { top: new V3(0, -.024, .036), bot: new V3(0, -.082, .062) }; } // a4: M14 sem punho de pistola (mão no pescoço da coronha)
       else grip(g, -.075, -.006, .09, woodM, .03);
       guard(g, -.004, -.006);
@@ -17309,6 +17309,11 @@ const FRAME = {
   model: { p90: { hi: [.14, .08, -.02] }, uzi: { hi: [.14, .08, .08] }, thunder: { lo: [-.04, -.06, -.12], hi: [.14, .08, -.08] },
     awp: { rh: [.84, .97, 1] }, scout: { rh: [.84, .97, 1] }, dmr: { rh: [.84, .98, 1], hi: [.14, .08, .04] } }, // precisão (a6): punho e ferrolho aparecem no canto // armas grossas: não chegam tão perto da câmera
 };
+// ===== 6-w02: SMGs I (MP5, MP5K, MP40, AK-74u): distância do olho no quadril =====
+// O enquadramento põe a boca do cano no mesmo ponto da tela para todas as armas: as curtas vinham para cima da câmera (vértice mais perto
+// do olho a 0,15-0,18 m, contra 0,23-0,29 m dos fuzis) e a caixa da culatra enchia o canto da tela, com o reflexo do contorno estourando no
+// bloom do Alto (MP5). hi[2]: o máximo que a arma chega perto (m, mesmo eixo do FRAME). Por arma base (as _pap usam a da base).
+const FRAME_ARMA = { mp5: { hi: [.14, .08, .07] }, mp5k: { hi: [.14, .08, .07] }, mp40: { hi: [.14, .08, .05] }, ak74u: { hi: [.14, .08, .06] } };
 function armsTipPts(gun) { // (a13) cantos das peças visíveis no espaço da arma (antes dos acessórios do Armeiro)
   gun.updateMatrixWorld(true); const inv = gun.matrixWorld.clone().invert(), m = new THREE.Matrix4(), P = [];
   gun.traverse(o => { if (!o.isMesh || !o.visible) return; o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox; m.multiplyMatrices(inv, o.matrixWorld); for (let i = 0; i < 8; i++) P.push(new V3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(m)); });
@@ -17979,7 +17984,7 @@ function vmSetWeapon(id) {
   if (ud.boltAction && rh && rh.parent === gun) { ud.rhG = rh; ud.rhRest = rh.position.clone(); } // ferrolho manual: a mão vai até a bola do ferrolho
   vmGun.scale.setScalar(1.18); ud.baseYaw = vmGun.rotation.y = ud.armsGun ? (W[mid]?.slot === 'primary' ? GRIP.yaw : GRIP.yawP) : .05; // arma maior e virada para dentro (com os braços, bem mais, como no CS: guarda-mão à esquerda da mão do gatilho)
   vmRoot.add(vmGun);
-  if (ud.armsGun) frameArms(ud, { ...(W[mid]?.slot === 'primary' ? FRAME.primary : FRAME.pistol), ...FRAME.model[m] });
+  if (ud.armsGun) frameArms(ud, { ...(W[mid]?.slot === 'primary' ? FRAME.primary : FRAME.pistol), ...FRAME.model[m], ...FRAME_ARMA[W[mid]?.base || mid] }); // 6-w02: FRAME_ARMA
   if (vck) vmcGuardar(vck, vmGun);
 }
 // ===== 6-w17: troca de arma sem engasgo (cache da arma na mão, molde das mãos, aquecimento das armas compradas) =====
@@ -18489,7 +18494,7 @@ function pistolaApoio(ud, o, r0) { // mão esquerda (braços do Blender) acompan
 // Peças mais baixas que alt e a coronha (atrás da mão do gatilho + coronha) ficam embaixo do rosto, como o rosto apoiado na coronha.
 // Com mira alta (acessório), o que fica até corpo abaixo da linha ainda empurra o olho para trás (encosto). Unidades da arma (antes da escala).
 const ADS = { rel: .144, folga: .05, larg: .3, alt: .02, lat: .035, coronha: .06, corpo: .07, encosto: .02, esc: 1.18,
-  ombro: [.06, -.12, .04], csPistola: .48, csLonga: .21, recuo: { ak47: .035, rpk: .035, galil: .035 } }; // 6-w04: a Galil tem a mesma caixa da AK (a tampa enchia o pé da tela na mira, a 0,066 m do olho) // ombro: desvio extra dos ombros dos braços prontos (modos estilo CS) ao mirar; cs*: distância olho→mira deles (m); recuo (a15): olho mais para trás (unidades da arma) nas armas de tampa larga, que enchia a parte de baixo da tela
+  ombro: [.06, -.12, .04], csPistola: .48, csLonga: .21, recuo: { ak47: .035, rpk: .035, galil: .035, ak74u: .035 } }; // 6-w02: AK-74u tem a mesma caixa e tampa da AK // 6-w04: a Galil tem a mesma caixa da AK (a tampa enchia o pé da tela na mira, a 0,066 m do olho) // ombro: desvio extra dos ombros dos braços prontos (modos estilo CS) ao mirar; cs*: distância olho→mira deles (m); recuo (a15): olho mais para trás (unidades da arma) nas armas de tampa larga, que enchia a parte de baixo da tela
 const _adsV = new V3();
 function adsEye(gun, ud) {
   const sp = ud.sight; ud.adsZ = null; if (!sp) return;
