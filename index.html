@@ -12815,6 +12815,35 @@ if (!['baixo', 'medio', 'alto'].includes(CFG.gfx)) {
   CFG.gfx = /nvidia|geforce|rtx|gtx|radeon rx|radeon pro|apple m[1-9]/i.test(gpu) ? 'alto' : 'medio';
 }
 const scene = new THREE.Scene();
+// ===== O1-A30: raiz da cena e o world parados (identidade) =====
+// Com matrixAutoUpdate na cena e no world, o updateMatrix deles forçava o grafo inteiro todo quadro: as peças já marcadas como paradas
+// (malhas juntadas, vegetação: matrixWorldAutoUpdate false) eram visitadas e multiplicadas mesmo assim. Sem o forçar, o three pula essas
+// subárvores e o resto (zumbis, arma, efeitos, dyn, anim) continua se atualizando sozinho (updateMatrix de cada um).
+const a30Fixa = o => { o.matrixAutoUpdate = false; return o; };
+a30Fixa(scene);
+// Áreas da atmosfera (zumbi): depois de montadas, as peças ficam paradas (sem updateMatrix e, sem nada que se mexa embaixo, fora do percurso).
+// Nem toda peça animada é A.dyn (fumaça, chamas e gatilhos mexem em sprites e grupos sem a marca), então a parada é vigiada: escrever
+// na posição/escala (x, y, z), na rotação ou no quaternion, ou pôr filho nela, acorda a peça na hora (antes do render do mesmo quadro)
+// e ela volta a se atualizar sozinha para sempre. Desenho idêntico; o que nunca se mexe deixa de custar matriz todo quadro.
+const A30 = { n: 0, acordou: 0 };
+function a30Caminho(o) { for (let a = o; a && a !== world; a = a.parent) a.matrixWorldAutoUpdate = true; } // o percurso chega até ela
+function a30Acorda(o) { const d = o.userData.a30; if (!d || d.on) return; d.on = 1; A30.acordou++; o.matrixAutoUpdate = true; a30Caminho(o); }
+function a30Vigia(o) {
+  const d = o.userData.a30 = { on: 0 }, ac = () => { if (!d.on) a30Acorda(o); };
+  for (const v of [o.position, o.scale]) { let x = v.x, y = v.y, z = v.z; Object.defineProperties(v, {
+    x: { configurable: true, enumerable: true, get: () => x, set: n => { if (n !== x) { x = n; ac(); } } },
+    y: { configurable: true, enumerable: true, get: () => y, set: n => { if (n !== y) { y = n; ac(); } } },
+    z: { configurable: true, enumerable: true, get: () => z, set: n => { if (n !== z) { z = n; ac(); } } } }); }
+  for (const e of [o.rotation, o.quaternion]) { const f = e._onChangeCallback; e._onChange(() => { f(); ac(); }); }
+  const add = o.add; o.add = function (...c) { a30Caminho(this); return add.apply(this, c); }; // filho novo: o percurso passa a visitar
+}
+function a30Congela() {
+  A30.n = A30.acordou = 0; if (!AT) return;
+  const vai = o => { let mexe = !!o.userData.dyn; for (const c of o.children) if (vai(c)) mexe = true;
+    if (!o.userData.dyn) { a30Vigia(o); o.matrixAutoUpdate = false; o.matrixWorldAutoUpdate = mexe; A30.n++; } return mexe; };
+  for (const a of AT.areas) { a.root.updateMatrixWorld(true); vai(a.root); }
+}
+// ===== O1-A30 fim =====
 const camera = new THREE.PerspectiveCamera(CFG.fov, innerWidth / innerHeight, .05, 600);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
@@ -12903,7 +12932,7 @@ function visTick() { // lanterna: segue o estado (L) só com o jogador vivo e na
   if (VIS.sh.r) visShadowTick(); // 3A-7: sombra do luar acompanha o jogador
   VIS.lant.intensity = CFG.lant && ZC.on && me.alive && !C.spec ? VIS.k.lant * (CFG.gfx === 'alto' ? 1.1 : 1) : 0;
 }
-let world = new THREE.Group(); scene.add(world);
+let world = a30Fixa(new THREE.Group()); scene.add(world); // O1-A30
 let fxGroup = new THREE.Group(); scene.add(fxGroup);
 
 // ---------- céu: degradê + sol/lua + estrelas ou nuvens ----------
@@ -15568,7 +15597,7 @@ function warmGrade(W) {
 function buildMap(id) {
   const M = MAPS[id] || MAPS.arena; curMapId = MAPS[id] ? id : 'arena'; curMap = M; texZ = curMapId === 'vila'; // texturas da fase 3 só na Vila (o Sanatório recebe as dele na fase 5)
   texS = curMapId === 'sanatorio'; // 5B-1
-  scene.remove(world); disposeGroup(world); world = new THREE.Group(); scene.add(world);
+  scene.remove(world); disposeGroup(world); world = a30Fixa(new THREE.Group()); scene.add(world); // O1-A30
   clearFx(); zClearDynamic(); MAP_ANIM = []; atmosReset();
   me.downed = false;
   scene.background = new THREE.Color(M.fogC ?? M.sky);
@@ -15616,6 +15645,7 @@ function buildMap(id) {
   if (M.marcas) paredeMarcas(M, boxes); // marcas nas paredes (3A-1)
   CULL = []; if (AT) for (const a of AT.areas) cullAdd(a.root, a.cx, a.cz, a.rad); if (M.zombie) for (const o of world.children) if (o.userData.blk && o.isMesh && !o.isInstancedMesh) { const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); CULL.push({ o, x: g.boundingSphere.center.x, z: g.boundingSphere.center.z, r: g.boundingSphere.radius }); }
   if (M.zombie) for (const o of world.children) if (o.userData.blk) { o.updateMatrixWorld(true); o.matrixAutoUpdate = o.matrixWorldAutoUpdate = false; } // 3A-15: malhas juntadas (paradas) fora da conta de matrizes de todo quadro
+  if (M.zombie) a30Congela(); // O1-A30
   SPAWNS.a = M.spawns.map(([x, z]) => [x, 0, z]);
   SPAWNS.b = M.spawnsB ? M.spawnsB.map(([x, z]) => [x, 0, z]) : M.spawns.map(([x, z]) => [-x, 0, -z]);
   if (M.zombie) zBuildWorld(M);
