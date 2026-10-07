@@ -16039,7 +16039,7 @@ function gunTextures() {
     pap: mk(g => {
       g.fillStyle = '#4a1a78'; g.fillRect(0, 0, S, S);
       for (let i = 0; i < 90; i++) { const c = ['#6a2aa8', '#2e0c4e', '#8e44d0', '#3a1466', '#b060e8'][Math.floor(Math.random() * 5)], s = [8, 16, 24][Math.floor(Math.random() * 3)]; g.fillStyle = c; g.fillRect(Math.floor(rand(0, S) / 8) * 8, Math.floor(rand(0, S) / 8) * 8, s, s); }
-      noise(g, 12); edgeWear(g, .25);
+      noise(g, 12); // 6-w13: sem edgeWear (na projeção triplanar a quina da textura não é a quina da peça)
     }),
     papGlow: mk(g => { // linhas de "circuito" que brilham (emissiveMap)
       g.fillStyle = '#000'; g.fillRect(0, 0, S, S); g.lineWidth = 2;
@@ -16138,7 +16138,7 @@ function gunMats(pap, fp, skin) {
   const key = (pap ? 'p' : 'n') + (fp ? 'f' : 't') + (f ? f.id : ''); if (GM[key]) return GM[key];
   const T = gunTextures();
   const mk = o => { if (fp) { const metal = (o.metalness ?? 0) > .5, m = metal ? new THREE.MeshPhysicalMaterial({ ...o, clearcoat: .35, clearcoatRoughness: .35 }) : new THREE.MeshStandardMaterial({ ...o }); m.userData.env = metal ? 1 : .35; m.envMapIntensity = VM_ENV * m.userData.env; return m; } const { metalness, roughness, roughnessMap, ...rest } = o; return new THREE.MeshLambertMaterial(rest); };
-  const camo = pap ? mk({ map: T.pap, emissiveMap: T.papGlow, emissive: new THREE.Color(0xffffff).multiplyScalar(fp ? 1.6 : 1), metalness: .55, roughness: .35 }) : null;
+  const camo = pap ? papCamo(mk({ map: T.pap, emissiveMap: T.papGlow, emissive: new THREE.Color(0xffffff).multiplyScalar(fp ? 1.6 : 1), metalness: .55, roughness: .35 })) : null; // 6-w13
   const sk = f ? skinMats(f, mk, fp) : null, A = sk?.a, Bm = sk?.b; // skin: 'a' no metal do corpo, 'b' (mais escuro) no polímero/madeira
   const M = {
     metal: camo || A || mk({ map: T.metal, color: 0x3c3f44, metalness: .8, roughness: .5, roughnessMap: T.metal, bumpMap: T.metal, bumpScale: .4 }),
@@ -16171,6 +16171,43 @@ function gunMats(pap, fp, skin) {
     shell: mk({ color: 0xa82020, metalness: .2, roughness: .5 }),
   };
   return (GM[key] = M);
+}
+// ===== 6-w13: camuflagem do Pack-a-Punch (projeção triplanar no espaço da arma) =====
+// A UV das peças feitas no código não serve para a camuflagem: a caixa estica a textura inteira em cada face (os quadrados viram
+// faixas e o tamanho do padrão muda de peça para peça; nas pistolas vira borrão) e o perfil extrudado usa metros como UV (uma mancha
+// só). Aqui a textura é projetada nos três eixos da ARMA, pela posição de repouso de cada vértice no espaço da arma (atributo papP,
+// feito uma vez na montagem): o padrão tem o mesmo tamanho em todas as peças, passa contínuo de uma peça para a vizinha e duas faces
+// coincidentes pintam igual (some o z-fighting que a camuflagem deixava à mostra). As peças móveis levam o padrão com elas.
+// Peça sem papP (criada depois) usa a própria posição. rep: repetições da textura por metro; nit: quão seca é a troca de eixo.
+const PAPC = { rep: 5.2, nit: 4, verniz: .6, vernizR: .12 }; // verniz: camada de verniz da primeira pessoa (brilho fino em vez do véu leitoso)
+function papCamo(m) {
+  if (m.isMeshPhysicalMaterial) Object.assign(m, { clearcoat: PAPC.verniz, clearcoatRoughness: PAPC.vernizR });
+  m.userData.papCamo = 1; m.defaultAttributeValues = { ...(m.defaultAttributeValues || {}), papP: [0, 0, 0, 1] }; // sem o atributo: w = 1
+  m.onBeforeCompile = sh => {
+    sh.uniforms.papRep = { value: PAPC.rep };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 papP; varying vec3 vPapP;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPapP = papP.w > .5 ? position : papP.xyz;');
+    const tri = t => `vec4 ${t}C = texture2D(${t}, pq.zy) * tw.x + texture2D(${t}, pq.xz) * tw.y + texture2D(${t}, pq.xy) * tw.z;`;
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vPapP; uniform float papRep;')
+      .replace('#include <map_fragment>', `vec3 pd = cross(dFdx(vPapP), dFdy(vPapP)); vec3 tw = pow(abs(pd / max(length(pd), 1e-20)), vec3(${PAPC.nit.toFixed(1)})); tw /= tw.x + tw.y + tw.z + 1e-5; vec3 pq = vPapP * papRep;\n#ifdef USE_MAP\n{ ${tri('map')} diffuseColor *= mapC; }\n#endif`)
+      .replace('#include <emissivemap_fragment>', `#ifdef USE_EMISSIVEMAP\n{ ${tri('emissiveMap')} totalEmissiveRadiance *= emissiveMapC.rgb; }\n#endif`);
+  };
+  m.customProgramCacheKey = () => 'w13pap';
+  return m;
+}
+// grava papP nas malhas com a camuflagem (posição no espaço de g, na pose de montagem). Geometria compartilhada com outra malha ou
+// guardada (keep) ganha uma cópia própria; malha que já tem o seu fica como está (chamar de novo depois dos acessórios é barato).
+function papUV(g) {
+  g.updateMatrixWorld(true);
+  const gi = new THREE.Matrix4().copy(g.matrixWorld).invert(), mt = new THREE.Matrix4(), v = new V3();
+  g.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || Array.isArray(o.material) || !o.material?.userData.papCamo || !o.geometry?.attributes.position) return;
+    let geo = o.geometry; if (geo.userData.papDono === o) return;
+    if (geo.userData.papDono || geo.userData.keep) { geo = o.geometry = geo.clone(); geo.userData = {}; }
+    const p = geo.attributes.position, a = new Float32Array(p.count * 4); mt.multiplyMatrices(gi, o.matrixWorld);
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(mt); a[i * 4] = v.x; a[i * 4 + 1] = v.y; a[i * 4 + 2] = v.z; }
+    geo.setAttribute('papP', new THREE.BufferAttribute(a, 4)); geo.userData.papDono = o;
+  });
 }
 // ---------- escopetas (a5): mira e coronha ----------
 // rib: quanto a fita ventilada sobe a conta acima do cano (m). Com a conta mais alta, a caixa da culatra fica embaixo da linha de mira.
@@ -16840,6 +16877,7 @@ function gunModel(id, fp = false, skin = null) {
   ud.muzzle = new V3(0, my, mz);
   if (!GM_VM && model !== 'knife' && model !== 'karambit') try { dlGun(g, id, pap || skin ? M : null); } catch (e) { console.warn(e); } // modelo baixado (mundo, mãos dos outros, vitrine)
   if (model === 'knife' || model === 'karambit') try { knifeSwap(g, model, M.blade !== gunMats(false, fp, null).blade ? { a: M.blade, b: M.polymer } : null); } catch (e) { } // faca baixada no lugar da procedural (se já carregou)
+  if (pap) papUV(g); // 6-w13
   return g;
 }
 let GM_VM = false; // gunModel chamado pela primeira pessoa (lá a arma baixada entra com os braços prontos, não aqui)
@@ -18043,6 +18081,7 @@ function vmSetWeapon(id) {
   const mid = knifeModelOf(id, PROF.data?.equipped), gun = (GM_VM = true, gunModel(mid, true, skinOf(mid))), ud = gun.userData, A = armMats(); vmGun.add(gun);
   const tp0 = attOn(mid).length ? armsTipPts(gun) : null; // (a13) ponta da arma antes dos acessórios (enquadramento)
   attPartsProc(mid, gun, ud); // acessórios do Armeiro (modo Zumbi) no modelo feito no código
+  if (W[mid]?.pap) papUV(gun); // 6-w13: peças dos acessórios com a camuflagem
   if (tp0) ud.tipPts = tp0;
   gun.updateMatrixWorld(true); ud.sightY = new THREE.Box3().setFromObject(gun).max.y; // topo da arma = altura da mira
   adsEye(gun, ud); // mirar (ADS): onde fica o olho na arma
