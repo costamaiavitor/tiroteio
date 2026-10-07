@@ -13194,7 +13194,8 @@ function g01Composer() { // antes de cada composer.render(): o setSize do alvo (
 // como a saída do OutputPass) e o gradePass desenha por cima. Bem mais barato que um alvo HalfFloat com MSAA.
 // Baixo e os mapas sem áreas (PvP) continuam sem pós; o Sanatório (29 áreas) também passa por aqui (5B-8).
 // Validação final (04/10/2026): a Vila saiu do passe no Médio (POS_MEDIO_FORA). Medido limpo nesta máquina (Intel UHD): quadro
-// mediano 12,6 -> 10,7 ms e p90 17,5 -> 14,5 ms; o look por área da Vila fica só no Alto. O Sanatório continua (9,4 ms no Médio).
+// mediano 12,6 -> 10,7 ms e p90 17,5 -> 14,5 ms. O Sanatório continua (9,4 ms no Médio). O1-B10: a Vila voltou a ter a cor da área no
+// Médio, sem a cópia: a conta vai no shader dos materiais (B10, logo abaixo).
 const POS_MEDIO_FORA = { vila: 1 };
 const posLeve = () => CFG.gfx === 'medio' && AT?.areas.length > 0 && !POS_MEDIO_FORA[AT.map];
 let gradeTex = null; const _gradeV = new THREE.Vector2(), _gradeS = new THREE.Vector2();
@@ -13206,6 +13207,62 @@ const composerMSize = () => { // a textura da cópia só existe no Médio, do ta
 function gradeMedio() { // a tela já tem a cena e a arma: copia e passa a cor da área
   if (!gradeTex) composerMSize(); gradePass.uniforms.time.value = now % 100;
   renderer.copyFramebufferToTexture(_gradeV, gradeTex); renderer.clearDepth(); gradePass.uniforms.tDiffuse.value = gradeTex; gradePass.fsQuad.render(renderer);
+}
+// ===== O1-B10: cor da área no Médio sem cópia de tela (a conta do gradePass no fim do shader de cada material) =====
+// A Vila saiu do passe leve no Médio (POS_MEDIO_FORA) porque ele copia a tela inteira e desenha um quadro cheio por cima. Aqui a
+// mesma conta do gradePass, com os mesmos valores (o atmosTick continua escrevendo em gradePass.uniforms), roda no fim do
+// fragment de cada material (depois da névoa, onde o material tem dithering_fragment; nos outros, logo depois do sRGB): sem
+// cópia, sem quadro extra. Opacos levam a conta inteira; transparentes (somam por cima, às vezes várias camadas) só a parte que
+// passa pelo zero (saturação, sombras/altas, tint e vinheta), senão cada camada somaria o deslocamento do contraste e o grão.
+// Fica de fora a aberração das bordas (precisa dos vizinhos). Os uniforms b10* não são do three: entram direto no programa (guardado em p.b10) na
+// primeira vez que ele é usado no quadro (gancho no state.useProgram); fora do Médio da Vila b10E.w = 0 e a conta é pulada.
+const B10 = { mapas: { vila: 1 }, on: false, fr: 0, v: 0, ve: 0, u: new Float32Array(16), n: new Array(14).fill(0), e: [0, 0, 0], nOn: 0 }; // nOn = programas com a conta ligada (fora da Vila no Médio o gancho sai na hora)
+THREE.ShaderChunk.colorspace_pars_fragment += `
+#ifndef B10_DECL
+#define B10_DECL
+uniform vec4 b10A, b10B, b10C, b10D, b10E; // A = tint, sat; B = sombras, vinheta; C = altas, contraste; D = 1/tela; E = tempo, grão, curva S, ligado
+vec3 b10Cor(vec3 c) {
+  vec2 uv = gl_FragCoord.xy * b10D.xy, d = uv - .5; float r = dot(d, d);
+  #ifdef OPAQUE
+  c = clamp(c, 0.0, 1.0);
+  #endif
+  float l = dot(c, vec3(.2126, .7152, .0722));
+  c = mix(vec3(l), c, 1.1 * b10A.w);
+  #ifdef OPAQUE
+  c = mix(c, c * c * (3.0 - 2.0 * c), b10E.z);
+  c = (c - .3) * b10C.w + .3;
+  #endif
+  c *= mix(vec3(.97, .99, 1.04) * b10B.xyz, vec3(1.03, 1.0, .96) * b10C.xyz, smoothstep(.15, .8, l));
+  c *= b10A.xyz; c *= 1.0 - b10B.w * smoothstep(.12, .5, r);
+  #ifdef OPAQUE
+  c += (fract(sin(dot(uv * 913.7 + b10E.x, vec2(12.9898, 78.233))) * 43758.5453) - .5) * b10E.y;
+  #endif
+  return c;
+}
+#endif`;
+THREE.ShaderChunk.colorspace_fragment += '\n#ifndef B10_FIM\nif (b10E.w > .5) gl_FragColor.rgb = b10Cor(gl_FragColor.rgb);\n#endif';
+THREE.ShaderChunk.dithering_pars_fragment = '#define B10_FIM\n' + THREE.ShaderChunk.dithering_pars_fragment; // materiais com dithering_fragment: a conta vai para o fim
+THREE.ShaderChunk.dithering_fragment = 'if (b10E.w > .5) gl_FragColor.rgb = b10Cor(gl_FragColor.rgb);\n' + THREE.ShaderChunk.dithering_fragment;
+{ const gl = renderer.getContext(), st = renderer.state, use0 = st.useProgram;
+  st.useProgram = function (p) { const r = use0.call(this, p); b10Prog(gl, p); return r; };
+}
+function b10Prog(gl, p) { // programa recém-ligado: põe os valores do quadro (uma vez por quadro) ou desliga se ficou ligado
+  let e = p.b10; if (e === null || !B10.on && !B10.nOn) return; // sem a conta (sombra, profundidade, passes) ou nada ligado
+  if (e === undefined) { const E = gl.getUniformLocation(p, 'b10E'); e = p.b10 = E && { E, A: gl.getUniformLocation(p, 'b10A'), B: gl.getUniformLocation(p, 'b10B'), C: gl.getUniformLocation(p, 'b10C'), D: gl.getUniformLocation(p, 'b10D'), v: -1, ve: -1, fr: -1, on: 0 }; if (!e) return; }
+  if (B10.on) {
+    if (e.fr === B10.fr) return; e.fr = B10.fr; if (!e.on) { e.on = 1; B10.nOn++; } const u = B10.u, x = B10.e;
+    if (e.v !== B10.v) { e.v = B10.v; gl.uniform4f(e.A, u[0], u[1], u[2], u[3]); gl.uniform4f(e.B, u[4], u[5], u[6], u[7]); gl.uniform4f(e.C, u[8], u[9], u[10], u[11]); gl.uniform4f(e.D, u[12], u[13], 0, 0); }
+    if (e.ve !== B10.ve) { e.ve = B10.ve; gl.uniform4f(e.E, x[0], x[1], x[2], 1); }
+  } else if (e.on) { e.on = 0; B10.nOn--; e.ve = -1; gl.uniform4f(e.E, 0, 0, 0, 0); }
+}
+function b10Quadro() { // começo de cada renderScene: liga só no Médio da Vila (onde o passe leve não roda) e junta os valores do gradePass
+  B10.on = CFG.gfx === 'medio' && AT?.areas.length > 0 && !!B10.mapas[AT.map] && !posLeve(); if (!B10.on) return;
+  B10.fr++; const g = gradePass.uniforms, u = B10.u, t = g.tint.value, sh = g.sh.value, hi = g.hi.value; renderer.getDrawingBufferSize(_gradeS);
+  const n = B10.n; n[0] = t.x; n[1] = t.y; n[2] = t.z; n[3] = g.sat.value; n[4] = sh.x; n[5] = sh.y; n[6] = sh.z; n[7] = g.vig.value;
+  n[8] = hi.x; n[9] = hi.y; n[10] = hi.z; n[11] = g.con.value; n[12] = 1 / _gradeS.x; n[13] = 1 / _gradeS.y;
+  let mud = false; for (let i = 0; i < 14; i++) if (u[i] !== Math.fround(n[i])) { u[i] = n[i]; mud = true; }
+  if (mud) B10.v++; const x = B10.e, tm = now % 100;
+  if (x[0] !== tm || x[1] !== g.gr.value || x[2] !== g.sc.value) { x[0] = tm; x[1] = g.gr.value; x[2] = g.sc.value; B10.ve++; }
 }
 function applyQuality() {
   const q = CFG.gfx;
@@ -24912,9 +24969,9 @@ function frame() {
   if (WARM) renderer.clear(); else renderScene(); // aquecendo os shaders do mapa: não desenha (o desenho compilaria tudo de uma vez)
 }
 function renderScene() {
-  sky.position.copy(camera.position); if (CULL.length) zCull();
+  sky.position.copy(camera.position); if (CULL.length) zCull(); b10Quadro(); // O1-B10
   if (CFG.gfx === 'alto') { gradePass.uniforms.time.value = now % 100; g01Composer(); composer.render(); } // 6-g01
-  else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); if (posLeve()) gradeMedio(); } // Médio no Sanatório: cor da área (a Vila saiu na validação final)
+  else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); if (posLeve()) gradeMedio(); } // Médio no Sanatório: cor da área com cópia; na Vila ela vem no shader dos materiais (O1-B10)
 }
 function tick(dt) {
   if (NET.isHost) srvTick(dt);
