@@ -365,7 +365,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 <script>
 (function () {
   const disco = location.protocol === 'file:', three = disco ? 'https://cdn.jsdelivr.net/npm/three@0.160.0/' : './vendor/three@0.160.0/';
-  const s = document.createElement('script'); s.src = disco ? 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js' : './vendor/peerjs@1.5.4/peerjs.min.js'; document.head.appendChild(s);
+  window.PEERJS_SRC = disco ? 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js' : './vendor/peerjs@1.5.4/peerjs.min.js'; // O1-B11: carregado na primeira sala (b11Peer), não na abertura
   const im = document.createElement('script'); im.type = 'importmap'; im.textContent = JSON.stringify({ imports: { three: three + 'build/three.module.js', 'three/addons/': three + 'examples/jsm/' } }); document.head.appendChild(im);
   window.LIB_DISCO = disco;
 })();
@@ -16156,7 +16156,7 @@ function warmUp(M) {
 function warmMsg(W) { // aviso enquanto o mapa aquece
   let el = document.getElementById('warmMsg');
   if (!W) { el?.remove(); return; }
-  if (!el) { el = document.createElement('div'); el.id = 'warmMsg'; el.style.cssText = 'position:fixed;left:0;right:0;top:46%;text-align:center;color:#fff;font:600 18px system-ui,sans-serif;text-shadow:0 2px 6px #000;pointer-events:none;z-index:30'; document.body.appendChild(el); }
+  if (!el) { el = document.createElement('div'); el.id = 'warmMsg'; el.style.cssText = 'position:fixed;left:0;right:0;top:calc(50% + 30px);text-align:center;color:#fff;font:600 18px system-ui,sans-serif;text-shadow:0 2px 6px #000;pointer-events:none;z-index:30'; document.body.appendChild(el); }
   el.textContent = 'Carregando o mapa... ' + Math.min(99, Math.round(W.i / Math.max(1, W.n) * 100)) + '%';
 }
 
@@ -20506,6 +20506,7 @@ function startHost(st) {
 }
 function hostOpenPeer(len) { // abre a sala no servidor de pareamento (len: 5 letras na pública, 10 na só com convite)
   NET.hostKey ||= genCode() + genCode(); // segredo do host (vai no link de convite e volta no 'welcome'): também para salas abertas pelo lobby
+  if (b11Peer(() => hostOpenPeer(len))) return; // O1-B11: PeerJS sob demanda
   if (!peerAvailable()) { toast('Sem internet/PeerJS: jogando offline (só bots)', 5); return; }
   const tryOpen = attempt => {
     const code = genCode(len);
@@ -20552,6 +20553,7 @@ function hostOpenPeer(len) { // abre a sala no servidor de pareamento (len: 5 le
 function joinRoom(code) {
   const status = $('#joinStatus');
   if (NET.joining) return; // Enter + clique (ou dois cliques) abriam duas conexões e um jogador fantasma
+  if (b11Peer(() => joinRoom(code))) { status.textContent = 'Conectando...'; status.className = 'status'; return; } // O1-B11: PeerJS sob demanda
   if (!peerAvailable()) { status.textContent = 'PeerJS não carregou (sem internet?)'; status.className = 'status err'; return; }
   code = code.replace(/.*sala=/i, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12); // aceita o link inteiro colado
   if (!code) { status.textContent = 'Digite o código'; status.className = 'status err'; return; }
@@ -24878,9 +24880,25 @@ function thumbURL(w, f) {
   if (thQ.length === 1) setTimeout(thPump, 0);
   return null;
 }
+// ===== O1-B11: menu pronto mais cedo =====
+// PeerJS sob demanda: ao carregar, ele testa o WebRTC com new RTCPeerConnection, que na 1ª vez em cada navegador aberto trava a
+// página ~3 s (medido: 2,9–3,6 s no Chrome e no Edge deste PC). Antes era na abertura (menu travado); agora é na 1ª sala.
+const B11P = { cb: [], st: 0 }; // st: 0 nunca pedido, 1 baixando, 2 terminou (com ou sem sucesso)
+function b11Peer(cb) { // true: cb roda quando o script terminar; false: já carregou (ou falhou), segue como antes
+  if (peerAvailable() || B11P.st === 2 || !window.PEERJS_SRC) return false;
+  B11P.cb.push(cb); if (B11P.st) return true; B11P.st = 1;
+  const s = document.createElement('script'); s.src = window.PEERJS_SRC; s.onload = s.onerror = () => { B11P.st = 2; for (const f of B11P.cb.splice(0)) f(); };
+  document.head.appendChild(s); return true;
+}
+// Miniaturas das armas no menu: cada uma trava a página 60–400 ms (gunModel + shaders), ~10 s ao todo logo depois da abertura,
+// bem quando a pessoa começa a clicar. No menu elas esperam 1,5 s sem mouse/teclado (a aba Skins aberta não espera).
+const B11M = { t: performance.now() };
+for (const ev of ['pointermove', 'pointerdown', 'keydown', 'wheel']) addEventListener(ev, () => { B11M.t = performance.now(); }, { capture: true, passive: true });
+function b11Mexendo() { return performance.now() - B11M.t < 1500 && ($('#menu').classList.contains('hidden') || $('#skinsPane').classList.contains('hidden')); }
 function thPump() {
   const k = thQ[0]; if (!k) return;
   if (inGame && !C.buyOpen) { setTimeout(thPump, 500); return; }
+  if (!inGame && b11Mexendo()) { setTimeout(thPump, 250); return; } // O1-B11
   if (!TH) {
     const c = document.createElement('canvas'); c.width = 360; c.height = 150;
     const r = new THREE.WebGLRenderer({ canvas: c, antialias: true, alpha: true, preserveDrawingBuffer: true }); r.toneMapping = THREE.ACESFilmicToneMapping;
@@ -24932,6 +24950,7 @@ function openCaseUI() {
 let PV = null;
 function pvShow(w, f) {
   const cv = $('#skPrev'); if (!cv) return;
+  if (!PV && !w) return; // O1-B11: sem arma, nada a mostrar (o contexto WebGL e o ambiente PMREM só nascem na 1ª arma aberta)
   if (!PV) {
     const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); r.toneMapping = THREE.ACESFilmicToneMapping; r.setPixelRatio(Math.min(devicePixelRatio, 2));
     const sc = new THREE.Scene(), pm = new THREE.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(r), .04).texture; pm.dispose();
@@ -24942,16 +24961,16 @@ function pvShow(w, f) {
     cv.onpointerdown = e => { PV.drag = e.clientX; cv.setPointerCapture(e.pointerId); };
     cv.onpointermove = e => { if (PV.drag != null) { PV.rot += (e.clientX - PV.drag) * .012; PV.drag = e.clientX; } };
     cv.onpointerup = cv.onpointercancel = () => { PV.drag = null; };
-    const loop = () => {
-      requestAnimationFrame(loop);
+    const loop = PV.loop = () => {
       const vis = !$('#menu').classList.contains('hidden') && !$('#skinsPane').classList.contains('hidden') && !$('#skDetail').classList.contains('hidden');
-      if (!vis || !PV.pivot.children.length) return;
+      if (!vis) { PV.on = false; return; } // O1-B11: fora da tela o laço para; o pvShow seguinte o religa
+      requestAnimationFrame(loop); if (!PV.pivot.children.length) return;
       const w = cv.clientWidth, h = cv.clientHeight; if (w && (cv.width !== Math.round(w * PV.r.getPixelRatio()))) { PV.r.setSize(w, h, false); PV.cam.aspect = w / h; PV.cam.updateProjectionMatrix(); }
       if (PV.drag == null) PV.rot += .004; PV.pivot.rotation.y = Math.PI / 2 + PV.rot;
       PV.r.render(PV.sc, PV.cam);
     };
-    loop();
   }
+  if (!PV.on) { PV.on = true; requestAnimationFrame(PV.loop); } // O1-B11
   const key = w ? w + ':' + f : null; if (PV.key === key) return; PV.key = key;
   while (PV.pivot.children.length) { const c = PV.pivot.children[0]; PV.pivot.remove(c); c.traverse(o => o.geometry?.dispose()); }
   if (!w) { PV.r.clear(); return; }
@@ -25113,7 +25132,8 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), .05);
   now = performance.now() / 1000; lastFrameAt = performance.now();
-  if (!inGame) { renderer.clear(); return; }
+  if (!inGame) { if (B11M.sujo) { B11M.sujo = false; renderer.clear(); } return; } // O1-B11: no menu não desenha nada (o clear de todo quadro esperava a GPU ocupada)
+  B11M.sujo = true; // O1-B11
   if (DEBUG && window.__simLock) now = window.__simNow ?? now; else tick(dt); // testes automáticos controlam o tempo (só em desenvolvimento)
   if (WARM) renderer.clear(); else renderScene(); // aquecendo os shaders do mapa: não desenha (o desenho compilaria tudo de uma vez)
 }
