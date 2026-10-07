@@ -17917,7 +17917,7 @@ function knBuild(kind, ud, skin) {
   const ms = FPC[mk].scene.clone(true); ms.updateMatrixWorld(true);
   const pts = fpPts(ms, () => true), Mf = fpFit({ T: D.A, fwd: D.fwd, up: D.up }, pts, new THREE.Matrix4()), Mi = Mf.clone().invert();
   let z0 = 1e9, z1 = -1e9; for (const p of pts) { p.applyMatrix4(Mi); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); }
-  const sc = F.len * (kind === 'knife' && ZC.on && ZC.bowie ? KNF.bowie : 1) / (z1 - z0), h = new THREE.Group(); h.matrixAutoUpdate = false; // Faca Bowie: maior
+  const sc = F.len * (ZC.on && ZC.bowie ? KNF.bowie : 1) / (z1 - z0), h = new THREE.Group(); h.matrixAutoUpdate = false; // Faca Bowie: maior
   h.matrix.copy(fpFrame(new V3(...F.Q), new V3(...F.fwd), new V3(...F.up))).multiply(new THREE.Matrix4().makeScale(sc, sc, sc)).multiply(Mi);
   ms.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; } });
   if (D.dim) ms.traverse(o => { if (o.isMesh) { o.material.color.multiplyScalar(D.dim); o.material.roughness = Math.max(o.material.roughness, .45); } }); // modelo claro demais
@@ -18547,13 +18547,20 @@ function qkStart() {
   QK.t0 = now; QK.g.visible = true; fpPlay(QK.ud, 'slash', KNF.qk.dur);
 }
 function qkUpdate(o, dt) {
-  const t = now - QK.t0, Q = KNF.qk;
-  if (t > Q.dur + Q.sobe && !QK.g.visible) return;
-  if (t > Q.dur || t < 0 || !me.alive || G.scope > 0 || W[G.cur]?.slot === 'knife') QK.g.visible = false; // a mão da faca já saiu (a arma ainda sobe)
-  else { const F = QK.ud.fps2; F.mixer.update(dt); if (F.hideL) F.hideL.scale.setScalar(1e-3); if (F.kf) knFollow(F); QK.g.position.y = -.16 * (1 - Math.min(smooth(t / Q.desce), smooth((Q.dur - t) / .1))); } // entra e sai por baixo
-  if (t < 0 || t > Q.dur + Q.sobe || W[G.cur]?.slot === 'knife') return;
-  const d = Math.min(smooth(t / Q.desce), smooth((Q.dur + Q.sobe - t) / Q.sobe)); o.y -= .3 * d; o.rx -= .8 * d; o.x += .05 * d; // a arma abaixa e volta
+  const t = now - QK.t0, Q = KNF.qk, fim = Q.sai + Q.saiD; // 6-w12: a mão da faca sai logo depois do golpe (antes fazia a volta do clipe no meio da tela)
+  if (t > fim + Q.sobe && !QK.g.visible) return;
+  if (t > fim || t < 0 || !me.alive || G.scope > 0 || W[G.cur]?.slot === 'knife') QK.g.visible = false; // a mão da faca já saiu (a arma ainda sobe)
+  else { const F = QK.ud.fps2; F.mixer.update(dt); if (F.hideL) F.hideL.scale.setScalar(1e-3); if (F.kf) knFollow(F); QK.g.position.y = -.16 * (1 - smooth(t / Q.desce)) - Q.baixa * (1 - smooth((fim - t) / Q.saiD)); } // entra e sai por baixo
+  if (t < 0 || t > Q.sai + Q.sobe || W[G.cur]?.slot === 'knife') return;
+  const d = Math.min(smooth(t / Q.desce), smooth((Q.sai + Q.sobe - t) / Q.sobe)); o.y -= .3 * d; o.rx -= .8 * d; o.x += .05 * d; // a arma abaixa e volta
 }
+// ===== 6-w12: facas: o corte cabe na cadência e a facada rápida (V) devolve a arma a tempo =====
+// corte: duração (s) dos clipes de corte do pacote. Eles duram 0,80/0,87 s, o dobro da cadência (W.knife.rate 0,42): o braço ficava
+// estacionado no canto esquerdo cobrindo meia tela até o próximo clique, que reiniciava o clipe dali. Agora o golpe varre, volta e cabe.
+// qk.sai: quando (s) a mão da facada rápida começa a sair, depois da varredura; saiD: quanto dura a saída; baixa: quanto ela desce (m).
+// A arma sobe junto com a saída da mão: volta pronta perto do próximo tiro (antes ficava escondida até 0,73 s, com o tiro liberado em 0,42).
+KNF.corte = { slash: .55, slash2: .55 };
+Object.assign(KNF.qk, { sai: .26, saiD: .12, baixa: .3 });
 function knViewmodel(o, ud, dt) { // corrida com a faca e bote (os dois modos)
   const k = me.sprintK; if (ud.fps2?.knife && k > .01) { o.y -= .03 * k + Math.abs(Math.sin(bobT * 1.3)) * .02 * k; o.rx -= .08 * k; o.rz += Math.sin(bobT) * .04 * k; o.x += .01 * k; }
   me.lungeK = lerp(me.lungeK || 0, me.lungeEnd > now ? 1 : 0, Math.min(1, dt * (me.lungeEnd > now ? 25 : 8))); // bote: o braço vai junto, a visão abre um pouco
@@ -19273,7 +19280,7 @@ function shoot() {
 function knifeAttack(heavy) {
   const w = W.knife; G.nextFire = now + (heavy ? w.altRate : w.rate); G.swing = 0; G.kan = { type: heavy ? 'stab' : G.lastSlash?.type === 'slash' && now - G.lastSlash.t0 < 1 ? 'slash2' : 'slash', t0: now }; if (!heavy) G.lastSlash = G.kan; // golpes seguidos alternam o lado
   if (vmGun?.userData.armsKnife) armsPlay(G.kan.type);
-  if (vmGun?.userData.fps2?.knife) fpPlay(vmGun.userData, G.kan.type);
+  if (vmGun?.userData.fps2?.knife) fpPlay(vmGun.userData, G.kan.type, ZC.on ? KNF.corte[G.kan.type] : 0); // 6-w12: só no Zumbi
   else if (W[G.cur]?.slot !== 'knife') qkStart(); // V com a arma na mão: a mão da faca entra (a9)
   const o = camera.position.clone(), d = new V3(0, 0, -1).applyQuaternion(camera.quaternion);
   if (ZC.on) { // zumbis: 150 de dano (mata na rodada 1 com uma facada), Bowie 1000
