@@ -12871,6 +12871,34 @@ const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const a31P = m => renderer.properties.get(m).currentProgram?.id ?? 0; // programa ainda não compilado: 0 (vai antes)
 renderer.setOpaqueSort((a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder || a31P(a.material) - a31P(b.material) || a.material.id - b.material.id || a.z - b.z || a.id - b.id);
 // ===== O1-A31 fim =====
+// ===== O1-A33: material dividido entre InstancedMesh e Mesh comum sem reavaliar o programa a cada desenho =====
+// O three guarda um programa atual por material; se o mesmo material desenha instâncias e objetos comuns, cada troca
+// (instancing sim/não) chama getProgram (getParameters + chave): ~8 por quadro na Vila e ~14 no Sanatório (paredes com AO,
+// props e o vidro do atmos-D, inclusive o verso do A15). Aqui o desenho do outro tipo vai numa "vista" do material
+// (Object.create: herda tudo ao vivo, inclusive version/needsUpdate; só id, uuid e eventos próprios), que fica com o seu programa.
+// Mesmo programa da cache, mesmos uniforms: mesmos pixels. O objeto continua com o material de sempre (o jogo não vê a vista).
+// material.a33 = { i: tipo do 1º desenho (instanciado?), v: vista, sw: programa da vista exposto, pr: programa próprio guardado }
+function a33Vista(m) {
+  const t = new THREE.Material(), v = Object.create(m); // t só empresta um id novo
+  Object.defineProperty(v, 'id', { value: t.id }); v.uuid = t.uuid; v._listeners = {}; v.a33 = null;
+  m.addEventListener('dispose', () => { m.a33 = undefined; v.dispatchEvent({ type: 'dispose' }); }); // o renderer solta o programa da vista
+  return v;
+}
+{
+  const rbd = renderer.renderBufferDirect, P = renderer.properties;
+  renderer.renderBufferDirect = function (cam, sc, g, m, o, grp) {
+    const k = o.isInstancedMesh === true; let e = m.a33;
+    if (e === undefined) e = m.a33 = m.isShaderMaterial ? null : { i: k, v: null, sw: false, pr: null }; // ShaderMaterial fica de fora (o three grava uniformsNeedUpdate nele)
+    if (e === null || (e.i === k && !e.sw)) return rbd.call(this, cam, sc, g, m, o, grp);
+    const p = P.get(m);
+    if (e.i === k) { p.currentProgram = e.pr; e.sw = false; return rbd.call(this, cam, sc, g, m, o, grp); } // volta o programa próprio
+    // a ordem dos opacos do A31 lê o programa atual do material, que antes ficava com o do último desenho: a vista o expõe igual
+    if (!e.sw) e.pr = p.currentProgram;
+    const v = e.v || (e.v = a33Vista(m)), r = rbd.call(this, cam, sc, g, v, o, grp);
+    p.currentProgram = P.get(v).currentProgram; e.sw = true; return r;
+  };
+}
+// ===== O1-A33 fim =====
 // Qualidade gráfica. Sem escolha salva: palpite pela placa de vídeo (integrada = Médio, dedicada = Alto).
 if (!['baixo', 'medio', 'alto'].includes(CFG.gfx)) {
   let gpu = '';
