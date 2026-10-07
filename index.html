@@ -16076,7 +16076,7 @@ function warmUp(M) {
       warmLuzes(scene); warmLuzes(vmScene); // 6-g06
       do {
         const [o, cam, g, sb] = items[W.i++]; if (!o.parent) continue; // saiu de cena enquanto isso
-        renderer.setRenderTarget(sb || CFG.gfx === 'alto' ? composer.readBuffer : null); // no Alto a cena é desenhada no alvo do pós-processamento (outra variante do shader); sb (6-g06): variante de sombra, também num alvo
+        renderer.setRenderTarget(CFG.gfx === 'alto' ? composer.readBuffer : sb ? b06Alvo() : null); // no Alto a cena é desenhada no alvo do pós-processamento (outra variante do shader); sb (6-g06): variante de sombra, também num alvo (O1-B06: fora do Alto, 1x1)
         try { for (const m of renderer.compile(o, cam, sb ? warmAlvo(g).sombra : warmAlvo(g))) { const pg = renderer.properties.get(m).currentProgram; if (pg) W.pend.push(pg); } } finally { renderer.setRenderTarget(null); }
         if (!par) while (W.pend.length) W.pend.pop().getUniforms(); // sem a extensão: espera este programa aqui (trava só ele)
       } while (W.i < items.length && performance.now() - t < 12);
@@ -21804,6 +21804,30 @@ function chalkTex(title, price) {
     g.fillStyle = 'rgba(240,240,230,.92)'; g.textAlign = 'center'; g.font = 'bold 28px Rajdhani, Arial'; g.fillText(title, 128, 32); g.font = 'bold 26px Rajdhani, Arial'; g.fillText(price, 128, 118);
   });
 }
+// ===== O1-B06: memória de vídeo (texturas e alvos) =====
+// Medido (Médio, 1280x720, contabilidade no WebGL): Vila 186 MB de textura + 68 MB de renderbuffer; ao trocar de mapa as texturas
+// do mapa anterior ficavam na placa (Vila -> Sanatório -> Arena -> Vila: 186 -> 236 -> 153 -> 234 MB, só ~150 em uso).
+// - trocar de mapa (outro id): textura do cenário anterior que nenhum objeto da cena usa mais sai da placa (dispose; a imagem fica na
+//   memória e sobe de novo se o mapa voltar). Também a cópia da tela do Médio (gradeTex) quando o mapa novo não usa o passe;
+// - fora do Alto o composer não desenha: os alvos dele (HalfFloat + MSAA) não ficam alocados;
+// - placas de giz das armas na parede: mesmo nome e preço = a mesma textura (eram até 3 cópias iguais).
+let B06_RT = null; const b06Alvo = () => B06_RT || (B06_RT = new THREE.WebGLRenderTarget(1, 1));
+const B06_GIZ = new Map(); let B06_B01 = null; // B06_B01: instanciadas da junção (O1-B01) fora da cena até a área animar
+{ const f = b01Fim; b01Fim = F => { B06_B01 = F; return f(F); }; }
+{ const giz = chalkTex; chalkTex = (t, p) => { const k = t + '|' + p; let x = B06_GIZ.get(k); if (!x) B06_GIZ.set(k, x = giz(t, p)); return x; }; }
+function b06Texturas(raizes) { // texturas presas a materiais (e fundo/ambiente) dentro das raízes
+  const S = new Set(), mat = m => { if (m) for (const v of Object.values(m)) if (v?.isTexture) S.add(v); };
+  for (const r of raizes) r?.traverse(o => { if (o.material) for (const m of [o.material].flat()) { mat(m); if (m.uniforms) for (const u of Object.values(m.uniforms)) if (u?.value?.isTexture) S.add(u.value); } });
+  for (const t of [scene.background, scene.environment]) if (t?.isTexture) S.add(t); return S;
+}
+function b06Composer() { if (CFG.gfx !== 'alto') { composer.renderTarget1.dispose(); composer.renderTarget2.dispose(); } } // dispose só solta a placa: o Alto aloca de novo no 1º uso
+{ const mapa = buildMap; buildMap = id => {
+    const ant = curMapId, antes = b06Texturas([world, skyExtra]); B06_GIZ.clear(); B06_B01 = null; mapa(id);
+    if (curMapId !== ant) { const agora = b06Texturas([scene, vmScene, ...(B06_B01 || []).map(f => f.o)]); for (const t of antes) if (!agora.has(t) && !t.isRenderTargetTexture) t.dispose(); } // o mesmo mapa de novo (zreset): nada sai
+    if (gradeTex && !posLeve()) { gradeTex.dispose(); gradeTex = null; } b06Composer();
+  }; }
+{ const q = applyQuality; applyQuality = () => { q(); b06Composer(); }; }
+// ===== O1-B06 fim =====
 const zIcons = {};
 function zIconTex(k) {
   if (zIcons[k]) return zIcons[k];
