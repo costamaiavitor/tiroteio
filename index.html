@@ -18171,10 +18171,10 @@ function reloadAnim(ud, t, o) {
     ev('open', .12, () => play('magout')); ev('eject', .3, () => { for (let i = 0; i < 6; i++) ejectShell(W[G.cur], true); }); ev('in', .62, () => play('magin')); ev('close', .76, () => play('slide'));
     if (ud.lhG) { const p = kf(t, [[0, L.x, L.y, L.z], [.36, L.x, L.y, L.z], [.46, C0.x - .06, C0.y - .13, C0.z + .03], [.6, C0.x - .04, C0.y - .03, C0.z + .005], [.64, C0.x - .04, C0.y - .03, C0.z + .005], [.74, L.x, L.y, L.z], [1, L.x, L.y, L.z]]); ud.lhG.position.set(p[0], p[1], p[2]); }
   } else if (ud.rig === 'break' && ud.brk) {
-    const open = seg(t, .08, .2) * (1 - seg(t, .76, .86)), P = ud.port;
+    const open = seg(t, .08, .2) * (1 - seg(t, SGA.fecha[0], SGA.fecha[1])); // 6-w07: fecha no fim da recarga (antes em .76–.86: a arma parecia pronta .38 s antes de poder atirar)
     ud.brk.rotation.x = -.5 * open; o.rx += .2 * open; o.rz -= .22 * open;
-    ev('open', .1, () => play('magout')); ev('ej', .22, () => { ejectShell(W[G.cur], true); ejectShell(W[G.cur], true); }); ev('in', .52, () => play('shellin')); ev('in2', .62, () => play('shellin')); ev('close', .8, () => play('slide'));
-    if (ud.lhG) { const p = kf(t, [[0, L.x, L.y, L.z], [.25, L.x, L.y, L.z], [.36, P.x - .05, P.y - .16, P.z + .06], [.5, P.x, P.y + .01, P.z + .03], [.64, P.x, P.y + .01, P.z + .03], [.74, L.x, L.y, L.z], [1, L.x, L.y, L.z]]); ud.lhG.position.set(p[0], p[1], p[2]); if (ud.handShell) ud.handShell.visible = t > .3 && t < .6; }
+    ev('open', .1, () => play('magout')); ev('ej', .22, () => { ejectShell(W[G.cur], true); ejectShell(W[G.cur], true); }); ev('in', .52, () => play('shellin')); ev('in2', .62, () => play('shellin')); ev('close', SGA.fecha[0] + .04, () => play('slide'));
+    if (ud.lhG) { kfTo(t, ud.sgBrk ||= sgBrkKF(ud), ud.lhG.position); sgBrkMao(ud, t); if (ud.handShell) ud.handShell.visible = t > .3 && t < .6; } // 6-w07
   } else if (ud.r8 && ud.mag) r8Reload(ud, t, o, ev); // (a8) armas maravilha, LAW e besta
   else { const s = Math.sin(t * Math.PI); o.rx -= s * .6; o.y -= s * .1; o.rz += s * .3; } // genérico
 }
@@ -18257,19 +18257,35 @@ function shellAnim(ud, o) { // escopeta / lança-granadas: bala por bala
   const S_ = G.reload, el = now - S_.t0, P = ud.port || ud.lhRest, L = ud.lhRest;
   let tilt = 1; if (S_.stage === 'start') tilt = seg(el / (.35 * S_.sp), 0, 1); else if (S_.stage === 'end') tilt = 1 - seg(el / (.45 * S_.sp), .3, 1);
   o.rz -= .55 * tilt; o.rx += .14 * tilt; o.x -= .06 * tilt; o.y += .05 * tilt; // gira a janela de carga (embaixo da caixa) para o lado do olho e levanta a boca: a mão aparece pondo cada cartucho
-  const low = [P.x - .03, P.y - .09, P.z + .05]; // cartucho vem de baixo, perto o bastante para a mão continuar na tela
-  if (ud.lhG) {
-    let p;
-    if (S_.stage === 'load') { const k = clamp(el / S_.iv, 0, 1); p = kf(k, [[0, ...low], [.45, P.x, P.y - .015, P.z], [.62, P.x, P.y - .005, P.z - .04], [1, ...low]]); if (ud.handShell) ud.handShell.visible = k < .55; }
-    else if (S_.stage === 'start') p = kf(tilt, [[0, L.x, L.y, L.z], [1, ...low]]);
-    else p = kf(seg(el / (.45 * S_.sp), 0, .5), [[0, ...low], [1, L.x, L.y, L.z]]);
-    ud.lhG.position.set(p[0], p[1], p[2]);
+  if (ud.lhG) { // cartucho vem de baixo, perto o bastante para a mão continuar na tela. 6-w07: quadros-chave guardados por arma (sgShellKF), sem alocar
+    const F = ud.sgKF ||= sgShellKF(ud, P, L);
+    if (S_.stage === 'load') { const k = clamp(el / S_.iv, 0, 1); kfTo(k, F.load, ud.lhG.position); if (ud.handShell) ud.handShell.visible = k < SGA.solta; }
+    else if (S_.stage === 'start') kfTo(tilt, F.start, ud.lhG.position);
+    else kfTo(seg(el / (.45 * S_.sp), 0, .5), F.end, ud.lhG.position);
   }
   if (S_.stage === 'end' && G.reloadEmpty && ud.pump) {
     const k = el / (.45 * S_.sp), pp = seg(k, .45, .65) * (1 - seg(k, .7, .9));
     ud.pump.position.z = ud.pumpRest.z + pp * .08; if (ud.lhG) ud.lhG.position.z += pp * .08;
     if (k > .6 && !G.rEv.pump) { G.rEv.pump = 1; play('pump'); }
   }
+}
+// ===== 6-w07: escopetas: quadros-chave da recarga sem alocar; Olympia: a mão acompanha o guarda-mão que abre e fecha =====
+// solta: fração da volta (bala por bala) em que o cartucho sai da mão (entra no tubo); fecha: [início, fim] do fechamento do cano
+// basculante (fração da recarga; antes .76–.86: a arma parecia pronta .38 s antes de poder atirar); vai/volta: [início, fim] em que a mão
+// larga o guarda-mão aberto (vai à janela) e volta a ele. Antes a mão ficava parada no lugar do guarda-mão fechado enquanto ele descia.
+const SGA = { solta: .55, fecha: [.84, .95], vai: [.25, .36], volta: [.64, .74] };
+const _sgV = new V3();
+function sgShellKF(ud, P, L) { // os mesmos quadros-chave de antes, montados uma vez por arma (ud.sgKF)
+  const lo = [P.x - .03, P.y - .09, P.z + .05];
+  return { load: [[0, ...lo], [.45, P.x, P.y - .015, P.z], [.62, P.x, P.y - .005, P.z - .04], [1, ...lo]], start: [[0, L.x, L.y, L.z], [1, ...lo]], end: [[0, ...lo], [1, L.x, L.y, L.z]] };
+}
+function sgBrkKF(ud) { // cano basculante (Olympia), uma vez por arma (ud.sgBrk)
+  const L = ud.lhRest, P = ud.port;
+  return [[0, L.x, L.y, L.z], [.25, L.x, L.y, L.z], [.36, P.x - .05, P.y - .16, P.z + .06], [.5, P.x, P.y + .01, P.z + .03], [.64, P.x, P.y + .01, P.z + .03], [.74, L.x, L.y, L.z], [1, L.x, L.y, L.z]];
+}
+function sgBrkMao(ud, t) { // a mão no guarda-mão: o lugar de repouso gira junto com o cano basculante (eixo da dobradiça = posição do grupo)
+  const B = ud.brk, w = t < .5 ? 1 - seg(t, SGA.vai[0], SGA.vai[1]) : seg(t, SGA.volta[0], SGA.volta[1]); if (w <= 0) return;
+  _sgV.copy(ud.lhRest).sub(B.position).applyAxisAngle(_rx, B.rotation.x).add(B.position); ud.lhG.position.lerp(_sgV, w);
 }
 // ---------- a7: metralhadoras de fita: recarga, fita andando no tiro, peso no saque e na corrida ----------
 // Recarga em frações do tempo de recarga do jogo (w.reload, já com Speed Cola e acessórios): a animação estica junto e termina com a
@@ -18591,6 +18607,11 @@ function adsEye(gun, ud) {
   });
   ud.adsZ = Math.max(zr + ADS.rel, ze); // z do olho (para trás = +z)
 }
+// ===== 6-w07: escopetas na mira: olho mais para trás =====
+// A caixa da culatra das escopetas fica 1,2 cm abaixo da conta (KS-23: 1,8 cm, no limite de ADS.alt, mas ainda conta) e o olho ficava a
+// 7–8 cm da traseira dela: a tampa da caixa (com o brilho da luz) enchia 40% de baixo da tela, e roxa com o Pack-a-Punch. Com o olho mais
+// para trás (rosto no pente, como numa escopeta de verdade), a caixa fica no pé da tela e a conta e a fita aparecem inteiras.
+ADS.recuo.nova = .05; ADS.recuo.stakeout = .05; ADS.recuo.spas = .05; ADS.recuo.trench = .05; ADS.recuo.ks23 = .05; ADS.recuo.olympia = .05; ADS.recuo.hs10 = .03;
 // ---------- luneta (a6): entrada com a arma subindo até o olho, retícula de cada arma, vinheta da ocular ----------
 // G.scR (0..1) é só visual: G.scope continua mudando na hora (precisão e sensibilidade não mudam). Entrada em ent s, saída em sai s;
 // a arma some em some; a tela da luneta aparece entre luz[0] e luz[1]; o zoom chega entre zoom[0] e zoom[1]; olho: distância olho→ocular (m);
