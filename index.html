@@ -12967,7 +12967,7 @@ VIS.fill.position.set(0, .25, .2); VIS.lant.position.set(.18, -.12, 0); VIS.lant
 function visFogC(M, c) { const col = new THREE.Color(c ?? M.fogC ?? M.sky); if (!M.zombie) return col; const h = {}; col.getHSL(h); if (h.l < VIS.k.fogL) col.setHSL(h.h, h.s, h.l + (VIS.k.fogL - h.l) * .6); return col; }
 function visMap(M) { // mapas de zumbi: neblina mais longe e menos preta, mais luz ambiente (o zumbi não vira só silhueta preta)
   g02SombraTam(M); // 6-g02: mapa PvP depois do Alto do Sanatório (sem recarregar) volta ao tamanho padrão
-  if (!M.zombie) return visApply();
+  if (!M.zombie) { visShadowMap(M); return visApply(); } // O1-B04: zera o VIS.sh.r (e o bias) de um mapa zumbi anterior: a sombra volta a cobrir o mapa inteiro
   const fc = visFogC(M);
   scene.background.copy(fc); skyMat.uniforms.hor.value.set(M.fogC ?? M.sky).lerp(fc, .5); skyMat.uniforms.bot.value.copy(fc).multiplyScalar(.6); // céu clareia só metade: a noite continua noite
   scene.fog = new THREE.Fog(fc, M.fog[0] * VIS.k.fogN, M.fog[1] * VIS.k.fogF);
