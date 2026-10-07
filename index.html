@@ -16893,7 +16893,20 @@ function nadeToss(ud, o, k) {
   if (T === 'under') { o.x -= .06 * a + .04 * b; o.y += .08 * a - .4 * b; o.z -= .2 * a - .1 * b; o.rx += .5 * a - .9 * b; }
   else { o.x -= .1 * a + .08 * b; o.y += .06 * a - .4 * b; o.z -= .18 * a - .1 * b; o.rx += .3 * a - .9 * b; o.rz += .3 * a; }
   if (ud.item) ud.item.visible = k < .1;
+  if (k >= 1) ud.tossFim = now; // 6-w11: o próximo sobe na mão (nadeVolta)
 }
+// ===== 6-w11: explosivos e lançadores =====
+// Granada, Semtex e macaco: depois do arremesso a mão voltava vazia (o objeto ficava escondido até trocar de arma) e de um salto (a pose
+// do fim do arremesso, fora da tela, virava a de descanso num quadro). Agora, se ainda sobra, o próximo sobe de baixo na mão em W11.volta s
+// (o arremesso continua a cada 1 s: G.nextFire não muda). LAW na mira: a tampa de trás do tubo ficava a 0,081 m do olho e enchia o pé da tela.
+const W11 = { volta: .3, y: .3, rx: .6, rz: .15 }; // ADS.recuo.law fica logo depois do ADS.recuo das escopetas (o ADS é declarado mais abaixo)
+function nadeVolta(ud, o) {
+  const s = (now - ud.tossFim) / W11.volta;
+  if (G.swing > 0 || s >= 1) { ud.tossFim = 0; if (ud.item && G.swing <= 0) ud.item.visible = G.inv[G.cur] > 0; return; }
+  const e = 1 - smooth(s); o.y -= W11.y * e; o.rx -= W11.rx * e; o.rz += W11.rz * e;
+  if (ud.item) ud.item.visible = G.inv[G.cur] > 0;
+}
+// ===== fim 6-w11 =====
 function nameSprite(name, color) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 64; const g = c.getContext('2d');
   g.font = 'bold 34px Rajdhani, Arial'; g.textAlign = 'center'; g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText(name, 128, 44); g.fillStyle = color; g.fillText(name, 128, 44);
@@ -18659,6 +18672,7 @@ function adsEye(gun, ud) {
 // 7–8 cm da traseira dela: a tampa da caixa (com o brilho da luz) enchia 40% de baixo da tela, e roxa com o Pack-a-Punch. Com o olho mais
 // para trás (rosto no pente, como numa escopeta de verdade), a caixa fica no pé da tela e a conta e a fita aparecem inteiras.
 ADS.recuo.nova = .05; ADS.recuo.stakeout = .05; ADS.recuo.spas = .05; ADS.recuo.trench = .05; ADS.recuo.ks23 = .05; ADS.recuo.olympia = .05; ADS.recuo.hs10 = .03;
+ADS.recuo.law = .08; // 6-w11: LAW na mira (a tampa de trás do tubo ficava a 0,081 m do olho)
 // ---------- luneta (a6): entrada com a arma subindo até o olho, retícula de cada arma, vinheta da ocular ----------
 // G.scR (0..1) é só visual: G.scope continua mudando na hora (precisão e sensibilidade não mudam). Entrada em ent s, saída em sai s;
 // a arma some em some; a tela da luneta aparece entre luz[0] e luz[1]; o zoom chega entre zoom[0] e zoom[1]; olho: distância olho→ocular (m);
@@ -18735,6 +18749,7 @@ function updateViewmodel(dt) {
   if (ud.armsKnife) ARMS.mixer.update(dt);
   if (ud.fps2) fpUpdate(ud, dt);
   if (G.swing > 0) { G.swing = Math.max(0, G.swing - dt * 4); if (ud.toss) nadeToss(ud, o, 1 - G.swing); else { const s = Math.sin(G.swing * Math.PI); o.ry += s * 1.1; o.x -= s * .12; o.z -= s * .1; } } // (a8) arremesso/colocação
+  if (ud.tossFim) nadeVolta(ud, o); // 6-w11: o próximo objeto sobe na mão
   if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model) && !ud.armsKnife && !ud.fps2) knifeAnim(o, ud);
   if (me.downed) { o.y -= .04; o.rz += .35; }
   // correndo: arma abaixada e de lado, balançando mais; deslize, pulo, pouso e agachar (a13, ver vmMove)
