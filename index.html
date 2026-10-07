@@ -15142,13 +15142,14 @@ function mergeStatic() {
   const moving = new Set();
   all.forEach((o, i) => { const [p, q, sc, v] = st[i]; if (!o.position.equals(p) || !o.quaternion.equals(q) || !o.scale.equals(sc) || o.visible !== v) o.traverse(c => moving.add(c)); o.position.copy(p); o.quaternion.copy(q); o.scale.copy(sc); o.visible = v; });
   world.updateMatrixWorld(true);
+  const b01 = b01Expande(all, moving); // O1-B01
   const grp = new Map(), _c = new V3();
   for (const o of all) {
     if (!mergeable(o) || moving.has(o) || o.matrixWorld.determinant() <= 0) continue;
     let hid = false; for (let a = o.parent; a; a = a.parent) if (!a.visible || a.userData.dyn) hid = true; if (hid) continue; // dentro de grupo que se mexe (atmosfera: A.dyn) também fica de fora
     const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
     _c.copy(g.boundingSphere.center).applyMatrix4(o.matrixWorld);
-    const t = matKey(o.material), k = t + '|' + (+o.castShadow) + (+o.receiveShadow) + '|' + Math.floor(_c.x / 48) + ',' + Math.floor(_c.z / 48);
+    const t = matKey(o.material), k = t + '|' + (+o.castShadow) + (+o.receiveShadow) + '|' + b01Lugar(o, _c); // O1-B01: área ou bloco
     let e = grp.get(k); if (!e) grp.set(k, e = { t, os: [] }); e.os.push(o);
   }
   for (const { t, os } of grp.values()) {
@@ -15156,10 +15157,83 @@ function mergeStatic() {
     const vc = t === 'L' || t === 'B', geo = mergeMeshes(os, os.map(o => o.matrixWorld), vc, !vc);
     const mm = new THREE.Mesh(geo, vc ? VC[t] : os[0].material); mm.userData.blk = 1; mm.castShadow = os[0].castShadow; mm.receiveShadow = os[0].receiveShadow; mm.userData.own = !vc && os.some(o => o.userData.own); world.add(mm);
     for (const o of os) o.parent.remove(o);
+    if (b01) b01Junta(os, mm); // O1-B01
   }
+  b01Fim(b01); // O1-B01
   const used = new Set(); world.traverse(o => { if (o.geometry) used.add(o.geometry); });
   for (const o of all) if (o.geometry && !used.has(o.geometry)) { used.add(o.geometry); o.geometry.dispose(); }
 }
+// ===== O1-B01: junção de malhas por área e com as instâncias paradas (Vila) =====
+// Na Vila a junção agrupa por área da atmosfera (material + sombra + área); fora das áreas, pelo bloco de 48 m como antes.
+// A área inteira vira poucas malhas (o bloco cortava as áreas nas bordas e repetia o material); o corte por distância continua
+// pela esfera de cada malha juntada (zCull). E as InstancedMesh paradas (pedras, garrafas, ferragens, potes...), que eram uma
+// chamada cada e sempre desenhadas (frustumCulled false), viram peças da junção, só quando isso não aumenta as chamadas
+// (por família de material: os lugares novos não passam do número de malhas). De fora: o que se mexe (dyn, MAP_ANIM),
+// transparente, renderOrder, espelhada, shader que lê a matriz da instância, cor por instância com textura e malha grande (maxV).
+// Rede de segurança: se o jogo mexer nela depois (needsUpdate da matriz ou da cor, setColorAt, visible, count), a instanciada volta
+// inteira para o lugar e os pedaços já juntados viram triângulos degenerados (desenho igual ao de antes).
+const B01 = { mapas: { vila: 1 }, maxV: 20000, ar: null, n: 0, voltas: 0, fora: { regra: 0, espelho: 0, blocos: 0 } };
+const _b01m = new THREE.Matrix4(), _b01c = new THREE.Color(), _b01p = new V3();
+const b01Fora = o => { for (let a = o.parent; a; a = a.parent) if (!a.visible || a.userData.dyn) return true; return false; };
+// lugar da junção (área ou bloco do centro da peça) e a mesma chave do agrupamento do mergeStatic
+const b01Lugar = (o, c) => B01.ar?.get(o) ?? Math.floor(c.x / 48) + ',' + Math.floor(c.z / 48);
+const b01Chave = (g, m, mw, o) => { _b01p.copy(g.boundingSphere.center).applyMatrix4(mw); return matKey(m) + '|' + (+o.castShadow) + (+o.receiveShadow) + '|' + b01Lugar(o, _b01p); };
+function b01Pode(o, moving) {
+  const m = o.material, g = o.geometry;
+  if (!o.count || o.children.length || !o.visible || o.renderOrder || o.userData.dyn || moving.has(o) || b01Fora(o) || Array.isArray(m) || m.transparent || m.vertexColors) return false;
+  if (!g.attributes.position || g.morphAttributes.position || o.onBeforeRender !== THREE.Object3D.prototype.onBeforeRender || o.count * g.attributes.position.count > B01.maxV) return false;
+  if (m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile && /instance/i.test(String(m.onBeforeCompile))) return false; // vento da vegetação lê instanceMatrix
+  if (o.instanceColor) { const t = matKey(m); if (t !== 'L' && t !== 'B') return false; } // cor por instância só vira cor por vértice em material liso
+  return true;
+}
+function b01Expande(all, moving) {
+  B01.ar = null; if (!B01.mapas[curMapId]) return null;
+  B01.ar = new Map(); for (const a of AT?.areas || []) a.root.traverse(o => B01.ar.set(o, 'a:' + a.id));
+  B01.n = B01.voltas = 0; for (const k in B01.fora) B01.fora[k] = 0;
+  const ocup = new Set(), F = [];
+  for (const o of all) if (mergeable(o) && !moving.has(o) && o.matrixWorld.determinant() > 0 && !b01Fora(o)) { const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); ocup.add(b01Chave(g, o.material, o.matrixWorld, o)); }
+  const C = []; // candidatas: chave de cada instância
+  for (const o of all) { if (!o.isInstancedMesh) continue; if (!b01Pode(o, moving)) { B01.fora.regra++; continue; }
+    const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
+    const mws = []; for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, _b01m); mws.push(new THREE.Matrix4().multiplyMatrices(o.matrixWorld, _b01m)); }
+    if (mws.some(mw => mw.determinant() <= 0)) { B01.fora.espelho++; continue; }
+    const ks = mws.map(mw => b01Chave(g, o.material, mw, o)); C.push({ o, mws, ks, fam: ks[0].slice(0, ks[0].lastIndexOf('|')) }); }
+  // por família (material + sombra): entra inteira se os blocos novos não passam do número de malhas; senão uma a uma (no máximo 1 bloco novo)
+  const fam = new Map(); for (const c of C) { let e = fam.get(c.fam); if (!e) fam.set(c.fam, e = []); e.push(c); }
+  const novos = ks => { let n = 0; for (const k of new Set(ks)) if (!ocup.has(k)) n++; return n; };
+  for (const L of fam.values()) {
+    const tudo = novos(L.flatMap(c => c.ks)) <= L.length;
+    for (const c of L) { if (!tudo && novos(c.ks) > 1) { B01.fora.blocos++; continue; } for (const k of c.ks) ocup.add(k); F.push(c); }
+  }
+  for (const c of F) { const { o, mws } = c, g = o.geometry, par = o.parent, inv = _b01m.copy(par.matrixWorld).invert();
+    c.pecas = mws.map((mw, i) => {
+      let m = o.material; if (o.instanceColor) { m = m.clone(); o.getColorAt(i, _b01c); m.color.multiply(_b01c); }
+      const p = new THREE.Mesh(g, m); p.matrixAutoUpdate = false; p.matrix.multiplyMatrices(inv, mw); p.matrixWorld.copy(mw);
+      p.castShadow = o.castShadow; p.receiveShadow = o.receiveShadow; p.userData.own = o.userData.own; p.userData.b01 = 1; const a = B01.ar.get(o); if (a) B01.ar.set(p, a); par.add(p); all.push(p); return p; });
+    par.remove(o); c.par = par;
+  }
+  return F;
+}
+// guarda onde ficou cada peça dentro da malha juntada (para degenerar se a instanciada voltar)
+function b01Junta(os, mm) { let v = 0; for (const o of os) { const n = o.geometry.attributes.position.count; if (o.userData.b01) o.userData.b01 = { mm, v, n }; v += n; } }
+function b01Volta(f) {
+  if (f.ok) return; f.ok = 1; B01.voltas++; const o = f.o;
+  for (const a of [o.instanceMatrix, o.instanceColor]) if (a) delete a.needsUpdate;
+  delete o.setColorAt; for (const k of ['visible', 'count']) { const v = o[k]; delete o[k]; o[k] = v; }
+  for (const p of f.pecas) { const j = p.userData.b01;
+    if (j.mm) { const P = j.mm.geometry.attributes.position, a = P.array; for (let i = j.v * 3 + 3, e = (j.v + j.n) * 3; i < e; i += 3) { a[i] = a[j.v * 3]; a[i + 1] = a[j.v * 3 + 1]; a[i + 2] = a[j.v * 3 + 2]; } P.needsUpdate = true; }
+    else p.parent?.remove(p); } // peça que ficou sozinha no grupo (não juntou)
+  f.par.add(o);
+}
+function b01Fim(F) {
+  B01.ar = null; if (!F) return;
+  for (const f of F) { B01.n++; const o = f.o, volta = () => b01Volta(f);
+    for (const a of [o.instanceMatrix, o.instanceColor]) if (a) Object.defineProperty(a, 'needsUpdate', { configurable: true, set(v) { if (v === true) { this.version++; volta(); } } });
+    const sc = o.setColorAt; o.setColorAt = function (...x) { volta(); return sc.apply(this, x); };
+    for (const k of ['visible', 'count']) { let val = o[k]; Object.defineProperty(o, k, { configurable: true, enumerable: true, get: () => val, set(v) { if (v !== val) { val = v; volta(); } } }); }
+  }
+}
+// ===== O1-B01 fim =====
 // ===== 5B-1: arquitetura das salas do núcleo do Sanatório (paredes clínicas, forro, batentes) =====
 // Só visual e só no Sanatório: sem colisão, sem sombra nova, sem sorteio do jogo. Três peças:
 // - paredes: o material das paredes do mapa ganha, por sala, a barra até ~1,5 m (azulejo, lambri, tinta a óleo ou embasamento),
