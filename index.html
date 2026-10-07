@@ -16478,6 +16478,7 @@ function gunModel(id, fp = false, skin = null) {
       if (mg42) { add(mag, RB(.05, .08, .1, .006), M.green, -.035, -.05, 0); for (let i = 0; i < 4; i++) add(mag, new THREE.BoxGeometry(.012, .006, .02), M.brass, -.01, -.005 - i * .008, .0); ud.magGrab = new V3(-.03, -.16, -.1); } // caixa de fita ao lado
       else if (ston) { add(mag, RB(.046, .1, .11, .006), M.dark, 0, -.06, .005); add(mag, RB(.03, .03, .04, .004), M.metal, 0, -.01, 0); ud.magGrab = new V3(0, -.19, -.1); }
       else if (lmg) { add(mag, CY(.068, .05, 24), M.metal, 0, -.08, .012, 0, Math.PI / 2); add(mag, new THREE.CylinderGeometry(.03, .03, .054, 12), M.dark, 0, -.08, .012, 0, 0, Math.PI / 2); add(mag, RB(.03, .04, .04, .004), M.metal, 0, -.012, 0); ud.magGrab = new V3(0, -.17, -.09); }
+      if (lmg && !mg42 && !ston) ud.w09Tambor = { c: new V3(0, -.092, -.088), r: .068, x: .025 }; // 6-w09: tambor da RPK (espaço da arma), a mão o contorna (w09Tambor)
       else if (stg) { add(mag, EX(banana(.25, 1.4, .052, .05), .028), M.metal); ud.magGrab = new V3(0, -.21, -.06); }
       else if (m14) { add(mag, EX(banana(.1, 2, .062), .03), M.metal); ud.magGrab = new V3(0, -.12, -.1); }
       else { add(mag, EX(banana(.21, .34, .074, .066), .03), id.startsWith('ak47') ? M.bakelite : M.metal); for (let i = 0; i < 4; i++) add(mag, new THREE.BoxGeometry(.032, .004, .012), M.dark, 0, -.04 - i * .04, .012 + i * .012, .15 + i * .1); ud.magGrab = new V3(0, -.17, -.05); }
@@ -18382,7 +18383,7 @@ function beltAnim(ud, w, o, t) { // t: fração da recarga (-1 fora dela)
     ev('ab', A.tampa[0] + .03, () => play('slide')); ev('out', A.sai[0] + .02, () => play('magout')); ev('drop', A.sai[1], () => dropMag(ud));
     ev('in', A.volta[1], () => play('magin')); ev('fita', A.fita[1] - .02, () => play('shellin')); ev('fe', A.tampa[3], () => play('slide'));
     if (E) ev('man', A.manejo[1], () => play('bolt'));
-    if (ud.lhG) kfTo(t, (ud.bkf || (ud.bkf = [beltKF(ud, false), beltKF(ud, true)]))[E ? 1 : 0], ud.lhG.position);
+    if (ud.lhG) { kfTo(t, (ud.bkf || (ud.bkf = [w09KF(ud, false), w09KF(ud, true)]))[E ? 1 : 0], ud.lhG.position); w09Tampa(ud, t); } // 6-w09
   } else if (G.lastShotW === G.cur && since < w.rate) { // tiro: a fita anda um elo para dentro e a arma treme
     B.g.position.copy(B.step).multiplyScalar(seg(since / w.rate, 0, .7)); o.rz += Math.sin(since * 90) * A.tiro;
   }
@@ -18392,6 +18393,53 @@ function beltAnim(ud, w, o, t) { // t: fração da recarga (-1 fora dela)
   else if (now - G.switchEnd < .3) o.y -= Math.sin((now - G.switchEnd) / .3 * Math.PI) * A.peso; // assenta com o peso
   if (me.sprintK > .01) { const k = me.sprintK * (1 - smooth(G.ads || 0)); o.rz += A.corrida[0] * k; o.y += A.corrida[1] * k; }
 }
+// ===== 6-w09: metralhadoras de fita: a mão de apoio presa à tampa enquanto ela gira e contornando a tampa aberta =====
+// A mão ia em linha reta (corda) de P (tampa fechada) a Q (tampa aberta) enquanto a tampa girava em arco: no meio do giro a palma
+// entrava 14 mm na tampa (Stoner, MG42). Agora, nas janelas da tampa, a palma acompanha o mesmo ponto da tampa (gira junto, com o
+// desvio da palma descontado), e Q passa a ser esse ponto girado. Entre a tampa aberta e a caixa (ida e volta) a mão sai primeiro para
+// o lado esquerdo (W09.lado), para não cortar a tampa aberta nem a quina da caixa (HK21).
+const W09 = { alto: .006, rampa: .02, lado: [-.05, -.01, 0], ladoT: .012, sai: [-.045, .012, -.05, .025], saiE: [.05, .012, 0, .012], cima: [.03, -.07, -.02] }; // cima: y, z, tempo (antes de tampa[0]) // sai/saiE: x, y, z, atraso (fração)
+const _w09a = new V3(), _w09b = new V3(), _w09c = new V3(), _w09q = new THREE.Quaternion();
+function w09Off(ud, out) { return rldPalma(ud, out.set(0, 0, 0), ud.lhQ || ud.lhG.quaternion, out); } // desvio da palma (espaço da arma)
+function w09Giro(ud, ang, out) { // posição da mão que mantém a palma no mesmo ponto da tampa girada de ang (rad)
+  const off = w09Off(ud, _w09b), c = ud.cover.position;
+  return out.copy(ud.coverP).add(off).sub(c).add(_w09c.set(0, W09.alto, 0)).applyQuaternion(_w09q.setFromAxisAngle(ud.coverAx, ang)).add(c).sub(off);
+}
+function w09KF(ud, E) {
+  const fr = beltKF(ud, E), A = LMGA, Q = w09Giro(ud, A.abre, new V3()), L = W09.lado, d = W09.ladoT;
+  for (const k of fr) if (k[0] === A.tampa[1] || k[0] === A.tampa[2] + .02) { k[1] = Q.x; k[2] = Q.y; k[3] = Q.z; }
+  const i1 = fr.findIndex(k => k[0] === A.tampa[1]), i2 = fr.findIndex(k => k[0] === A.tampa[2] + .02);
+  fr.splice(i2, 0, [A.tampa[2] + .02 - d, Q.x + L[0], Q.y + L[1], Q.z + L[2]]); // volta: vem pelo lado antes de pegar a tampa
+  fr.splice(i1 + 1, 0, [A.tampa[1] + d, Q.x + L[0], Q.y + L[1], Q.z + L[2]]); // ida: sai pelo lado antes de descer à caixa
+  const i0 = fr.findIndex(k => k[0] === A.tampa[0] + .01), P0 = fr[i0], C = W09.cima; // tampa de cima: a mão chega por cima e à frente da fita
+  if (!ud.feedLow) fr.splice(i0, 0, [A.tampa[0] + C[2], P0[1], P0[2] + C[0], P0[3] + C[1]]);
+  const i3 = fr.findIndex(k => k[0] === A.tampa[3]), P = fr[i3], S = E && ud.chg ? W09.saiE : W09.sai; // tampa fechada: a mão sai por cima (para a esquerda
+  fr.splice(i3 + 1, 0, [A.tampa[3] + S[3], P[1] + S[0], P[2] + S[1], P[3] + S[2]]); // ou, se vai à alavanca de manejo, para a direita) antes de descer
+  return fr;
+}
+function w09Tampa(ud, t) { // nas janelas da tampa, a mão segue o arco da tampa (mesmo ângulo de beltAnim)
+  if (!ud.cover || !ud.coverP) return;
+  const A = LMGA, r = W09.rampa, ang = seg(t, A.tampa[0], A.tampa[1]) * (1 - seg(t, A.tampa[2], A.tampa[3]));
+  const w = t < A.tampa[2] ? (t <= A.tampa[1] ? clamp((t - A.tampa[0] + r) / r, 0, 1) : 0) // abrindo: chega à tampa antes de ela girar; no fim (Q) o quadro-chave já é o ponto girado
+    : Math.min(clamp((t - A.tampa[2]) / .02, 0, 1), clamp(1 - (t - A.tampa[3]) / .02, 0, 1)); // fechando: entra e sai em rampa
+  if (w <= 0) return;
+  ud.lhG.position.lerp(w09Giro(ud, A.abre * ang, _w09a), w);
+}
+// RPK: a mão ia em linha reta entre o apoio, o tambor e a alavanca e atravessava o tambor (16–18 mm). Trecho que corta o tambor (com o
+// tambor no lugar) ganha um ponto de passagem: por baixo e à frente dele (apoio <-> tambor) ou pelo lado direito (tambor <-> alavanca).
+const W09T = { folga: .008, baixo: .02, direita: .07, amostras: 10 };
+function w09Tambor(ud, fr) {
+  const D = ud.w09Tambor; if (!D || !ud.lhG) return fr;
+  const off = w09Off(ud, new V3()), p = new V3(), cruza = (a, b) => { for (let i = 1; i < W09T.amostras; i++) { const k = i / W09T.amostras; p.set(lerp(a[1], b[1], k), lerp(a[2], b[2], k), lerp(a[3], b[3], k)).add(off); if (Math.abs(p.x - D.c.x) < D.x + W09T.folga && Math.hypot(p.y - D.c.y, p.z - D.c.z) < D.r + W09T.folga) return true; } return false; };
+  for (let i = fr.length - 1; i > 0; i--) {
+    const a = fr[i - 1], b = fr[i]; if (a[0] > .19 && a[0] < .64 || b[0] > .19 && b[0] < .64 || !cruza(a, b)) continue; // com o tambor na mão (fora do lugar) não conta
+    const alto = Math.max(a[2], b[2]) > D.c.y + D.r * .5, t = (a[0] + b[0]) / 2;
+    if (alto && Math.min(a[2], b[2]) > D.c.y) continue; // alavanca <-> apoio passa por cima do tambor: a linha reta já serve
+    fr.splice(i, 0, alto ? [t, D.c.x + W09T.direita, D.c.y - D.r * .5, D.c.z] : [t, Math.min(a[1], b[1]) - .03, D.c.y - D.r - W09T.baixo, D.c.z - D.r]);
+  }
+  return fr;
+}
+rldKF = (f => function (ud, E, md) { return w09Tambor(ud, f(ud, E, md)); })(rldKF); // sem mexer em rldKF (6-w16): só acrescenta os pontos
 // estilo CS: a tampa de alimentação do modelo baixado (osso D.cover) gira na dobradiça (eixo lateral da arma) enquanto o pacote troca a caixa
 const LMGCS = { tampa: [.04, .14, .8, .9] };
 function fpCoverInit(F, ms, D) {
