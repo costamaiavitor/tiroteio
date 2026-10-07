@@ -18026,14 +18026,7 @@ function reloadAnim(ud, t, o) {
     ev('out', .18, () => play('magout')); ev('drop', .31, () => dropMag(ud)); ev('in', .63, () => play('magin'));
     o.y -= up * Math.max(0, 1 - Math.abs(t - .65) / .035) * .012; // tapa no carregador
     if (ud.lhG) {
-      const Gp = ud.magGrab, R = ud.rOut ?? .38, gp = (t, k, dx, dz = 0) => [t, Gp.x + dx + md.x * k, Gp.y + md.y * k, Gp.z + dz + md.z * k];
-      const fr = [[0, L.x, L.y, L.z], [.1, L.x, L.y, L.z], gp(.19, 0, -.01), gp(.3, .13, -.01), gp(.38, R, -.08, .1), gp(.46, R, -.08, .1), gp(.55, .17, -.01), gp(.64, 0, -.01)];
-      if (E && ud.bolt && !ud.pistol && !ud.boltAction) { const Bp = ud.boltRest; fr.push([.71, Bp.x - .03, Bp.y + .005, Bp.z], [.75, Bp.x - .03, Bp.y + .005, Bp.z + .05], [.79, Bp.x - .03, Bp.y + .005, Bp.z + .05], [.88, L.x, L.y, L.z]); }
-      else if (ud.pistol && ud.ltP) fr.push(gp(RLD.pistola[0], 0, -.01), [RLD.pistola[1], L.x, L.y, L.z]); // a12: pistola com os braços: a mão fica embaixo do carregador até a arma começar a descer (no punho com a arma ainda erguida, o braço descia de cima)
-      else fr.push([.74, L.x, L.y, L.z]);
-      fr.push([1, L.x, L.y, L.z]);
-      if (ud.via) for (let i = fr.length - 1; i > 0; i--) { const a = fr[i - 1], b = fr[i], v = ud.via; if ((a[3] - v.z) * (b[3] - v.z) < 0) fr.splice(i, 0, [(a[0] + b[0]) / 2, Math.min(a[1], b[1]) - .03, Math.min(v.y, a[2], b[2]), v.z]); } // a4 (bullpup): trecho que cruza o punho desce por baixo da mão direita
-      const p = kf(t, fr); ud.lhG.position.set(p[0], p[1], p[2]);
+      const Gp = ud.magGrab; kfTo(t, (ud.rkf ||= [null, null])[E ? 1 : 0] || (ud.rkf[E ? 1 : 0] = rldKF(ud, E, md)), ud.lhG.position); // 6-w16: quadros-chave guardados por arma (rldKF)
       // a12: o carregador vai na mão (tira o velho de .19 a .31; o novo vem com ela de .46 até encaixar em .64), em vez de seguir uma curva
       // própria: antes o novo aparecia parado a 17 cm do encaixe enquanto a mão ainda vinha de baixo (até 22 cm longe dele)
       if (!ud.rock && ((t >= .19 && t < .31) || (t >= RLD.novo && t < .64))) { ud.mag.visible = true; ud.mag.position.copy(ud.magRest).add(ud.lhG.position).sub(_rg.set(Gp.x - .01, Gp.y, Gp.z)); }
@@ -18067,6 +18060,63 @@ function reloadAnim(ud, t, o) {
     if (ud.lhG) { const p = kf(t, [[0, L.x, L.y, L.z], [.25, L.x, L.y, L.z], [.36, P.x - .05, P.y - .16, P.z + .06], [.5, P.x, P.y + .01, P.z + .03], [.64, P.x, P.y + .01, P.z + .03], [.74, L.x, L.y, L.z], [1, L.x, L.y, L.z]]); ud.lhG.position.set(p[0], p[1], p[2]); if (ud.handShell) ud.handShell.visible = t > .3 && t < .6; }
   } else if (ud.r8 && ud.mag) r8Reload(ud, t, o, ev); // (a8) armas maravilha, LAW e besta
   else { const s = Math.sin(t * Math.PI); o.rx -= s * .6; o.y -= s * .1; o.rz += s * .3; } // genérico
+}
+// ===== 6-w16: sistema de recarga: a mão de apoio contorna a arma; quadros-chave guardados; fim da recarga bala por bala =====
+// lado: alavanca de manejo do lado direito (ferrolho com x > 0): a mão fica à direita dela (antes ficava 3 cm à esquerda, dentro da
+// caixa da culatra: AK-74u, M14, STG-44, Dragunov, PSG1). folga: distância (m) da palma à peça; rampa: quanto (m) a palma entra pela face de cima/baixo/frente/trás até o
+// desvio lateral ficar inteiro; solta: tempo (s) em que o desvio
+// volta a zero depois que a mão sai da peça; min: menor lado (m) de uma peça que conta como obstáculo.
+const RLDF = { lado: .012, folga: .004, rampa: .008, solta: .05, min: .01 };
+function rldKF(ud, E, md) { // os mesmos quadros-chave de antes (a12), montados uma vez por arma e por tipo de recarga
+  const L = ud.lhRest, Gp = ud.magGrab, R = ud.rOut ?? .38, gp = (t, k, dx, dz = 0) => [t, Gp.x + dx + md.x * k, Gp.y + md.y * k, Gp.z + dz + md.z * k];
+  const fr = [[0, L.x, L.y, L.z], [.1, L.x, L.y, L.z], gp(.19, 0, -.01), gp(.3, .13, -.01), gp(.38, R, -.08, .1), gp(.46, R, -.08, .1), gp(.55, .17, -.01), gp(.64, 0, -.01)];
+  if (E && ud.bolt && !ud.pistol && !ud.boltAction) { const Bp = ud.boltRest, bx = Bp.x > .005 ? Bp.x + RLDF.lado : Bp.x - .03; fr.push([.71, bx, Bp.y + .005, Bp.z], [.75, bx, Bp.y + .005, Bp.z + .05], [.79, bx, Bp.y + .005, Bp.z + .05], [.88, L.x, L.y, L.z]); }
+  else if (ud.pistol && ud.ltP) fr.push(gp(RLD.pistola[0], 0, -.01), [RLD.pistola[1], L.x, L.y, L.z]);
+  else fr.push([.74, L.x, L.y, L.z]);
+  fr.push([1, L.x, L.y, L.z]);
+  if (ud.via) for (let i = fr.length - 1; i > 0; i--) { const a = fr[i - 1], b = fr[i], v = ud.via; if ((a[3] - v.z) * (b[3] - v.z) < 0) fr.splice(i, 0, [(a[0] + b[0]) / 2, Math.min(a[1], b[1]) - .03, Math.min(v.y, a[2], b[2]), v.z]); }
+  return fr;
+}
+// Caixas das peças fixas da arma (espaço da arma), uma vez por arma: sem as peças que mexem na recarga (carregador, ferrolho, slide,
+// tambor, cano basculante, tampa, fita, bomba, clipe) e sem as mãos. A caixa onde a palma já fica em repouso encolhe até ela.
+function rldCaixas(ud) {
+  const gun = ud.lhG.parent, mov = new Set(), bx = [];
+  for (const o of [ud.mag, ud.bolt, ud.slide, ud.cyl, ud.brk, ud.cover, ud.belt?.g, ud.pump, ud.clipG, ud.lhG, ud.rhG, ud.spdl, ud.hammer, ud.chg]) if (o?.isObject3D) mov.add(o);
+  gun.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(gun.matrixWorld).invert(), M = new THREE.Matrix4(), c = new V3(), lo = new V3(), hi = new V3();
+  gun.traverse(m => {
+    if (!m.isMesh || !m.visible || m.material?.transparent || m.material?.name === 'hand') return;
+    for (let v = m; v && v !== gun; v = v.parent) if (!v.visible || mov.has(v) || (v !== m && v.children.some(k => k.isMesh && k.material?.name === 'hand'))) return;
+    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const b = m.geometry.boundingBox; M.multiplyMatrices(inv, m.matrixWorld); lo.set(1e9, 1e9, 1e9); hi.set(-1e9, -1e9, -1e9);
+    for (let i = 0; i < 8; i++) { c.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(M); lo.min(c); hi.max(c); }
+    if (Math.min(hi.x - lo.x, hi.y - lo.y, hi.z - lo.z) > RLDF.min) bx.push(lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
+  });
+  const p = rldPalma(ud, ud.lhRest, ud.lhQ || ud.lhG.quaternion, c);
+  for (let i = 0; i < bx.length; i += 6) { const e = Math.min(p.x - bx[i], bx[i + 3] - p.x, p.y - bx[i + 1], bx[i + 4] - p.y, p.z - bx[i + 2], bx[i + 5] - p.z); if (e > 0) for (let k = 0; k < 3; k++) { bx[i + k] += e + .001; bx[i + 3 + k] -= e + .001; } }
+  ud.rbx = new Float32Array(bx); ud.rFace = new Int8Array(bx.length / 6).fill(-1); ud.rPush = new V3(); ud.rT = now;
+}
+const _rldP = new V3(), _rldO = new V3(), _rldT = new V3();
+function rldPalma(ud, pos, q, out) { const lt = ud.armsGun?.lt; out.copy(pos); if (lt && lt.parent === ud.lhG) out.add(_rldO.copy(lt.position).applyQuaternion(q)); return out; }
+function rldFora(ud) { // empurra a palma para fora das peças fixas (na recarga e enquanto o desvio volta a zero)
+  if (!ud.lhG || ud.ltP || !ud.lhRest) return;
+  const ativo = !!(G.reloadEnd || G.reload);
+  if (!ativo && (!ud.rPush || ud.rPush.lengthSq() < 1e-8)) { if (ud.rPush) ud.rT = now; return; }
+  if (!ud.rbx) rldCaixas(ud);
+  const B = ud.rbx, F = ud.rFace, p = rldPalma(ud, ud.lhG.position, ud.lhG.quaternion, _rldP), T = _rldT.set(0, 0, 0), f = RLDF.folga;
+  if (ativo) for (let i = 0, j = 0; i < B.length; i += 6, j++) {
+    const e0 = p.x - B[i], e1 = B[i + 3] - p.x, e2 = p.y - B[i + 1], e3 = B[i + 4] - p.y, e4 = p.z - B[i + 2], e5 = B[i + 5] - p.z;
+    if (Math.min(e0, e1, e2, e3, e4, e5) <= 0) { F[j] = -1; continue; }
+    if (F[j] < 0) F[j] = e0 < e1 ? 0 : 1; // lado (esquerdo/direito) por onde a mão contorna: fica até ela sair da peça (o desvio não pula de lado)
+    const ex = F[j] ? e1 : e0, w = smooth(Math.min(e2, e3, e4, e5) / RLDF.rampa), v = (F[j] ? 1 : -1) * w * (ex + Math.min(ex, f)); // contorna pelo lado (x): a arma é estreita e a mão vem de baixo/de cima;
+    if (Math.abs(v) > Math.abs(T.x)) T.x = v; // o peso w cresce do zero na face de cima/baixo/frente/trás (sem salto, sem atravessar ao sair pelo outro lado)
+  }
+  const P = ud.rPush, r = 1 - Math.exp(-Math.max(0, now - ud.rT) / RLDF.solta); ud.rT = now;
+  for (let a = 0; a < 3; a++) { const t = T.getComponent(a), c = P.getComponent(a); P.setComponent(a, t !== 0 && Math.sign(t) === Math.sign(c || t) && Math.abs(t) >= Math.abs(c) ? t : c + (t - c) * r); } // entra na hora (nunca atravessa), solta suave
+  ud.lhG.position.add(P);
+}
+function rldFimBala(S_, a) { // bala por bala: o fim (barra do HUD) segue as etapas de verdade (cada etapa começa no quadro seguinte ao tempo)
+  if (S_.stage === 'end') G.reloadEnd = S_.t0 + .45 * S_.sp;
+  else if (a) G.reloadEnd = S_.t0 + Math.min(wMag(G.cur) - a.mag, a.res) * S_.iv + .45 * S_.sp;
 }
 // ---------- a3: recarga da família AK / Galil / FAL: o carregador sai e entra "de bico" ----------
 // Sai: gira para a frente em volta do bico (frente da boca do carregador) e cai. Volta: sobe já inclinado, engata o bico e gira para
@@ -18199,6 +18249,7 @@ function gunAnim(ud, w, o) {
     const a = mine && since < PIST.cao.t ? PIST.cao.a * (1 - seg(since, PIST.cao.t * .25, PIST.cao.t)) : 0, P = ud.hammerP, c = Math.cos(a), s2 = Math.sin(a);
     ud.hammer.rotation.x = a; ud.hammer.position.set(0, P.y - (P.y * c - P.z * s2), P.z - (P.y * s2 + P.z * c));
   }
+  rldFora(ud); // 6-w16
   if (ud.ltP) pistolaApoio(ud, o, r0);
 }
 // ---------- facas (a9): a faca gira com o pacote dentro do punho, giro da butterfly, estocada, corrida, facada rápida (V) e bote ----------
@@ -18973,6 +19024,7 @@ function updateWeapon(dt) {
       S_.t0 = now; if (!a || a.mag >= wMag(G.cur) || a.res <= 0) S_.stage = 'end';
     } else if (S_.stage === 'end' && now - S_.t0 >= .45 * S_.sp) { G.reload = null; G.reloadEnd = 0; }
     if (G.reload && S_.stage !== 'end' && (G.trigger || mouseDown) && a?.mag > 0 && locked()) { G.reload = null; G.reloadEnd = 0; } // atirar interrompe
+    if (G.reload && S_.stage !== 'start') rldFimBala(S_, a); // 6-w16
   } else if (G.reloadEnd && now >= G.reloadEnd) { const a = G.ammo[G.cur]; if (a) { const take = Math.min(wMag(G.cur) - a.mag, a.res); a.mag += take; a.res -= take; } G.reloadEnd = 0; }
   if (G.rezoom && now >= G.nextFire) { G.scope = G.rezoom; G.rezoom = 0; }
   const since = now - G.lastShot;
