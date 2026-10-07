@@ -18856,12 +18856,12 @@ function vmMove(o, ud, dt, pist) {
   const k = me.sprintK;
   if (k > .01 && !pist && !kn) { const S = F ? M.corridaCS : M.corrida, c = k * (F?.clips.run && !F.P.semCorrida ? S.clip : 1);
     rx += S.rx * c; ry += S.ry * c; rz += (S.rz + Math.sin(bobT) * S.rol) * c; x += S.x * c; y += (S.y - Math.abs(Math.sin(bobT * 1.3)) * S.bal) * c; z += S.z * c; }
-  const D = M.deslize, sl = VMS.sl = lerp(VMS.sl, me.slideEnd > now && !me.downed ? 1 : 0, Math.min(1, dt * D.ent)); // deslize (Zumbis)
+  const D = M.deslize, sl = w18Mola(VMS, 'sl', 'slV', me.slideEnd > now && !me.downed ? 1 : 0, D.ent * W18.k, dt, 0, 1); // 6-w18: mola // deslize (Zumbis)
   if (sl > .01 && !kn) { rx += D.rx * sl; ry += D.ry * sl; rz += D.rz * sl; x += D.x * sl; y += D.y * sl; z += D.z * sl; }
-  const A = M.agachar, cr = VMS.cr = lerp(VMS.cr, me.crouch && !(me.slideEnd > now) && !me.downed ? 1 : 0, Math.min(1, dt * A.ent));
+  const A = M.agachar, cr = w18Mola(VMS, 'cr', 'crV', me.crouch && !(me.slideEnd > now) && !me.downed ? 1 : 0, A.ent * W18.k, dt, 0, 1); // 6-w18: mola
   if (cr > .01) { rz += A.rz * cr; x += A.x * cr; y += A.y * cr; }
   const P = M.pulo, Po = M.pouso, ar = !me.onGround && !me.downed;
-  VMS.ay = lerp(VMS.ay, ar ? clamp(-me.vel.y * P.y, -P.max, P.max) : 0, Math.min(1, dt * P.ent)); y += VMS.ay; rx += VMS.ay * P.rx;
+  w18Mola(VMS, 'ay', 'ayV', ar ? clamp(-me.vel.y * P.y, -P.max, P.max) : 0, P.ent * W18.k, dt); // 6-w18: mola y += VMS.ay; rx += VMS.ay * P.rx;
   if (ar) VMS.vy = me.vel.y; else if (VMS.ar && VMS.vy < -Po.vmin) VMS.pv += clamp((-VMS.vy - Po.vmin) / (Po.vmax - Po.vmin), 0, 1) * Math.sqrt(Po.mola) * 1.2; // pancada do pouso
   VMS.ar = ar; VMS.pv += (-VMS.po * Po.mola - VMS.pv * Po.amort) * Math.min(dt, .05); VMS.po += VMS.pv * Math.min(dt, .05);
   if (Math.abs(VMS.po) > 1e-4) { y += Po.y * VMS.po; rx += Po.rx * VMS.po; }
@@ -18872,6 +18872,21 @@ function vmMove(o, ud, dt, pist) {
     o.x += _vmV.x - _vmV2.x; o.y += _vmV.y - _vmV2.y; o.z += _vmV.z - _vmV2.z;
   }
 }
+// ===== 6-w18: movimento da arma na mão sem tranco nas entradas e saídas =====
+// Corrida, deslize, agachar e pulo seguiam um lerp (filtro de 1ª ordem): a pose começa e para já na velocidade máxima. Ao soltar o
+// Shift a arma dava um tranco de ~0,1 rad num quadro (aceleração de 76-135 mrad/quadro² medida, contra 5-12 no resto do movimento);
+// o mesmo no fim do deslize e na saída do chão. Agora cada um é uma mola criticamente amortecida (não passa do alvo): a velocidade sai
+// do zero e chega no zero, com o mesmo tempo de resposta (ω = k × a taxa antiga: 63% no mesmo instante). Passos de até 1/120 s,
+// estável a 20 qps; sem alocar. O me.sprintK também dá o FOV da corrida (+7°), que agora abre e fecha sem tranco.
+const W18 = { k: 2.15, corrida: 21.5, passo: 1 / 120 }; // k: ω/taxa do lerp (VMOV.*.ent); corrida: ω da corrida (era lerp 10/s)
+Object.assign(VMS, { slV: 0, crV: 0, ayV: 0 }); me.sprintV = 0;
+function w18Mola(o, k, v, alvo, w, dt, lo = -1e9, hi = 1e9) { // o[k] vai a alvo com velocidade o[v]
+  const T = Math.min(dt, .1), n = Math.max(1, Math.ceil(T / W18.passo)), h = T / n; let x = o[k] || 0, u = o[v] || 0;
+  for (let i = 0; i < n; i++) { u += (w * w * (alvo - x) - 2 * w * u) * h; x += u * h; }
+  if (x <= lo) { x = lo; if (u < 0) u = 0; } else if (x >= hi) { x = hi; if (u > 0) u = 0; }
+  o[k] = x; o[v] = u; return x;
+}
+// ===== fim 6-w18 =====
 function updateViewmodel(dt) {
   const w = W[G.cur], ud = vmGun?.userData || {}, vo = ud.vm || [0, 0, 0];
   const hs = Math.hypot(me.vel.x, me.vel.z);
@@ -18889,7 +18904,7 @@ function updateViewmodel(dt) {
   if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model) && !ud.armsKnife && !ud.fps2) knifeAnim(o, ud);
   if (me.downed) { o.y -= .04; o.rz += .35; }
   // correndo: arma abaixada e de lado, balançando mais; deslize, pulo, pouso e agachar (a13, ver vmMove)
-  me.sprintK = lerp(me.sprintK, me.sprinting ? 1 : 0, Math.min(1, dt * 10));
+  w18Mola(me, 'sprintK', 'sprintV', me.sprinting ? 1 : 0, W18.corrida, dt, 0, 1); // 6-w18: mola (era lerp dt * 10)
   vmMove(o, ud, dt, pist);
   knViewmodel(o, ud, dt); // faca: corrida, bote e facada rápida (a9)
   const ak = smooth(Math.max(G.ads || 0, w?.scope ? G.scR || 0 : 0)); let hx = 0, hy = 0, hz = 0; // luneta: a arma sobe até o olho (G.scR, só visual) // hx..: posição de quadril antes da mira (para os ombros ficarem onde estavam)
@@ -18926,6 +18941,7 @@ function equip(id, force) {
   if (!hasW(id) || (id === G.cur && !force)) return;
   if (id !== G.cur) G.last = G.cur;
   G.ads = 0;
+  G.swing = 0; // 6-w18: o balanço do arremesso/colocação (G.swing, só visual) ficava para a arma nova, que girava até 63° logo depois do saque
   G.cur = id; G.reloadEnd = 0; G.reload = null; G.scope = 0; G.rezoom = 0; G.burstN = 0; G.switchDur = id === 'awp' ? .6 : id === 'knife' ? .55 : .35; G.kan = null; G.switchEnd = now + G.switchDur; G.shots = 0;
   vmSetWeapon(id); play('draw');
 }
