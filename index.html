@@ -19120,7 +19120,7 @@ function attPartsProc(id, gun, ud) {
       L = Lz.Lp; z = fr + L / 2; const U = q(-.03, .03, my - .06, my - .004, z - L / 2, z + L / 2); par = U.par; y = (U.n ? U.y0 : my - .025) - Lz.h / 2; x = 0; sz = [.022, Lz.h, L];
     } else {
       L = Lz.L; z = Math.max(lh.z - Lz.frente, mz.z + .03 + L / 2); const U = q(-1, 1, my - .035, my + .03, z - L / 2, z + L / 2); par = U.par;
-      x = (U.n ? U.x0 : -.015) - Lz.w / 2 - .001; y = my - .003; sz = [Lz.w, Lz.h, L];
+      y = my - .003; x = w15LaserX(q, MB, U, y, z, L, Lz); sz = [Lz.w, Lz.h, L]; // 6-w15
       put(par, CY(.0035, .004, 8), N.dark, x - Lz.w / 2 - .001, y + .002, z + .008, 0, Math.PI / 2, 0); // botão
     }
     put(par, RB(...sz, .003), N.optic, x, y, z); lzMax = z + L / 2;
@@ -19142,24 +19142,25 @@ function attPartsProc(id, gun, ud) {
     else gz = vg ? lh.z : lh.z + .01 - sp;
     if (ud.mag) { const Mb = new THREE.Box3(); for (const e of MB) if (top(e.o) === ud.mag && e.o.visible) Mb.union(e.B); if (!Mb.isEmpty() && gz - sp < Mb.max.z + .006 && gz + sp > Mb.min.z - .006) gz = Mb.min.z - sp - .008; } // à frente do carregador
     gz = Math.max(gz, mz.z + sp + .02);
-    const U = q(-.04, .04, my - .07, my + .005, gz - sp, gz + sp), yU = U.n ? U.y0 : my - .02, par = U.par;
+    const U = q(-.04, .04, my - .07, my + .005, gz - sp, gz + sp), yU = U.n ? U.y0 : w15FundoY(MB, gz, sp, my), par = U.par; // 6-w15: w15FundoY
     if (vg) {
       const c = G.cant, L = G.L, cy = yU - .008 - L / 2 * Math.cos(c), cz = gz - L / 2 * Math.sin(c);
       put(par, RB(.02, .01, .03), N.optic, 0, yU - .004, gz);
       put(par, new THREE.CylinderGeometry(G.r * .92, G.r, L, hi ? 14 : 8), N.polymer, 0, cy, cz, c);
       for (const k of [.3, .55]) put(par, new THREE.CylinderGeometry(G.r * 1.04, G.r * 1.04, .003, hi ? 14 : 8), N.dark, 0, yU - .008 - L * k * Math.cos(c), gz - L * k * Math.sin(c), c);
       put(par, new THREE.CylinderGeometry(G.r * 1.15, G.r * 1.1, .006, hi ? 14 : 8), N.dark, 0, yU - .008 - L * Math.cos(c), gz - L * Math.sin(c), c);
-      ud.lh = V(-.005, yU - .008 - L * .42 * Math.cos(c), gz - L * .42 * Math.sin(c));
+      ud.lh = V(-.005, yU - .008 - L * .42 * Math.cos(c), gz - L * .42 * Math.sin(c)); w15LGrip(ud, yU - .008, gz, L, c); // 6-w15
     } else { // angular (tipo AFG): rampa que desce para a frente, a palma apoia atrás
       const L = G.L, zr = gz + sp, h = G.h;
       put(par, EX([[zr, -.004], [zr - .006, -.006], [zr - L + .03, -h * .8], [zr - L + .014, -h], [zr - L, -h * .4], [zr - L, .001], [zr, .001]], .028), N.polymer, 0, yU, 0);
-      ud.lh = V(lh.x, lh.y - .008, lh.z - .006);
+      ud.lh = V(lh.x, lh.y - .008, lh.z - .006); delete ud.lgrip; // 6-w15: a vertical de fábrica saiu
     }
     ud.lhAtt = 1; // pistola: a mão de apoio larga o punho e vai na empunhadura
   }
   // boca do cano: supressor (não sobe além da linha de mira) ou compensador (janelas em cima)
   const mu = slot('muzzle'), mzB = mz.z; // mzB: boca do cano (sem a peça da boca)
   if (mu) {
+    if (!slot('barrel')) mz.z = w15Boca(q, mz, my, rb); // 6-w15
     const par = R0.par, Sv = ATTV.sup;
     if (mu === 'muzzle_sup') {
       const L = hg ? Sv.LP : sg ? Sv.LS : Sv.L, lineY = ud.sight ? ud.sight.y : my + .03, r = Math.max(rb + .002, Math.min(hg ? Sv.rP : sg ? Sv.rS : Sv.r, lineY - my - Sv.min));
@@ -19182,8 +19183,8 @@ function attPartsProc(id, gun, ud) {
     const shell = (x, y, z, n) => { for (let k = 0; k < n; k++) { put(gun, CY(.0095, .046, 10), M.shell, x, y, z - .022 * (k - (n - 1) / 2), Math.PI / 2); put(gun, CY(.0098, .012, 10), N.brass, x, y - .028, z - .022 * (k - (n - 1) / 2), Math.PI / 2); } };
     if (mg === 'mag_fast') {
       if (sg) { // porta-cartuchos na lateral esquerda da caixa (escopeta) ou da coronha (Olympia)
-        const zs = ud.rig === 'break' ? .15 : .03, R = q(-1, 1, my - .05, my + .02, zs - .04, zs + .04), x = (R.n ? R.x0 : -.023) - .003;
-        put(gun, RB(.003, .034, .095), N.optic, x, my - .01, zs); shell(x - .011, my - .008, zs, 4);
+        const zs = ud.rig === 'break' ? .15 : .03, R = q(-1, 1, my - .05, my + .02, zs - .04, zs + .04), Pc = w15Porta(q, ud, my, zs, R), x = Pc.x; // 6-w15: w15Porta
+        put(gun, RB(.003, .034, .095), N.optic, x, Pc.y, zs); shell(x - .011, Pc.y + .002, zs, 4);
       } else if (pis && ud.gripAx) { // funil no fim do punho e alça de puxar na base do carregador
         const bt = ud.gripAx.bot, gi = gun.children.findIndex(o => o.isMesh && MB.find(e => e.o === o)?.B.min.y <= bt.y + .001), R = q(-.04, .04, bt.y - .002, bt.y + .012, bt.z - .06, bt.z + .06, gi);
         if (R.n) put(gun, RB(R.x1 - R.x0 + .006, .012, R.z1 - R.z0 + .008), N.optic, 0, bt.y + .004, (R.z0 + R.z1) / 2);
@@ -19193,8 +19194,8 @@ function attPartsProc(id, gun, ud) {
         if (ud.magUp || Mb.max.z - Mb.min.z > .75 * hgt) put(ud.mag, new THREE.TorusGeometry(.009, .002, 6, 14), N.dark, (Mb.min.x + Mb.max.x) / 2, ud.magUp ? Mb.max.y + .003 : Mb.min.y - .002, (Mb.min.z + Mb.max.z) / 2, 0, Math.PI / 2); // tambor/caixa/em cima: alça de puxar
         else { // dois carregadores presos: o segundo do lado esquerdo, um pouco mais baixo; braçadeiras em volta dos dois
           const dx = -(wid + .004), dy = -.015, ms = []; ud.mag.traverse(o => { if (o.isMesh && o.visible) ms.push(o); });
-          for (const o of ms) { const c = new THREE.Mesh(o.geometry, o.material); c.position.copy(o.position); c.quaternion.copy(o.quaternion); c.scale.copy(o.scale); c.position.x += dx; c.position.y += dy; o.parent.add(c); }
-          for (const k of [.35, .7]) { const ly = Mb.max.y - hgt * k, L = q(-1, 1, ly - .004, ly + .004, -1, 1, ki); if (!L.n) continue; put(ud.mag, RB(2 * wid + .012, .008, L.z1 - L.z0 + .006, .002), N.optic, (Mb.min.x + Mb.max.x + dx) / 2, ly, (L.z0 + L.z1) / 2); }
+          const cs = []; for (const o of ms) { const c = new THREE.Mesh(o.geometry, o.material); c.position.copy(o.position); c.quaternion.copy(o.quaternion); c.scale.copy(o.scale); c.position.x += dx; c.position.y += dy; o.parent.add(c); cs.push(c); }
+          w15PenteDuplo(gun, ud.mag, cs, Mb, q, ki, hgt, dy, put, RB, N); // 6-w15: braçadeiras medidas nos dois (antes: o segundo ficava solto a 4-5 mm)
         }
       }
     } else if (pis && ud.mag?.children[0]?.isMesh) { // pistola: o carregador sai do punho (luva entre o punho e a base)
@@ -19275,6 +19276,54 @@ function w14Reticulo() {
   if (dk > 1) { ar[1].updateWorldMatrix(true, false); v.set(W14.anel[0], 0, 0).applyMatrix4(ar[1].matrixWorld).project(vmCam); d = Math.round(clamp(2 * Math.hypot(v.x * hw - x, v.y * hh + y), W14.anel[1], W14.anel[2])); }
   if (x !== W14.x || y !== W14.y) { rd.style.transform = x || y ? 'translate(' + x + 'px,' + y + 'px)' : ''; W14.x = x; W14.y = y; }
   if (d !== W14.d) { rd.style.width = rd.style.height = d ? d + 'px' : ''; rd.style.margin = d ? -d / 2 + 'px 0 0 ' + -d / 2 + 'px' : ''; W14.d = d; }
+}
+// ===== 6-w15: acessórios do Armeiro (boca, laser, empunhaduras, carregadores, coronha) =====
+// Medido com a peça nova contra as peças da arma (caixas no espaço da arma): compensador 2-3,5 mm à frente do cano (ud.muzzle é o ponto do
+// clarão, não a ponta do cano), laser a 3-13 mm do guarda-mão (MP5K, Kiparis, HK21, Uzi, Famas, G11, Enfield: media a parte mais larga
+// em 6,5 cm de altura), empunhaduras da AUG/G11 a 10 mm embaixo do guarda-mão (cano cilíndrico só tem vértices nas pontas: a busca
+// não achava nada), o segundo carregador preso solto a 4-5 mm (MP40, Spectre, PM63, PSG1: perfil extrudado sem vértice na altura das
+// braçadeiras) e a braçadeira da AK/AK-74u/Galil solta (carregador curvo, o segundo é mais baixo). Na Olympia o porta-cartuchos ficava
+// em cima do pescoço da coronha. A empunhadura vertical do Armeiro não dava o eixo para a mão (ud.lgrip): a mão segurava como guarda-mão.
+function w15Boca(q, mz, my, rb) { // ponta real do cano na linha do clarão (nunca atrás do clarão nem mais de 6 mm à frente)
+  const e = rb + .004, R = q(mz.x - e, mz.x + e, my - e, my + e, mz.z - .001, mz.z + .02);
+  return R.n ? Math.min(mz.z + .006, Math.max(mz.z, R.z0)) : mz.z;
+}
+function w15LaserX(q, MB, U, y, z, L, Lz) { // x do módulo: encostado no lado esquerdo do que existe na altura e no comprimento dele
+  const h = Lz.h / 2, U2 = q(-.08, .08, y - h, y + h, z - L / 2, z + L / 2); let x0 = U2.n ? U2.x0 : 1e9;
+  if (!U2.n) for (const e of MB) { const B = e.B; if (e.o.visible && B.min.y < y + h && B.max.y > y - h && B.min.z < z + L / 2 && B.max.z > z - L / 2 && B.min.x > -.08 && B.min.x < .02) x0 = Math.min(x0, B.min.x); }
+  if (x0 > 1) x0 = U.n ? U.x0 : -.015;
+  return x0 - Lz.w / 2 - .001;
+}
+function w15FundoY(MB, gz, sp, my) { // fundo da arma no lugar da empunhadura pelas caixas das peças visíveis (só quando não há vértice ali)
+  let y = 1e9;
+  for (const e of MB) { const B = e.B; if (e.o.visible && B.min.z < gz + sp && B.max.z > gz - sp && B.min.x < .02 && B.max.x > -.02 && B.min.y >= my - .07 && B.min.y < my + .005) y = Math.min(y, B.min.y); }
+  return y < 1 ? y : my - .02;
+}
+function w15LGrip(ud, yt, gz, L, c) { // eixo da empunhadura vertical do Armeiro (topo e pé), como o vGrip das de fábrica
+  ud.lgrip = { top: new V3(0, yt, gz), bot: new V3(0, yt - L * Math.cos(c), gz - L * Math.sin(c)) };
+}
+function w15Porta(q, ud, my, zs, R) { // porta-cartuchos: escopeta na lateral da caixa (como antes); Olympia na lateral da coronha, abaixo do topo dela
+  if (ud.rig !== 'break') return { x: (R.n ? R.x0 : -.023) - .003, y: my - .01 };
+  const T = q(-.04, .04, my - .09, my + .02, zs - .04, zs + .04);
+  return { x: (T.n ? T.x0 : R.n ? R.x0 : -.023) - .003, y: (T.n ? T.y1 : my) - .019 };
+}
+function w15PenteDuplo(gun, mag, cs, Mb, q, ki, hgt, dy, put, RB, N) { // o segundo carregador a 3 mm do primeiro (no espaço da arma) e as braçadeiras em volta dos dois
+  gun.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(gun.matrixWorld).invert(), m = new THREE.Matrix4(), C = new THREE.Box3(), b = new THREE.Box3();
+  for (const c of cs) { c.geometry.computeBoundingBox(); C.union(b.copy(c.geometry.boundingBox).applyMatrix4(m.multiplyMatrices(inv, c.matrixWorld))); }
+  if (C.isEmpty()) return;
+  const sx = Mb.min.x - .003 - C.max.x;
+  if (Math.abs(sx) > .0005) {
+    const p0 = new V3().applyMatrix4(gun.matrixWorld), p1 = new V3(sx, 0, 0).applyMatrix4(gun.matrixWorld);
+    for (const c of cs) { const a = c.parent.worldToLocal(p0.clone()), d = c.parent.worldToLocal(p1.clone()); c.position.add(d.sub(a)); }
+    C.min.x += sx; C.max.x += sx;
+  }
+  for (const k of [.35, .7]) {
+    const ly = Mb.max.y - hgt * k, fat = y => { let r = null; for (const w of [.004, .008, .012, .016]) { r = q(-1, 1, y - w, y + w, -1, 1, ki); if (r.n && r.z1 - r.z0 > .02) break; } return r; }; // carregador curvo: a fatia fina pega só uma borda
+    const A = fat(ly), B = fat(ly - dy);
+    let z0 = Math.min(A.n ? A.z0 : 1e9, B.n ? B.z0 : 1e9), z1 = Math.max(A.n ? A.z1 : -1e9, B.n ? B.z1 : -1e9); if (z0 > z1) { z0 = Mb.min.z; z1 = Mb.max.z; } if (z1 - z0 < .012) continue; // fatia estreita demais (ponta do curvo): sem braçadeira, que ficaria solta
+    mag.attach(put(gun, RB(Mb.max.x - C.min.x + .006, .008, z1 - z0 + .006, .002), N.optic, (C.min.x + Mb.max.x) / 2, ly, (z0 + z1) / 2));
+  }
 }
 // tela do Armeiro (menu): nível, XP e acessórios de cada arma
 let ARM_SEL = null;
