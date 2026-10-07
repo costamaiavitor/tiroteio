@@ -12868,7 +12868,8 @@ const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 // useProgram, câmera e as 13 luzes. Programa antes do material: 57 e 93 trocas; as de material não mudam (já eram 1 por material).
 // groupOrder e renderOrder continuam na frente; os transparentes seguem de trás para frente, como antes.
 // Opacos exatamente coplanares sem polygonOffset (já em z-fighting) podem trocar de vencedor: ex. janelas da torre da igreja na Vila.
-const a31P = m => renderer.properties.get(m).currentProgram?.id ?? 0; // programa ainda não compilado: 0 (vai antes)
+const a31K = new WeakMap(); // programa de cada material guardado no 1º desenho: com o A33 o currentProgram alterna entre a vista instanciada e a comum, e a ordem dos coplanares oscilava de um quadro para o outro (cintilava)
+const a31P = m => { let v = a31K.get(m); if (!v) { v = renderer.properties.get(m).currentProgram?.id ?? 0; if (v) a31K.set(m, v); } return v; }; // ainda não compilado: 0 (vai antes)
 renderer.setOpaqueSort((a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder || a31P(a.material) - a31P(b.material) || a.material.id - b.material.id || a.z - b.z || a.id - b.id);
 // ===== O1-A31 fim =====
 // ===== O1-A33: material dividido entre InstancedMesh e Mesh comum sem reavaliar o programa a cada desenho =====
