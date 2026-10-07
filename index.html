@@ -11909,6 +11909,60 @@ ATMOS.sanatorio.r7 = A => {
   A.look({ tint: [1.08, .97, .88], sat: .62, vig: .45, fog: .75, con: 1.18, grain: 1.25, bloom: 1.2, fogC: 0x170c07, shadowTint: [.92, .9, .9], hiTint: [1.1, .98, .84] });
 };
 // @@ATMOS_SAN_FIM@@
+// ===== O1-B02: Sanatório, menos chamadas de desenho =====
+// 1) A junção por área e das instanciadas paradas do O1-B01 passa a valer também aqui (B02.junta). Sanatório no Médio,
+//    nascimento, 4 direções: 789/763/464/605 -> 682/659/366/510 chamadas.
+// 2) O que sobra fora da junção, só no desenho (nada muda em colisão, sorteio, rede ou lógica): -> 632/572/307/458.
+// - instanciada parada que veio com frustumCulled = false (A.inst) ganha o recorte da câmera com a esfera de todas as
+//   instâncias; se o código mexer nela depois (instanceMatrix, count, geometria), volta na hora a ser como era;
+// - peça opaca com névoa cuja esfera fica toda além de fog.far + margem na profundidade da câmera (a mesma conta da névoa
+//   linear do three: ali ela já sai na cor da névoa) não é desenhada (camada 0 desligada; visible fica com o código do mapa).
+//   Quadro com sombra (Alto, ou a sombra fixa sendo refeita) mantém quem projeta sombra; aquecimento e cullTodo mostram tudo.
+// Vale para as peças montadas até o fim da atmosfera (buildSanatorio, zGenDeco, áreas); zBuildWorld (portas, máquinas) fica de fora.
+const B02 = { junta: { sanatorio: 1 }, mapas: { sanatorio: 1 }, margem: 10, on: false, w: null, raiz: null, obj: null, hook: false };
+const _b02c = new V3();
+const b02Liso = m => m && m.fog === true && !m.transparent && m.blending === THREE.NormalBlending && !m.isShaderMaterial; // névoa linear de verdade
+function b02Junta() { // na 1ª imagem depois da montagem e da junção: as peças elegíveis
+  B02.obj = [];
+  for (const top of B02.raiz) { if (top.parent !== world || top.userData.blk) continue;
+    top.traverse(o => {
+      if (!o.isMesh || o.isSkinnedMesh || o.userData.blk || !o.geometry?.attributes.position || o.geometry.morphAttributes.position) return;
+      const e = { o, top, g: o.geometry, pv: o.geometry.attributes.position.version, m: o.material, ok: false, fc: false, fora: false, solto: false, dyn: false, r: 0, c: new V3(), w: [0, 0, 0, 0, NaN, 0, 0, 0] };
+      if (o.isInstancedMesh) { e.iv = o.instanceMatrix.version; e.n = o.count; if (!o.frustumCulled) { o.computeBoundingSphere(); o.frustumCulled = true; e.fc = true; } }
+      else if (!o.frustumCulled) return; // o autor avisou que a esfera não vale (pontos que andam etc.)
+      e.ok = !Array.isArray(o.material) && b02Liso(o.material); if (!e.ok && !e.fc) return; // nem recorta nem vigia: fica como está
+      for (let a = o; a; a = a.parent) if (a.userData.dyn) e.dyn = true; // peça que se mexe: esfera no mundo refeita a cada imagem
+      const s = o.isInstancedMesh ? o.boundingSphere : (o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere));
+      e.c.copy(s.center); e.r = s.radius; B02.obj.push(e);
+    }); }
+}
+function b02Solta(e) { e.solto = true; if (e.fc) e.o.frustumCulled = false; if (e.fora) { e.fora = false; e.o.layers.enable(0); } }
+function b02Cull(cam) {
+  if (!B02.on) return; if (B02.w !== world) { B02.on = false; B02.raiz = B02.obj = null; return; } // outro mapa montado (PvP não passa pela atmosfera)
+  if (!B02.obj) { if (WARM || !world.children.some(o => o.userData.blk)) return; b02Junta(); }
+  const fog = scene.fog, todo = !!WARM || cullTodo || !fog || fog.isFogExp2 || !cam.isPerspectiveCamera;
+  const somb = sun.castShadow && renderer.shadowMap.enabled && (renderer.shadowMap.autoUpdate || renderer.shadowMap.needsUpdate), lim = todo ? 0 : fog.far + B02.margem;
+  const C = cam.matrixWorld.elements, px = C[12], py = C[13], pz = C[14]; let fx = C[8], fy = C[9], fz = C[10]; const k = 1 / Math.hypot(fx, fy, fz); fx *= k; fy *= k; fz *= k; // a câmera olha para −z
+  for (const e of B02.obj) {
+    const o = e.o; if (e.solto || !e.top.visible) continue;
+    if (o.material !== e.m) { e.m = o.material; e.ok = !Array.isArray(e.m) && b02Liso(e.m); } // material trocado (gráfico, 3A-13): reavalia
+    if (o.geometry !== e.g || e.g.attributes.position.version !== e.pv || o.isInstancedMesh && (o.instanceMatrix.version !== e.iv || o.count !== e.n)) { b02Solta(e); continue; } // peça que se mexe por dentro: volta a ser como antes
+    let fora = false;
+    if (!todo && e.ok && !(somb && o.castShadow)) {
+      const m = o.matrixWorld.elements, w = e.w;
+      if (e.dyn || m[12] !== w[4] || m[13] !== w[5] || m[14] !== w[6] || m[0] !== w[7]) { // esfera no mundo (refeita só se a peça andou)
+        _b02c.copy(e.c).applyMatrix4(o.matrixWorld); w[0] = _b02c.x; w[1] = _b02c.y; w[2] = _b02c.z; w[3] = e.r * o.matrixWorld.getMaxScaleOnAxis(); w[4] = m[12]; w[5] = m[13]; w[6] = m[14]; w[7] = m[0]; }
+      fora = -((w[0] - px) * fx + (w[1] - py) * fy + (w[2] - pz) * fz) - w[3] > lim; // profundidade do ponto mais perto da esfera além da névoa
+    }
+    if (fora !== e.fora) { e.fora = fora; fora ? o.layers.disable(0) : o.layers.enable(0); }
+  }
+}
+ATMOS_POST.push(mapId => {
+  Object.assign(B01.mapas, B02.junta); // junção por área e instâncias paradas do O1-B01 também no Sanatório
+  B02.on = !!B02.mapas[mapId]; B02.w = world; B02.raiz = B02.on ? new Set(world.children) : null; B02.obj = null;
+  if (B02.on && !B02.hook) { B02.hook = true; const ob = scene.onBeforeRender; scene.onBeforeRender = function (r, s, c, rt) { ob.call(this, r, s, c, rt); b02Cull(c); }; }
+});
+// ===== O1-B02 fim =====
 // ===== 3A-9: névoa, volume e atmosfera (cor da névoa por área, névoa rasteira, bancos de neblina, feixes sob as lâmpadas, respiração) =====
 // Só visual: planos transparentes poucos e grandes, sem colisão e sem sombra; tudo no grupo da área (some com o corte por distância).
 MAPS.vila.fogC = 0x363c4c; // noite de luar fria (antes 0x4a4152, lilás): névoa base e horizonte
