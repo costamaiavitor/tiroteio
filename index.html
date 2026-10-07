@@ -1218,7 +1218,7 @@ function vegVila(o) {
   }
   const ocup = (x, z) => { const i = Math.floor(x + R), j = Math.floor(z + R); return i < 0 || j < 0 || i >= NG || j >= NG || occ[j * NG + i] === 1 || ((x - 12) / 9) ** 2 + ((z - 32) / 6.6) ** 2 < 1; };
   // chão: quanto cabe de mato (1 = grama, 0 = piso duro). Dentro do muro lê a pintura do chão (1 px por m)
-  const pix = (() => { if (!VGC) return null; const c = document.createElement('canvas'); c.width = c.height = VG; const g = c.getContext('2d'); g.drawImage(VGC, 0, 0, VG, VG); return g.getImageData(0, 0, VG, VG).data; })();
+  const pix = (() => { if (!VGC) return null; const c = document.createElement('canvas'); c.width = c.height = VG; const g = ctxLeitura(c); g.drawImage(VGC, 0, 0, VG, VG); return g.getImageData(0, 0, VG, VG).data; })();
   const KIND = { grass: 1, dirt: .45, sand: .25, rock: .2, concrete: .07, asphalt: .07 }, rooms = Object.entries(VILA_GEN.rooms), h2 = VG / 2;
   const DIST = [[.45, .2], [.07, .2], [0, .25], [1, .45]]; // distritos [u < 0, u > 0]: Hospital/Mina, Fábrica/Ferrovia, Porto/Farol, Floresta/Serraria
   const chao = (x, z) => {
@@ -1899,7 +1899,7 @@ let VGC = null; // a pintura do chão da Vila fica guardada: reiniciar / voltar 
 function vilaGround() {
   const tex = c => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; t.userData.tmp = true; return t; };
   if (VGC) return tex(VGC);
-  const S = 2048, K = S / VG, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+  const S = 2048, K = S / VG, c = document.createElement('canvas'); c.width = c.height = S; const g = ctxLeitura(c); // 6-g06
   const P = (x, z) => [(x + VG / 2) * K, (z + VG / 2) * K];
   g.fillStyle = '#5b6a3a'; g.fillRect(0, 0, S, S);
   const spot = (x, y, r, col, a) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); };
@@ -12425,7 +12425,7 @@ function buildVila() {
   const TEL = (() => {
     let sd = 90217; const rr = (a = 0, b = 1) => { sd = sd * 16807 % 2147483647; return a + sd / 2147483647 * (b - a); }; // sorteio próprio: não gasta o do jogo
     const lo = CFG.gfx === 'baixo', env = curMap?.stars ? .18 : .32;
-    const ct = (S, draw, rep) => { const t = canvasTex(S, S, g => draw(g, S)); t.wrapS = THREE.RepeatWrapping; t.wrapT = rep ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping; t.anisotropy = MAX_ANISO; return t; };
+    const ct = (S, draw, rep) => { const t = canvasTex(S, S, g => draw(g, S), true); t.wrapS = THREE.RepeatWrapping; t.wrapT = rep ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping; t.anisotropy = MAX_ANISO; return t; };
     const grain = (g, S, k) => { const im = g.getImageData(0, 0, S, S), d = im.data; for (let i = 0; i < d.length; i += 4) { const n = (rr() - .5) * k; d[i] += n; d[i + 1] += n; d[i + 2] += n; } g.putImageData(im, 0, 0); };
     const wrapX = (S, x, r, f) => { f(x); if (x < r) f(x + S); if (x > S - r) f(x - S); }; // desenha emendando nas bordas (textura repete em u)
     const blob = (g, S, x, y, r, col, a) => wrapX(S, x, r, X => { const gr = g.createRadialGradient(X, y, 0, X, y, r); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(X - r, y - r, r * 2, r * 2); });
@@ -12800,7 +12800,7 @@ function buildVila() {
 const canvas = $('#game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(innerWidth, innerHeight, false);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = true; renderer.debug.checkShaderErrors = DEBUG; // 6-g06: só em desenvolvimento (no site, o 1º uso de cada programa esperava o log da placa)
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // No Baixo/Médio as sombras são só do cenário (desenhadas uma vez por mapa). No Alto, tudo faz sombra.
 renderer.shadowMap.autoUpdate = false;
@@ -13092,7 +13092,7 @@ function genTex(kind) {
   if (kind.startsWith('s:')) return genSan(kind.slice(2)); // 5B-1: variante só do Sanatório
   const z = kind.startsWith('z:'); if (z) kind = kind.slice(2); // 'z:' = variante dos mapas de zumbi (integração 3A); sem ele, o desenho original (PvP)
   if (PAREDE[kind]) return genParede(kind); // paredes da Vila (3A-1)
-  const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+  const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = ctxLeitura(c); // 6-g06
   const noise = (amt, px = 1) => {
     const img = g.getImageData(0, 0, S, S), d = img.data;
     for (let y = 0; y < S; y += px) for (let x = 0; x < S; x += px) { const n = (Math.random() - .5) * amt; for (let yy = 0; yy < px; yy++) for (let xx = 0; xx < px; xx++) { const i = ((y + yy) * S + x + xx) * 4; d[i] += n; d[i + 1] += n; d[i + 2] += n; } }
@@ -13279,7 +13279,7 @@ function paredeGeo(b, k, scale) {
 }
 function genParede(kind) {
   const P = PAREDE[kind], S = 512, PU = S / PAREDE_U, PV = S / PAREDE_V, D = P.dano, R = mkRand(P.seed), r = (a, b) => a + R() * (b - a);
-  const cv = () => { const c = document.createElement('canvas'); c.width = c.height = S; return [c, c.getContext('2d')]; };
+  const cv = () => { const c = document.createElement('canvas'); c.width = c.height = S; return [c, ctxLeitura(c)]; }; // 6-g06
   const yM = m => S - m * PV; // altura em metros -> linha do canvas
   const wrap = (x, w, f) => { f(0); if (x - w < 0) f(S); if (x + w > S) f(-S); }; // repete do outro lado: emenda sem costura
   const noise = (g, amt, px = 1) => {
@@ -13509,7 +13509,7 @@ function propTex(k, tinta) {
     return o;
   };
   const traco = (lst, w) => { // linhas (trincas) desenhadas em canvas, repetidas nas bordas; devolve 0..1
-    const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); g.strokeStyle = '#fff'; g.lineWidth = w; g.lineCap = g.lineJoin = 'round';
+    const c = document.createElement('canvas'); c.width = c.height = S; const g = ctxLeitura(c); g.strokeStyle = '#fff'; g.lineWidth = w; g.lineCap = g.lineJoin = 'round';
     for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) for (const p of lst) { g.beginPath(); for (const [x, y] of p) g.lineTo(x + ox, y + oy); g.stroke(); }
     const d = g.getImageData(0, 0, S, S).data, o = new Float32Array(N); for (let i = 0; i < N; i++) o[i] = d[i * 4 + 3] / 255; return o;
   };
@@ -13932,7 +13932,7 @@ function chaoRuido() {
   const ch = [0, 1, 2].map(c => [oct(4, 11 + c), oct(8, 21 + c), oct(16, 31 + c)]);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) for (let c = 0; c < 3; c++) { const [a, b, e] = ch[c]; d[(y * N + x) * 4 + c] = Math.max(0, Math.min(255, ((a(x, y) * .55 + b(x, y) * .3 + e(x, y) * .15) - .5) * 1.9 * 255 + 128)); }
   // rachaduras: pontos numa grade torta ligados aos vizinhos por linhas quebradas (polígonos de barro seco)
-  const cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d'), r = mkRand(77), K = 6, C = N / K;
+  const cv = document.createElement('canvas'); cv.width = cv.height = N; const g = ctxLeitura(cv), r = mkRand(77), K = 6, C = N / K;
   const pt = Array.from({ length: K * K }, (_, i) => [(i % K + .2 + r() * .6) * C, ((i / K | 0) + .2 + r() * .6) * C]);
   g.fillStyle = '#000'; g.fillRect(0, 0, N, N); g.strokeStyle = '#fff'; g.lineWidth = 1.2; g.lineJoin = 'round';
   for (let j = 0; j < K; j++) for (let i = 0; i < K; i++) for (const [di, dj] of [[1, 0], [0, 1], [1, 1]]) {
@@ -14431,7 +14431,7 @@ const ROUGH_Z = { wood: .8, crate: .78 }; // madeira nova (3A-5) só nos mapas d
 Object.assign(ROUGH, { madeira_podre: .93, tabua_pintada: .8, tecido: .97, lona: .94, estopa: .98 });
 Object.assign(TEXS, { madeira_podre: 1.5, tabua_pintada: 1.5, tecido: 1.5, lona: 2, estopa: 1.2 });
 function genMadTec(kind) {
-  const S = MADTEC[kind], c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+  const S = MADTEC[kind], c = document.createElement('canvas'); c.width = c.height = S; const g = ctxLeitura(c); // 6-g06
   const R = mkRand(atHash('3a5:' + kind)), r = (a, b) => a + R() * (b - a), T = 6.2832, N = S * S;
   const img = g.createImageData(S, S), D = img.data, sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   // ruído suave que repete nas bordas (0..1), oitavas a partir de células de "cel" px
@@ -15403,6 +15403,49 @@ ATMOS_POST.push((mapId, AT, M) => {
   }
   if (bat.length) put(mergeGeos(bat), worldMat('batente', SAN1.batente, true), true);
 });
+// ===== 6-g06: carregamento da Vila =====
+// - mapa fresco: no host, startHost/lobbyStart montam o mapa e, na mesma pilha de chamadas, zStartGame manda 'zreset', que montava
+//   tudo de novo (cenário, atmosfera, texturas de canvas, um segundo aquecimento). MAPA_FRESCO vale só até o fim da tarefa atual
+//   (microtarefa): qualquer 'zreset' que chegue depois (fim de partida, cliente) monta de novo como antes.
+// - aquecimento: renderer.compile(o, cam, cena) percorre a cena INTEIRA atrás das luzes a cada chamada, e o aquecimento chama uma vez
+//   por material (~1200 na Vila). A cena-alvo passa a ser um espelho da cena (Object.create: mesma névoa, ambiente e fundo) que só
+//   lista as luzes visíveis, colhidas uma vez por pedaço do aquecimento. A chave dos programas é a mesma; sai uma varredura do mapa por pedaço.
+// - canvas lidos de volta (getImageData) nascem com willReadFrequently: ficam na memória, sem a leitura da placa a cada ruído.
+var MAPA_FRESCO = null, WARM_ALVO = null; // var/function: genTex pode rodar antes desta linha na carga do módulo
+function warmAlvo(g) {
+  WARM_ALVO ||= new WeakMap(); let a = WARM_ALVO.get(g);
+  if (!a) { a = Object.create(g); a.luzes = []; a.traverseVisible = f => { for (const l of a.luzes) f(l); }; a.sombra = Object.create(a); a.sombra.fog = a.sombra.environment = null; WARM_ALVO.set(g, a); } // sombra: como o _emptyScene do shadowMap
+  return a;
+}
+function warmLuzes(g) { const a = warmAlvo(g); a.luzes.length = 0; g.traverseVisible(o => { if (o.isLight) a.luzes.push(o); }); }
+// - sombras: o quadro final do aquecimento compilava as variantes de profundidade do shadowMap uma a uma, travando (o compile() não as vê).
+//   warmSombras monta, para cada combinação que o shadowMap vai usar, um espelho do objeto (Object.create: mesmo tipo, geometria, ossos,
+//   instâncias) com um MeshDepthMaterial igual ao que o shadowMap montaria; ele entra na fila com alvo de render (sombra = render target).
+const WARM_LADO = { [THREE.FrontSide]: THREE.BackSide, [THREE.BackSide]: THREE.FrontSide, [THREE.DoubleSide]: THREE.DoubleSide };
+function warmSombras(items, warm) {
+  const temp = []; if (!renderer.shadowMap.enabled || renderer.shadowMap.type === THREE.VSMShadowMap) return temp;
+  let luz = false; scene.traverseVisible(o => { if (o.isLight && o.castShadow && !o.isPointLight) luz = true; }); if (!luz) return temp;
+  const inW = new Set(), seen = new Set(); warm.traverse(o => inW.add(o));
+  scene.traverse(o => {
+    if (!o.isMesh || !o.material || !(o.castShadow || (inW.has(o) && !o.material.transparent))) return; // como no quadro final do aquecimento
+    const ga = o.geometry?.attributes || {}, cust = o.customDepthMaterial;
+    for (const m of [o.material].flat()) {
+      if (!m.visible) continue;
+      const lado = m.shadowSide != null ? m.shadowSide : WARM_LADO[m.side];
+      const k = [o.type, !!o.instanceColor, !!o.morphTargetInfluences, !!ga.uv1, !!ga.uv2, !!ga.uv3, o.receiveShadow, cust ? cust.uuid : [lado, m.map?.channel ?? -1, m.alphaMap?.channel ?? -1, m.alphaTest > 0, !!(m.displacementMap && m.displacementScale), m.wireframe, !!m.clipShadows].join()].join();
+      if (seen.has(k)) continue; seen.add(k);
+      let d = cust;
+      if (!d) {
+        d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }); temp.push(d);
+        Object.assign(d, { side: lado, wireframe: m.wireframe, alphaMap: m.alphaMap, alphaTest: m.alphaTest, map: m.map, clipShadows: m.clipShadows, clippingPlanes: m.clippingPlanes, clipIntersection: m.clipIntersection,
+          displacementMap: m.displacementMap, displacementScale: m.displacementScale, displacementBias: m.displacementBias });
+      }
+      const px = Object.create(o); px.material = d; px.children = []; items.push([px, camera, scene, 1]);
+    }
+  });
+  return temp;
+}
+function ctxLeitura(c) { return c.getContext('2d', { willReadFrequently: true }); }
 function buildMap(id) {
   const M = MAPS[id] || MAPS.arena; curMapId = MAPS[id] ? id : 'arena'; curMap = M; texZ = curMapId === 'vila'; // texturas da fase 3 só na Vila (o Sanatório recebe as dele na fase 5)
   texS = curMapId === 'sanatorio'; // 5B-1
@@ -15460,6 +15503,7 @@ function buildMap(id) {
   else { ZC.on = false; ZC.world = null; buildNav(M); }
   renderer.shadowMap.needsUpdate = true;
   warmUp(M);
+  MAPA_FRESCO = curMapId; queueMicrotask(() => { MAPA_FRESCO = null; }); // 6-g06
 }
 // Aquecimento: compila os shaders agora. Senão cada material novo que entra na tela ao girar compila na hora e
 // trava a câmera por alguns frames. Vai em pedaços (um material por vez, ~12 ms por tarefa): de uma vez só, a
@@ -15483,20 +15527,22 @@ function warmUp(M) {
     const k = [o.material].flat().map(m => m.uuid).join() + o.type + !!o.instanceColor + !!ga.color + !!ga.tangent + !!o.morphTargetInfluences;
     if (!seen.has(k)) { seen.add(k); items.push([o, cam, g]); }
   });
+  const sombraMats = warmSombras(items, warm); // 6-g06
   const tex = new Set(); for (const [o] of items) for (const m of [o.material].flat()) for (const v of Object.values(m)) if (v?.isTexture && !v.isRenderTargetTexture && v.image) tex.add(v);
   const texs = [...tex], W = WARM = { i: 0, pend: [], tm: 0, n: items.length + texs.length, t0: performance.now() };
   W.end = () => {
     clearTimeout(W.tm); scene.remove(warm); vmScene.remove(vmWarm); if (WARM === W) WARM = null; warmMsg();
-    vmWarm.traverse(o => o.geometry?.dispose());
+    vmWarm.traverse(o => o.geometry?.dispose()); for (const d of sombraMats) d.dispose(); // 6-g06
     warm.traverse(o => { o.skeleton?.dispose(); if (!o.geometry?.userData.keep) o.geometry?.dispose(); if (o.material?.map && o.material.map !== SOFT && !Object.values(GTX || {}).includes(o.material.map)) o.material.map.dispose(); });
   };
   const step = () => {
     const t = performance.now();
     if (W.i < items.length) {
+      warmLuzes(scene); warmLuzes(vmScene); // 6-g06
       do {
-        const [o, cam, g] = items[W.i++]; if (!o.parent) continue; // saiu de cena enquanto isso
-        renderer.setRenderTarget(CFG.gfx === 'alto' ? composer.readBuffer : null); // no Alto a cena é desenhada no alvo do pós-processamento (outra variante do shader)
-        try { for (const m of renderer.compile(o, cam, g)) { const pg = renderer.properties.get(m).currentProgram; if (pg) W.pend.push(pg); } } finally { renderer.setRenderTarget(null); }
+        const [o, cam, g, sb] = items[W.i++]; if (!o.parent) continue; // saiu de cena enquanto isso
+        renderer.setRenderTarget(sb || CFG.gfx === 'alto' ? composer.readBuffer : null); // no Alto a cena é desenhada no alvo do pós-processamento (outra variante do shader); sb (6-g06): variante de sombra, também num alvo
+        try { for (const m of renderer.compile(o, cam, sb ? warmAlvo(g).sombra : warmAlvo(g))) { const pg = renderer.properties.get(m).currentProgram; if (pg) W.pend.push(pg); } } finally { renderer.setRenderTarget(null); }
         if (!par) while (W.pend.length) W.pend.pop().getUniforms(); // sem a extensão: espera este programa aqui (trava só ele)
       } while (W.i < items.length && performance.now() - t < 12);
       warmMsg(W); W.tm = setTimeout(step, 0); return;
@@ -15511,6 +15557,7 @@ function warmUp(M) {
     // travava segundos. Para ser leve, nada é pintado: cada malha entra com 0 vértices (sobe e compila, mas não desenha);
     // o próximo frame() desenha de verdade.
     warm.visible = vmWarm.visible = true;
+    renderer.compile(new THREE.Object3D(), camera, scene); // 6-g06: monta as luzes do estado de render da cena (o passe de sombra usa o da cena, não o do espelho)
     const fc = [], inW = new Set(), dr = new Map(); warm.traverse(o => inW.add(o)); // o mapa inteiro também, sem recorte: sobe todas as malhas
     for (const g of [scene, vmWarm]) g.traverse(o => { fc.push([o, o.frustumCulled, o.castShadow]); o.frustumCulled = false; if (inW.has(o) && o.isMesh && !o.material.transparent) o.castShadow = true; if (o.geometry && !dr.has(o.geometry)) dr.set(o.geometry, o.geometry.drawRange.count); });
     try { for (const g of dr.keys()) g.drawRange.count = 0; renderer.shadowMap.needsUpdate = true; cullTodo = true; renderScene(); renderer.clear(); }
@@ -20922,8 +20969,8 @@ ATMOS_POST.push((mapId, AT, M) => {
   cont._ms = +(performance.now() - t0).toFixed(1); window.__DESGS = cont; // testes: marcas de cada tipo em cada área e onde ([tipo, x, y, z, nx, nz])
 });
 // ---------- texturas desenhadas em canvas ----------
-function canvasTex(w, h, draw) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+function canvasTex(w, h, draw, leitura) { // leitura: o desenho usa getImageData (6-g06)
+  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(leitura ? ctxLeitura(c) : c.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.userData.tmp = true; return t;
 }
 function chalkTex(title, price) {
@@ -22930,7 +22977,7 @@ function onMsgInner(m) {
       break;
     // ----- modo zumbis -----
     case 'zreset':
-      if (curMapId) buildMap(curMapId);
+      if (curMapId && MAPA_FRESCO !== curMapId) buildMap(curMapId); // 6-g06: o mapa que acabou de ser montado nesta mesma tarefa já está no estado inicial
       me.alive = false; me.downed = false; C.spec = null;
       for (const rp of R.values()) { rp.alive = rp.dead = rp.downed = false; rp.buf = []; }
       break;
@@ -23696,6 +23743,10 @@ function lobbyStart() {
   broadcast({ t: 'start', st }, C.myId); // os outros montam o mapa antes do primeiro "spawn"
   buildMap(st.map); enterGame(); srvStartMatch(); lobbyUI();
 }
+function lobbyStartAviso() { // 6-g06: mostra "Carregando o mapa" e espera dois quadros (o aviso chega à tela) antes da montagem, que trava a aba
+  if (LB.indo) return; LB.indo = true; warmMsg({ i: 0, n: 1 });
+  requestAnimationFrame(() => requestAnimationFrame(() => { LB.indo = false; try { lobbyStart(); } finally { if (!WARM) warmMsg(); } }));
+}
 function lobbyUI() {
   const el = $('#lobby'); if (!el) return;
   const on = LB.on && !inGame, host = NET.isHost;
@@ -23709,7 +23760,7 @@ function lobbyUI() {
     if (host) {
       LB.getForm = matchForm($('#lbForm'), S.st);
       $('#lbForm').addEventListener('click', () => setTimeout(() => { S.st = C.st = LB.getForm(); lobbySync(); }));
-      $('#lbGo').onclick = lobbyStart;
+      $('#lbGo').onclick = lobbyStartAviso; // 6-g06
     }
     $('#lbOut').onclick = leaveGame;
     frPing();
