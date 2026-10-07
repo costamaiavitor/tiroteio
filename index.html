@@ -21955,6 +21955,29 @@ function b06Composer() { if (CFG.gfx !== 'alto') { composer.renderTarget1.dispos
   }; }
 { const q = applyQuality; applyQuality = () => { q(); b06Composer(); }; }
 // ===== O1-B06 fim =====
+// ===== O1-B07: geometria liberada na troca de mapa e moldes de zumbi sem cópias =====
+// Medido (troca de mapa, glmem do B06): os buffers de vértices cresciam a cada troca (Vila 16,5 -> Sanatório 18,5 -> Arena 9 MB, mas
+// com 3.700 buffers de instâncias de mapas que já tinham saído). Duas fontes:
+// - disposeGroup descartava a geometria, mas não a InstancedMesh: instanceMatrix e instanceColor (1 buffer cada) ficavam na placa;
+// - instanciadas que a junção do O1-B01 tirou da cena (só voltam se a área animar) não estão no world na hora da troca: a geometria
+//   delas (que o aquecimento do O1-A34 sobe de novo) e as instâncias ficavam para trás.
+const B07 = { b01: null };
+{ const f = b01Fim; b01Fim = F => { B07.b01 = F; return f(F); }; } // instanciadas da junção do mapa montado
+{ const dg = disposeGroup; disposeGroup = gr => { dg(gr); gr.traverse(o => { if (o.isInstancedMesh) o.dispose(); }); }; } // dispose só solta a placa: se voltar a ser desenhada, sobe de novo
+{ const mapa = buildMap; buildMap = id => { for (const f of B07.b01 || []) if (!f.o.parent) { f.o.geometry.dispose(); f.o.dispose(); } B07.b01 = null; mapa(id); }; }
+// Rodadas longas (Vila, 15 rodadas matando tudo): os buffers subiam 16,7 -> 26 MB e o heap ~+30 MB, todo o aumento nos moldes de
+// zumbi (ZTPL): um por tipo + cores de pele, roupa e calça (até ~300), cada um com a sua cópia de posição, normal, ossos e índice,
+// mas só a cor por vértice muda entre os moldes do mesmo tipo (conferido: 213 moldes = 34,6 MB, 7,5 MB sem as repetições).
+// O molde novo passa a usar os mesmos atributos (o mesmo buffer na placa) de um molde anterior igual; a cor continua dele.
+const B07_ZAT = new Map(); // nome + tamanho -> atributos de moldes já montados
+function b07Igual(a, b) { if (a.itemSize !== b.itemSize || a.normalized !== b.normalized || a.array.constructor !== b.array.constructor || a.array.length !== b.array.length) return false; const x = a.array, y = b.array; for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false; return true; }
+function b07Partilha(geo) {
+  const um = (n, a) => { const k = n + ':' + a.array.length; let L = B07_ZAT.get(k); if (!L) B07_ZAT.set(k, L = []); const e = L.find(b => b07Igual(a, b)); if (e) return e; L.push(a); return a; };
+  for (const [n, a] of Object.entries(geo.attributes)) if (n !== 'color') { const e = um(n, a); if (e !== a) geo.setAttribute(n, e); }
+  if (geo.index) { const e = um('index', geo.index); if (e !== geo.index) geo.setIndex(e); }
+}
+{ const sk = zSkinGeo; zSkinGeo = (g, bones) => { const out = sk(g, bones); for (const geo of Object.values(out)) b07Partilha(geo); return out; }; }
+// ===== O1-B07 fim =====
 const zIcons = {};
 function zIconTex(k) {
   if (zIcons[k]) return zIcons[k];
