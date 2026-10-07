@@ -2646,7 +2646,8 @@ function A_mtx(O, x, y, z, sx, sy, sz) { O.position.set(x, y, z); O.scale.set(sx
       A.box(px, .55, pz - .06, .08, .38, .1, A.mat('rock', 0x8a867a)); }
     // ---- 6. sino de bronze à vista no campanário (vãos nas 4 faces, sino no vão sul) ----
     const vao = A.flat(0x0a0806), TX = 9.2, TZ = -38.5;
-    A.plane(TX, 10, TZ + 1.71, 1.2, 1.6, vao); A.plane(TX, 10, TZ - 1.71, 1.2, 1.6, vao, Math.PI); A.plane(TX + 1.71, 10, TZ, 1.2, 1.6, vao, Math.PI / 2); A.plane(TX - 1.71, 10, TZ, 1.2, 1.6, vao, -Math.PI / 2);
+    const VO = 1.74; // O1-B18: 4 cm fora da torre (a 1 cm brigava com a parede de longe, z-fighting)
+    A.plane(TX, 10, TZ + VO, 1.2, 1.6, vao); A.plane(TX, 10, TZ - VO, 1.2, 1.6, vao, Math.PI); A.plane(TX + VO, 10, TZ, 1.2, 1.6, vao, Math.PI / 2); A.plane(TX - VO, 10, TZ, 1.2, 1.6, vao, -Math.PI / 2);
     const bronze = Object.assign(A.mat('latao', 0x7a6234), { side: THREE.DoubleSide });
     const bell = A.dyn(A.group(TX, 10.75, TZ + 1.62));
     A.box(0, -.02, 0, .9, .1, .12, madE, 0, bell);
@@ -5370,6 +5371,7 @@ ATMOS.vila.c1 = A => {
   // névoa rasteira (6 planos aditivos derivando) e anéis na água
   const fogM = new THREE.MeshBasicMaterial({ map: SOFT, color: 0x3a4236, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: .55 }), mist = [];
   for (let i = 0; i < 6; i++) { const m = A.dyn(A.plane(0, .4 + i * .05, 0, 14, 10, fogM, 0, -Math.PI / 2)); m.renderOrder = 2; mist.push({ m, a: A.r(0, 6), r: A.r(8, 24), s: A.r(.02, .05) }); }
+  for (const f of mist) f.m.position.set(A.cx + Math.cos(f.a) * f.r, f.m.position.y, A.cz + Math.sin(f.a * 1.3) * f.r); // O1-B18: nasce na órbita (antes ficava na origem, na Praça, até alguém chegar ao Pântano)
   const ringM = [0, 1].map(() => new THREE.MeshBasicMaterial({ color: 0xb8c0a0, transparent: true, depthWrite: false, opacity: 0, blending: THREE.AdditiveBlending }));
   const rings = ringM.map(m => { const r = A.dyn(A.mesh(new THREE.RingGeometry(.9, 1, 24).rotateX(-Math.PI / 2), m)); r.visible = false; r.renderOrder = 2; return { r, m, t: -1 }; });
   const ring = (x, z, i) => { const R = rings[i % 2]; R.r.position.set(x, .1, z); R.t = 0; R.r.visible = true; };
@@ -6109,7 +6111,7 @@ const _g6M = new THREE.Matrix4(), _g6P = new V3(), _g6Q = new THREE.Quaternion()
   // ================================================================ Pico da montanha: falsa segurança
   ATMOS.vila.b02 = A => {
     // pedras do tema: granito claro com geada no topo (a Encosta fica com a terra vermelha)
-    const gran = A.mat('rock', 0x8a9096), gea = A.mat('snow', 0xc0ccd8);
+    const gran = A.mat('rock', 0x575b60), gea = A.mat('snow', 0x8c98a4); // O1-B18: granito e geada mais escuros (no luar viravam blocos brancos de longe)
     for (const b of genBoxes(A, 'rock')) { capa(A, b, gran); A.box(b.x, b.h - .08, b.z, b.w + .1, .12, b.d + .1, gea); }
     // banco de pedra (a caixa de metal do tema) e o alpendre
     const bc = genBoxes(A, 'metal')[0] || { x: 173.6, z: -208.6, w: 6, d: 2, h: 1.2 };
@@ -11186,6 +11188,7 @@ ATMOS.sanatorio.r13 = A => {
       for (const s of [-1, 1]) { const r = A.box(s * .25, .14, .2, .05, .03, 2.4, A.mat('wood', 0x7a5a38), 0, bt); r.rotation.y = s * .04; } }
     A.cyl(46.15, -.2, 85.4, .1, .12, .95, A.mat('wood', 0x4a3424), 8);
     const corda = A.dyn(A.box(0, 0, 0, .02, .02, 1, A.flat(0x9a8a62))); corda.geometry.translate(0, -.01, .5);
+    corda.position.set(46.15, .7, 85.4); corda.lookAt(44.2, .35, 84.8); corda.scale.z = 2; // O1-B18: já presa ao barco (antes ficava na origem até a animação rodar)
     // 6. sinos de vento de vidro na ponta norte do píer (parados, mesmo quando tocam) e 7. o fio de lanternas de papel
     const PX = 46.35, PZ = 82.45, PH = 2.9;
     if (A.livre(PX, PZ, 2)) { A.cyl(PX, 0, PZ, .05, .06, PH, A.mat('wood', 0x3a2a1e), 6); A.box(PX + .2, PH - .1, PZ, .5, .04, .04, mad); A.cyl(PX + .32, PH - .1, PZ, .1, .1, .02, mad, 10);
@@ -12112,6 +12115,25 @@ ATMOS_POST.push((mapId, AT, M) => {
     }
   } });
 });
+
+// ===== O1-B18: bancos de neblina da Vila rasteiros (o zumbi atrás do banco continua legível; sem custo de quadro) =====
+// O banco em pé (3,2 m, centro a 1,25 m) cobria o tronco e a cabeça do zumbi: o contraste dele (Weber) caía de ~0,63 para ~0,30.
+// Na Vila o banco desce 0,4 m e a textura fica densa de 0,3 a 1 m e rala (30%) acima de 1,6 m: neblina que abraça o chão, com a
+// cabeça e os ombros por cima. Some no chão (sem a linha dura onde o plano corta o terreno). Mesma malha e mesmo programa: só uma
+// textura a mais (1 canvas 256²) para todos os bancos da Vila.
+const B18 = { banco: { dy: -.4, op: 1.15, perfil: [.3, 1, 1.6, .3] } }; // perfil (m acima do chão): [cheio a partir de, cheio até, ralo a partir de, opacidade no alto]
+for (const k in NEV.baixa.vila) NEV.baixa.vila[k][3] = B18.banco.op; // 4º campo = opacidade dos bancos da área (o 3º, longe da água, continua vazio)
+ATMOS_POST.push((mapId, AT) => {
+  if (mapId !== 'vila') return;
+  const bs = AT.nev.filter(n => n[0] === 'banco').map(n => n[4]); if (!bs.length) return;
+  const B = NEV.banco, y0 = B.y + B18.banco.dy - B.h / 2, v = h => clamp((h - y0) / B.h, 0, 1), [h0, h1, h2, fim] = B18.banco.perfil, im = bs[0].material.map.image;
+  const t = canvasTex(im.width, im.height, (g, w, h) => { g.drawImage(im, 0, 0); g.globalCompositeOperation = 'destination-in';
+    const gr = g.createLinearGradient(0, h, 0, 0); // de baixo (v = 0) para cima
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(v(0), 'rgba(0,0,0,0)'); gr.addColorStop(v(h0), '#000'); gr.addColorStop(v(h1), '#000'); gr.addColorStop(v(h2), `rgba(0,0,0,${fim})`); gr.addColorStop(1, `rgba(0,0,0,${fim})`);
+    g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+  for (const m of bs) { m.material.map = t; m.position.y += B18.banco.dy; }
+});
+// ===== O1-B18 fim =====
 
 // ===== 5B-4: névoa, vapor e volume do Sanatório (cor por área, névoa que fecha nas bordas, rasteira, véus de vapor e fumaça, fachos de luar pelas janelas) =====
 // Só visual e só no Sanatório: a Vila e os PvP não leem nada daqui (tabelas por mapa; ramo próprio no ATMOS_POST). Planos poucos e grandes, sem colisão e sem sombra; nada aloca por quadro.
@@ -13509,6 +13531,8 @@ const PAREDE = {
 }, PAREDE_U = 6, PAREDE_V = 4; // metros de parede por textura (horizontal, vertical)
 Object.assign(BUMP, { vila_pedra: 1.5, vila_pedra2: 1.7, vila_reboco: 1.3, vila_tijolo: 2.2 });
 Object.assign(ROUGH, { vila_pedra: .92, vila_pedra2: .94, vila_reboco: .9, vila_tijolo: .88 });
+// O1-B18: muros das bordas da Vila com menos reboco caído e lascas menores (de longe as manchas escuras ainda liam como camuflagem)
+PAREDE.vila_pedra2.reboco = .76; PAREDE.vila_pedra2.lk = .5;
 const paredeKind = (th, x, z) => th[2] && Math.max(Math.abs(x), Math.abs(z)) > th[2][0] ? th[2][1] : th[0];
 // UV presa ao mundo: u corre ao longo da parede (com uma fase por linha de muro, para muros vizinhos não repetirem o
 // desenho) e v é a altura desde o chão. Parede alta (igreja) estica até 1,5x para o topo encharcado ficar no topo.
