@@ -13036,6 +13036,18 @@ const gradePass = new ShaderPass({
       gl_FragColor = vec4(c, 1.0); }`,
 });
 composer.addPass(new RenderPass(scene, camera)); composer.addPass(vmPass); composer.addPass(bloomPass); composer.addPass(new OutputPass()); composer.addPass(gradePass);
+// ===== 6-g01: engasgos do Alto (resolução de MSAA do composer) =====
+// Medido na fase 6 (g01, Vila no Alto): o caminho do composer custava ~15-20 ms de placa a mais que o desenho direto da mesma
+// cena (mesma sombra de 4096), com picos de 100+ ms. A cena e a arma vão para o alvo com MSAA (readBuffer = renderTarget2) e
+// cada render() nele termina num blitFramebuffer de cor E profundidade (o three r160 sempre resolve a profundidade); no
+// ANGLE/D3D11 resolver profundidade multiamostrada é caro. Ninguém lê essa profundidade resolvida, então: (1) o alvo 1, que só
+// recebe o OutputPass (tela cheia, sem geometria), fica sem MSAA e sem profundidade; (2) o alvo da cena resolve só a cor
+// (__ignoreDepthValues, o mesmo caminho que o three usa no WebXR). A imagem não muda.
+const RT_CENA = composer.renderTarget2; composer.renderTarget1.samples = 0; composer.renderTarget1.depthBuffer = false;
+function g01Composer() { // antes de cada composer.render(): o setSize do alvo (resize) apaga as propriedades, então refaz sempre
+  if (composer.readBuffer !== RT_CENA) composer.swapBuffers(); // a cena cai sempre no alvo com MSAA (o outro não tem profundidade)
+  renderer.properties.get(RT_CENA).__ignoreDepthValues = true;
+}
 // Médio (integração 3A): cor da área (o mesmo gradePass do Alto, sem bloom) só onde há atmosfera por área (Vila). A cena vai
 // direto para a tela como antes (com o antisserrilhado do canvas), é copiada para uma textura de 8 bits (já em tom e sRGB,
 // como a saída do OutputPass) e o gradePass desenha por cima. Bem mais barato que um alvo HalfFloat com MSAA.
@@ -24043,7 +24055,7 @@ function frame() {
 }
 function renderScene() {
   sky.position.copy(camera.position); if (CULL.length) zCull();
-  if (CFG.gfx === 'alto') { gradePass.uniforms.time.value = now % 100; composer.render(); }
+  if (CFG.gfx === 'alto') { gradePass.uniforms.time.value = now % 100; g01Composer(); composer.render(); } // 6-g01
   else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); if (posLeve()) gradeMedio(); } // Médio no Sanatório: cor da área (a Vila saiu na validação final)
 }
 function tick(dt) {
