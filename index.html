@@ -16622,7 +16622,7 @@ function gunModel(id, fp = false, skin = null) {
         ud.mag = mag; ud.magUp = 1; ud.magGrab = new V3(0, .085, .035);
         mz = -.3; my = .04; ud.lh = new V3(-.02, -.075, .035); ud.rh = new V3(0, -.055, .04); ud.pistol = 1; ud.vm = [.012, .012, -.03];
         irons(.118, .05, -.2, { notch: 1, base: .02, fbase: .02 });
-        r8(g, ud, { d: [0, 1, .25], ins: .11, pop: .035, drop: 1, H: [-.04, -.005, .01], rz: .45, rx: .12, f: pap ? 0x30e0ff : 0xff3030 }); // (a8) bateria sai por cima
+        r8(g, ud, { d: [0, 1, .25], ins: .11, pop: .035, drop: 1, H: [-.04, -.005, .01], rz: .45, rx: .12, f: pap ? 0x30e0ff : 0xff3030, fim: 1 }); // (a8) bateria sai por cima
         break;
       }
       const body = pap ? M.metal : M.red;
@@ -16636,7 +16636,7 @@ function gunModel(id, fp = false, skin = null) {
       ud.mag = mag; ud.magUp = 1; ud.magGrab = new V3(0, .095, -.03);
       mz = -.3; my = .04; ud.lh = new V3(-.02, -.075, .035); ud.rh = new V3(0, -.055, .04); ud.pistol = 1; ud.vm = [.012, .012, -.03];
       irons(.112, .06, -.195, { notch: 1, base: .03, fbase: .01 });
-      r8(g, ud, { d: [0, 1, .25], ins: .11, pop: .035, drop: 1, H: [-.04, -.005, .01], rz: .45, rx: .12, f: pap ? 0xff3355 : 0x33ff55 }); // (a8) bateria sai por cima
+      r8(g, ud, { d: [0, 1, .25], ins: .11, pop: .035, drop: 1, H: [-.04, -.005, .01], rz: .45, rx: .12, f: pap ? 0xff3355 : 0x33ff55, fim: 1 }); // (a8) bateria sai por cima
       break;
     }
     case 'thunder': {
@@ -16650,7 +16650,7 @@ function gunModel(id, fp = false, skin = null) {
       grip(g, -.08, -.05, .1, M.woodDark, .045); add(g, EX([[-.18, .04], [-.32, .03], [-.33, .0], [-.33, -.06], [-.32, -.07], [-.18, -.05]], .06, null, .006), br);
       mz = -.44; my = .04; ud.lh = new V3(-.06, -.03, -.16); ud.vm = [-.02, -.02, .02];
       irons(.18, -.04, -.41, { base: .09, fbase: .014 }); // (a8) alça alta (passa por cima da célula) e massa na boca larga
-      r8(g, ud, { d: [0, 1, .2], ins: .13, pop: .045, drop: 1, H: [-.035, -.012, .01], rz: .35, rx: .1, dy: -.02, f: 0xcfeaff }); // (a8) célula de cima
+      r8(g, ud, { d: [0, 1, .2], ins: .13, pop: .045, drop: 1, H: [-.035, -.012, .01], rz: .35, rx: .1, dy: -.02, f: 0xcfeaff, fim: 1 }); // (a8) célula de cima
       break;
     }
     case 'ppsh': { // PPSh-41 (coronha de madeira inteiriça, camisa furada, tambor) e Thompson (punho, empunhadura, aletas, tambor)
@@ -16745,7 +16745,7 @@ function gunModel(id, fp = false, skin = null) {
       ud.mag = mag; ud.magUp = 1; ud.magGrab = new V3(-.045, .1, -.03);
       ud.lh = new V3(-.005, -.03, -.24); ud.rh = new V3(0, -.08, .06);
       irons(.08, .06, -.42, { notch: 1, base: .03, fbase: .05 });
-      r8(g, ud, { d: [-.35, 1, 0], ins: .11, pop: .03, drop: 1, H: [-.025, -.015, .01], rz: .4, rx: .1, f: pap ? 0xff5050 : 0x66ccff }); // (a8) troca a lâmpada
+      r8(g, ud, { d: [-.35, 1, 0], ins: .11, pop: .03, drop: 1, H: [-.025, -.015, .01], rz: .4, rx: .1, f: pap ? 0xff5050 : 0x66ccff, fim: 1 }); // (a8) troca a lâmpada
       break;
     }
     case 'howl': { // Winter's Howl: corpo gelado, anéis, tubo de gelo e boca em sino
@@ -16758,7 +16758,7 @@ function gunModel(id, fp = false, skin = null) {
       grip(g, -.05, -.01, .09, M.polymer); guard(g, -.02, -.01);
       mz = -.37; my = .03; ud.lh = new V3(-.005, -.02, -.2);
       irons(.124, .03, -.22, { notch: 1, base: .05, fbase: .06 });
-      r8(g, ud, { d: [0, 1, -.3], ins: .11, pop: .035, drop: 1, H: [-.04, -.005, -.04], rz: .25, rx: .15, dy: -.06, dz: -.04, f: pap ? 0x7fd8ff : 0xcff4ff }); // (a8) tubo de gelo de cima
+      r8(g, ud, { d: [0, 1, -.3], ins: .11, pop: .035, drop: 1, H: [-.04, -.005, -.04], rz: .25, rx: .15, dy: -.06, dz: -.04, f: pap ? 0x7fd8ff : 0xcff4ff, fim: 1 }); // (a8) tubo de gelo de cima
       break;
     }
     case 'law': { // M72 LAW: tubo verde com mira rebatível e o foguete na boca
@@ -16869,7 +16869,7 @@ function mk3(fp, c, metal, rough) { const k = (fp ? 'f' : 't') + c; return MK3[k
 function r8(g, ud, o) { ud.rig = 'r8'; ud.r8 = { ...o, d: new V3(...o.d).normalize(), H: new V3(...o.H) }; ud.flashC = o.f; }
 const _r8 = new V3();
 function r8Reload(ud, t, o, ev) {
-  const R = ud.r8, M = ud.mag, M0 = ud.magRest, L = ud.lhRest, h = ud.lhG?.position, tilt = seg(t, 0, .16) * (1 - seg(t, .8, .96));
+  const R = ud.r8, M = ud.mag, M0 = ud.magRest, L = ud.lhRest, h = ud.lhG?.position, tilt = seg(t, 0, .16) * (1 - (R.fim ? seg(t, W10.fim[0], W10.fim[1]) : seg(t, .8, .96))); // 6-w10: R.fim
   o.rz += R.rz * tilt; o.rx += R.rx * tilt; o.y += (R.dy || 0) * tilt; o.z += (R.dz || 0) * tilt;
   ev('out', .1, () => play('magout')); ev('in', .6, () => play('magin')); if (R.drop) ev('drop', .22, () => dropMag(ud));
   if (!h) return;
@@ -18708,6 +18708,27 @@ function lunetaCentro(o, ud, ak, hx, hy, tx, ty) {
   if (vmGun && ud.baseYaw != null) vmGun.rotation.y = lerp(ud.baseYaw, .05, kl);
 }
 // ===== fim 6-w08 =====
+// ===== 6-w10: armas maravilha (Ray Gun, Mk II, Arma Trovão, Wunderwaffe, Winter's Howl) =====
+// fim: janela (fração da recarga) em que a arma volta do giro da recarga; com 1 no fim ela chega ao repouso junto com a barra (antes
+// em .96: a arma parecia pronta 0,11-0,15 s antes de poder atirar).
+// cone: opacidade no pico do cone do tiro (trovão e gelo); o cone é aditivo, some na boca e na base (sem a borda de polígono).
+const W10 = { fim: [.84, 1], cone: { trovao: .3, gelo: .3 } };
+FRAME_ARMA.wintershowl = { hi: [.14, .08, .07] }; // corpo grosso e curto: vinha a 0,147 m do olho no quadril, enchendo um terço da tela
+ADS.recuo.wunderwaffe = .035; // a traseira de bronze e a coronha enchiam o pé da tela na mira (olho a 0,09 m)
+let w10Geo = null; const w10Pool = [];
+function w10Cone(o, f, len, rad, col, op, life) { // cone do tiro, de uma peça guardada (sem geometria nem material novos por tiro)
+  if (!w10Geo) { // cone unitário aberto (ponta em +y), alfa por vértice: 0 na boca, pico a 18% e 0 na base
+    w10Geo = new THREE.ConeGeometry(1, 1, 24, 6, true); const p = w10Geo.attributes.position, c = new Float32Array(p.count * 4);
+    for (let i = 0; i < p.count; i++) { const t = .5 - p.getY(i); c.set([1, 1, 1, smooth(t / .18) * Math.pow(1 - t, 1.5)], i * 4); }
+    w10Geo.setAttribute('color', new THREE.BufferAttribute(c, 4));
+  }
+  const m = w10Pool.pop() || new THREE.Mesh(w10Geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+  m.userData.pool = w10Pool; m.geometry = w10Geo; m.material.color.set(col); m.material.opacity = op;
+  m.scale.set(rad, len, rad); m.quaternion.setFromUnitVectors(_w10Y, f); m.position.copy(o).addScaledVector(f, len / 2);
+  addFx(m, life, (k, q) => { q.material.opacity = op * (1 - k) * (1 - k); });
+}
+const _w10Y = new V3(0, -1, 0);
+// ===== fim 6-w10 =====
 const _adsV = new V3();
 function adsEye(gun, ud) {
   const sp = ud.sight; ud.adsZ = null; if (!sp) return;
@@ -22040,9 +22061,7 @@ function zSplash(p, w, dmgBy, n) {
   zBoomFx(p, w);
 }
 function thunderFx(o, f, range) {
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(range * .45, range, 18, 1, true), new THREE.MeshBasicMaterial({ color: 0xcfeaff, transparent: true, opacity: .3, side: THREE.DoubleSide, depthWrite: false }));
-  cone.quaternion.setFromUnitVectors(new V3(0, -1, 0), f); cone.position.copy(o).addScaledVector(f, range / 2);
-  addFx(cone, .35, (k, m) => { m.material.opacity = .3 * (1 - k); });
+  w10Cone(o, f, range, range * .45, 0xcfeaff, W10.cone.trovao, .35); // 6-w10
 }
 function thunderBlast(w, mz) { // Arma Trovão: onda de ar que derruba tudo num cone
   const o = camera.position.clone(), f = new V3(0, 0, -1).applyQuaternion(camera.quaternion), range = w.pap ? 18 : 14, cosA = Math.cos(w.pap ? .8 : .62);
@@ -22058,9 +22077,7 @@ function thunderBlast(w, mz) { // Arma Trovão: onda de ar que derruba tudo num 
   me.shake = Math.max(me.shake, .4);
 }
 function frostFx(o, f, w) {
-  const R = w.frost.range, cone = new THREE.Mesh(new THREE.ConeGeometry(R * Math.tan(Math.acos(w.frost.cos)), R, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xdff6ff, transparent: true, opacity: .35, side: THREE.DoubleSide, depthWrite: false }));
-  cone.quaternion.setFromUnitVectors(new V3(0, -1, 0), f); cone.position.copy(o).addScaledVector(f, R / 2);
-  addFx(cone, .3, (k, m) => { m.material.opacity = .35 * (1 - k); });
+  const R = w.frost.range; w10Cone(o, f, R, R * Math.tan(Math.acos(w.frost.cos)), 0xdff6ff, W10.cone.gelo, .3); // 6-w10
   for (let i = 1; i <= 4; i++) puff(o.clone().addScaledVector(f, R * i / 5), 0xe8f8ff, .5 + i * .35, .45, .1);
 }
 function frostBlast(w, mz) { // Winter's Howl: cone de gelo; quem sobrevive fica lento (o host aplica)
