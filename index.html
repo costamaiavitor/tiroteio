@@ -13336,7 +13336,7 @@ function b10Quadro() { // começo de cada renderScene: liga só no Médio da Vil
 }
 function applyQuality() {
   const q = CFG.gfx;
-  renderer.setPixelRatio(q === 'alto' ? Math.min(devicePixelRatio, 2) : q === 'medio' ? Math.min(devicePixelRatio, 1.25) : .8);
+  renderer.setPixelRatio(b15Pr()); // O1-B15
   renderer.setSize(innerWidth, innerHeight, false);
   composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(innerWidth, innerHeight); composerMSize();
   sun.castShadow = CFG.shadows && q !== 'baixo';
@@ -13345,7 +13345,7 @@ function applyQuality() {
   if (curMap?.zombie) visShadowMap(curMap); // 6-g02: raio e tamanho da sombra dependem da qualidade (Alto do Sanatório)
   const dyn = q === 'alto'; // personagens projetam sombra no Alto
   for (const rp of R.values()) rp.model.traverse(o => { if (o.isMesh) o.castShadow = dyn; });
-  for (const zc of ZC.zs.values()) zc.model.traverse(o => { if (o.isMesh) o.castShadow = dyn; });
+  for (const zc of ZC.zs.values()) zc.model.traverse(o => { if (o.isMesh) o.castShadow = dyn && !o.userData.noShadow; }); // O1-B15: noShadow como no zModel
 }
 
 addEventListener('resize', () => {
@@ -22006,6 +22006,21 @@ function b06Composer() { if (CFG.gfx !== 'alto') { composer.renderTarget1.dispos
   }; }
 { const q = applyQuality; applyQuality = () => { q(); b06Composer(); }; }
 // ===== O1-B06 fim =====
+// ===== O1-B15: troca de gráfico, resize, DPR =====
+// Medido (Vila, 1280x720): Alto -> Médio deixava os alvos do bloom na placa (+6,5 MB de textura e +3,2 MB de renderbuffer, que
+// só saíam num resize); peça de zumbi marcada noShadow ganhava sombra na troca para o Alto (o zModel não põe); com a janela
+// passando para uma tela de outro DPR (ou zoom do navegador) a resolução ficava a do DPR antigo (borrada ou cara demais).
+function b15Pr() { const q = CFG.gfx; return q === 'alto' ? Math.min(devicePixelRatio, 2) : q === 'medio' ? Math.min(devicePixelRatio, 1.25) : .8; } // resolução por qualidade
+function b15Bloom() { if (CFG.gfx === 'alto') return; const b = bloomPass; b.renderTargetBright.dispose(); for (const t of [...b.renderTargetsHorizontal, ...b.renderTargetsVertical]) t.dispose(); } // o Alto aloca de novo no 1º uso
+{ const q = applyQuality; applyQuality = () => { q(); b15Bloom(); }; }
+function b15Dpr() { // DPR mudou (outra tela, zoom): refaz a resolução como no applyQuality, sem mexer na sombra
+  if (renderer.getPixelRatio() === b15Pr()) return;
+  renderer.setPixelRatio(b15Pr()); renderer.setSize(innerWidth, innerHeight, false);
+  composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(innerWidth, innerHeight); composerMSize(); b06Composer(); b15Bloom();
+}
+addEventListener('resize', b15Dpr); // depois do resize de sempre
+{ const vigia = () => matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener('change', () => { b15Dpr(); vigia(); }, { once: true }); vigia(); } // troca de tela sem resize
+// ===== O1-B15 fim =====
 // ===== O1-B07: geometria liberada na troca de mapa e moldes de zumbi sem cópias =====
 // Medido (troca de mapa, glmem do B06): os buffers de vértices cresciam a cada troca (Vila 16,5 -> Sanatório 18,5 -> Arena 9 MB, mas
 // com 3.700 buffers de instâncias de mapas que já tinham saído). Duas fontes:
