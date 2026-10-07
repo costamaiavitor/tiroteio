@@ -16655,7 +16655,7 @@ function gunModel(id, fp = false, skin = null) {
       const optic = (y, z, len, r, mat) => { // luneta curta (tubo aberto) com ponto vermelho
         const q = new THREE.CylinderGeometry(r, r, len, hi ? 18 : 10, 1, true); q.rotateX(-Math.PI / 2); add(g, q, mat, 0, y, z);
         for (const e of [-1, 1]) add(g, new THREE.TorusGeometry(r, .0035, 6, 18), M.dark, 0, y, z + e * len / 2);
-        add(g, RB(.022, y - .06, .03, .003), M.dark, 0, (y + .06) / 2 - .004, z);
+        { const h = y - r - W06.pe; add(g, RB(.022, h, .03, .003), M.dark, 0, W06.pe + h / 2 + .001, z); } // 6-w06: o pé acaba no fundo do tubo (antes subia até 4 mm abaixo do eixo e tampava a metade de baixo da mira)
         add(g, new THREE.CircleGeometry(.0009, 10), M.reticle, 0, y, z - len / 2 + .004);
         ud.sight = new V3(0, y, z - len / 2 + .004); ud.sightR = z + len / 2;
       };
@@ -16669,7 +16669,7 @@ function gunModel(id, fp = false, skin = null) {
       grip(g, .085, -.012, .085, bodyM); guard(g, .1, -.012, .045);
       // a4: G11 com o carregador deitado em cima do cano (entra pela frente, sai para cima); os outros atrás do punho
       const mag = g11 ? grp(g, 0, .052, -.13) : grp(g, 0, -.03, .05); ud.mag = mag;
-      if (g11) { add(mag, RB(.034, .028, .19, .004), M.dark, 0, 0, -.095); for (let i = 0; i < 3; i++) add(mag, new THREE.BoxGeometry(.036, .004, .006), M.metal, 0, .006, -.12 - i * .03); ud.magUp = 1; ud.magGrab = new V3(-.01, .085, -.27); }
+      if (g11) { add(mag, RB(.034, .028, .19, .004), M.dark, 0, 0, -.095); for (let i = 0; i < 3; i++) add(mag, new THREE.BoxGeometry(.036, .004, .006), M.metal, 0, .006, -.12 - i * .03); ud.magUp = 1; ud.magGrab = new V3(-.01, .085, -.27); ud.rVai = W06.g11Vai; }
       else { add(mag, EX(banana(.12, 1.2, .054, .05), .028, null, .003), aug ? M.polymer : M.metal); ud.magGrab = new V3(0, -.17, .05); }
       const bolt = grp(g, ...(aug ? [-.034, .005, -.2] : fam ? [0, .068, -.02] : g11 ? [-.034, .0, -.17] : [.03, .03, .1])); add(bolt, RB(.012, .012, .02, .003), M.dark); ud.bolt = bolt; // alavanca de manejo de cada uma
       ud.rh = new V3(0, -.05, -.11); ud.lh = new V3(-.005, -.03, -.2); ud.via = new V3(0, -.16, -.11); // via: a mão esquerda passa por baixo da mão do gatilho (carregador atrás do punho)
@@ -18184,7 +18184,7 @@ function reloadAnim(ud, t, o) {
 const RLDF = { lado: .012, folga: .004, rampa: .008, solta: .05, min: .01 };
 function rldKF(ud, E, md) { // os mesmos quadros-chave de antes (a12), montados uma vez por arma e por tipo de recarga
   const L = ud.lhRest, Gp = ud.magGrab, R = ud.rOut ?? .38, gp = (t, k, dx, dz = 0) => [t, Gp.x + dx + md.x * k, Gp.y + md.y * k, Gp.z + dz + md.z * k];
-  const fr = [[0, L.x, L.y, L.z], [.1, L.x, L.y, L.z], gp(.19, 0, -.01), gp(.3, .13, -.01), gp(.38, R, -.08, .1), gp(.46, R, -.08, .1), gp(.55, .17, -.01), gp(.64, 0, -.01)];
+  const fr = [[0, L.x, L.y, L.z], [.1, L.x, L.y, L.z], gp(.19, 0, -.01), gp(.3, .13, -.01), ...w06Vai(ud, gp, R, Gp), gp(.55, .17, -.01), gp(.64, 0, -.01)];
   if (E && ud.bolt && !ud.pistol && !ud.boltAction) { const Bp = ud.boltRest, bx = Bp.x > .005 ? Bp.x + RLDF.lado : Bp.x - .03; fr.push([.71, bx, Bp.y + .005, Bp.z], [.75, bx, Bp.y + .005, Bp.z + .05], [.79, bx, Bp.y + .005, Bp.z + .05], [.88, L.x, L.y, L.z]); }
   else if (ud.pistol && ud.ltP) fr.push(gp(RLD.pistola[0], 0, -.01), [RLD.pistola[1], L.x, L.y, L.z]);
   else fr.push([.74, L.x, L.y, L.z]);
@@ -18554,6 +18554,14 @@ function pistolaApoio(ud, o, r0) { // mão esquerda (braços do Blender) acompan
 // Com mira alta (acessório), o que fica até corpo abaixo da linha ainda empurra o olho para trás (encosto). Unidades da arma (antes da escala).
 const ADS = { rel: .144, folga: .05, larg: .3, alt: .02, lat: .035, coronha: .06, corpo: .07, encosto: .02, esc: 1.18,
   ombro: [.06, -.12, .04], csPistola: .48, csLonga: .21, recuo: { ak47: .035, rpk: .035, galil: .035, ak74u: .035, thompson: .06, ppsh: .035, spectre: .025, kiparis: .025, m14: .035 } }; // 6-w05: a M14 é feita na caixa da AK (a tampa enchia o pé da tela, a 0,066 m do olho) // 6-w03: Thompson, PPSh, Spectre e Kiparis: a caixa da culatra enchia o pé da tela na mira (olho a 0,078/0,099/0,108/0,108 m) // 6-w02: AK-74u tem a mesma caixa e tampa da AK // 6-w04: a Galil tem a mesma caixa da AK (a tampa enchia o pé da tela na mira, a 0,066 m do olho) // ombro: desvio extra dos ombros dos braços prontos (modos estilo CS) ao mirar; cs*: distância olho→mira deles (m); recuo (a15): olho mais para trás (unidades da arma) nas armas de tampa larga, que enchia a parte de baixo da tela
+// ===== 6-w06: fuzis AUG, Famas, G11, Enfield e STG-44 =====
+// pe: altura (m) do pé do suporte da luneta integrada (topo da caixa); o suporte vai até o fundo do tubo.
+// g11Vai: onde a mão esquerda busca o carregador novo na G11 (desvio do ponto de pegar, espaço da arma: x, y, z), em vez de subir 0,38 m
+// (o carregador sai por cima): desce pelo lado esquerdo, para fora da tela, e volta pelo mesmo caminho.
+const W06 = { pe: .056, g11Vai: [-.12, -.3, .12] };
+ADS.recuo.stg44 = .06; // a STG-44 usa a caixa e a tampa da AK: na mira a tampa enchia a metade de baixo da tela (olho a 0,066 m; com .035 ainda enchia um terço)
+function w06Vai(ud, gp, R, Gp) { const v = ud.rVai; return v ? [[.38, Gp.x + v[0], Gp.y + v[1], Gp.z + v[2]], [.46, Gp.x + v[0], Gp.y + v[1], Gp.z + v[2]]] : [gp(.38, R, -.08, .1), gp(.46, R, -.08, .1)]; }
+// ===== fim 6-w06 =====
 const _adsV = new V3();
 function adsEye(gun, ud) {
   const sp = ud.sight; ud.adsZ = null; if (!sp) return;
