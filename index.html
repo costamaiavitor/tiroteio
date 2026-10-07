@@ -17960,9 +17960,9 @@ function vmSetWeapon(id) {
         rt.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, up, z)); rt.position.copy(bot).lerp(top, GRIP.gripAt); gun.add(rt);
       } else { rt.rotation.x = GRIP.tilt; rt.position.fromArray(GRIP.r); rh.add(rt); } // sem punho modelado: usa o lugar antigo da mão
       const lt = new THREE.Group();
-      if (ud.pistol && ud.gripAx && !ud.lhAtt) { // pistola com as duas mãos (com empunhadura do Armeiro, a esquerda vai nela): a esquerda fecha por fora dos dedos da direita, no mesmo eixo do punho
+      if ((ud.pistol || ud.rig === 'revolver') && ud.gripAx && !ud.lhAtt) { // pistola com as duas mãos (com empunhadura do Armeiro, a esquerda vai nela): a esquerda fecha por fora dos dedos da direita, no mesmo eixo do punho. 6-w01: o revólver também (a esquerda ficava solta embaixo do cabo)
         const { top, bot } = ud.gripAx, up = top.clone().sub(bot).normalize(), z = up.clone().negate(), y = new V3(1, 0, 0), x = new V3().crossVectors(y, z);
-        lt.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z)); lt.position.copy(bot).lerp(top, GRIP.gripAt - .1).add(new V3(...GRIP.pl)); gun.add(lt);
+        lt.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z)); lt.position.copy(bot).lerp(top, GRIP.gripAt - .1).add(new V3(...GRIP.pl)); pistolaApoioPulso(lt); gun.add(lt);
         ud.ltP = { g: lt, p: lt.position.clone(), q: lt.quaternion.clone() }; // pistolas (a1): apoio no punho, que a recarga leva ao carregador
       } else if (ud.lgrip) { // empunhadura vertical (a2): o eixo do guarda-mão da mão (z) vira o eixo da empunhadura, polegar para cima
         const { top, bot } = ud.lgrip, z = bot.clone().sub(top).normalize(), y = new V3(...VGRIP.pal); y.addScaledVector(z, -y.dot(z)).normalize();
@@ -18440,6 +18440,24 @@ function pistolaPose(o, ud) {
     _pQ.setFromEuler(_pE.set(rx, ry, rz)); _pV.fromArray(ud.fps2.P.v?.p || PIST.piv); _pV2.copy(_pV).applyQuaternion(_pQ); o.x += _pV.x - _pV2.x; o.y += _pV.y - _pV2.y; o.z += _pV.z - _pV2.z;
   }
 }
+// ===== 6-w01: pistolas: mão de apoio com o pulso para baixo (a manga clara saía no canto inferior esquerdo da tela) =====
+// pulso: giro (rad) da mão esquerda em volta do próprio eixo x (dos nós dos dedos) quando fecha no punho. O IK põe o cotovelo na
+// direção natural do antebraço vista pela mão: com a mão reta, o antebraço vinha quase deitado da esquerda e a manga camuflada (clara)
+// enchia o canto inferior esquerdo. Com o pulso para baixo o antebraço sai pela borda de baixo e só a luva e o punho elástico aparecem.
+// coronha (Coronha Tática do Armeiro nas pistolas): a de fuzil encolhida (bloco de polímero de 3 cm de largura) enchia o terço de baixo
+// da tela na mira, mais larga que a própria pistola. Nas pistolas ela vira de arame, como as coronhas de pistola de verdade: tubo de
+// cima (sup), haste de baixo saindo do pé do punho (inf) e uma soleira fina (sol: largura, espessura em m).
+const PISTW = { pulso: -.4, coronha: { sup: .0045, inf: .0035, sol: [.024, .007] } };
+const _w01Q = new THREE.Quaternion(), _w01X = new V3(1, 0, 0);
+function pistolaCoronha(gun, put, CY, RB, N, X, gA, yT, zA, zE, yt, yb) {
+  const C = PISTW.coronha, haste = (r, y0, z0, y1, z1) => { const dy = y1 - y0, dz = z1 - z0; put(gun, CY(r, Math.hypot(dy, dz), 10), N.metal, 0, (y0 + y1) / 2, (z0 + z1) / 2, Math.atan2(-dy, dz)); };
+  const yS = (yt + yT) / 2, yI = yb + .01, zS = zE - C.sol[1] / 2;
+  haste(C.sup, yT, zA, yS, zS); // de cima: do encaixe atrás do cão até o topo da soleira
+  haste(C.inf, gA ? gA.bot.y + .012 : yT - .06, gA ? gA.bot.z : zA, yI, zS); // de baixo: do pé do punho até o pé da soleira
+  put(gun, RB(C.sol[0], yt - yb, C.sol[1], .002), X.rubber, 0, (yt + yb) / 2, zE); // soleira
+}
+function pistolaApoioPulso(lt) { lt.quaternion.multiply(_w01Q.setFromAxisAngle(_w01X, PISTW.pulso)); }
+// ===== fim 6-w01 =====
 let SPDL_GEO = null;
 function pistolaRapido(ud, lh, A) { // carregador rápido (6 balas em volta de um botão), aparece na mão enquanto ela vai ao tambor
   const P = PIST.rapido, G2 = SPDL_GEO ||= [new THREE.CylinderGeometry(.017, .017, .012, 14), new THREE.CylinderGeometry(.0045, .0045, .02, 8), new THREE.CylinderGeometry(.006, .006, .012, 10)];
@@ -18899,7 +18917,7 @@ function attPartsProc(id, gun, ud) {
   // coronha tática: troca a coronha de fábrica (ou entra onde não tinha); coronha inteiriça (de precisão, bullpup) ganha soleira de borracha e apoio de rosto
   if (slot('stock')) {
     const gA = ud.gripAx, rh = ud.rh || V(0, -.04, .05), zg = (gA ? Math.max(gA.top.z, gA.bot.z) : rh.z) + .01, all = q(-1, 1, -1, 1, -1, 1), rear = all.z1;
-    const inteira = MB.some(e => e.o.parent === gun && e.o.visible && e.B.max.z >= rear - .02 && e.B.min.z < zg - .06);
+    const inteira = !(hg && PISTW.coronha) && MB.some(e => e.o.parent === gun && e.o.visible && e.B.max.z >= rear - .02 && e.B.min.z < zg - .06); // 6-w01: na pistola a armação vai do punho à boca e ela caía aqui (soleira de 13 cm colada atrás do punho)
     if (inteira) {
       const P = q(-.04, .04, -1, 1, rear - .012, rear + .001); if (P.n) put(gun, RB(P.x1 - P.x0 + .004, P.y1 - P.y0, .018, .004), X.rubber, (P.x0 + P.x1) / 2, (P.y0 + P.y1) / 2, rear + .008);
       if (!bull) { const C = q(-.03, .03, -1, 1, rear - .15, rear - .09); if (C.n) { put(gun, RB(.026, .012, .07, .003), N.polymer, 0, C.y1 + .008, rear - .12); for (const s of [-1, 1]) put(gun, new THREE.BoxGeometry(.004, .008, .004), N.dark, s * .009, C.y1 + .001, rear - .12 + s * .022); } }
@@ -18915,11 +18933,12 @@ function attPartsProc(id, gun, ud) {
         ud.gripAx = { top: V(0, yt, zt), bot: V(0, yt - hh, zt + .018) };
       }
       const k = hg ? .8 : 1, yt = yT + .016 * k, yb = yT - .085 * k, zf = zE - .13 * k;
+      if (hg && PISTW.coronha) pistolaCoronha(gun, put, CY, RB, N, X, gA, yT, zA, zE, yt, yb); else { // 6-w01: pistola com coronha de arame
       put(gun, CY(.0135 * k, zE - zA - .02, 14), N.metal, 0, yT, (zA + zE - .02) / 2);
       put(gun, EX([[zf, yt], [zE - .012, yt + .003], [zE, yt - .008], [zE, yb], [zE - .04 * k, yb], [zf + .03 * k, yT - .022 * k], [zf, yT - .012 * k]], .034 * k,
         [[[zE - .085 * k, yT - .012 * k], [zE - .022 * k, yT - .012 * k], [zE - .022 * k, yb + .02 * k], [zE - .045 * k, yb + .02 * k]]]), N.polymer, 0, 0, 0);
       put(gun, RB(.038 * k, yt - yb + .004, .014, .004), X.rubber, 0, (yt + yb) / 2, zE + .006);
-      put(gun, RB(.008, .01, .02), N.dark, 0, yT - .018 * k, zf + .012);
+      put(gun, RB(.008, .01, .02), N.dark, 0, yT - .018 * k, zf + .012); }
     }
   }
   if (ret.length) ud.attRet = ret; // ponto/anel 3D da mira: some quando o do HUD aparece (mirando), para não ficarem dois
