@@ -12862,6 +12862,15 @@ renderer.autoClear = false;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; // cores com mais contraste, estilo filme
 renderer.toneMappingExposure = 1.15;
 const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+// ===== O1-A31: opacos agrupados por programa, depois por material =====
+// O three r160 já desenha cada material de uma vez (ordem renderOrder > material.id > distância), mas os ids de material
+// alternam entre programas: 194 (Vila) e 257 (Sanatório) trocas de programa por quadro para ~45 programas. Cada troca refaz
+// useProgram, câmera e as 13 luzes. Programa antes do material: 57 e 93 trocas; as de material não mudam (já eram 1 por material).
+// groupOrder e renderOrder continuam na frente; os transparentes seguem de trás para frente, como antes.
+// Opacos exatamente coplanares sem polygonOffset (já em z-fighting) podem trocar de vencedor: ex. janelas da torre da igreja na Vila.
+const a31P = m => renderer.properties.get(m).currentProgram?.id ?? 0; // programa ainda não compilado: 0 (vai antes)
+renderer.setOpaqueSort((a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder || a31P(a.material) - a31P(b.material) || a.material.id - b.material.id || a.z - b.z || a.id - b.id);
+// ===== O1-A31 fim =====
 // Qualidade gráfica. Sem escolha salva: palpite pela placa de vídeo (integrada = Médio, dedicada = Alto).
 if (!['baixo', 'medio', 'alto'].includes(CFG.gfx)) {
   let gpu = '';
