@@ -18174,15 +18174,18 @@ function rldFimBala(S_, a) { // bala por bala: o fim (barra do HUD) segue as eta
 // trás até travar (clique do 'magin' em .63). A mão esquerda vai presa ao carregador nessas duas janelas. Arma vazia: a mão puxa a
 // alavanca do lado em que ela fica (AK à direita, FAL à esquerda). ud.rock = { z: bico (z no carregador), a: giro máx., cx/cy: mão na alavanca }
 const _rx = new V3(1, 0, 0), _rg = new V3();
+// ===== 6-w04: família AK / Galil / FAL: volta da mão da alavanca por baixo da caixa =====
+const AKR = { baixa: .03 }; // baixa: quanto (m) a mão desce no caminho da alavanca de manejo para o guarda-mão (recarga vazia)
 function akRock(ud, t, E) {
   const R = ud.rock, M = ud.mag, M0 = ud.magRest, out = t < .4;
   const ang = R.a * (out ? seg(t, .17, .24) : 1 - seg(t, .56, .63)), d = out ? seg(t, .23, .31) : 1 - seg(t, .47, .56);
   const s = Math.sin(ang), c = Math.cos(ang);
   M.rotation.x = ang; M.position.set(M0.x, M0.y + R.z * s - (out ? .14 : .26) * d, M0.z + R.z * (1 - c) - .03 * d);
   if (!ud.lhG) return;
-  const w = seg(t, .16, .2) * (1 - seg(t, .29, .33)) + seg(t, .43, .47) * (1 - seg(t, .63, .69)); // a12: a mão já está no carregador novo quando ele aparece (.47); antes ele surgia sozinho, a 22 cm dela
+  const w = seg(t, .16, .2) * (1 - seg(t, .31, .35)) + seg(t, .43, .47) * (1 - seg(t, .63, .69)); // 6-w04: a mão só larga o carregador velho depois que ele cai (.31; antes largava em .29 e ele ficava a 33–53 mm dela); a12: a mão já está no carregador novo quando ele aparece (.47); antes ele surgia sozinho, a 22 cm dela
   if (w > 0 && ud.magGrab) ud.lhG.position.lerp(_rg.copy(ud.magGrab).sub(M0).applyAxisAngle(_rx, ang).add(M.position), w);
   if (E && ud.bolt) { const B = ud.boltRest, wb = seg(t, .66, .71) * (1 - seg(t, .8, .88)); if (wb > 0) ud.lhG.position.lerp(_rg.set(B.x + R.cx, B.y + R.cy, ud.bolt.position.z + .012), wb); }
+  if (E && ud.bolt) ud.lhG.position.y -= AKR.baixa * seg(t, .79, .83) * (1 - seg(t, .85, .9)); // 6-w04: da alavanca ao guarda-mão a mão passa por baixo da caixa (antes cruzava 3–4 mm por dentro dela)
 }
 function shellAnim(ud, o) { // escopeta / lança-granadas: bala por bala
   const S_ = G.reload, el = now - S_.t0, P = ud.port || ud.lhRest, L = ud.lhRest;
@@ -18468,7 +18471,7 @@ function pistolaApoio(ud, o, r0) { // mão esquerda (braços do Blender) acompan
 // Peças mais baixas que alt e a coronha (atrás da mão do gatilho + coronha) ficam embaixo do rosto, como o rosto apoiado na coronha.
 // Com mira alta (acessório), o que fica até corpo abaixo da linha ainda empurra o olho para trás (encosto). Unidades da arma (antes da escala).
 const ADS = { rel: .144, folga: .05, larg: .3, alt: .02, lat: .035, coronha: .06, corpo: .07, encosto: .02, esc: 1.18,
-  ombro: [.06, -.12, .04], csPistola: .48, csLonga: .21, recuo: { ak47: .035, rpk: .035 } }; // ombro: desvio extra dos ombros dos braços prontos (modos estilo CS) ao mirar; cs*: distância olho→mira deles (m); recuo (a15): olho mais para trás (unidades da arma) nas armas de tampa larga, que enchia a parte de baixo da tela
+  ombro: [.06, -.12, .04], csPistola: .48, csLonga: .21, recuo: { ak47: .035, rpk: .035, galil: .035 } }; // 6-w04: a Galil tem a mesma caixa da AK (a tampa enchia o pé da tela na mira, a 0,066 m do olho) // ombro: desvio extra dos ombros dos braços prontos (modos estilo CS) ao mirar; cs*: distância olho→mira deles (m); recuo (a15): olho mais para trás (unidades da arma) nas armas de tampa larga, que enchia a parte de baixo da tela
 const _adsV = new V3();
 function adsEye(gun, ud) {
   const sp = ud.sight; ud.adsZ = null; if (!sp) return;
