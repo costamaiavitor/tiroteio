@@ -8359,7 +8359,7 @@ ATMOS.sanatorio.E = A => {
   // 5. lanterna mágica de latão sobre tripé, com a caixa de lâminas; facho fraco até a cortina
   const LX = 22.5, LZ = 9.8, LY = 1.25, ALVO = [15, 2.085, 23.36];
   const dir = new V3(ALVO[0] - LX, ALVO[1] - LY, ALVO[2] - LZ), DL = dir.length(); dir.normalize();
-  const proj = A.dyn(A.plane(ALVO[0], ALVO[1], ALVO[2], 1.7, 1.0, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }), Math.PI));
+  const proj = A.dyn(A.plane(ALVO[0], ALVO[1], ALVO[2], 2.2, 1.3, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }), Math.PI)); // O1-B19: 1,7 x 1,0 virava um borrão a 11 m
   let feixe = null, poe = [];
   if (A.livre(LX, LZ, 2.5)) {
     for (let k = 0; k < 3; k++) { const a = k * TAU / 3 + .4; H.tubo(A, [LX, LY - .05, LZ], [LX + Math.cos(a) * .38, 0, LZ + Math.sin(a) * .38], .015, madeira2); }
@@ -8391,7 +8391,7 @@ ATMOS.sanatorio.E = A => {
       g.restore(); H.txt(g, C[i], 256, y + 150, 'bold 16px Georgia', i === 2 ? '#3a2a20' : '#4a2a10');
       g.save(); g.globalCompositeOperation = 'destination-over'; g.fillStyle = '#000'; g.fillRect(0, y, 512, 171); g.restore(); }
   });
-  lam.repeat.set(1, 1 / 3); lam.offset.set(0, 2 / 3); proj.material.map = lam; proj.material.needsUpdate = true; proj.material.color.setScalar(1.6);
+  lam.repeat.set(1, 1 / 3); lam.offset.set(0, 2 / 3); proj.material.map = lam; proj.material.needsUpdate = true; proj.material.color.setScalar(1); // O1-B19: 1,6 estourava a lâmina (ilegível)
 
   // assinatura: a lanterna mágica (olhar o teatrinho por 2 s, a mais de 4 m, uma vez por rodada)
   let ultR = -1, lam_i = -1;
@@ -9416,7 +9416,7 @@ ATMOS.sanatorio.M = A => {
   // poça preta ao pé da torre (oeste das pernas, fora da frente do PaP) e a mancha sob a escada
   const poT = A.tex(256, 256, (g, w, h) => { g.fillStyle = '#0b0c0d'; g.beginPath(); for (let i = 0; i <= 24; i++) { const a = i / 24 * TAU, r = 100 + 22 * Math.sin(a * 3 + 1) + 12 * Math.sin(a * 7); const x = 128 + Math.cos(a) * r, y = 128 + Math.sin(a) * r * .9; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.fill();
     for (let k = 0; k < 9; k++) { g.beginPath(); g.arc(128 + Math.cos(k * 2.3) * 118, 128 + Math.sin(k * 2.3) * 108, 6 + k % 4 * 3, 0, TAU); g.fill(); } });
-  const poM = new THREE.MeshPhongMaterial({ map: poT, transparent: true, alphaTest: .05, depthWrite: false, shininess: 100, specular: 0x8898a8, color: 0xffffff });
+  const poM = new THREE.MeshPhongMaterial({ map: poT, transparent: true, alphaTest: .05, depthWrite: false, shininess: 100, specular: 0x8898a8, color: 0xffffff, emissive: 0x0e1219 }); // O1-B19: reflexo do céu (na sombra da torre sumia)
   A.decal(39.4, TZ, 4.4, 5.6, poM, 0, .022); A.decal(50.4, -22.3, 1.6, 1.4, poM, .7, .023);
   // ondinhas na poça (4 anéis reciclados)
   const ON = []; for (let i = 0; i < 4; i++) { const m = A.dyn(A.mesh(new THREE.RingGeometry(.92, 1, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x8a98a8, transparent: true, opacity: 0, depthWrite: false }))); m.position.set(39.9, .03, TZ); ON.push({ m, t0: -9, x: 0, z: 0 }); }
@@ -9628,7 +9628,7 @@ ATMOS.sanatorio.P = A => {
   A.inst(new THREE.ConeGeometry(.1, .12, 8), latao, VAL.map(([x, y, z]) => A.mtx(x, y + .53, z)));
   // ---- 3. monte de carvão, pá de cabo quebrado e uma ficha de paciente meio queimada (com a cruz de cal)
   let [CX, CZ] = [-60.5, 60.5]; if (!A.livre(CX, CZ, 2)) [CX, CZ] = [-59.8, 61.2];
-  const carv = A.mat('rock', 0x1c1a18), pile = A.cone(CX, 0, CZ, 1.45, .8, carv, 9); pile.scale.z = .85; pile.castShadow = true;
+  const carv = A.mat('rock', 0x3c3833), pile = A.cone(CX, 0, CZ, 1.45, .8, carv, 9); pile.scale.z = .85; pile.castShadow = true; // O1-B19: carvão 0x1c1a18 -> 0x3c3833 (era um borrão preto)
   A.inst(new THREE.DodecahedronGeometry(.08, 0), carv, Array.from({ length: 16 }, () => { const a = A.r(0, 6.28), r = A.r(1.3, 1.9); return A.mtx(CX + Math.cos(a) * r, .04, CZ + Math.sin(a) * r * .85, A.r(0, 6), A.r(.6, 1.4)); }));
   { const g = A.group(CX + .35, .55, CZ - .2, -.6); const b = A.box(0, -.25, 0, .26, .3, .02, A.mat('metal', 0x3a3632), 0, g); b.rotation.x = .5;
     const c = A.cyl(0, 0, -.1, .02, .022, .5, A.mat('wood', 0x5a4028), 6, g); c.rotation.x = .5; c.position.set(0, .2, -.02);
@@ -9765,10 +9765,10 @@ ATMOS.sanatorio.r1 = A => {
   });
   const latM = new THREE.MeshLambertMaterial({ map: latT, side: THREE.DoubleSide }), latG = Array.from({ length: 6 }, (_, i) => S.uvp(new THREE.PlaneGeometry(.22, .165), (i % 3) * 85.33, Math.floor(i / 3) * 64, (i % 3 + 1) * 85.33, (Math.floor(i / 3) + 1) * 64, 256, 128));
   const covaT = A.tex(128, 256, g => {
-    g.fillStyle = '#2a1e14'; g.fillRect(0, 0, 128, 256);
+    g.fillStyle = '#3a2a1c'; g.fillRect(0, 0, 128, 256); // O1-B19: tons clareados (o fundo era preto puro)
     const L = (a, b, c, d, cor) => { g.fillStyle = cor; g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.lineTo(...c); g.lineTo(...d); g.fill(); };
-    L([0, 0], [128, 0], [100, 40], [28, 40], '#5a4430'); L([0, 256], [128, 256], [100, 216], [28, 216], '#3e2e20'); L([0, 0], [28, 40], [28, 216], [0, 256], '#4a3826'); L([128, 0], [100, 40], [100, 216], [128, 256], '#4e3a28');
-    const gr = g.createLinearGradient(0, 40, 0, 216); gr.addColorStop(0, '#120c08'); gr.addColorStop(.5, '#060403'); gr.addColorStop(1, '#100a06'); g.fillStyle = gr; g.fillRect(28, 40, 72, 176);
+    L([0, 0], [128, 0], [100, 40], [28, 40], '#7a5c40'); L([0, 256], [128, 256], [100, 216], [28, 216], '#54402c'); L([0, 0], [28, 40], [28, 216], [0, 256], '#644c34'); L([128, 0], [100, 40], [100, 216], [128, 256], '#6a4e36');
+    const gr = g.createLinearGradient(0, 40, 0, 216); gr.addColorStop(0, '#2c2014'); gr.addColorStop(.5, '#18100a'); gr.addColorStop(1, '#261a10'); g.fillStyle = gr; g.fillRect(28, 40, 72, 176);
     g.strokeStyle = 'rgba(20,14,8,.7)'; g.lineWidth = 2; for (let i = 0; i < 14; i++) { const y = A.r(46, 210); g.beginPath(); g.moveTo(A.r(2, 26), y); g.lineTo(28, y + A.r(-6, 6)); g.stroke(); g.beginPath(); g.moveTo(A.r(102, 126), y); g.lineTo(100, y + A.r(-6, 6)); g.stroke(); } // marcas de pá
     g.strokeStyle = 'rgba(120,96,70,.5)'; g.lineWidth = 1; for (let i = 0; i < 8; i++) { g.beginPath(); const x = A.r(2, 26); g.moveTo(x, A.r(40, 200)); g.quadraticCurveTo(x + 8, A.r(60, 220), x + A.r(-4, 10), A.r(80, 230)); g.stroke(); } // raízes
   });
@@ -10183,7 +10183,7 @@ ATMOS.sanatorio.r13 = A => {
       g.strokeStyle = 'rgba(48,44,38,.45)'; g.lineWidth = 1; for (let i = 0; i < 900; i++) { const x = R(0, w), y = R(0, h), a = R(.5, .9); g.beginPath(); g.moveTo(x, y); g.lineTo(x + 6 * Math.cos(a), y + 6 * Math.sin(a)); g.stroke(); } // marcas de ponteiro
     }));
     gT.repeat.set(.5, .5);
-    const granM = std(gT, 0xb4ada2, .92);
+    const granM = std(gT, 0x7e786e, .92); // O1-B19: 0xb4ada2 saía quase branco
     for (const b of rocks) A.box(b.x, 0, b.z, b.w + .08, b.h + .04, b.d + .08, granM);
     { const sl = []; for (let k = 0; k < 40 && sl.length < 6; k++) { const x = R(28, 70), z = R(-87, -49); if (!A.livre(x, z, 2) || A.ocupado(x, z, 1.4)) continue; sl.push([x, z]); } // blocos cortados largados (baixos)
       for (const [x, z] of sl) A.box(x, 0, z, R(.9, 1.6), R(.18, .28), R(.6, 1), granM, R(0, PI)); }
@@ -10214,12 +10214,12 @@ ATMOS.sanatorio.r13 = A => {
       A.plane(b.x - .2, 1.35, b.z + b.d / 2 + .05, 3.4, 1.7, rm, 0); }
     // --- pau-de-carga e sarilho no alto do pilar, recortados contra o céu
     const top = pil.h, px = pil.x, pz = pil.z, LZ = pz + pil.d / 2 + 1.7; // ponta da lança (para o sul)
-    const mad = A.mat('wood', 0x4e3e2c), cord = A.flat(0x8a7a5a);
+    const mad = A.mat('wood', 0x8a7458), cord = A.flat(0xb8a682); // O1-B19: madeira e corda clareadas (contra o céu escuro sumiam)
     A.mesh(mg([bar([px, top + .55, pz - .6], [px, top + .4, LZ], .09), bar([px, top + .05, pz + pil.d / 2 - .1], [px, top + .4, LZ - .3], .06),
       bar([px - .55, top, pz - .3], [px - .55, top + .7, pz - .3], .06), bar([px + .55, top, pz - .3], [px + .55, top + .7, pz - .3], .06), bar([px - .55, top, pz + .3], [px - .55, top + .7, pz - .3], .05), bar([px + .55, top, pz + .3], [px + .55, top + .7, pz - .3], .05)]), mad);
     const drum = A.dyn(A.group(px, top + .62, pz - .3)); A.mesh(new THREE.CylinderGeometry(.13, .13, 1, 10).rotateZ(PI / 2), mad, drum); A.mesh(new THREE.CylinderGeometry(.15, .15, .7, 10).rotateZ(PI / 2), cord, drum);
-    const crank = A.dyn(A.group(px + .62, top + .62, pz - .3)); A.mesh(mg([new THREE.BoxGeometry(.04, .34, .05).translate(0, .15, 0), new THREE.CylinderGeometry(.025, .025, .2, 6).rotateZ(PI / 2).translate(.1, .3, 0)]), A.flat(0x2a2622), crank);
-    A.cyl(px, top + .3, LZ, .07, .07, .1, A.flat(0x2a2622)); // roldana na ponta
+    const crank = A.dyn(A.group(px + .62, top + .62, pz - .3)); A.mesh(mg([new THREE.BoxGeometry(.04, .34, .05).translate(0, .15, 0), new THREE.CylinderGeometry(.025, .025, .2, 6).rotateZ(PI / 2).translate(.1, .3, 0)]), A.flat(0x5a5248), crank);
+    A.cyl(px, top + .3, LZ, .07, .07, .1, A.flat(0x5a5248)); // roldana na ponta
     // --- cesto de vime no cabo
     const vT = wrap(A.tex(128, 128, (g) => { g.fillStyle = '#9a8662'; g.fillRect(0, 0, 128, 128); for (let y = 0; y < 128; y += 8) for (let x = 0; x < 128; x += 16) { g.fillStyle = (x / 16 + y / 8) % 2 ? '#c8b48a' : '#a8946a'; g.fillRect(x + 1, y + 1, 14, 6); } g.fillStyle = 'rgba(60,46,30,.6)'; for (let x = 0; x < 128; x += 16) g.fillRect(x, 0, 2, 128); }));
     const vime = lam(vT, { dbl: true }), cY0 = 10.9, cY1 = 1.6;
@@ -10578,7 +10578,7 @@ ATMOS.sanatorio.r13 = A => {
     let pastaM = null; if (pasta) { const pT2 = A.tex(128, 128, (g) => { const gr = g.createRadialGradient(64, 64, 4, 64, 64, 62); gr.addColorStop(0, 'rgba(110,112,108,.95)'); gr.addColorStop(.7, 'rgba(90,92,88,.85)'); gr.addColorStop(1, 'rgba(90,92,88,0)'); g.fillStyle = gr; for (let i = 0; i < 6; i++) { g.beginPath(); g.ellipse(64 + R(-14, 14), 64 + R(-14, 14), R(30, 56), R(24, 46), R(0, PI), 0, TAU); g.fill(); } });
       pastaM = A.dyn(A.decal(pasta.x, pasta.z, 1.6, 1.6, new THREE.MeshPhongMaterial({ map: pT2, transparent: true, depthWrite: false, specular: 0x666666, shininess: 60 }), pasta.ry, .02)); pastaM.scale.set(.25, .25, 1); }
     // --- maletas de médico abertas sobre o capô, toalha branca com instrumentos enfileirados
-    { const c = perto(-59.1, 99.6, cars), y = c.h + .03, x = c.x, z = c.z, cou = A.flat(0x4a2c1c), fo = A.flat(0x2a1a12);
+    { const c = perto(-59.1, 99.6, cars), y = .03, x = c.x + (Math.sign(A.cx - c.x) || 1) * (c.w / 2 + 1.9), z = c.z, cou = A.flat(0x4a2c1c), fo = A.flat(0x2a1a12); // O1-B19: no teto (2 m) ficavam invisíveis; agora no chão, na ponta dele (do lado da área; na lateral a junção do O1-B01 mudava)
       bx(A, x, y, z, 1.2, .01, .6, A.flat(0xeae8e0), .05);
       const ins = []; for (let i = 0; i < 20; i++) { const t = i % 4; ins.push(M4(x - .5 + i * .052, y + .02, z + (t === 1 ? .05 : 0), 0, .05, 0, 1, 1, t === 2 ? .7 : 1)); }
       A.inst(new THREE.BoxGeometry(.012, .01, .32), new THREE.MeshPhongMaterial({ color: 0xc8ccd0, specular: 0xffffff, shininess: 100 }), ins);
@@ -11449,8 +11449,8 @@ ATMOS.sanatorio.r8 = A => {
     for (const [x, y, r] of [[22, 34, 7], [33, 30, 5.5], [42, 32, 5], [49, 37, 4.2], [54, 44, 3.6]]) { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
   });
   const PE = [];
-  for (let i = 0; i < 20; i++) { const m = new THREE.MeshBasicMaterial({ map: peT, color: 0x7a8a7c, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
-    const d = A.dyn(A.decal(0, 0, .17, .34, m, 0, .05)); d.position.set(LX, -5, LZ); d.visible = false; PE.push({ d, m, t: -99, fim: -99 }); }
+  for (let i = 0; i < 20; i++) { const m = new THREE.MeshBasicMaterial({ map: peT, color: 0xd0dcd0, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
+    const d = A.dyn(A.decal(0, 0, .17, .34, m, 0, .05)); d.position.set(LX, -5, LZ); d.visible = false; PE.push({ d, m, t: -99, fim: -99 }); } // O1-B19: cor 0x7a8a7c -> 0xd0dcd0 (escuras no capim escuro, não apareciam)
 
   // vaga-lumes num canto da mata (apagam em volta da "presença" durante a assinatura)
   const VG = S.pts(A, 30, 0xd8ff7a, .14, 1, { vc: 1, add: 1 }), vgB = [];
@@ -11540,7 +11540,7 @@ ATMOS.sanatorio.r11 = A => {
   A.inst(new THREE.BoxGeometry(1.23, 1.12, 1.23), S.lm(fenT), FEN.map(([x, z]) => A.mtx(x, .56, z, R(-.02, .02))));
 
   // 1. volume sob a lona na última baia oeste (77,8, 103,7): um cavalo deitado, só a lona aparece
-  const lonaT = A.tex(256, 256, (g, w, h) => { g.fillStyle = '#7a766a'; g.fillRect(0, 0, w, h);
+  const lonaT = A.tex(256, 256, (g, w, h) => { g.fillStyle = '#9c988b'; g.fillRect(0, 0, w, h);
     for (let k = 0; k < 40; k++) { g.strokeStyle = `rgba(${R() < .5 ? '30,30,26' : '150,150,140'},${R(.15, .4)})`; g.lineWidth = R(1, 4); const x = R(0, w), y = R(0, h); g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + R(-40, 40), y + R(-20, 20), x + R(-70, 70), y + R(-50, 50)); g.stroke(); } // dobras
     for (let k = 0; k < 6; k++) { const r = g.createRadialGradient(R(0, w), R(0, h), 4, R(0, w), R(0, h), R(20, 50)); r.addColorStop(0, 'rgba(40,36,28,.55)'); r.addColorStop(1, 'rgba(40,36,28,0)'); g.fillStyle = r; g.fillRect(0, 0, w, h); }
     g.fillStyle = 'rgba(0,0,0,.25)'; for (let y = 0; y < h; y += 3) g.fillRect(0, y, w, 1); });
@@ -11553,7 +11553,7 @@ ATMOS.sanatorio.r11 = A => {
       hh = Math.max(hh * Math.min(1, borda * 3 + .35), .012) + (hh > .05 ? .018 * Math.sin(x * 11 + z * 4) * Math.sin(z * 7) : .008 * Math.sin(x * 23) );
       p.setY(i, hh); }
     lonaG.computeVertexNormals(); }
-  const lona = A.dyn(A.mesh(lonaG, new THREE.MeshLambertMaterial({ map: lonaT, color: 0xa8a498, side: THREE.DoubleSide })));
+  const lona = A.dyn(A.mesh(lonaG, new THREE.MeshLambertMaterial({ map: lonaT, color: 0xd4d0c4, side: THREE.DoubleSide }))); // O1-B19: lona clareada (saía preta)
   lona.position.set(LX, 0, LZ); lona.castShadow = true;
   // o casco (escorrega 15 cm para fora da borda da lona e volta sem ser visto)
   const casco = A.dyn(A.group(LX + .62, .07, LZ + .96, 0));
@@ -11784,10 +11784,10 @@ ATMOS.sanatorio.r7 = A => {
   const liT = A.tex(512, 512, g => {
     const pag = (x0, y0, titulo, linhas, branco) => { g.fillStyle = '#ddd2b4'; g.fillRect(x0, y0, 192, 256); g.fillStyle = 'rgba(110,80,40,.18)'; g.fillRect(x0 + (x0 ? 0 : 180), y0, 12, 256);
       if (titulo) { S.txt(g, 'LISTA DO PROGRAMA', x0 + 96, y0 + 14, 'bold 13px Georgia', '#2a1a10'); S.txt(g, 'S. LÁZARO DO VALE', x0 + 96, y0 + 29, 'italic 11px Georgia', '#2a1a10'); }
-      g.strokeStyle = 'rgba(80,60,40,.45)'; g.lineWidth = 1; for (let y = 40; y < 250; y += 16) { g.beginPath(); g.moveTo(x0 + 8, y); g.lineTo(x0 + 184, y); g.stroke(); }
-      linhas.forEach((s, k) => { const y = 50 + k * 16; S.txt(g, s, x0 + 12, y, '12px Courier New', '#1a1a2a', 'left'); S.txt(g, ['14.08', '15.08', '17.08', '19.08', '21.08', '22.08'][k % 6] + ' · ' + ['Forno 1', 'Forno 2', 'Forno 3', 'Forno 4'][k % 4], x0 + 70, y, 'italic 10px Georgia', '#3a2a20', 'left');
+      g.strokeStyle = 'rgba(80,60,40,.45)'; g.lineWidth = 1; for (let y = y0 + 40; y < y0 + 250; y += 16) { g.beginPath(); g.moveTo(x0 + 8, y); g.lineTo(x0 + 184, y); g.stroke(); } // O1-B19: + y0 (pautas, linhas e brancos das páginas de baixo do atlas)
+      linhas.forEach((s, k) => { const y = y0 + 50 + k * 16; S.txt(g, s, x0 + 12, y, '12px Courier New', '#1a1a2a', 'left'); S.txt(g, ['14.08', '15.08', '17.08', '19.08', '21.08', '22.08'][k % 6] + ' · ' + ['Forno 1', 'Forno 2', 'Forno 3', 'Forno 4'][k % 4], x0 + 70, y, 'italic 10px Georgia', '#3a2a20', 'left');
         g.strokeStyle = 'rgba(236,232,220,.95)'; g.lineWidth = 4; g.beginPath(); g.moveTo(x0 + 6, y + R(-1, 1)); g.lineTo(x0 + 186, y + R(-2, 2)); g.stroke(); });
-      if (branco) branco.forEach((s, k) => { const y = 50 + (linhas.length + k) * 16; S.txt(g, s, x0 + 12, y, 'bold 12px Courier New', '#1a1a2a', 'left'); g.strokeStyle = 'rgba(40,30,20,.5)'; g.beginPath(); g.moveTo(x0 + 60, y + 5); g.lineTo(x0 + 184, y + 5); g.stroke(); }); };
+      if (branco) branco.forEach((s, k) => { const y = y0 + 50 + (linhas.length + k) * 16; S.txt(g, s, x0 + 12, y, 'bold 12px Courier New', '#1a1a2a', 'left'); g.strokeStyle = 'rgba(40,30,20,.5)'; g.beginPath(); g.moveTo(x0 + 60, y + 5); g.lineTo(x0 + 184, y + 5); g.stroke(); }); };
     const L = (a, n) => { const o = []; for (let f = a; o.length < n; f++) for (let p = 1; p <= 3 && o.length < n; p++) o.push(f + '-' + p); return o; };
     pag(0, 0, 1, L(398, 12)); pag(192, 0, 0, L(402, 13)); pag(0, 256, 0, ['411-3', '412-1', '412-2', '412-3', '412-4'], ['413-1', '413-2', '413-3', '413-4']); pag(192, 256, 0, L(406, 13));
   });
@@ -11798,7 +11798,7 @@ ATMOS.sanatorio.r7 = A => {
   A.mesh(S.bx(.72, .03, .48, 0, -.02, 0), A.mat('metal', 0x4a4440), livro);
   A.mesh(S.bx(.7, .025, .46, 0, .005, 0), A.flat(0x3a2414), livro);
   const pg = (x0, y0, xc) => S.uvp(new THREE.PlaneGeometry(.32, .42), x0, y0, x0 + 192, y0 + 256, 512).rotateX(-PI / 2).rotateY(PI).translate(xc, 0, 0);
-  const liM = S.lm(liT);
+  const liM = S.lm(liT); liM.color.setHex(0xa49c8c); // O1-B19: papel menos estourado sob a brasa (as linhas sumiam no branco)
   A.mesh(pg(0, 0, .17).translate(0, .021, 0), liM, livro); // esquerda: o começo da lista
   A.mesh(pg(0, 256, -.17).translate(0, .021, 0), liM, livro); // direita (por baixo): 412 riscada e 413-1 a 413-4 em branco
   const folha = A.dyn(A.group(0, .024, 0, 0, livro));
@@ -15886,8 +15886,8 @@ ATMOS_POST.push((mapId, AT, M) => {
       fio.push(new THREE.CylinderGeometry(.008, .008, len, 5).translate(l.x, y1 + len / 2, l.z), new THREE.CylinderGeometry(.06, .075, .045, 10).translate(l.x, Y - .022, l.z), new THREE.CylinderGeometry(.03, .022, .07, 8).translate(l.x, y1 + .02, l.z)); } // fio, canopla e bocal
   }
   if (P.e.length) put(san1Merge(P.e), new THREE.MeshLambertMaterial({ map: tex('forro'), vertexColors: true }));
-  if (P.t.length) put(san1Merge(P.t), new THREE.MeshLambertMaterial({ map: tex('tabuado'), vertexColors: true }));
-  if (P.vm.length) put(san1Merge(P.vm), new THREE.MeshLambertMaterial({ map: tex('wood'), vertexColors: true }));
+  if (P.t.length) put(san1Merge(P.t), new THREE.MeshLambertMaterial({ map: tex('tabuado'), vertexColors: true, emissive: 0x1e160e })); // O1-B19: luz que volta do chão (o forro de tábuas era preto puro)
+  if (P.vm.length) put(san1Merge(P.vm), new THREE.MeshLambertMaterial({ map: tex('wood'), vertexColors: true, emissive: 0x18110a })); // O1-B19: idem nas vigas
   if (fio.length) put(mergeGeos(fio), new THREE.MeshLambertMaterial({ color: 0x1c1a18 }));
   if (!lo && (man.length || bur.length)) { // manchas de infiltração e buracos (o Baixo fica sem)
     const mt = canvasTex(512, 256, g => {
@@ -15921,6 +15921,32 @@ ATMOS_POST.push((mapId, AT, M) => {
   }
   if (bat.length) put(mergeGeos(bat), worldMat('batente', SAN1.batente, true), true);
 });
+// ===== O1-B19: Sanatório, legibilidade e brilho (g12 da fase 6) =====
+// Medido nas fotos (luminância média, Médio): Recepção 90, Enfermaria 91, Laboratório 93 (as brancas tão claras quanto a Recepção),
+// Crematório 28 e Floresta 20 (zumbi vira só silhueta), Caldeiras 26 no Médio e 13 no Baixo (sem pós). Nada novo é desenhado:
+// força das lâmpadas de duas salas, tom de três forros e duas luzes que já existem (hemisfério e preenchimento da câmera)
+// moduladas pela área, como uniform (sem programa novo nem chamada de desenho).
+Object.assign(SAN_LUZ.escArea, { B: .7, D: .66 }); // eram .9 e .86: o azulejo branco devolvia tudo
+Object.assign(SAN1.forro.N, { c: 0x957152, vc: 0x6a4a30 }); // forros de tábua quase pretos (Biblioteca, Teatro, Capela): perto do da Recepção (0xa08060)
+Object.assign(SAN1.forro.E, { c: 0x8a5a48, vc: 0x5e3c2c });
+Object.assign(SAN1.forro.F, { c: 0x9c7656, vc: 0x7a5a44 });
+// fator por área sobre o preenchimento preso à câmera (VIS.fill: o zumbi perto aparece de frente) e sobre o hemisfério:
+// o cenário longe continua escuro (a escalada da Recepção ao Crematório fica), o zumbi a até ~15 m ganha forma
+const B19 = { fill: { r7: 2.4, r8: 2.4 }, dist: { r7: 1.45, r8: 1.45 }, hemi: { r7: 1.2, r8: 1.45 }, exp: { B: .74, D: .7 }, baixo: { fill: { P: 2 }, hemi: { P: 1.8 } }, vel: 1.5 }; // exp: exposição na Enfermaria e no Laboratório (o azulejo branco recebe as lâmpadas das salas vizinhas; baixar só as delas quase não mudava)
+ATMOS_POST.push((mapId, AT, M) => {
+  VIS.fill.distance = 14; // outro mapa: o alcance de sempre (o da criação do VIS)
+  if (mapId !== 'sanatorio') return;
+  let fv = 1, hv = 1, dv = 1, ev = 1; const d0 = 14;
+  MAP_ANIM.push(dt => {
+    const id = AT.cur?.id, lo = CFG.gfx === 'baixo' ? B19.baixo : null, k = Math.min(1, dt * B19.vel);
+    fv += (((lo?.fill[id]) ?? B19.fill[id] ?? 1) - fv) * k;
+    hv += (((lo?.hemi[id]) ?? B19.hemi[id] ?? 1) - hv) * k; dv += ((B19.dist[id] ?? 1) - dv) * k; ev += ((B19.exp[id] ?? 1) - ev) * k;
+    if (VIS.fill.parent) { VIS.fill.intensity = VIS.k.fill * fv; VIS.fill.distance = d0 * dv; } // alcance maior: o zumbi a 15-20 m também ganha forma
+    renderer.toneMappingExposure = (M.exposure ?? 1) * VIS.k.exp * clamp(+CFG.bright || 1, .5, 2) * ev; // a mesma conta do visApply, vezes o da área
+    hemi.intensity = Math.max((M.hemi ?? 1.4) * VIS.k.hemi, VIS.k.hemiMin) * hv; // o mesmo valor do visMap, vezes o da área
+  });
+});
+// ===== O1-B19 fim =====
 // ===== 6-g06: carregamento da Vila =====
 // - mapa fresco: no host, startHost/lobbyStart montam o mapa e, na mesma pilha de chamadas, zStartGame manda 'zreset', que montava
 //   tudo de novo (cenário, atmosfera, texturas de canvas, um segundo aquecimento). MAPA_FRESCO vale só até o fim da tarefa atual
