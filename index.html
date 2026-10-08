@@ -15734,6 +15734,7 @@ function mergeStatic() {
   const moving = new Set();
   all.forEach((o, i) => { const [p, q, sc, v] = st[i]; if (!o.position.equals(p) || !o.quaternion.equals(q) || !o.scale.equals(sc) || o.visible !== v) o.traverse(c => moving.add(c)); o.position.copy(p); o.quaternion.copy(q); o.scale.copy(sc); o.visible = v; });
   world.updateMatrixWorld(true);
+  const b21 = b21Prepara(all, moving); // O1-B21: transparentes colados (antes da junção: os opacos pequenos servem de apoio)
   const b01 = b01Expande(all, moving); // O1-B01
   const grp = new Map(), _c = new V3();
   for (const o of all) {
@@ -15752,6 +15753,7 @@ function mergeStatic() {
     if (b01) b01Junta(os, mm); // O1-B01
   }
   b01Fim(b01); // O1-B01
+  b21Junta(b21); // O1-B21
   const used = new Set(); world.traverse(o => { if (o.geometry) used.add(o.geometry); });
   for (const o of all) if (o.geometry && !used.has(o.geometry)) { used.add(o.geometry); o.geometry.dispose(); }
 }
@@ -15826,6 +15828,290 @@ function b01Fim(F) {
   }
 }
 // ===== O1-B01 fim =====
+// ===== O1-B21: ambiente transparente parado juntado por material (manchas, mofo, escorridos, decalques) =====
+// Os transparentes (depthWrite false) ficavam fora da junção do O1-B01: cada mancha, escorrido ou decalque era uma chamada de desenho
+// (duas se DoubleSide: as passadas do O1-A15), ordenados de trás para frente um a um. Aqui, na montagem dos mapas zumbis, juntam-se por
+// material e por lugar (área da atmosfera ou bloco de 48 m) só as peças PLANAS e COLADAS num opaco (B21.apoio atrás do centro e dos
+// cantos): o que fica atrás delas nunca aparece, então a malha juntada vai antes dos outros transparentes da mesma renderOrder (o que
+// está na frente continua por cima) e numa passada só (FrontSide; a peça DoubleSide é virada para fora da parede: o desenho do verso).
+// Escorridos, ferrugem, musgo e reboco do exterior do Sanatório (5B-9: pedaços instanciados com distância de desenho por tipo, feitos na
+// face das paredes) viram uma malha por pedaço; a distância de cada tipo continua valendo (a malha desenha até o último tipo visível,
+// na ordem do mais longe para o mais perto).
+// De fora: o que se mexe (dyn, MAP_ANIM), peça que não é plana ou não encosta em opaco, ShaderMaterial, gancho de desenho, espelhado.
+// Rede de segurança (antes de cada imagem): peça que o jogo mexer depois (posição, giro, escala, visible, material, camadas, pai,
+// instâncias ou um grupo acima dela) volta para o lugar, e o pedaço dela na malha juntada vira triângulos degenerados.
+const B21 = { mapas: { vila: 1, sanatorio: 1 }, veg: { escorre: 1, ferrugem: 1, musgo: 1, reboco: 1 }, apoio: .08, plano: .002,
+  G: [], P: [], Z: [], zero: { MeshBasicMaterial: 1, MeshLambertMaterial: 1, MeshPhongMaterial: 1, MeshStandardMaterial: 1 }, cp: new Map(), cel: null, w: null, n: 0, pecas: 0, voltas: 0, ms: 0, fora: { forma: 0, apoio: 0, vizinho: 0 } };
+const _b21a = new V3(), _b21b = new V3(), _b21c = new V3(), _b21m = new THREE.Matrix4(), _b21k = new THREE.Color(), _b21nm = new THREE.Matrix3(), b21Ray = { origin: new V3(), direction: new V3() };
+// shader próprio (onBeforeCompile): uma cópia do material reaproveitaria o programa sem os uniforms dele (o three só chama o gancho ao
+// compilar), então esses materiais nunca são copiados
+const b21Proprio = m => m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile || m.customProgramCacheKey !== THREE.Material.prototype.customProgramCacheKey;
+// peça candidata (malha comum ou instanciada): material transparente comum, sem gancho, só posição/normal/uv/cor
+function b21Pode(o) {
+  const m = o.material, g = o.geometry;
+  if (!o.isMesh || o.isSkinnedMesh || Array.isArray(m) || !m.transparent || m.depthWrite !== false || m.blending !== THREE.NormalBlending || m.isShaderMaterial || m.side === THREE.BackSide || !m.visible) return false;
+  if (o.children.length || !o.visible || o.userData.blk || o.userData.dyn || !(o.layers.mask & 1) || (!o.isInstancedMesh && !o.frustumCulled)) return false;
+  if (o.onBeforeRender !== THREE.Object3D.prototype.onBeforeRender || m.onBeforeRender !== THREE.Material.prototype.onBeforeRender || m.alphaToCoverage || m.aoMap || m.lightMap) return false;
+  if (!g.attributes.position || g.morphAttributes.position || Object.keys(g.attributes).some(k => !['position', 'normal', 'uv', 'color'].includes(k))) return false;
+  if (m.vertexColors !== !!g.attributes.color || (g.attributes.color && g.attributes.color.itemSize !== 3)) return false;
+  return !!g.attributes.uv || !(m.map || m.alphaMap || m.emissiveMap || m.specularMap || m.bumpMap || m.normalMap);
+}
+// peça plana (todos os vértices a menos de B21.plano do plano do 1º triângulo): normal da frente no mundo (null se não for plana)
+function b21Normal(g, mw) {
+  const P = g.attributes.position, I = g.index, vi = k => I ? I.getX(k) : k; if (P.count < 3) return null;
+  const a = new V3().fromBufferAttribute(P, vi(0)).applyMatrix4(mw); _b21b.fromBufferAttribute(P, vi(1)).applyMatrix4(mw).sub(a); _b21c.fromBufferAttribute(P, vi(2)).applyMatrix4(mw).sub(a);
+  const n = new V3().crossVectors(_b21b, _b21c); if (n.lengthSq() < 1e-12) return null; n.normalize();
+  for (let i = 0; i < P.count; i++) if (Math.abs(_b21b.fromBufferAttribute(P, i).applyMatrix4(mw).sub(a).dot(n)) > B21.plano) return null;
+  return n;
+}
+// pontos de teste da peça plana: o centro e os cantos (um pouco para dentro); esfera em volta
+function b21Pontos(g, mw) {
+  const P = g.attributes.position, nv = P.count, W = [], c = new V3();
+  for (let i = 0; i < nv; i++) { const v = new V3().fromBufferAttribute(P, i).applyMatrix4(mw); W.push(v); c.add(v); } c.divideScalar(nv);
+  let r = 0; for (const v of W) r = Math.max(r, v.distanceTo(c));
+  const bx = new THREE.Box3().setFromPoints(W), am = [c], st = Math.max(1, Math.floor(nv / 8)); for (let i = 0; i < nv; i += st) am.push(W[i].lerp(c, .15));
+  return { am, c, r, bx };
+}
+// células marcadas (em volta das candidatas, grade de 4 m no chão) que o retângulo [x0, x1] x [z0, z1] toca: as listas de opacos delas
+function b21Toca(x0, x1, z0, z1) {
+  const G = B21.cel, C = 4, L = []; x0 = Math.floor(x0 / C); x1 = Math.floor(x1 / C); z0 = Math.floor(z0 / C); z1 = Math.floor(z1 / C);
+  if ((x1 - x0 + 1) * (z1 - z0 + 1) > G.size) { for (const e of G.values()) if (e.x >= x0 && e.x <= x1 && e.z >= z0 && e.z <= z1) L.push(e.L); } // retângulo grande: percorre as marcadas
+  else for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const e = G.get(x * 65536 + z); if (e) L.push(e.L); }
+  return L;
+}
+// colada num opaco: de que lado da normal fica a parede (+1/-1), com todos os pontos acertando um opaco a até B21.apoio; 0 = solta
+function b21Cola(pt, n, perto) {
+  const R = b21Ray, far = B21.apoio + .004, bate = e => b21Tri(e, R.origin, R.direction, far);
+  for (const s of [1, -1]) {
+    let ok = true, h = null;
+    for (const p of pt.am) { R.origin.copy(p).addScaledVector(n, -.004 * s); R.direction.copy(n).multiplyScalar(s);
+      if (h && bate(h)) continue; h = perto.find(bate); if (!h) { ok = false; break; } } // a mesma superfície costuma servir para todos os cantos
+    if (ok) return s;
+  }
+  return 0;
+}
+// raio curto contra um opaco: triângulos no mundo (montados na 1ª consulta, só na montagem); malha grande (paredes juntadas) numa grade de 2 m
+function b21Tri(e, o, d, far) {
+  const g = e.g, P = g.attributes.position, I = g.index, C = 2;
+  if (!e.t) { const W = new Float32Array(P.count * 3), nt = I ? I.count : P.count, G = e.big ? new Map() : null;
+    for (let i = 0; i < P.count; i++) { _b21a.fromBufferAttribute(P, i).applyMatrix4(e.mw); W[i * 3] = _b21a.x; W[i * 3 + 1] = _b21a.y; W[i * 3 + 2] = _b21a.z; }
+    if (G) for (let t = 0; t < nt; t += 3) { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9;
+      for (let k = 0; k < 3; k++) { const v = (I ? I.getX(t + k) : t + k) * 3; x0 = Math.min(x0, W[v]); x1 = Math.max(x1, W[v]); y0 = Math.min(y0, W[v + 1]); y1 = Math.max(y1, W[v + 1]); z0 = Math.min(z0, W[v + 2]); z1 = Math.max(z1, W[v + 2]); }
+      if (!b21Toca(x0, x1, z0, z1).length) continue; // longe de todas as candidatas
+      for (let x = Math.floor(x0 / C); x <= Math.floor(x1 / C); x++) for (let y = Math.floor(y0 / C); y <= Math.floor(y1 / C); y++) for (let z = Math.floor(z0 / C); z <= Math.floor(z1 / C); z++) { const k = x + ',' + y + ',' + z; let L = G.get(k); if (!L) G.set(k, L = []); L.push(t); } }
+    const todos = []; if (!G) for (let t = 0; t < nt; t += 3) todos.push(t);
+    e.t = { W, G, todos, fl: e.mw.determinant() < 0 ? -1 : 1, side: e.side }; }
+  const { W, G, fl, side } = e.t, vt = G ? [] : [e.t.todos];
+  if (G) for (const f of [0, far]) { const k = Math.floor((o.x + d.x * f) / C) + ',' + Math.floor((o.y + d.y * f) / C) + ',' + Math.floor((o.z + d.z * f) / C); const L = G.get(k); if (L && !vt.includes(L)) vt.push(L); }
+  for (const L of vt) for (const t of L) { // Möller-Trumbore; FrontSide só acerta a face da frente (a do three), BackSide só o verso
+    const a = (I ? I.getX(t) : t) * 3, b = (I ? I.getX(t + 1) : t + 1) * 3, c = (I ? I.getX(t + 2) : t + 2) * 3;
+    const e1x = W[b] - W[a], e1y = W[b + 1] - W[a + 1], e1z = W[b + 2] - W[a + 2], e2x = W[c] - W[a], e2y = W[c + 1] - W[a + 1], e2z = W[c + 2] - W[a + 2];
+    const frente = ((e1y * e2z - e1z * e2y) * d.x + (e1z * e2x - e1x * e2z) * d.y + (e1x * e2y - e1y * e2x) * d.z) * fl < 0;
+    if (side === THREE.FrontSide && !frente || side === THREE.BackSide && frente) continue;
+    const px = d.y * e2z - d.z * e2y, py = d.z * e2x - d.x * e2z, pz = d.x * e2y - d.y * e2x, det = e1x * px + e1y * py + e1z * pz; if (Math.abs(det) < 1e-12) continue;
+    const iv = 1 / det, tx = o.x - W[a], ty = o.y - W[a + 1], tz = o.z - W[a + 2], u = (tx * px + ty * py + tz * pz) * iv; if (u < 0 || u > 1) continue;
+    const qx = ty * e1z - tz * e1y, qy = tz * e1x - tx * e1z, qz = tx * e1y - ty * e1x, v = (d.x * qx + d.y * qy + d.z * qz) * iv; if (v < 0 || u + v > 1) continue;
+    const tt = (e2x * qx + e2y * qy + e2z * qz) * iv; if (tt >= 0 && tt <= far) return true;
+  }
+  return false;
+}
+// as peças numa geometria só, já no mundo (a peça virada troca a ordem dos vértices do triângulo e a normal)
+function b21Malha(L, cor, uv) {
+  let nv = 0, ni = 0; for (const p of L) { nv += p.g.attributes.position.count; ni += p.g.index ? p.g.index.count : p.g.attributes.position.count; }
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), U = uv ? new Float32Array(nv * 2) : null, C = cor ? new Float32Array(nv * 3) : null, idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+  let ov = 0, oi = 0;
+  for (const p of L) {
+    let g = p.g; if (!g.attributes.normal) { g = g.clone(); g.computeVertexNormals(); }
+    const A = g.attributes, n = A.position.count, sg = p.vira ? -1 : 1, k = p.cor; _b21nm.getNormalMatrix(p.mw); p.v0 = ov; p.v1 = ov + n;
+    for (let i = 0, j = ov * 3; i < n; i++, j += 3) {
+      _b21a.fromBufferAttribute(A.position, i).applyMatrix4(p.mw); pos[j] = _b21a.x; pos[j + 1] = _b21a.y; pos[j + 2] = _b21a.z;
+      _b21a.fromBufferAttribute(A.normal, i).applyMatrix3(_b21nm).normalize(); nor[j] = _b21a.x * sg; nor[j + 1] = _b21a.y * sg; nor[j + 2] = _b21a.z * sg;
+      if (C) { const a = A.color; C[j] = (k ? k.r : 1) * (a ? a.getX(i) : 1); C[j + 1] = (k ? k.g : 1) * (a ? a.getY(i) : 1); C[j + 2] = (k ? k.b : 1) * (a ? a.getZ(i) : 1); }
+    }
+    if (U) for (let i = 0; i < n; i++) { U[(ov + i) * 2] = A.uv.getX(i); U[(ov + i) * 2 + 1] = A.uv.getY(i); }
+    const T = g.index ? g.index.array : null, m = T ? T.length : n;
+    for (let t = 0; t < m; t += 3) { const a = T ? T[t] : t, b = T ? T[t + 1] : t + 1, c = T ? T[t + 2] : t + 2; idx[oi + t] = a + ov; idx[oi + t + 1] = (p.vira ? c : b) + ov; idx[oi + t + 2] = (p.vira ? b : c) + ov; }
+    oi += m; p.i1 = oi; ov += n; if (g !== p.g) g.dispose();
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  if (U) geo.setAttribute('uv', new THREE.BufferAttribute(U, 2)); if (C) geo.setAttribute('color', new THREE.BufferAttribute(C, 3));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.computeBoundingSphere(); return geo;
+}
+// 1) na montagem, antes da junção dos opacos (as peças pequenas ainda servem de apoio ao raio): escolhe as peças e agrupa
+function b21Prepara(all, moving) {
+  for (const g of B21.G) for (const f of g.fontes) if (f.o.isInstancedMesh && !f.o.parent) { f.o.geometry.dispose(); f.o.dispose(); } // mapa anterior (como o O1-B07)
+  B21.G = []; B21.P = []; B21.Z = []; B21.w = null; B21.n = B21.pecas = B21.voltas = 0; for (const k in B21.fora) B21.fora[k] = 0;
+  if (!B21.mapas[curMapId]) return null; const t0 = performance.now();
+  const ar = new Map(); for (const a of AT?.areas || []) a.root.traverse(o => ar.set(o, a));
+  const C = 4, cad = [], grp = new Map(), G = new Map(); // G: grade de 4 m no chão com as células em volta das candidatas
+  for (const o of all) { // candidatas: peças planas; as soltas (sem a vegetação do 5B-9) esperam o teste do apoio
+    const veg = !!(o.isInstancedMesh && o.parent === world && B21.veg[o.userData.veg] && o.material.side === THREE.FrontSide); // 5B-9: feitos na face da parede (a distância é do pedaço)
+    if (!b21Pode(o) || (!veg && (moving.has(o) || b01Fora(o)))) continue;
+    if (o.matrixWorld.determinant() <= 0) { B21.fora.forma++; continue; }
+    const pecas = []; let ok = true;
+    for (let i = 0, n = o.isInstancedMesh ? o.count : 1; i < n; i++) {
+      const mw = o.isInstancedMesh ? new THREE.Matrix4().multiplyMatrices(o.matrixWorld, (o.getMatrixAt(i, _b21m), _b21m)) : o.matrixWorld.clone(), nf = mw.determinant() > 0 && b21Normal(o.geometry, mw);
+      if (!nf) { ok = false; break; }
+      const p = { g: o.geometry, mw, n: nf, s: 1, cor: o.instanceColor ? o.getColorAt(i, new THREE.Color()) : null }; pecas.push(p);
+      if (!veg) { p.pt = b21Pontos(o.geometry, mw); const q = p.pt.r + B21.apoio, c = p.pt.c; for (let x = Math.floor((c.x - q) / C); x <= Math.floor((c.x + q) / C); x++) for (let z = Math.floor((c.z - q) / C); z <= Math.floor((c.z + q) / C); z++) { const k = x * 65536 + z; if (!G.has(k)) G.set(k, { x, z, L: [] }); } }
+    }
+    if (!ok) { B21.fora.forma++; continue; }
+    cad.push({ o, veg, pecas });
+  }
+  B21.cel = G; const ops = []; // opacos parados e à vista (sem recorte por alphaTest, sem vegetação) perto de alguma candidata: o apoio (instanciada = uma entrada por instância)
+  const _s = new THREE.Sphere();
+  for (const o of all) { const m = o.material; if (!o.isMesh || o.isSkinnedMesh || Array.isArray(m) || m.transparent || m.depthWrite === false || !m.visible || m.alphaTest > 0 || m.isShaderMaterial || o.userData.veg || !o.visible || moving.has(o) || b01Fora(o)) continue;
+    const g = o.geometry; if (!g.attributes.position || g.morphAttributes.position) continue; if (!g.boundingSphere) g.computeBoundingSphere();
+    const nt = (g.index ? g.index.count : g.attributes.position.count) / 3;
+    if (o.isInstancedMesh) { if (!o.boundingSphere) o.computeBoundingSphere(); _s.copy(o.boundingSphere).applyMatrix4(o.matrixWorld); if (!b21Toca(_s.center.x - _s.radius, _s.center.x + _s.radius, _s.center.z - _s.radius, _s.center.z + _s.radius).length) continue; } // nenhuma instância perto
+    for (let i = 0, n = o.isInstancedMesh ? o.count : 1; i < n; i++) {
+      const mw = o.isInstancedMesh ? _b21m.multiplyMatrices(o.matrixWorld, (o.getMatrixAt(i, _b21m), _b21m)) : o.matrixWorld; _s.copy(g.boundingSphere).applyMatrix4(mw);
+      const c = _s.center, r = _s.radius, L = b21Toca(c.x - r, c.x + r, c.z - r, c.z + r); if (!L.length) continue; const e = { g, mw: mw.clone(), side: m.side, s: _s.clone(), big: nt > 256, t: null }; for (const l of L) l.push(e); ops.push(e); } }
+  const ace = [];
+  for (const { o, veg, pecas } of cad) { // apoio
+    let ok = true;
+    if (!veg) for (const p of pecas) { const c = p.pt.c, q = p.pt.r + B21.apoio, pp = new Set();
+      for (let x = Math.floor((c.x - q) / C); x <= Math.floor((c.x + q) / C); x++) for (let z = Math.floor((c.z - q) / C); z <= Math.floor((c.z + q) / C); z++) for (const e of G.get(x * 65536 + z)?.L || []) if (e.s.center.distanceTo(c) < e.s.radius + q) pp.add(e);
+      p.s = pp.size ? b21Cola(p.pt, p.n, [...pp]) : 0; if (!p.s) { ok = false; break; } }
+    if (!ok) { B21.fora.apoio++; continue; }
+    ace.push({ o, veg, pecas });
+  }
+  // outro transparente encostado (vidro sob a rachadura, véu que cruza a parede...): a ordem entre os dois mudaria; a peça fica de fora
+  const tt = [], ok = new Set(ace.map(x => x.o));
+  for (const o of all) { const m = o.material; if (!o.isMesh || ok.has(o) || !(Array.isArray(m) ? m.some(x => x.transparent) : m.transparent) || !o.geometry?.attributes.position) continue;
+    const g = o.geometry; if (!g.boundingBox) g.computeBoundingBox();
+    for (let i = 0, n = o.isInstancedMesh ? o.count : 1; i < n; i++) { const mw = o.isInstancedMesh ? new THREE.Matrix4().multiplyMatrices(o.matrixWorld, (o.getMatrixAt(i, _b21m), _b21m)) : o.matrixWorld;
+      tt.push({ g, mw, b: g.boundingBox.clone().applyMatrix4(mw), W: null }); } }
+  const encosta = (t, b) => { // algum triângulo do outro transparente (caixa no mundo) toca a caixa da peça
+    const g = t.g, P = g.attributes.position, I = g.index, n = I ? I.count : P.count;
+    if (!t.W) { t.W = new Float32Array(P.count * 3); for (let i = 0; i < P.count; i++) { _b21a.fromBufferAttribute(P, i).applyMatrix4(t.mw); t.W.set([_b21a.x, _b21a.y, _b21a.z], i * 3); } }
+    const W = t.W; for (let k = 0; k < n; k += 3) { let ok = true;
+      for (let e = 0; e < 3 && ok; e++) { const lo = e ? (e > 1 ? b.min.z : b.min.y) : b.min.x, hi = e ? (e > 1 ? b.max.z : b.max.y) : b.max.x, a = (I ? I.getX(k) : k) * 3 + e, c = (I ? I.getX(k + 1) : k + 1) * 3 + e, d = (I ? I.getX(k + 2) : k + 2) * 3 + e;
+        if (Math.max(W[a], W[c], W[d]) < lo || Math.min(W[a], W[c], W[d]) > hi) ok = false; }
+      if (ok) return true; }
+    return false; };
+  for (const { o, veg, pecas } of ace) {
+    if (!veg && pecas.some(p => { const b = p.pt.bx.clone().expandByScalar(B21.apoio); return tt.some(t => t.b.intersectsBox(b) && encosta(t, b)); })) { B21.fora.vizinho++; continue; }
+    const m = o.material; for (const p of pecas) { p.vira = m.side === THREE.DoubleSide && p.s > 0; delete p.pt; } // DoubleSide de frente para a parede: vira
+    const a = ar.get(o), c = _b21a.setFromMatrixPosition(pecas[0].mw);
+    const lugar = veg ? 'veg:' + Math.floor(o.boundingSphere.center.x / 64) + ',' + Math.floor(o.boundingSphere.center.z / 64) : a ? 'a:' + a.id : Math.floor(c.x / 48) + ',' + Math.floor(c.z / 48);
+    const k = lugar + '|' + m.id + '|' + o.renderOrder + '|' + (+o.castShadow) + (+o.receiveShadow) + '|' + o.layers.mask;
+    let e = grp.get(k); if (!e) grp.set(k, e = { veg, fontes: [] }); e.fontes.push({ o, pecas, veg });
+  }
+  B21.cel = null; B21.ms = performance.now() - t0; return grp;
+}
+// 2) depois da junção dos opacos: monta as malhas e tira as peças da cena
+function b21Junta(grp) {
+  if (!grp) return; const t0 = performance.now();
+  for (const g of grp.values()) {
+    const m = g.fontes[0].o.material, dupla = m.side === THREE.DoubleSide, L = g.fontes.flatMap(f => f.pecas);
+    if (L.length < 2 && !dupla) continue; // sozinha e de uma face: já é uma chamada
+    if (g.veg) g.fontes.sort((a, b) => (VSAN.vis[b.o.userData.veg]?.[0] ?? 0) - (VSAN.vis[a.o.userData.veg]?.[0] ?? 0)); // do tipo que vai mais longe para o mais perto
+    const cor = m.vertexColors || L.some(p => p.cor), L2 = g.fontes.flatMap(f => f.pecas), geo = b21Malha(L2, cor, !!L2[0].g.attributes.uv);
+    const copia = dupla || cor !== m.vertexColors; if (copia && b21Proprio(m)) continue;
+    let mat = m; if (copia) { // cópia de uma face só (e cor por vértice da cor das instâncias); segue o original (b21Copia)
+      mat = m.clone(); mat.side = THREE.FrontSide; mat.vertexColors = cor; mat.defines = m.defines; mat.userData = m.userData;
+      m.addEventListener('dispose', () => mat.dispose()); }
+    const o0 = g.fontes[0].o, mm = new THREE.Mesh(geo, mat);
+    mm.renderOrder = o0.renderOrder; mm.castShadow = o0.castShadow; mm.receiveShadow = o0.receiveShadow; mm.layers.mask = o0.layers.mask;
+    mm.userData.b21 = 1; mm.userData.own = mat !== m || g.fontes.some(f => f.o.userData.own); if (!g.veg) mm.userData.blk = 1; // blk: recorte por distância e oclusão (zCull/O1-B03), como as outras juntadas
+    world.add(mm); B21.n++;
+    const G = { mm, mat, m, ver: m.version, veg: g.veg, fontes: [], anc: new Map(), vis: -1 };
+    for (const f of g.fontes) {
+      const o = f.o; f.par = o.parent; f.mat = o.material; f.lm = o.layers.mask; f.p = o.position.clone(); f.q = o.quaternion.clone(); f.s = o.scale.clone();
+      f.v0 = f.pecas[0].v0; f.v1 = f.pecas.at(-1).v1; f.i1 = f.pecas.at(-1).i1; f.ok = true; f.anc = [];
+      if (o.isInstancedMesh) { f.iv = o.instanceMatrix.version; f.cv = o.instanceColor?.version ?? -1; f.cnt = o.count; }
+      for (let a = f.par; a && a !== world; a = a.parent) { // grupos acima dela (a raiz da área é do zCull)
+        if (AT?.areas.some(x => x.root === a)) break;
+        let e = G.anc.get(a); if (!e) G.anc.set(a, e = { a, vis: a.visible, par: a.parent, mw: a.matrixWorld.elements.slice(), fontes: [] }); e.fontes.push(f); }
+      f.par.remove(o); G.fontes.push(f); B21.pecas += f.pecas.length; delete f.pecas;
+    }
+    B21.G.push(G);
+  }
+  b21Planos(); B21.w = world; B21.ms += performance.now() - t0;
+}
+// Plano DoubleSide solto (véus, lençóis, fachos, cartazes): das duas passadas do three (verso, depois frente) só a do lado que a câmera
+// vê tem pixels (num plano todos os triângulos ficam de frente ou todos de costas). Na hora do desenho a peça recebe a cópia de uma face
+// desse lado (os mesmos programas das duas passadas do O1-A15) e o material original volta depois da imagem: uma chamada em vez de duas.
+function b21Planos() {
+  B21.P = []; B21.Z = [];
+  world.traverse(o => {
+    const m = o.material, g = o.geometry;
+    if (o.isMesh && !Array.isArray(m) && m.transparent && m.depthWrite === false && m.blending === THREE.NormalBlending && !m.premultipliedAlpha && !o.castShadow && B21.zero[m.type] && !b21Proprio(m)) B21.Z.push(o); // opacidade 0 (b21Escolhe)
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || Array.isArray(m) || !m.transparent || m.side !== THREE.DoubleSide || m.forceSinglePass || m.isShaderMaterial || b21Proprio(m) || o.castShadow || o.userData.b21) return;
+    if (o.onBeforeRender !== THREE.Object3D.prototype.onBeforeRender || g.morphAttributes.position || !g.attributes.position) return;
+    const n = b21Normal(g, _b21m.identity()); if (!n) return;
+    const P = g.attributes.position, I = g.index, nt = I ? I.count : P.count; // todos os triângulos do mesmo lado
+    for (let t = 0; t < nt; t += 3) { const a = I ? I.getX(t) : t, b = I ? I.getX(t + 1) : t + 1, c = I ? I.getX(t + 2) : t + 2;
+      _b21a.fromBufferAttribute(P, a); _b21b.fromBufferAttribute(P, b).sub(_b21a); _b21c.fromBufferAttribute(P, c).sub(_b21a); if (_b21b.cross(_b21c).dot(n) < -1e-9) return; }
+    let e = B21.cp.get(m); if (!e) B21.cp.set(m, e = b21Lados(m));
+    B21.P.push({ o, m, e, n, p: new V3().fromBufferAttribute(P, 0) });
+  });
+}
+function b21Lados(m) { // cópias de uma face (frente e verso) que seguem o original
+  const c = s => { const b = m.clone(); b.side = s; b.defines = m.defines; b.userData = m.userData; return b; };
+  const e = { m, f: c(THREE.FrontSide), b: c(THREE.BackSide), ver: m.version, t: -1 }; m.addEventListener('dispose', () => { e.f.dispose(); e.b.dispose(); B21.cp.delete(m); }); return e;
+}
+function b21Segue(e, b) {
+  const m = e.m;
+  for (const k of A15.campos) if (k in m && b[k] !== m[k]) b[k] = m[k];
+  for (const k of A15.cores) if (m[k] && !b[k].equals(m[k])) b[k].copy(m[k]);
+  if (b.visible !== m.visible) b.visible = m.visible; if (b.transparent !== m.transparent) b.transparent = m.transparent;
+}
+const _b21i = new THREE.Matrix4(), _b21q = new V3();
+function b21Escolhe(cam) { // antes do recorte: a face que a câmera vê
+  // opacidade 0 com mistura normal, sem gravar profundidade e sem shader próprio (que pode tirar o alfa de outro lugar, ex.: relâmpago):
+  // o desenho não muda nenhum pixel (alfa 0); fica fora só durante a imagem
+  if (B21.w === world) for (const o of B21.Z) { const m = o.material; if (o.visible && !o.children.length && m.opacity === 0 && m.transparent && m.depthWrite === false && m.blending === THREE.NormalBlending && !m.premultipliedAlpha && B21.zero[m.type] && !b21Proprio(m)) { o.visible = false; o.userData.b21z = 1; } }
+  if (!B21.P.length) return; if (B21.w !== world) { B21.P = []; return; }
+  const cx = cam.matrixWorld.elements[12], cy = cam.matrixWorld.elements[13], cz = cam.matrixWorld.elements[14], fr = renderer.info.render.frame;
+  for (const p of B21.P) {
+    const o = p.o, e = p.e; if (o.material !== p.m) { p.fora = true; continue; } // o jogo trocou o material: fica com ele (o próximo mapa refaz a lista)
+    if (p.fora || !o.visible || !e.m.transparent || e.m.side !== THREE.DoubleSide || e.m.forceSinglePass) continue;
+    if (e.t !== fr) { e.t = fr; if (e.m.version !== e.ver) { e.ver = e.m.version; for (const b of [e.f, e.b]) { const s = b.side; b.copy(e.m); b.side = s; b.needsUpdate = true; } } else { b21Segue(e, e.f); b21Segue(e, e.b); } }
+    _b21q.set(cx, cy, cz).applyMatrix4(_b21i.copy(o.matrixWorld).invert()).sub(p.p); // câmera no espaço da peça
+    o.material = _b21q.dot(p.n) >= 0 ? e.f : e.b; // espelhada: o three vira a frente junto, então vale o lado no espaço da peça
+  }
+}
+function b21Devolve() { for (const p of B21.P) if (p.o.material === p.e.f || p.o.material === p.e.b) p.o.material = p.m; for (const o of B21.Z) if (o.userData.b21z) { o.userData.b21z = 0; o.visible = true; } }
+// a peça volta para o lugar (o jogo mexeu nela) e o pedaço dela na malha juntada vira triângulos degenerados
+function b21Volta(G, f) {
+  if (!f.ok) return; f.ok = false; B21.voltas++;
+  const P = G.mm.geometry.attributes.position, a = P.array; for (let i = f.v0 * 3 + 3, e = f.v1 * 3; i < e; i += 3) { a[i] = a[f.v0 * 3]; a[i + 1] = a[f.v0 * 3 + 1]; a[i + 2] = a[f.v0 * 3 + 2]; } P.needsUpdate = true;
+  if (!f.o.parent) { f.par.add(f.o); f.o.updateMatrixWorld(true); }
+  if (G.fontes.every(x => !x.ok)) { G.mm.parent?.remove(G.mm); G.fim = true; }
+}
+// o material da cópia acompanha o original (opacidade, cor, mapa... como o O1-A15 faz com o verso)
+function b21Copia(G) {
+  const m = G.m, b = G.mat;
+  if (m.version !== G.ver) { G.ver = m.version; const s = b.side, vc = b.vertexColors; b.copy(m); b.side = s; b.vertexColors = vc; b.needsUpdate = true; return; }
+  for (const k of A15.campos) if (k in m && b[k] !== m[k]) b[k] = m[k];
+  for (const k of A15.cores) if (m[k] && !b[k].equals(m[k])) b[k].copy(m[k]);
+  if (b.visible !== m.visible) b.visible = m.visible; if (b.transparent !== m.transparent) b.transparent = m.transparent;
+}
+// 3) antes de cada imagem da câmera do jogo: vigia as peças tiradas e espelha a distância dos pedaços do 5B-9
+function b21Vigia(cam) {
+  if (cam !== camera || !B21.G.length) return; if (B21.w !== world) { B21.G = []; return; }
+  for (const G of B21.G) {
+    if (G.fim) continue; if (G.mat !== G.m) b21Copia(G);
+    for (const e of G.anc.values()) { const a = e.a, w = a.matrixWorld.elements; let mudou = a.visible !== e.vis || a.parent !== e.par; for (let i = 0; i < 16 && !mudou; i++) mudou = w[i] !== e.mw[i]; if (mudou) for (const f of e.fontes) b21Volta(G, f); }
+    let fimV = 0;
+    for (const f of G.fontes) {
+      if (!f.ok) continue; const o = f.o;
+      if (o.parent || o.material !== f.mat || o.layers.mask !== f.lm || !o.position.equals(f.p) || !o.quaternion.equals(f.q) || !o.scale.equals(f.s) || (!f.veg && !o.visible)
+        || (o.isInstancedMesh && (o.instanceMatrix.version !== f.iv || (o.instanceColor?.version ?? -1) !== f.cv || o.count !== f.cnt))) { b21Volta(G, f); continue; }
+      if (f.veg && o.visible) fimV = f.i1; // 5B-9: o pedaço desenha até o último tipo visível
+    }
+    if (G.veg && !G.fim && fimV !== G.vis) { G.vis = fimV; G.mm.visible = fimV > 0; G.mm.geometry.setDrawRange(0, fimV); }
+  }
+}
+{ const ob = scene.onBeforeRender; scene.onBeforeRender = function (r, s, c, rt) { ob.call(this, r, s, c, rt); b21Vigia(c); b21Escolhe(c); }; }
+{ const oa = scene.onAfterRender; scene.onAfterRender = function (r, s, c) { oa.call(this, r, s, c); b21Devolve(); }; }
+// transparentes: as malhas juntadas (coladas na parede) antes dos outros da mesma renderOrder; o resto como o three (de trás para frente)
+const b21Ordem = (a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder || (b.object.userData.b21 | 0) - (a.object.userData.b21 | 0) || (a.z !== b.z ? b.z - a.z : a.id - b.id);
+renderer.setTransparentSort(b21Ordem);
+// ===== O1-B21 fim =====
 // ===== 5B-1: arquitetura das salas do núcleo do Sanatório (paredes clínicas, forro, batentes) =====
 // Só visual e só no Sanatório: sem colisão, sem sombra nova, sem sorteio do jogo. Três peças:
 // - paredes: o material das paredes do mapa ganha, por sala, a barra até ~1,5 m (azulejo, lambri, tinta a óleo ou embasamento),
