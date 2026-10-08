@@ -13083,6 +13083,175 @@ function g02SombraCheia(M) { // sem sombra que segue: a câmera da sombra volta 
   sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.near = 1; sc.far = Math.max(220, Math.hypot(s[0], s[1], s[2]) + ext * 1.6); sc.updateProjectionMatrix();
   sun.updateMatrixWorld(); sun.target.updateMatrixWorld(); renderer.shadowMap.needsUpdate = true;
 }
+// ===== O1-B05: sombra do Alto em cache (só o que se mexe é redesenhado) =====
+// Medido (BX e B05, Alto): a sombra era refeita inteira a cada quadro: CPU 3-5 ms (Vila: ~320 peças paradas; PvP: ~45 peças por
+// boneco) e GPU 7-10 ms, quase tudo limpar e preencher o mapa de 4096 (esta placa limpa 4096² em ~5 ms). Agora o mapa só é refeito
+// inteiro quando o parado muda (degrau da sombra que segue, needsUpdate (porta), peça do world que some, anda ou é nova, mapa novo, e a
+// cada B05.refazS s por garantia). Nos outros quadros: os retângulos onde os que se mexem estavam no quadro anterior voltam do atlas
+// (cópia do parado guardada antes de desenhá-los), o parado de onde eles estão agora é guardado no atlas e só eles são desenhados.
+// Resultado igual ao de refazer tudo. Parado = peça do world (malha/linha/pontos com castShadow); o resto da cena e peça do world
+// que anda, troca de geometria/material ou tem pele/morph/customDepthMaterial é "dinâmica" (redesenhada todo quadro). Peça parada que
+// aparece (o zCull mostra as áreas que entram na névoa) é desenhada por cima do mapa, sem refazer; a que some refaz. Se os dinâmicos não
+// cabem no atlas, o B05 fica B05.pausaS s de fora (como antes).
+// Boneco: peças rígidas do mesmo pai juntas numa malha só na sombra (b05Boneco); peça ou junção miúda (raio < B05.pecaMin m: polegar,
+// cotovelo, mão...) não lança sombra no Alto: fica dentro da silhueta.
+const B05 = { on: true, tile: 32, atlas: 1024, refazS: 5, pecaMin: .09, lista: 15, pausaS: 1,
+  ok: false, w: null, map: null, AN: [], AV: null, sig: new Float64Array(12), sv: new Float64Array(12), L: [], M: null, din: new Set(), hash: 0, n: 0, t: 0, pausa: 0,
+  prev: [], novos: [], bon: new Set(), cand: new Map(), jm: new Map(), jmat: new Map(), px: [], G: null, gx: 0, gy: 0, at: null, peq: [], st: { refaz: 0, inc: 0, queda: 0, blit: 0, novas: 0, junta: 0 } };
+const _b05s = new THREE.Sphere(), _b05v = new V3(), b05Raiz = { visible: true, layers: { test: () => false }, children: [] }, b05Raiz2 = { ...b05Raiz, children: [] };
+const b05Vis = o => { for (let a = o; a; a = a.parent) if (!a.visible) return false; return true; };
+const b05Din = o => o.isSkinnedMesh || !!o.morphTargetInfluences?.length || !!o.customDepthMaterial; // mexe sem mudar a matriz
+function b05Lista() { // peças paradas do world que lançam sombra (com o estado de agora) e a assinatura do conjunto
+  const L = B05.L = []; let h = 0;
+  world.traverse(o => { if (!o.castShadow || !(o.isMesh || o.isLine || o.isPoints)) return; h = (h + o.id * 2654435761) % 4294967296;
+    if (B05.din.has(o)) return; if (b05Din(o)) { B05.din.add(o); return; } L.push(o); });
+  const AN = B05.AN = [], vis = new Set(); for (const o of L) for (let a = o.parent; a && !vis.has(a); a = a.parent) { vis.add(a); AN.push(a); } // pais (visibilidade vista uma vez por pai)
+  B05.AV = Uint8Array.from(AN, a => a.visible ? 1 : 0);
+  B05.hash = h; const M = B05.M = new Float64Array(L.length * 24);
+  for (let i = 0; i < L.length; i++) b05Grava(L[i], M, i * 24);
+}
+function b05Grava(o, M, k) { const e = o.matrixWorld.elements; for (let j = 0; j < 16; j++) M[k + j] = e[j]; const g = o.geometry;
+  M[k + 16] = g.id; M[k + 17] = g.drawRange.start * 1e6 + Math.min(g.drawRange.count, 1e6 - 1); M[k + 18] = o.isInstancedMesh ? o.instanceMatrix.version * 1e6 + o.count : 0;
+  M[k + 19] = Array.isArray(o.material) ? -1 : o.material.id; M[k + 20] = o.visible ? 1 : 0; M[k + 21] = b05Vis(o) ? 1 : 0; M[k + 22] = o.layers.mask; M[k + 23] = o.castShadow ? 1 : 0; }
+function b05Parado() { // true = o parado mudou (refaz); peça que mudou por dentro vira dinâmica
+  const L = B05.L, M = B05.M, AN = B05.AN, AV = B05.AV; let muda = false, pai = false;
+  for (let i = 0; i < AN.length; i++) { const v = AN[i].visible ? 1 : 0; if (v !== AV[i]) { AV[i] = v; pai = true; } } // algum pai sumiu/apareceu: confere a visibilidade de todas
+  for (let i = L.length - 1; i >= 0; i--) { const o = L[i], k = i * 24, e = o.matrixWorld.elements, g = o.geometry; let p = false;
+    for (let j = 0; j < 16; j++) if (e[j] !== M[k + j]) { p = true; break; }
+    if (!p && (g.id !== M[k + 16] || g.drawRange.start * 1e6 + Math.min(g.drawRange.count, 1e6 - 1) !== M[k + 17] || (o.isInstancedMesh && o.instanceMatrix.version * 1e6 + o.count !== M[k + 18])
+      || (Array.isArray(o.material) ? -1 : o.material.id) !== M[k + 19])) p = true;
+    if (p) { B05.din.add(o); muda = true; L[i] = L[L.length - 1]; L.pop(); M.copyWithin(k, L.length * 24, L.length * 24 + 24); continue; } // anda/troca: dinâmica daqui em diante
+    if ((o.visible ? 1 : 0) !== M[k + 20] || (pai && (b05Vis(o) ? 1 : 0) !== M[k + 21]) || o.layers.mask !== M[k + 22] || (o.castShadow ? 1 : 0) !== M[k + 23]) {
+      const v = M[k + 21], lm = M[k + 22], cs = M[k + 23]; b05Grava(o, M, k); const so = lm === M[k + 22] && cs === M[k + 23];
+      if (so && !v && M[k + 21]) B05.novos.push(o); // apareceu: é desenhada por cima do mapa, sem refazer
+      else if (!so || v !== M[k + 21]) muda = true; } // sumiu (ou outra troca): refaz
+  }
+  if (++B05.n % B05.lista === 0) { let h = 0; world.traverse(o => { if (o.castShadow && (o.isMesh || o.isLine || o.isPoints)) h = (h + o.id * 2654435761) % 4294967296; }); if (h !== B05.hash) muda = true; } // peça nova/removida
+  return muda;
+}
+function b05Sig() { // câmera da sombra e mapa: mudou = refaz
+  const s = sun.shadow, c = s.camera, a = sun.matrixWorld.elements, b = sun.target.matrixWorld.elements, S = B05.sig;
+  const v = B05.sv; v[0] = a[12]; v[1] = a[13]; v[2] = a[14]; v[3] = b[12]; v[4] = b[13]; v[5] = b[14]; v[6] = c.left; v[7] = c.right; v[8] = c.top; v[9] = c.bottom; v[10] = c.near * 1e4 + c.far; v[11] = s.mapSize.x * 1e5 + s.mapSize.y; let m = false;
+  for (let i = 0; i < 12; i++) if (S[i] !== v[i]) { S[i] = v[i]; m = true; } return m;
+}
+function b05Marca(o, cam) { // percorre como o three: cada peça que lança sombra marca o seu retângulo (no boneco, a peça rígida espera a junção)
+  if (!o.visible) return; const ch = o.children;
+  if (o.castShadow && (o.isMesh || o.isLine || o.isPoints) && o.layers.test(cam.layers)) {
+    if (B05.boneco && b05Junta1(o)) { let l = B05.cand.get(o.parent); if (!l) B05.cand.set(o.parent, l = []); l.push(o); } else b05Uma(o);
+  }
+  for (let i = 0; i < ch.length; i++) b05Marca(ch[i], cam);
+}
+function b05Uma(o) { // retângulo do mapa coberto pela esfera da peça (como o recorte do three), em blocos de B05.tile
+  const fr = sun.shadow.getFrustum();
+  if (o.boundingSphere !== undefined) { if (o.boundingSphere === null) o.computeBoundingSphere(); _b05s.copy(o.boundingSphere).applyMatrix4(o.matrixWorld); }
+  else { const g = o.geometry; if (g.boundingSphere === null) g.computeBoundingSphere(); _b05s.copy(g.boundingSphere).applyMatrix4(o.matrixWorld); }
+  if (!o.frustumCulled || fr.intersectsSphere(_b05s)) {
+    if (B05.boneco && _b05s.radius < B05.pecaMin) { o.castShadow = false; B05.peq.push(o); } // peça miúda de boneco: fora da sombra (volta depois)
+    else if (!o.frustumCulled && !o.isSkinnedMesh) B05.tudo = true; // sem recorte: pode desenhar fora da esfera
+    else { const e = sun.shadow.matrix.elements, W = B05.gx, H = B05.gy, T = B05.tile; _b05v.copy(_b05s.center).applyMatrix4(sun.shadow.matrix);
+      const r = _b05s.radius * (o.isSkinnedMesh ? 1.25 : 1.02), rx = r * Math.hypot(e[0], e[4], e[8]), ry = r * Math.hypot(e[1], e[5], e[9]), mw = sun.shadow.map.width, mh = sun.shadow.map.height;
+      const x0 = Math.max(0, Math.floor(((_b05v.x - rx) * mw - 2) / T)), x1 = Math.min(W - 1, Math.floor(((_b05v.x + rx) * mw + 2) / T));
+      const y0 = Math.max(0, Math.floor(((_b05v.y - ry) * mh - 2) / T)), y1 = Math.min(H - 1, Math.floor(((_b05v.y + ry) * mh + 2) / T));
+      for (let y = y0; y <= y1; y++) B05.G.fill(1, y * W + x0, y * W + x1 + 1); }
+  }
+}
+// Boneco (jogador remoto/bot, ~45 peças): as peças rígidas de um mesmo pai (tronco, cabeça, perna, mão, partes da arma) vão para a sombra
+// como uma malha só (posições juntadas no espaço do pai, desenhada com a matriz dele). Peça que se mexe dentro do pai (braço do IK,
+// ferrolho) é vista pela matriz local e sai da junção para sempre; peça trocada/escondida refaz a junção. Desenho igual, menos chamadas.
+const b05Junta1 = o => o.isMesh && !o.isSkinnedMesh && !o.morphTargetInfluences && !o.customDepthMaterial && !Array.isArray(o.material) && o.material.visible && !(o.material.alphaTest > 0)
+  && !o.material.displacementMap && o.frustumCulled && !o.userData.b05m && o.parent && o.matrix.determinant() > 0;
+function b05Geo(ps) { // posições das peças no espaço do pai, numa geometria só
+  let nv = 0, ni = 0; for (const o of ps) { const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+  const pos = new Float32Array(nv * 3), idx = new Uint32Array(ni); let v = 0, k = 0;
+  for (const o of ps) { const g = o.geometry, P = g.attributes.position, m = o.matrix.elements;
+    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), j = (v + i) * 3;
+      pos[j] = m[0] * x + m[4] * y + m[8] * z + m[12]; pos[j + 1] = m[1] * x + m[5] * y + m[9] * z + m[13]; pos[j + 2] = m[2] * x + m[6] * y + m[10] * z + m[14]; }
+    if (g.index) for (let i = 0; i < g.index.count; i++) idx[k++] = g.index.getX(i) + v; else for (let i = 0; i < P.count; i++) idx[k++] = v + i;
+    v += P.count; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeBoundingSphere(); return g;
+}
+function b05Boneco(md, cam) {
+  B05.cand.clear(); B05.boneco = true; b05Marca(md, cam);
+  for (const [p, l0] of B05.cand) {
+    const m0 = l0[0].material, lado = m0.side, ls = m0.shadowSide, l = []; for (const o of l0) if (o.material.side === lado && o.material.shadowSide === ls) l.push(o); else b05Uma(o);
+    let e = B05.jm.get(p);
+    if (e && (e.ps.length !== l.length || e.ps.some((o, i) => o !== l[i]))) e = null; // peças trocadas, escondidas ou novas
+    if (e) { const mx = e.mx; for (let i = l.length - 1; i >= 0; i--) { const a = l[i].matrix.elements; for (let j = 0; j < 16; j++) if (a[j] !== mx[i * 16 + j]) { l[i].userData.b05m = 1; e = null; break; } } } // mexeu dentro do pai: sai da junção
+    if (!e) { const v = B05.jm.get(p); if (v) { v.geo.dispose(); B05.jm.delete(p); } // (re)monta
+      for (let i = l.length - 1; i >= 0; i--) if (l[i].userData.b05m) { b05Uma(l[i]); l.splice(i, 1); }
+      if (l.length < 2) { for (const o of l) b05Uma(o); continue; }
+      const k = lado + '|' + ls; let mt = B05.jmat.get(k); if (!mt) B05.jmat.set(k, mt = new THREE.MeshBasicMaterial({ side: lado, shadowSide: ls }));
+      const geo = b05Geo(l), mesh = new THREE.Mesh(geo, mt); B05.st.junta++; mesh.matrixAutoUpdate = false; mesh.castShadow = true;
+      e = { ps: l, mx: new Float64Array(l.length * 16), geo, mesh, raiz: md }; l.forEach((o, i) => e.mx.set(o.matrix.elements, i * 16)); B05.jm.set(p, e); }
+    e.mesh.matrixWorld.copy(p.matrixWorld); for (const o of e.ps) { o.castShadow = false; B05.peq.push(o); } B05.px.push(e.mesh); b05Uma(e.mesh);
+  }
+  B05.boneco = false;
+}
+function b05Rets() { // blocos marcados -> retângulos (corridas da linha juntadas na vertical) -> lugar no atlas (prateleiras); null = não cabe
+  const W = B05.gx, H = B05.gy, G = B05.G, T = B05.tile, Q = [], ab = new Map();
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (!G[y * W + x]) continue; const x0 = x; while (x < W && G[y * W + x]) x++;
+    const k = x0 * 4096 + x, r = ab.get(k); if (r && r.y + r.h === y) r.h++; else { const n = { x: x0, y, w: x - x0, h: 1 }; ab.set(k, n); Q.push(n); } }
+  const A = B05.atlas, mw = sun.shadow.map.width, mh = sun.shadow.map.height; let sx = 0, sy = 0, sh = 0;
+  Q.sort((a, b) => b.h - a.h);
+  for (const r of Q) { r.x *= T; r.y *= T; r.w = Math.min(r.w * T, mw - r.x); r.h = Math.min(r.h * T, mh - r.y);
+    if (sx + r.w > A) { sx = 0; sy += sh; sh = 0; } if (r.w > A || sy + r.h > A) return null;
+    r.ax = sx; r.ay = sy; sx += r.w; sh = Math.max(sh, r.h); }
+  return Q;
+}
+function b05Copia(rets, doAtlas) { // doAtlas: atlas -> mapa (devolve o parado); senão mapa -> atlas (guarda o parado)
+  if (!rets.length) return; const gl = renderer.getContext(), P = renderer.properties, fm = P.get(sun.shadow.map).__webglFramebuffer, fa = P.get(B05.at).__webglFramebuffer;
+  const pr = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING), pd = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING); renderer.state.setScissorTest(false);
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, doAtlas ? fa : fm); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, doAtlas ? fm : fa);
+  for (const r of rets) { if (doAtlas) gl.blitFramebuffer(r.ax, r.ay, r.ax + r.w, r.ay + r.h, r.x, r.y, r.x + r.w, r.y + r.h, gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+    else gl.blitFramebuffer(r.x, r.y, r.x + r.w, r.y + r.h, r.ax, r.ay, r.ax + r.w, r.ay + r.h, gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT, gl.NEAREST); B05.st.blit++; }
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, pr); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, pd);
+}
+const b05Nada = () => {};
+const b05Orig = renderer.shadowMap.render;
+renderer.shadowMap.render = function (lights, sc, cam) {
+  if (!lights.includes(sun)) return b05Orig.call(this, lights, sc, cam); // outra cena (arma na mão): o mapa do sol não é tocado
+  if (!B05.on || CFG.gfx !== 'alto' || !this.enabled || !this.autoUpdate || lights.length !== 1 || lights[0] !== sun || sc !== scene || WARM || cullTodo) { B05.ok = false; return b05Orig.call(this, lights, sc, cam); }
+  const s = sun.shadow, agora = performance.now() / 1000; if (agora < B05.pausa) { B05.ok = false; return b05Orig.call(this, lights, sc, cam); }
+  if (B05.w !== world) { B05.w = world; B05.din.clear(); B05.ok = false; }
+  let refaz = !B05.ok || this.needsUpdate || !s.map || s.map !== B05.map || agora - B05.t > B05.refazS;
+  if (b05Sig()) refaz = true;
+  if (!B05.at || !renderer.properties.get(B05.at).__webglFramebuffer) { // atlas novo (ou contexto WebGL recriado: tudo de novo)
+    B05.at ||= new THREE.WebGLRenderTarget(B05.atlas, B05.atlas, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    const rt = renderer.getRenderTarget(); renderer.setRenderTarget(B05.at); renderer.setRenderTarget(rt); refaz = true; }
+  B05.novos.length = 0;
+  if (refaz) b05Lista(); else if (b05Parado()) refaz = true;
+  if (refaz) B05.novos.length = 0;
+  // os dinâmicos: tudo da cena fora do world + as peças do world que andam
+  const raiz = b05Raiz.children; raiz.length = 0;
+  for (const c of scene.children) if (c !== world) raiz.push(c);
+  if (world.visible) for (const o of B05.din) if (o.parent && b05Vis(o)) raiz.push(o);
+  if (refaz) { // parado inteiro (com a limpeza do three), sem os dinâmicos do world
+    const des = []; for (const o of B05.din) if (o.castShadow) { o.castShadow = false; des.push(o); }
+    try { b05Orig.call(this, lights, world, cam); } finally { for (const o of des) o.castShadow = true; }
+    B05.map = s.map; B05.t = agora; B05.ok = true; B05.prev = []; B05.st.refaz++;
+  } else B05.st.inc++;
+  // onde os dinâmicos estão agora (a matriz da sombra é a mesma do desenho)
+  s.updateMatrices(sun);
+  const W = B05.gx = Math.ceil(s.map.width / B05.tile), H = B05.gy = Math.ceil(s.map.height / B05.tile); if (!B05.G || B05.G.length !== W * H) B05.G = new Uint8Array(W * H); else B05.G.fill(0);
+  B05.tudo = false; B05.peq.length = 0; const bon = B05.bon; bon.clear(); for (const rp of R.values()) bon.add(rp.model);
+  for (const [p, e] of B05.jm) if (!bon.has(e.raiz)) { e.geo.dispose(); B05.jm.delete(p); } // boneco que saiu
+  B05.px.length = 0; for (const o of raiz) if (bon.has(o)) b05Boneco(o, cam); else b05Marca(o, cam);
+  for (const x of B05.px) raiz.push(x);
+  const rets = !B05.tudo && b05Rets();
+  try {
+    if (!rets) { // não cabe no atlas (ou peça sem recorte): como antes por B05.pausaS s (sem pagar o parado duas vezes por quadro)
+      for (const o of B05.peq) o.castShadow = true; B05.peq.length = 0; this.needsUpdate = true; B05.ok = false; B05.pausa = agora + B05.pausaS; B05.st.queda++; return b05Orig.call(this, lights, sc, cam);
+    }
+    const cl = renderer.clear; renderer.clear = b05Nada; // o mapa já tem o parado: nada de limpar
+    try {
+      b05Copia(B05.prev, true); // devolve o parado onde os dinâmicos estavam
+      if (B05.novos.length) { b05Raiz2.children = B05.novos; this.needsUpdate = true; b05Orig.call(this, lights, b05Raiz2, cam); B05.st.novas += B05.novos.length; } // peças paradas que apareceram
+      b05Copia(rets, false); B05.prev = rets; // guarda o parado de onde eles estão agora
+      this.needsUpdate = true; b05Orig.call(this, lights, b05Raiz, cam);
+    } finally { renderer.clear = cl; }
+  } finally { for (const o of B05.peq) o.castShadow = true; B05.peq.length = 0; raiz.length = 0; }
+};
+// ===== O1-B05 fim =====
 function visApply() { // brilho (configuração) e luzes extras; roda ao montar o mapa e ao mudar as configurações
   const M = curMap; if (!M) return;
   renderer.toneMappingExposure = (M.exposure ?? 1) * (M.zombie ? VIS.k.exp : 1) * clamp(+CFG.bright || 1, .5, 2);
