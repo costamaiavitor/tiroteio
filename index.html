@@ -16170,6 +16170,7 @@ function warmUp(M) {
     warm.traverse(o => { o.skeleton?.dispose(); if (!o.geometry?.userData.keep) o.geometry?.dispose(); if (o.material?.map && o.material.map !== SOFT && !Object.values(GTX || {}).includes(o.material.map)) o.material.map.dispose(); });
   };
   const step = () => {
+    if (b11bPerdido(W)) { W.tm = setTimeout(step, 100); return; } // O1-B11b
     const t = performance.now();
     if (W.i < items.length) {
       warmLuzes(scene); warmLuzes(vmScene); // 6-g06
@@ -16202,6 +16203,15 @@ function warmUp(M) {
     W.end();
   };
   step();
+}
+// ===== O1-B11b: aquecimento espera o contexto WebGL voltar =====
+// Contexto perdido (o processo da GPU reinicia; no Chromium com --use-gl=swiftshader, todo contexto criado nos ~2 s depois de abrir
+// o navegador se perde e volta segundos depois): o getUniforms de programa perdido lançava erro e a montagem do mapa parava.
+// Agora o aquecimento espera o contexto voltar e recomeça do zero (os programas antigos não valem no contexto novo).
+function b11bPerdido(W) {
+  if (renderer.getContext().isContextLost()) { W.perdeu = true; return true; }
+  if (W.perdeu) { W.perdeu = false; W.i = 0; W.pend = []; }
+  return false;
 }
 function warmMsg(W) { // aviso enquanto o mapa aquece
   let el = document.getElementById('warmMsg');
