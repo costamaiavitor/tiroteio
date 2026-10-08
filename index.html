@@ -16326,21 +16326,62 @@ function moveBody(o, dt) {
     if (best > -Infinity) { p.y = best; o.onGround = true; v.y = 0; }
   }
 }
-// raio x AABB -> {t, ax, s} ou null
+// ===== O1-A10: raios sem alocar e só contra as caixas perto do segmento =====
+// raio x AABB -> {t, ax, s} ou null. Sem arrays: a mesma conta, eixo a eixo (x, y, z). O objeto devolvido é sempre
+// o mesmo (_RB): quem chama lê na hora e nunca guarda
+const _RB = { t: 0, ax: 0, s: 0 };
 function rayBox(o, d, b, maxT) {
-  let tmin = 0, tmax = maxT, ax = -1;
-  const mins = [b.minX, b.minY, b.minZ], maxs = [b.maxX, b.maxY, b.maxZ], oo = [o.x, o.y, o.z], dd = [d.x, d.y, d.z];
-  for (let i = 0; i < 3; i++) {
-    if (Math.abs(dd[i]) < 1e-9) { if (oo[i] < mins[i] || oo[i] > maxs[i]) return null; continue; }
-    let t1 = (mins[i] - oo[i]) / dd[i], t2 = (maxs[i] - oo[i]) / dd[i];
-    if (t1 > t2) { const tt = t1; t1 = t2; t2 = tt; }
-    if (t1 > tmin) { tmin = t1; ax = i; }
-    if (t2 < tmax) tmax = t2;
-    if (tmin > tmax) return null;
-  }
+  let tmin = 0, tmax = maxT, ax = -1, t1, t2, tt;
+  const ox = o.x, oy = o.y, oz = o.z, dx = d.x, dy = d.y, dz = d.z;
+  if (Math.abs(dx) < 1e-9) { if (ox < b.minX || ox > b.maxX) return null; }
+  else { t1 = (b.minX - ox) / dx; t2 = (b.maxX - ox) / dx; if (t1 > t2) { tt = t1; t1 = t2; t2 = tt; } if (t1 > tmin) { tmin = t1; ax = 0; } if (t2 < tmax) tmax = t2; if (tmin > tmax) return null; }
+  if (Math.abs(dy) < 1e-9) { if (oy < b.minY || oy > b.maxY) return null; }
+  else { t1 = (b.minY - oy) / dy; t2 = (b.maxY - oy) / dy; if (t1 > t2) { tt = t1; t1 = t2; t2 = tt; } if (t1 > tmin) { tmin = t1; ax = 1; } if (t2 < tmax) tmax = t2; if (tmin > tmax) return null; }
+  if (Math.abs(dz) < 1e-9) { if (oz < b.minZ || oz > b.maxZ) return null; }
+  else { t1 = (b.minZ - oz) / dz; t2 = (b.maxZ - oz) / dz; if (t1 > t2) { tt = t1; t1 = t2; t2 = tt; } if (t1 > tmin) { tmin = t1; ax = 2; } if (t2 < tmax) tmax = t2; if (tmin > tmax) return null; }
   if (ax < 0) return null;
-  return { t: tmin, ax, s: -Math.sign(dd[ax]) };
+  _RB.t = tmin; _RB.ax = ax; _RB.s = -Math.sign(ax === 0 ? dx : ax === 1 ? dy : dz); return _RB;
 }
+// índices das caixas cujo retângulo XZ pode encostar no segmento o -> o + d*maxD: colunas da grade (colGrid) ao longo dele,
+// cada uma só nas linhas que o segmento cruza ali, com 5 cm de folga (o ponto de acerto fica sempre no segmento e na caixa).
+// Fora de ordem: quem usa desempata pelo índice, o mesmo resultado do laço pelo COL inteiro. null (raio não finito): use o COL inteiro
+const _RQ = [];
+function rayCands(o, d, maxD) {
+  const ex = o.x + d.x * maxD, ez = o.z + d.z * maxD; if (!Number.isFinite(ex) || !Number.isFinite(ez) || !Number.isFinite(o.x) || !Number.isFinite(o.z)) return null;
+  const G = colGrid(), out = _RQ, M = .05, sx0 = Math.min(o.x, ex), sx1 = Math.max(o.x, ex), sz0 = Math.min(o.z, ez) - M, sz1 = Math.max(o.z, ez) + M; out.length = 0;
+  const i0 = Math.max(0, Math.floor((sx0 - M - G.x0) / CGS)), i1 = Math.min(G.nx - 1, Math.floor((sx1 + M - G.x0) / CGS)); if (i0 > i1) return out;
+  if (G.stamp > 2e9) { G.stamp = 0; G.mark.fill(0); }
+  const st = ++G.stamp, mk = G.mark, S0 = G.start, IT = G.items, ddx = ex - o.x, inc = Math.abs(ddx) > 1e-6 ? (ez - o.z) / ddx : 0;
+  for (let i = i0; i <= i1; i++) {
+    let za = sz0, zb = sz1;
+    if (inc) { // z do segmento nas bordas da coluna (com a folga)
+      const xa = Math.max(sx0, G.x0 + i * CGS - M), xb = Math.min(sx1, G.x0 + (i + 1) * CGS + M), z1 = o.z + (xa - o.x) * inc, z2 = o.z + (xb - o.x) * inc;
+      za = Math.max(sz0, Math.min(z1, z2) - M); zb = Math.min(sz1, Math.max(z1, z2) + M);
+    }
+    const j0 = Math.max(0, Math.floor((za - G.z0) / CGS)), j1 = Math.min(G.nz - 1, Math.floor((zb - G.z0) / CGS));
+    for (let j = j0; j <= j1; j++) { const c = i * G.nz + j; for (let q = S0[c], e = S0[c + 1]; q < e; q++) { const k = IT[q]; if (mk[k] !== st) { mk[k] = st; out.push(k); } } }
+  }
+  return out;
+}
+// raio x cenário: menor t (maxD sem acerto); no empate fica a caixa de menor índice, como no laço em ordem pelo COL.
+// _rhK/_rhAx/_rhS = caixa, eixo e sinal do acerto (_rhK -1: nenhum)
+let _rhK = -1, _rhAx = 0, _rhS = 0;
+function rayCOL(o, d, maxD) {
+  let t = maxD, bk = -1, bax = 0, bs = 0; const L = rayCands(o, d, maxD);
+  if (L) for (let q = 0; q < L.length; q++) { const k = L[q], b = COL[k]; if (b.ns) continue; const h = rayBox(o, d, b, t); if (h && (h.t < t || h.t === t && k < bk)) { t = h.t; bk = k; bax = h.ax; bs = h.s; } }
+  else for (let k = 0; k < COL.length; k++) { const b = COL[k]; if (b.ns) continue; const h = rayBox(o, d, b, t); if (h && h.t < t) { t = h.t; bk = k; bax = h.ax; bs = h.s; } }
+  _rhK = bk; _rhAx = bax; _rhS = bs; return t;
+}
+// algum colisor corta o segmento antes de lim? (linha de visão: a ordem não importa)
+function rayBlocked(o, d, dist, lim) {
+  const L = rayCands(o, d, dist);
+  if (L) { for (let q = 0; q < L.length; q++) { const b = COL[L[q]]; if (b.ns) continue; const h = rayBox(o, d, b, dist); if (h && h.t < lim) return true; } }
+  else for (const b of COL) { if (b.ns) continue; const h = rayBox(o, d, b, dist); if (h && h.t < lim) return true; }
+  return false;
+}
+const _HB = [['head', {}], ['body', {}], ['legs', {}]]; // caixas de acerto do jogador no trace (reaproveitadas)
+function _hbSet(b, x, y, z, r, y0, y1, s) { b.minX = x - r; b.maxX = x + r; b.minZ = z - r; b.maxZ = z + r; b.minY = y + y0 * s; b.maxY = y + y1 * s; }
+// ===== fim O1-A10 =====
 function hitboxes(p, crouch) {
   const s = crouch ? .69 : 1, x = p.x, y = p.y, z = p.z;
   const bb = (r, y0, y1) => ({ minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, minY: y + y0 * s, maxY: y + y1 * s });
@@ -16348,18 +16389,20 @@ function hitboxes(p, crouch) {
 }
 // cands: [{id, pos:{x,y,z}, crouch, boxes?}]  (boxes = hitboxes próprias, ex.: zumbi rastejando ou cão)
 function trace(o, d, maxD, cands) {
-  const res = { t: maxD, n: null, id: null, zone: null };
-  for (const b of COL) { if (b.ns) continue; const h = rayBox(o, d, b, res.t); if (h && h.t < res.t) { res.t = h.t; res.n = [0, 0, 0]; res.n[h.ax] = h.s; } }
+  const res = { t: rayCOL(o, d, maxD), n: null, id: null, zone: null }; // O1-A10: cenário só nas caixas perto
+  if (_rhK >= 0) { res.n = [0, 0, 0]; res.n[_rhAx] = _rhS; }
   if (cands) for (const c of cands) {
     if (Math.abs(c.pos.x - o.x) > res.t + 1 && Math.abs(c.pos.z - o.z) > res.t + 1) continue;
-    for (const [zone, box] of (c.boxes || hitboxes(c.pos, c.crouch))) { const h = rayBox(o, d, box, res.t); if (h && h.t < res.t) { res.t = h.t; res.id = c.id; res.zone = zone; res.n = null; } }
+    let B = c.boxes; if (!B) { const s = c.crouch ? .69 : 1, x = c.pos.x, y = c.pos.y, z = c.pos.z; B = _HB; _hbSet(B[0][1], x, y, z, .19, 1.44, 1.84, s); _hbSet(B[1][1], x, y, z, .32, .85, 1.44, s); _hbSet(B[2][1], x, y, z, .27, 0, .85, s); } // = hitboxes()
+    for (const zb of B) { const h = rayBox(o, d, zb[1], res.t); if (h && h.t < res.t) { res.t = h.t; res.id = c.id; res.zone = zb[0]; res.n = null; } }
   }
   res.p = o.clone().addScaledVector(d, res.t);
   return res;
 }
+const _lcD = new V3();
 function losClear(a, b) {
-  const d = b.clone().sub(a), dist = d.length(); if (dist < .01) return true; d.divideScalar(dist);
-  for (const bx of COL) { if (bx.ns) continue; const h = rayBox(a, d, bx, dist); if (h && h.t < dist - .05) return false; }
+  const d = _lcD.subVectors(b, a), dist = d.length(); if (dist < .01) return true; d.divideScalar(dist);
+  if (rayBlocked(a, d, dist, dist - .05)) return false; // O1-A10
   for (const s of smokes) { if (now - s.t0 < .8) continue; const tt = clamp(s.pos.clone().sub(a).dot(d), 0, dist); if (a.clone().addScaledVector(d, tt).distanceTo(s.pos) < 3.2) return false; }
   return true;
 }
@@ -20783,10 +20826,10 @@ const INVISIVEIS = new RegExp('[<>' + String.fromCharCode(0x200B) + '-' + String
 // teto de dano de um tiro (mesma conta que o cliente faz, com 10 % de folga): dano × zona × bagos
 function tetoDano(w, wd, zone) { if (w === 'knife') return 180; return (wd.dmg || 0) * (zone === 'head' ? Math.max(wd.head || 4, 1) : zone === 'legs' ? .75 : 1) * (wd.pellets || 1) * 1.1; }
 const olhoDe = p => new V3(p.pos[0], p.pos[1] + (p.crouch ? EYE_CROUCH : EYE_STAND), p.pos[2]);
+const _vlD = new V3();
 function visaoLivre(a, b) { // só o cenário (a fumaça não bloqueia o tiro no cliente, então não bloqueia aqui)
-  const d = b.clone().sub(a), dist = d.length(); if (dist < .01) return true; d.divideScalar(dist);
-  for (const bx of COL) { if (bx.ns) continue; const h = rayBox(a, d, bx, dist); if (h && h.t < dist - .05) return false; }
-  return true;
+  const d = _vlD.subVectors(b, a), dist = d.length(); if (dist < .01) return true; d.divideScalar(dist);
+  return !rayBlocked(a, d, dist, dist - .05); // O1-A10: só as caixas perto, sem alocar
 }
 const _vv = new V3();
 // o atacante vê a vítima? Testa cabeça, tronco, pernas e as laterais do tronco, na posição atual e nas recentes
@@ -20813,8 +20856,8 @@ function posPlausivel(p, np) {
   b.d = Math.max(0, b.d - dh); if (dv > 0) b.v = Math.max(0, b.v - dv);
   return null;
 }
-const _ad = new V3(0, -1, 0), _ao = new V3();
-function apoioEmbaixo(np) { for (const [dx, dz] of [[0, 0], [PR, 0], [-PR, 0], [0, PR], [0, -PR]]) if (trace(_ao.set(np[0] + dx, np[1] + .1, np[2] + dz), _ad, 1.4, null).t < 1.4) return true; return false; } // centro e bordas do corpo (dá para ficar com o centro fora da borda de uma caixa)
+const _ad = new V3(0, -1, 0), _ao = new V3(), _apP = [0, 0, PR, 0, -PR, 0, 0, PR, 0, -PR];
+function apoioEmbaixo(np) { for (let i = 0; i < 10; i += 2) if (rayCOL(_ao.set(np[0] + _apP[i], np[1] + .1, np[2] + _apP[i + 1]), _ad, 1.4) < 1.4) return true; return false; } // centro e bordas do corpo (dá para ficar com o centro fora da borda de uma caixa); O1-A10: rayCOL = trace(...).t, sem alocar
 // explosão (sp): o zumbi precisa estar perto de um zumbi acertado direto há pouco ou do ponto em que a mira do jogador bate no cenário
 const _af = new V3();
 function pertoDeImpacto(p, z, wd) {
