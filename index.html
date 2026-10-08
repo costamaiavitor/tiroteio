@@ -11991,7 +11991,7 @@ function b16Liga(e) { // devolve a camada, a não ser que o O1-B02 também a ten
 }
 function b16Cull(cam) {
   if (!B16.on || cam !== camera) return;
-  if (B16.w !== world || CFG.gfx !== 'baixo') { if (B16.obj) for (const e of B16.obj) if (e.fora) b16Liga(e); B16.on = false; B16.obj = null; return; } // outro mapa ou saiu do Baixo
+  if (B16.w !== world || CFG.gfx !== 'baixo') { if (B16.obj) for (const e of B16.obj) if (e.fora) b16Liga(e); B16.on = false; B16.obj = B16.raiz = null; return; } // outro mapa ou saiu do Baixo (O1-B22: sem segurar o world anterior)
   if (!B16.obj) { if (WARM || !AT) return; b16Junta(); }
   if (WARM || cullTodo) { if (!B16.tudo) { B16.tudo = true; for (const e of B16.obj) if (e.fora) b16Liga(e); } return; }
   const C = cam.matrixWorld.elements, px = C[12], py = C[13], pz = C[14], H = innerHeight / 2 / Math.tan(cam.fov * Math.PI / 360) * (cam.zoom || 1), P = B16.p;
@@ -13198,12 +13198,13 @@ function b05Copia(rets, doAtlas) { // doAtlas: atlas -> mapa (devolve o parado);
   gl.bindFramebuffer(gl.READ_FRAMEBUFFER, pr); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, pd);
 }
 const b05Nada = () => {};
+function b05Solta() { B05.w = null; B05.L = []; B05.AN = []; B05.M = null; B05.din.clear(); B05.prev = []; B05.novos.length = 0; for (const e of B05.jm.values()) e.geo.dispose(); B05.jm.clear(); } // O1-B22: mapa que saiu (o Alto refaz tudo no próximo uso)
 const b05Orig = renderer.shadowMap.render;
 renderer.shadowMap.render = function (lights, sc, cam) {
   if (!lights.includes(sun)) return b05Orig.call(this, lights, sc, cam); // outra cena (arma na mão): o mapa do sol não é tocado
-  if (!B05.on || CFG.gfx !== 'alto' || !this.enabled || !this.autoUpdate || lights.length !== 1 || lights[0] !== sun || sc !== scene || WARM || cullTodo) { B05.ok = false; return b05Orig.call(this, lights, sc, cam); }
+  if (!B05.on || CFG.gfx !== 'alto' || !this.enabled || !this.autoUpdate || lights.length !== 1 || lights[0] !== sun || sc !== scene || WARM || cullTodo) { B05.ok = false; if (B05.w && B05.w !== world) b05Solta(); return b05Orig.call(this, lights, sc, cam); }
   const s = sun.shadow, agora = performance.now() / 1000; if (agora < B05.pausa) { B05.ok = false; return b05Orig.call(this, lights, sc, cam); }
-  if (B05.w !== world) { B05.w = world; B05.din.clear(); B05.ok = false; }
+  if (B05.w !== world) { b05Solta(); B05.w = world; B05.ok = false; } // O1-B22: também as junções dos bonecos do mapa anterior
   let refaz = !B05.ok || this.needsUpdate || !s.map || s.map !== B05.map || agora - B05.t > B05.refazS;
   if (b05Sig()) refaz = true;
   if (!B05.at || !renderer.properties.get(B05.at).__webglFramebuffer) { // atlas novo (ou contexto WebGL recriado: tudo de novo)
@@ -15657,6 +15658,7 @@ function oclGuardada(m, top) { // malha que não aparece onde está (escondida, 
   return !oclMostra(m, top) || Math.max(b.x - a.x, b.y - a.y, b.z - a.z) < .01 || b.y < -1 || Math.abs(cx) > 900 || Math.abs(cz) > 900;
 }
 function oclReg(c) {
+  if (ZC.world?.lights.some(l => l.bulb === c.o)) { c.oc = 0; return; } // O1-B22: bulbo escondido não recebe cor nem balanço (zUpdateWorld): voltaria 1 quadro com o estado velho
   const cel = new Map(), ar = AT?.areas.find(q => q.root === c.o), om = []; let ruim = false, nt = 0; c.o.updateMatrixWorld(true);
   c.o.traverse(m => {
     if (ruim || !(m.isMesh || m.isPoints || m.isLine || m.isSprite)) return; nt++; if (!oclCaixa(m)) return;
@@ -16054,7 +16056,8 @@ const _b21i = new THREE.Matrix4(), _b21q = new V3();
 function b21Escolhe(cam) { // antes do recorte: a face que a câmera vê
   // opacidade 0 com mistura normal, sem gravar profundidade e sem shader próprio (que pode tirar o alfa de outro lugar, ex.: relâmpago):
   // o desenho não muda nenhum pixel (alfa 0); fica fora só durante a imagem
-  if (B21.w === world) for (const o of B21.Z) { const m = o.material; if (o.visible && !o.children.length && m.opacity === 0 && m.transparent && m.depthWrite === false && m.blending === THREE.NormalBlending && !m.premultipliedAlpha && B21.zero[m.type] && !b21Proprio(m)) { o.visible = false; o.userData.b21z = 1; } }
+  if (B21.w !== world) B21.Z.length = 0; // O1-B22: outro mapa (PvP não passa pelo B21): não segura o world anterior
+  else for (const o of B21.Z) { const m = o.material; if (o.visible && !o.children.length && m.opacity === 0 && m.transparent && m.depthWrite === false && m.blending === THREE.NormalBlending && !m.premultipliedAlpha && B21.zero[m.type] && !b21Proprio(m)) { o.visible = false; o.userData.b21z = 1; } }
   if (!B21.P.length) return; if (B21.w !== world) { B21.P = []; return; }
   const cx = cam.matrixWorld.elements[12], cy = cam.matrixWorld.elements[13], cz = cam.matrixWorld.elements[14], fr = renderer.info.render.frame;
   for (const p of B21.P) {
