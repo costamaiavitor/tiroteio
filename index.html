@@ -21413,8 +21413,9 @@ function srvHandle(pid, m) {
       if (S.st.mode !== 'zombies' || !Z.on || !p.alive || S.phase === 'over' || !isW(m.w)) return;
       const w = m.w, wd = W[w], z = Z.zs.get(+m.v); if (!z) return;
       if (!((w === 'knife' && !p.downed) || ((p.inv.primary === w || p.inv.secondary === w) && (!p.downed || wd.slot === 'secondary')) || (p.inv.third === w && !p.downed) || (w === 'm1911_ls' && p.downed) || (w === 'dmach' && !p.downed && p.dmEnd > now - .5))) return; // caído: só pistola // terceira arma (Mule Kick); Máquina da Morte com folga de rede
-      const zona = m.z === 'head' || m.z === 'legs' ? m.z : 'body'; // o teto segue a zona informada: tiro no corpo não vale o multiplicador da cabeça
-      const cap = (wd.thunder ? 1e7 : w === 'knife' ? (p.bowie ? 1000 : 150) : (wd.dmg || 0) * (zona === 'head' ? Math.max(wd.head || 4, 1) : zona === 'legs' ? .75 : 1) * (wd.pellets || 1) * 1.1 + (wd.splash?.dmg || 0)) * (p.perks.includes('ds') && w !== 'knife' && zona === 'head' ? 1.5 : 1); // Deadshot: headshot +50%
+      const zona = m.z === 'head' || m.z === 'legs' ? m.z : m.z === 'fraco' ? campZona(z, p) : 'body'; // o teto segue a zona informada: tiro no corpo não vale o multiplicador da cabeça; O3-D03: 'fraco' só na campanha
+      if (CAMP.on && !campZhitOk(p, m, z)) return; // O3-D03: Silêncio e regras da campanha
+      const cap = (wd.thunder ? 1e7 : w === 'knife' ? (p.bowie ? 1000 : 150) : (wd.dmg || 0) * (zona === 'head' ? Math.max(wd.head || 4, 1) : zona === 'legs' ? .75 : zona === 'fraco' ? campFracoK(z) : 1) * (wd.pellets || 1) * 1.1 + (wd.splash?.dmg || 0)) * (p.perks.includes('ds') && w !== 'knife' && zona === 'head' ? 1.5 : 1); // Deadshot: headshot +50%
       if (w === 'knife' && Math.hypot(z.body.pos.x - p.pos[0], z.body.pos.z - p.pos[2]) > 4.5 + Math.min(2.5, z.speed * .4)) return; // facada (com o bote) alcança uns 3,4 m, mais o que o zumbi andou desde o golpe
       // alvo plausível: não está no subsolo (nascendo), não está a mais de 260 m e, no tiro direto, está à vista; cone das armas de onda conferido aqui
       // (antes, zhit em qualquer id de Z.zs valia: zumbi atrás da parede, do outro lado do mapa ou ainda embaixo do chão)
@@ -21432,7 +21433,7 @@ function srvHandle(pid, m) {
         const tg = wd.thunder ? 48 : wd.frost ? wd.frost.n : (wd.pellets || 1) + (wd.splash ? 24 : 0);
         if (!fichaOk(p.wb ||= {}, w, iv * .6, tg)) return;
       }
-      zHit(p, z.id, clamp(+m.dmg || 0, 0, cap), m.z === 'head' || m.z === 'legs' ? m.z : 'body', w, !!m.sp);
+      zHit(p, z.id, clamp(+m.dmg || 0, 0, cap), zona, w, !!m.sp);
       if (wd.frost && +m.dmg > 0 && Z.zs.has(z.id)) zFreeze(z, wd); // sobreviveu ao gelo: fica lento
       if (wd.chain) zChain(p, z, wd, w); // raio pula para os vizinhos (calculado aqui, com limite de saltos e de distância)
       break;
@@ -23136,7 +23137,7 @@ function zUpdateWorld(dt) {
 // ---------- zumbis no cliente (só desenho + interpolação) ----------
 const ZVMAX = 16; // m/s: mais rápido que isso entre duas fotos é teleporte (zumbi mais rápido ~11 com grito)
 function zNewClientZombie(id, f) {
-  const dog = !!(f & 16), kind = dog ? 0 : ((f >> 7) & 7) % ZKIND.length, model = zombieModel(dog, kind, id); zGroup.add(model); // o tipo vem nos bits 128-512 e não muda
+  const dog = !!(f & 16), kind = dog ? 0 : zTipoDeF(f) % ZKIND.length, model = zombieModel(dog, kind, id); zGroup.add(model); // o tipo vem nos bits 128-512 e 2048-4096 (O3-D03) e não muda
   if (CFG.gfx === 'alto') model.traverse(o => { if (o.isMesh && !o.userData.noShadow) o.castShadow = true; });
   const zc = { id, sid: 'z' + id, model, buf: [], pos: new V3(), last: new V3(), yaw: 0, f, dog, kind, sz: dog ? 1 : zSize(kind, id), dead: false, deadT: 0, anim: Math.random() * 6, spd: 0, groanT: rand(1, 6), lastSeen: now, atk: false, atk0: 0, fling: null, eo: new V3(), rx: 0, rz: 0, rt: 0, xt: false };
   zAnimInit(zc); ZC.zs.set(id, zc); return zc;
@@ -23791,14 +23792,14 @@ const zRegenDelay = (D, qr) => D.regen * (qr ? .75 : 1); // Quick Revive encurta
 const ZSPEC = [{ k: .7, dr: 2, boss: 14, cada: 10 }, { k: 1, dr: 0, boss: 12, cada: 10 }, { k: 1.15, dr: -1, boss: 11, cada: 9 }, { k: 1.3, dr: -2, boss: 10, cada: 8 }];
 const zSp = () => ZSPEC[S.st?.zdiff ?? 1] || ZSPEC[1];
 function zMix(r, n, np) { // quantos de cada tipo especial nesta rodada (índices de ZKIND; o resto é zumbi comum)
-  const sp = zSp(), q = r - sp.dr, m = [0, 0, 0, 0, 0, 0], f = x => Math.round(n * x * sp.k);
+  const sp = zSp(), q = r - sp.dr, m = ZKIND.map(() => 0), f = x => Math.round(n * x * sp.k); // O3-D03: um lugar por tipo do ZKIND
   if (q >= 4) m[3] = f(Math.min(.16, .06 + (q - 4) * .012)); // Veloz
   if (q >= 6) m[2] = Math.max(1, f(Math.min(.08, .03 + (q - 6) * .006))); // Explosivo
   if (q >= 8) m[1] = Math.min(2 + np, Math.max(1, Math.round((1 + Math.floor((q - 8) / 3)) * sp.k))); // Brutamonte: poucos
   if (q >= 10) m[4] = Math.max(1, f(Math.min(.08, .03 + (q - 10) * .006))); // Tóxico
   if (q >= 12) m[5] = Math.min(3, 1 + Math.floor((q - 12) / 5)); // Gritador
-  let t = m[1] + m[2] + m[3] + m[4] + m[5]; const cap = Math.floor(n * .5);
-  while (t > cap) { let i = 1; for (let j = 2; j < 6; j++) if (m[j] > m[i]) i = j; m[i]--; t--; } // nunca mais da metade da rodada
+  let t = 0; for (let j = 1; j < m.length; j++) t += m[j]; const cap = Math.floor(n * .5); // O3-D03
+  while (t > cap) { let i = 1; for (let j = 2; j < m.length; j++) if (m[j] > m[i]) i = j; m[i]--; t--; } // nunca mais da metade da rodada
   Z.mix = m; Z.mixN = t;
 }
 const zHp = r => r < 10 ? 150 + 100 * (r - 1) : Math.round(950 * Math.pow(1.1, r - 9)); // vida do zumbi (fórmula do CoD)
@@ -23915,7 +23916,7 @@ function zReset() {
     drops: [], dropId: 1, dropsRound: 0, dropThresh: 2000 * zDf().drop, dropScore: 0, bag: [], insta: 0, dbl: 0, power: false, doors: new Set(), boards: ZD.windows.map(() => 6),
     winT: ZD.windows.map(() => ({ tear: 0, climb: 0, busy: false })), box: { loc: 0, st: 'idle', user: null, w: null, t: 0, uses: 0 }, pap: { st: 'idle', user: null, w: null, t: 0, slot: null },
     qrBuys: 0, lure: null, zsT: 0, ffT: 0, repPts: new Map(), repT: {}, fire: 0, bf: 0, clays: [], clayId: 1, vult: [], vultId: 1, traps: (ZD.traps || []).map(() => ({ st: 'idle', t: 0, by: null, hurt: {} })) });
-  Object.assign(Z, { mix: [0, 0, 0, 0, 0, 0], mixN: 0, reQ: [], bossQ: 0, bossAt: 0, nextBoss: zSp().boss, clouds: [], cloudId: 1 }); // especiais, Carniceiro e nuvens tóxicas
+  Object.assign(Z, { mix: ZKIND.map(() => 0), mixN: 0, reQ: [], bossQ: 0, bossAt: 0, nextBoss: zSp().boss, clouds: [], cloudId: 1 }); // especiais, Carniceiro e nuvens tóxicas
   zintReset(); // O2-C04
   zBuildWalk();
 }
@@ -23938,7 +23939,7 @@ function zStartRound() {
   Z.toSpawn = Z.dogRound ? Math.min(24, Math.round(6 * np * Math.min(D.cnt, 1.25))) : Math.max(1, Math.round(zCount(Z.round, np) * D.cnt));
   Z.spawnDelay = (Z.dogRound ? 1.4 : Math.max(.15, 2 * Math.pow(.95, Z.round - 1))) * D.spawn;
   Z.spawnT = now + (Z.dogRound ? 3 : 1.5); Z.dropsRound = 0; Z.repPts = new Map();
-  Z.mix = [0, 0, 0, 0, 0, 0]; Z.mixN = 0; Z.reQ = []; Z.bossQ = 0;
+  Z.mix = ZKIND.map(() => 0); Z.mixN = 0; Z.reQ = []; Z.bossQ = 0;
   if (!Z.dogRound) { // rodada de cães nunca tem especiais; o Carniceiro cai na primeira rodada comum a partir de nextBoss
     zMix(Z.round, Z.toSpawn, np);
     if (Z.round >= Z.nextBoss) { Z.bossQ = 1; Z.toSpawn++; Z.bossAt = Math.max(1, Math.floor(Z.toSpawn * .65)); Z.nextBoss = Z.round + zSp().cada; }
@@ -24038,8 +24039,9 @@ function zSpawnOne() {
   if (!Z.dogRound) {
     if (Z.reQ.length) { keep = Z.reQ[Z.reQ.length - 1]; kind = keep[0]; }
     else if (Z.bossQ && Z.toSpawn <= Z.bossAt) kind = 6;
-    else { const rem = Z.toSpawn - Z.bossQ; if (Z.mixN > 0 && Math.random() * rem < Z.mixN) { let k = Math.random() * Z.mixN; for (let i = 1; i < 6 && !kind; i++) { k -= Z.mix[i]; if (k < 0) kind = i; } if (!kind) kind = Z.mix.findIndex((x, i) => i && x > 0); if (kind < 0) kind = 0; } }
+    else { const rem = Z.toSpawn - Z.bossQ; if (Z.mixN > 0 && Math.random() * rem < Z.mixN) { let k = Math.random() * Z.mixN; for (let i = 1; i < Z.mix.length && !kind; i++) { k -= Z.mix[i]; if (k < 0) kind = i; } if (!kind) kind = Z.mix.findIndex((x, i) => i && x > 0); if (kind < 0) kind = 0; } }
   }
+  kind = campTipo(kind); // O3-D03: tipos da campanha e dos eventos (no clássico devolve o mesmo)
   const z = { id: Z.nextId, hp: 0, st: 'in', body: { pos: new V3(), vel: new V3(), onGround: true, h: 1.8, stepUp: 0 }, yaw: 0, speed: 1.5, sc: 0, dog: false, crawler: false,
     atkT: 0, atkWind: 0, atkQ: null, tgt: null, tgtT: 0, losT: 0, los: false, chkT: now + 6, chkX: 0, chkZ: 0, stuck: 0, off: rand(-.5, .5), win: -1, t0: now, nukeAt: 0,
     kind, dm: 1, aw: .45, ac: 1, rad: ZKIND[kind].rad || .3, buffT: 0, scrT: 0 };
@@ -24059,6 +24061,7 @@ function zSpawnOne() {
     ZD.windows.forEach((w, i) => { if (act.has(w.room)) cands.push({ i, x: w.x, z: w.z }); });
     ZD.risers.forEach(rz => { if (act.has(rz[2])) cands.push({ i: -1, x: rz[0], z: rz[1] }); });
     if (!cands.length) return false;
+    if (campNasce(z, cands)) return false; // O3-D03: a campanha pode trocar os pontos (água, portão); sem ponto, tenta depois
     let tot = 0;
     for (const c of cands) { let md = 200; for (const q of tg) md = Math.min(md, Math.hypot(q.pos[0] - c.x, q.pos[2] - c.z)); c.wt = (c.i < 0 && md < 4 ? .03 : md > 80 ? .1 : 1) / (1 + (md / 10) ** 2); tot += c.wt; } // prefere perto dos jogadores (mas não sai do chão no pé de ninguém; longe demais quase nunca, nos mapas grandes)
     let pick = Math.random() * tot, c = cands[cands.length - 1]; for (const cc of cands) { pick -= cc.wt; if (pick <= 0) { c = cc; break; } }
@@ -24071,6 +24074,7 @@ function zSpawnOne() {
     if (c.i >= 0) { const w = ZD.windows[c.i], d = rand(4, 7), t = rand(-2, 2); z.st = 'out'; z.win = c.i; P.set(w.x + w.n[0] * d + w.tx * t, 0, w.z + w.n[1] * d + w.tz * t); z.yaw = Math.atan2(w.n[0], w.n[1]); }
     else { let x = c.x, zz = c.z; for (let k = 0; k < 6; k++) { const tx = c.x + rand(-1, 1), tz = c.z + rand(-1, 1), cc = ffCell(tx, tz); if (cc >= 0 && FF.walk[cc]) { x = tx; zz = tz; break; } } z.st = 'rise'; P.set(x, -1.8, zz); }
   }
+  campStatus(z); // O3-D03: vida, velocidade e ataque dos tipos da campanha
   z.maxHp = z.hp; z.chkX = P.x; z.chkZ = P.z;
   if (keep) { Z.reQ.pop(); if (keep[1] > 0) { z.hp = keep[1]; z.maxHp = keep[2]; } } // voltou da fila: o Carniceiro mantém a vida que tinha
   else if (kind === 6) Z.bossQ = 0;
@@ -24089,10 +24093,11 @@ function zTickZombies(dt) {
     if (!Z.zs.has(z.id)) continue; // morreu nesta volta (explosão de outro)
     if (now - (z.phT || -1) >= .05) { const P0 = z.body.pos; (z.ph ||= []).push({ t: now, p: [P0.x, P0.y, P0.z] }); if (z.ph.length > 9) z.ph.shift(); z.phT = now; } // posições recentes (linha de visão dos tiros com lag)
     if (z.frzT && now >= z.frzT) { z.frzT = 0; z.frz = 0; z.speed = z.spd0; z.sc = z.sc0; } // o gelo passou
-    if (z.nukeAt && now >= z.nukeAt) { if (z.kind === 6) { z.nukeAt = 0; z.hp = Math.max(1, z.hp - z.maxHp * .2); } else { zKill(z, null, 'body', 'nuke', false, true); continue; } } // Nuke não mata o Carniceiro: tira 20%
+    if (z.nukeAt && now >= z.nukeAt) { if (ZKIND[z.kind].chefe) { z.nukeAt = 0; z.hp = Math.max(1, z.hp - z.maxHp * ZKIND[z.kind].capNuke); } else { zKill(z, null, 'body', 'nuke', false, true); continue; } } // Nuke não mata chefe: tira capNuke (Carniceiro 20%)
     const P = z.body.pos;
     if (z.tgt && (!z.tgt.alive || z.tgt.downed || !S.players.has(z.tgt.id) || z.tgt.zbEnd > now)) { if (z.tgt.zbEnd > now && z.atkQ === z.tgt) z.atkWind = 0; z.tgt = null; z.tgtT = 0; }
     if (now >= z.tgtT) { z.tgtT = now + .5; let best = null, bd = 1e9; for (let qi = 0; qi < tg.length; qi++) { const q = tg[qi], d = hyp(q.pos[0] - P.x, q.pos[2] - P.z); if (d < bd) { bd = d; best = q; } } z.tgt = best; }
+    if (z.ck && campIA(z, dt, z.tgt)) continue; // O3-D03: comportamento próprio (z.ck só existe na campanha)
     switch (z.st) {
       case 'rise': { const k = (now - z.t0) / 1.6; P.y = Math.min(0, -1.8 + k * 1.8); if (k >= 1) { z.st = 'in'; P.y = 0; z.body.onGround = true; z.chkT = now + 6; } break; }
       case 'out': {
@@ -24157,17 +24162,17 @@ function zChase(z, dt) {
     else { const fd = zFlowDir(P.x, P.z); if (fd) { dX = fd[0]; dZ = fd[1]; } else if (dist > .01) { dX = dx / dist; dZ = dz / dist; } const fc = ffCell(P.x, P.z); z.lost = fd || (fc >= 0 && FF.dist[fc] < Infinity) ? 0 : (z.lost || 0) + dt; } // sem caminho (longe demais de todos): anda reto
     if (z.lost > 8 && zSeenHold(z)) z.lost = 4;
     if (z.lost > 8) { zRecycle(z); return; } // e se continuar sem caminho volta para a fila e renasce perto
-    if (!Z.lure && tgt) { if (z.los || z.atkWind) zTryAttack(z, tgt, z.dog ? 1.5 : z.kind === 6 ? 2.3 : z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35); if (dist < (z.dog ? .9 : .85 + (z.rad - .3) * 2)) dX = dZ = 0; } // sem linha livre (grade no meio) não bate
+    if (!Z.lure && tgt) { if (z.los || z.atkWind) zTryAttack(z, tgt, z.dog ? 1.5 : ZKIND[z.kind].alc || (z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35)); if (dist < (z.dog ? .9 : .85 + (z.rad - .3) * 2)) dX = dZ = 0; } // sem linha livre (grade no meio) não bate
     else if (Z.lure && dist < 1) dX = dZ = 0;
   }
-  const spd = (z.crawler ? .9 : z.speed * (z.buffT > now ? 1.3 : 1) * (z.kind === 6 && z.hp < z.maxHp * .5 ? 1.4 : 1) * (z.slowT > now ? .6 : 1) * (z.webT > now ? .2 : 1)) * (z.atkWind ? .35 : 1) * (z.fogoT > now ? ZINT.fogo.lento : 1) * (z.barrL ? ZINT.barricada.lento : 1), k = Math.min(1, dt * 8); // O2-C06: queimando anda mais devagar (armadilha de fogo); O2-C09: barricada com tábuas; grito: +30%; Carniceiro furioso abaixo da metade
+  const spd = (z.crawler ? .9 : z.speed * (z.buffT > now ? 1.3 : 1) * (z.hp < z.maxHp * .5 && ZKIND[z.kind].furia || 1) * (z.slowT > now ? .6 : 1) * (z.webT > now ? .2 : 1)) * (z.atkWind ? .35 : 1) * (z.fogoT > now ? ZINT.fogo.lento : 1) * (z.barrL ? ZINT.barricada.lento : 1) * (z.cv || 1), k = Math.min(1, dt * 8); // O2-C06: queimando anda mais devagar (armadilha de fogo); O2-C09: barricada com tábuas; grito: +30%; Carniceiro furioso abaixo da metade (ZKIND.furia); O3-D03: z.cv da campanha
   b.vel.x += (dX * spd - b.vel.x) * k; b.vel.z += (dZ * spd - b.vel.z) * k;
   const face = (dX || dZ) ? Math.atan2(-dX, -dZ) : has ? Math.atan2(-(gx - P.x), -(gz - P.z)) : z.yaw;
   z.yaw += clamp(angDiff(z.yaw, face), -8 * dt, 8 * dt);
   const ox = P.x, oz = P.z, want = (dX || dZ) ? spd : 0;
   moveBody(b, dt);
   if (want && b.onGround && hyp(P.x - ox, P.z - oz) < want * dt * .3) z.stall = (z.stall || 0) + dt; else z.stall = 0;
-  const gyv = has && !Z.lure && tgt ? tgt.pos[1] : P.y, canHit = z.atkWind || (z.los && dist < (z.dog ? 1.5 : z.kind === 6 ? 2.3 : z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35) && Math.abs(gyv - P.y) < 1.5);
+  const gyv = has && !Z.lure && tgt ? tgt.pos[1] : P.y, canHit = z.atkWind || (z.los && dist < (z.dog ? 1.5 : ZKIND[z.kind].alc || (z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35)) && Math.abs(gyv - P.y) < 1.5);
   if (z.stall > .2 && !canHit && now >= (z.vaultT || 0)) { z.vaultT = now + .4; if (zTryVault(z, dX, dZ, gx, gz, gyv)) return; }
   if (P.y < -5) { zRecycle(z); return; }
   if (now >= z.chkT) { // travado atrás de alguma coisa por muito tempo? volta pra fila e renasce
@@ -24220,7 +24225,7 @@ function zScream(z) { // Gritador: zumbis em volta (9 m) correm 30% mais por 5 s
   const P = z.body.pos, t = z.tgt;
   if (!t || Math.hypot(t.pos[0] - P.x, t.pos[2] - P.z) > 18) { z.scrT = now + 2; return; }
   z.scrT = now + rand(7, 10); broadcast({ t: 'zscr', id: z.id });
-  for (const o of Z.zs.values()) if (o !== z && !o.dog && o.kind !== 6 && Math.hypot(o.body.pos.x - P.x, o.body.pos.z - P.z) < 9) o.buffT = now + 5;
+  for (const o of Z.zs.values()) if (o !== z && !o.dog && !ZKIND[o.kind].chefe && Math.hypot(o.body.pos.x - P.x, o.body.pos.z - P.z) < 9) o.buffT = now + 5;
 }
 function zBloatBoom(x, y, zz, p) { // Explosivo estoura: muito dano nos zumbis em volta, pouco nos jogadores; só com linha livre (como granada)
   const R = 4.5, c = new V3(x, y + 1, zz), D = zDf(), dz = zHp(Z.round) * zHpK(Z.round) * 1.4;
@@ -24229,7 +24234,7 @@ function zBloatBoom(x, y, zz, p) { // Explosivo estoura: muito dano nos zumbis e
     const t = o.body.pos.clone(); t.y += o.dog ? .5 : 1; const d = t.distanceTo(c);
     if (d > R || !losClear(c, t)) continue;
     const dmg = dz * (1 - d / (R * 1.3));
-    if (p) zHit(p, o.id, dmg, 'body', 'bloat', true); else { o.hp -= o.kind === 6 ? Math.min(dmg, o.maxHp * .12) : dmg; if (o.hp <= 0) zKill(o, null, 'body', 'bloat', true, false); } // sem dono: outro Explosivo em volta também estoura
+    if (p) zHit(p, o.id, dmg, 'body', 'bloat', true); else { o.hp -= ZKIND[o.kind].chefe ? Math.min(dmg, o.maxHp * ZKIND[o.kind].capGolpe) : dmg; if (o.hp <= 0) zKill(o, null, 'body', 'bloat', true, false); } // sem dono: outro Explosivo em volta também estoura
   }
   for (const q of S.players.values()) {
     if (!q.alive || q.downed || q.perks.includes('phd')) continue; // PhD Flopper: explosão não machuca
@@ -24246,7 +24251,7 @@ function zTickClouds() { // nuvem do Tóxico (7 s, 2,8 m): tira vida de quem fic
     for (const c of Z.clouds) if (Math.hypot(p.pos[0] - c.x, p.pos[2] - c.z) < 2.8 && Math.abs(p.pos[1] - c.y) < 2.5) { p.toxT = now + .5; zHurt(p, dmg, null); break; }
   }
 }
-function zRecycle(z) { Z.zs.delete(z.id); Z.toSpawn++; if (z.kind) Z.reQ.push([z.kind, z.kind === 6 ? z.hp : 0, z.maxHp]); broadcast({ t: 'zgone', id: z.id }); } // especial volta para a fila com o mesmo tipo
+function zRecycle(z) { Z.zs.delete(z.id); Z.toSpawn++; if (z.kind) Z.reQ.push([z.kind, ZKIND[z.kind].chefe ? z.hp : 0, z.maxHp]); broadcast({ t: 'zgone', id: z.id }); } // especial volta para a fila com o mesmo tipo
 const ZSEE_R = 45, ZSEE_MAX = 60, _zsA = new V3(), _zsB = new V3();
 function zAtGoal(x, z) { const c = ffCell(x, z); return c >= 0 && FF.walk[c] && isFinite(FF.dist[c]) && FF.dist[c] <= 15; } // ate ~3 m de caminho da origem do campo
 function zSeen(z) { const P = z.body.pos; _zsB.set(P.x, P.y + 1.1, P.z); for (const q of S.players.values()) { if (!q.alive) continue; const d = hyp(q.pos[0] - P.x, q.pos[2] - P.z); if (d > ZSEE_R) continue; _zsA.set(q.pos[0], q.pos[1] + 1.6, q.pos[2]); if (losClear(_zsA, _zsB) || losClear(_zsA, _zsB.set(P.x, P.y + 1.7, P.z))) return true; _zsB.set(P.x, P.y + 1.1, P.z); } return false; }
@@ -24256,14 +24261,15 @@ function zPts(p, n) { if (Z.dbl > now) n *= 2; p.money += n; sendTo(p.id, { t: '
 function zPay(p, c) { if (p.money < c) { sendTo(p.id, { t: 'err', txt: 'Pontos insuficientes' }); return false; } p.money -= c; sendTo(p.id, { t: 'pts', n: -c, m: p.money }); return true; }
 function zHit(p, zid, dmg, zone, w, splash) {
   const z = Z.zs.get(zid); if (!z || !(dmg > 0) || S.phase === 'over') return;
-  dmg = Math.min(dmg, 1e7);
-  if (Z.insta > now) dmg = z.kind === 6 ? dmg * 2 : z.hp; // Insta-Kill (no Carniceiro só dobra o dano)
-  if (z.kind === 6) dmg = Math.min(dmg, z.maxHp * .12); // nenhum golpe tira mais de 12% do Carniceiro (Arma Trovão, macaco, Insta-Kill)
+  dmg = Math.min(dmg, 1e7); const K = ZKIND[z.kind];
+  dmg = campDano(z, dmg, zone, w, p, splash); // O3-D03: capacete, crosta, Silêncio (no clássico devolve o mesmo)
+  if (Z.insta > now) dmg = K.chefe ? dmg * 2 : z.hp; // Insta-Kill (no chefe só dobra o dano)
+  if (K.chefe) dmg = Math.min(dmg, z.maxHp * (zone === 'fraco' && K.capFraco || K.capGolpe)); // nenhum golpe tira mais de capGolpe do chefe (Carniceiro 12%: Arma Trovão, macaco, Insta-Kill)
   z.hp -= dmg;
   if (z.hp <= 0) zKill(z, p, zone, w, splash, false);
-  else { zPts(p, zGain(10)); if (z.kind === 6 && z.hp < z.maxHp * .5) z.sc = 1; if (splash && !W[w]?.frost && !W[w]?.chain && !z.dog && !z.crawler && z.kind !== 1 && z.kind !== 6 && z.st === 'in' && Math.random() < .3) z.crawler = true; } // explosão pode arrancar as pernas
+  else { zPts(p, zGain(10)); if (K.furia && z.hp < z.maxHp * .5) z.sc = 1; if (splash && !W[w]?.frost && !W[w]?.chain && !z.dog && !z.crawler && z.kind !== 1 && !K.chefe && z.st === 'in' && Math.random() < .3) z.crawler = true; } // explosão pode arrancar as pernas
 }
-function zFreeze(z, wd) { if (z.kind === 6) { z.slowT = now + 1.5; return; } if (!z.frzT) { z.spd0 = z.speed; z.sc0 = z.sc; } z.frzT = now + (wd.pap ? 6 : 4); z.frz = 1; if (z.dog) { z.speed = Math.min(z.speed, 3); return; } z.speed = Math.min(z.speed, wd.pap ? .8 : 1.1); z.sc = 0; } // congelado: passa a andar devagar
+function zFreeze(z, wd) { if (ZKIND[z.kind].chefe) { z.slowT = now + 1.5; return; } if (!z.frzT) { z.spd0 = z.speed; z.sc0 = z.sc; } z.frzT = now + (wd.pap ? 6 : 4); z.frz = 1; if (z.dog) { z.speed = Math.min(z.speed, 3); return; } z.speed = Math.min(z.speed, wd.pap ? .8 : 1.1); z.sc = 0; } // congelado: passa a andar devagar
 function zChain(p, z0, wd, w) { // Wunderwaffe: o raio pula para o zumbi mais perto (até chain.n saltos de até chain.r metros, com linha de visão)
   const C_ = wd.chain, done = new Set([z0.id]), a = new V3(), b = new V3(); let cur = z0.body.pos;
   const pts = [[r2(cur.x), r2(cur.y + 1.2), r2(cur.z)]];
@@ -24287,7 +24293,7 @@ function zKill(z, p, zone, w, splash, nuke) {
   if (W[w]?.frost) msg.ic = 1; // Uivo do Inverno: o zumbi congelado se estilhaça
   const bx = z.body.pos.x, bz = z.body.pos.z; // dx/dz é o ponto de dentro da janela (para o power-up); estouro e nuvem ficam onde ele está
   if (K) msg.k = K; if (K === 2 && !nuke) msg.ex = [r2(bx), r2(Math.max(0, z.body.pos.y)), r2(bz)];
-  broadcast(msg);
+  broadcast(msg); campMorte(z, p, zone, w); // O3-D03: brasa, cal, chave, Pregador (no clássico não faz nada)
   if (K === 6) { if (p) for (const q of S.players.values()) if (q !== p && q.alive) zPts(q, 300); zDrop(null, dx, dz, true); } // Carniceiro: pontos para o time e power-up garantido
   if (msg.ex) zBloatBoom(bx, Math.max(0, z.body.pos.y), bz, p);
   if (p && !nuke && !z.dog && p.perks.includes('vult') && Math.random() < ZPK.vultP) zVultDrop(p, dx, dz);
@@ -24496,7 +24502,7 @@ function zTickTraps(dt) { // armadilha ligada: mata zumbi que passa (sem pontos)
       const x0 = t.x - t.w / 2 - .3, x1 = t.x + t.w / 2 + .3, z0 = t.z - t.d / 2 - .3, z1 = t.z + t.d / 2 + .3;
       for (const z of [...Z.zs.values()]) {
         const P = z.body.pos; if (z.st === 'rise' || P.x <= x0 || P.x >= x1 || P.z <= z0 || P.z >= z1 || P.y >= 2) continue;
-        if (z.kind === 6) { if (now >= (z.trapT || 0)) { z.trapT = now + ZTRAP.every; z.hp -= z.maxHp * .06; if (z.hp <= 0) zKill(z, null, 'body', 'trap', false, true); } continue; } // Carniceiro: 6% a cada choque, não morre de uma vez
+        if (ZKIND[z.kind].chefe) { if (now >= (z.trapT || 0)) { z.trapT = now + ZTRAP.every; z.hp -= z.maxHp * ZKIND[z.kind].capArmadilha; if (z.hp <= 0) zKill(z, null, 'body', 'trap', false, true); } continue; } // chefe: capArmadilha a cada choque (Carniceiro 6%), não morre de uma vez
         zKill(z, null, 'body', 'trap', false, true);
       }
       for (const q of S.players.values()) {
@@ -24812,7 +24818,7 @@ ZINT_FN.fogo = {
       const P = z.body.pos;
       if (aceso && z.st !== 'rise' && P.x > x0 && P.x < x1 && P.z > z0 && P.z < z1 && P.y < 2) { z.fogoT = now + D.queima; z.fogoI = i; }
       if (z.fogoI !== i || !(z.fogoT > now) || !dt) continue;
-      z.hp -= (z.kind === 6 ? z.maxHp * D.dpsBoss : dps) * dt; // Carniceiro: só uma fração por segundo
+      z.hp -= (ZKIND[z.kind].chefe ? z.maxHp * D.dpsBoss : dps) * dt; // chefe (Carniceiro): só uma fração por segundo
       if (z.hp <= 0) zKill(z, null, 'body', 'fogo', false, true); // sem pontos, como a elétrica
     }
     if (aceso) for (const q of S.players.values()) {
@@ -25879,6 +25885,48 @@ async function campSomTeste(nomes) {
 }
 if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_NOTA_TXT, CAMP_RADIO_TXT, CAMP_FALA_TXT, CAMP_CENA_TXT, CAMP_SOM, ZINT_NOTA_VIS, ZNOTA, zintNotaAbre, zintNotaLigada, campDocs, campSomTeste }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
 // ===== FIM O3-D04 =====
+// ===== O3-D03: refator de tipos para os zumbis e chefes da campanha (docs/overhaul/campanha.md §6.1) =====
+// @@CAMP-TIPOS@@ (a marca é do D02; enquanto ela não existe, o bloco fica logo depois do FIM O3-D04)
+// O clássico não muda: os números do Carniceiro saíram dos ~15 "kind === 6" para o ZKIND[6] (chefe, tetos, alcance, fúria), com os
+// mesmos valores; o que é do Carniceiro e não "de chefe" (nascer em volta do jogador, zSlam, modelo, som, queda, pontos ao time) continua
+// com kind === 6. Os ganchos devolvem na hora sem CAMP.on (nenhum sorteio, nenhuma alocação) e o z.ck/z.cv não existem no clássico.
+// Os blocos da campanha registram as regras aqui (push nas listas de CAMP_G e CAMP_IA[tipo] = fn), sem tocar de novo nas funções da Frente A.
+const CAMP = { on: false }; // O3-D03 PROVISÓRIO: o estado de verdade é do D02 (@@CAMP-BASE@@); na junção fica só o dele (com on: false no clássico)
+// números do Carniceiro (os de antes, agora na tabela): teto por golpe 12%, armadilha 6% por choque, Nuke 20%, alcance do golpe 2,3 m,
+// fúria ×1,4 abaixo da metade. Chefe novo põe os dele no próprio ZKIND[k] (capFraco = teto no ponto fraco, fracoK = multiplicador do
+// teto do 'zhit' na zona 'fraco', fracoTras = ângulo em graus a partir do qual o tiro "vem de trás" e acerta o fraco sem janela aberta).
+Object.assign(ZKIND[6], { chefe: 1, capGolpe: .12, capArmadilha: .06, capNuke: .2, alc: 2.3, furia: 1.4 });
+const CAMP_FRACO = { k: 3 }; // multiplicador padrão do teto na zona 'fraco' (campanha.md §6.1: fracoK 3), quando o tipo não tem fracoK
+// tipo na foto (f): bits 7-9 (como antes) e 11-12 (o bit 10 é o 'vault'): 5 bits, tipos 0 a 31. Nada mais usa os bits 11+ do f.
+const zfTipo = k => ((k & 7) << 7) | ((k >> 3) << 11);
+const zTipoDeF = f => ((f >> 7) & 7) | (((f >> 11) & 3) << 3);
+// ganchos registrados pelos blocos da campanha; vazios no clássico (e nem são lidos sem CAMP.on)
+const CAMP_G = {
+  tipo: [], // (kind) => kind: troca o tipo sorteado no zSpawnOne (tipos novos, eventos)
+  nasce: [], // (z, cands) => void: filtra/troca os pontos de nascimento (lista mexida no lugar; vazia = não nasce agora)
+  status: [], // (z) => void: vida, velocidade, ataque e marcas do tipo, no fim do zSpawnOne (antes do maxHp)
+  dano: [], // (z, dmg, zone, w, p, splash) => dmg: no zHit, antes do Insta-Kill e do teto do chefe
+  morte: [], // (z, p, zone, w) => void: no zKill, depois do 'zdie'
+  zhit: [], // (p, m, z) => bool: false recusa o 'zhit' (Silêncio)
+};
+const CAMP_IA = []; // CAMP_IA[kind] = (z, dt, tgt) => true quando o comportamento próprio já cuidou do zumbi neste tick
+function campTipo(k) { if (!CAMP.on) return k; const L = CAMP_G.tipo; for (let i = 0; i < L.length; i++) k = L[i](k); return k; }
+function campNasce(z, cands) { if (!CAMP.on) return false; const L = CAMP_G.nasce; for (let i = 0; i < L.length; i++) L[i](z, cands); return !cands.length; }
+function campStatus(z) { if (!CAMP.on) return; const L = CAMP_G.status; for (let i = 0; i < L.length; i++) L[i](z); if (CAMP_IA[z.kind]) z.ck = 1; }
+function campIA(z, dt, tgt) { const f = CAMP_IA[z.kind]; return f ? f(z, dt, tgt) : false; } // só é chamado com z.ck (posto pelo campStatus)
+function campDano(z, dmg, zone, w, p, splash) { if (!CAMP.on) return dmg; const L = CAMP_G.dano; for (let i = 0; i < L.length; i++) dmg = L[i](z, dmg, zone, w, p, splash); return dmg; }
+function campMorte(z, p, zone, w) { if (!CAMP.on) return; const L = CAMP_G.morte; for (let i = 0; i < L.length; i++) L[i](z, p, zone, w); }
+function campZhitOk(p, m, z) { const L = CAMP_G.zhit; for (let i = 0; i < L.length; i++) if (!L[i](p, m, z)) return false; return true; } // chamado só com CAMP.on
+// zona 'fraco' (ponto fraco do chefe): o cliente manda m.z === 'fraco'; o host aceita com a janela aberta (z.fracoAte, posta pelo chefe)
+// ou, se o tipo tiver fracoTras, com o atirador atrás dele (ângulo entre a frente e o atirador acima de fracoTras). Senão vale 'body'.
+function campZona(z, p) {
+  if (!CAMP.on) return 'body'; const K = ZKIND[z.kind]; if (!K || !K.chefe) return 'body';
+  if (z.fracoAte > now) return 'fraco';
+  if (K.fracoTras) { const P = z.body.pos, dx = p.pos[0] - P.x, dz = p.pos[2] - P.z, d = Math.hypot(dx, dz) || 1; if ((-Math.sin(z.yaw) * dx - Math.cos(z.yaw) * dz) / d < Math.cos(K.fracoTras * Math.PI / 180)) return 'fraco'; }
+  return 'body';
+}
+const campFracoK = z => ZKIND[z.kind].fracoK || CAMP_FRACO.k;
+// ===== FIM O3-D03 =====
 
 function srvZHold(p, m) {
   if (!p.alive || p.downed || S.phase === 'over') return;
@@ -25920,9 +25968,9 @@ const zBoardsDec = s => { const o = []; for (const ch of s) { const c = ch.charC
 function zSnap() {
   const a = []; let bo = 0;
   for (const z of Z.zs.values()) {
-    const P = z.body.pos, f = z.sc | (z.atkWind ? 4 : 0) | (z.crawler ? 8 : 0) | (z.dog ? 16 : 0) | (z.st === 'out' || z.st === 'tear' || z.st === 'climb' ? 32 : 0) | (z.st === 'rise' ? 64 : 0) | (z.kind << 7) | (z.st === 'vault' ? 1024 : 0); // 128-512: tipo
+    const P = z.body.pos, f = z.sc | (z.atkWind ? 4 : 0) | (z.crawler ? 8 : 0) | (z.dog ? 16 : 0) | (z.st === 'out' || z.st === 'tear' || z.st === 'climb' ? 32 : 0) | (z.st === 'rise' ? 64 : 0) | zfTipo(z.kind) | (z.st === 'vault' ? 1024 : 0); // 128-512 e 2048-4096: tipo (O3-D03: 5 bits)
     a.push(z.id, r2(P.x), r2(P.y), r2(P.z), r2(wrapA(z.yaw)), f);
-    if (z.kind === 6) bo = Math.max(bo, r2(Math.max(0, z.hp) / z.maxHp));
+    if (ZKIND[z.kind].chefe) bo = Math.max(bo, r2(Math.max(0, z.hp) / z.maxHp));
   }
   const bk = Z.boards.join(), sendB = bk !== Z.lastB || (Z.snapN = (Z.snapN || 0) + 1) % 10 === 0; Z.lastB = bk;
   const msg = { t: 'zs', ts: r3(now), z: a, b: sendB ? zBoardsEnc(Z.boards) : undefined, ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0, rem: Z.phase === 'round' ? Z.toSpawn + Z.zs.size : 0 };
@@ -25944,7 +25992,7 @@ function zExplode(pos, owner, r, dmgMax, w, insta) { // granada / macaco
     if (d > r || !losClear(pos, c)) continue;
     const dmg = insta ? z.hp + 1 : dmgMax * (1 - d / (r * 1.3));
     if (p) zHit(p, z.id, dmg, 'body', w, true);
-    else { z.hp -= z.kind === 6 ? Math.min(dmg, z.maxHp * .12) : dmg; if (z.hp <= 0) zKill(z, null, 'body', w, true, true); }
+    else { z.hp -= ZKIND[z.kind].chefe ? Math.min(dmg, z.maxHp * ZKIND[z.kind].capGolpe) : dmg; if (z.hp <= 0) zKill(z, null, 'body', w, true, true); }
   }
   if ((w === 'he' || w === 'semtex') && p && p.alive && !p.downed && !p.perks.includes('phd')) { const d = Math.hypot(p.pos[0] - pos.x, p.pos[2] - pos.z); if (d < 4) zHurt(p, Math.round(60 * (1 - d / 4)), null); } // a sua granada te machuca
   if (Z.zint?.length) zintExplosao(pos, r, owner); // O2-C04: explosão perto de barril acende o pavio curto (corrente)
@@ -27272,6 +27320,9 @@ if (DEBUG) Object.assign(window.__T, { zBuildWalk, footFreeR, segClearR, zRoomAt
 // ===== O2-C04: ganchos de teste dos interativos (tests/interativos-zumbi.test.mjs e tools/itens/auditoria.mjs) =====
 if (DEBUG) Object.assign(window.__T, { ZINT, ZINT_MAPA, ZINT_BARRIL, ZINT_FN, zintUsar, zintTiro, zintExplosao, zintBarrilBoom, zintEstado, zintAud, zintSync, zintMsg, zExplode, zWorldState });
 // ===== FIM O2-C04 =====
+// ===== O3-D03: ganchos de teste do refator de tipos (tests/tipos-zumbi.test.mjs) =====
+if (DEBUG) Object.assign(window.__T, { ZKIND, CAMP, CAMP_G, CAMP_IA, zfTipo, zTipoDeF, campTipo, campNasce, campStatus, campIA, campDano, campMorte, campZhitOk, campZona, campFracoK, zMix, zRecycle, zFreeze });
+// ===== FIM O3-D03 =====
 </script>
 </body>
 </html>
