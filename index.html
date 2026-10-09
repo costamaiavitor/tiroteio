@@ -25790,6 +25790,9 @@ requestAnimationFrame(frame);
 if (DEBUG) window.__T = { startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zKill, zDrop, zEndRound, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
+// ===== O2-C01: ganchos de teste para a auditoria de itens (tools/itens/auditoria.mjs); só leitura e as funções do próprio jogo, nada de gameplay =====
+if (DEBUG) Object.assign(window.__T, { zBuildWalk, footFreeR, segClearR, zRoomAt, zActive, zDoorOpen, zBoxPlace, zHigh, colQuery, ffCell, ZPERKS, ZTRAP, ZMAXPERKS, ZWEAP, PR, STEP, ZVAULT, ZTOP });
+// ===== FIM O2-C01 =====
 </script>
 </body>
 </html>
