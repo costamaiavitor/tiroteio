@@ -24832,20 +24832,20 @@ const ZFOGO_PLACA = () => canvasTex(256, 64, g => { g.fillStyle = '#0d0d0d'; g.f
 // leitura no HUD. O host confere a distância (zintUsar), anota quem leu (E.lidos, para a campanha da Onda 3) e responde só a quem leu
 // (sendTo, { t: 'zint', i, st: 'lido' }): o estado global continua 'pronto' (nada a sincronizar para quem entra no meio).
 // O painel não pausa o jogo: fecha com F, Esc, andando (fechaAndar) ou sozinho depois do tempo de leitura. Não dá pontos nem itens.
-// Texto PROVISÓRIO (uma linha, até maxTxt letras) em ZINT_TERM_TXT, por id: a lore oficial vem em docs/overhaul/lore.md (Onda 3).
+// Texto (uma linha, até maxTxt letras) em ZINT_TERM_TXT, por id: a lore oficial de docs/overhaul/lore.md §7 (O3-D04; vale também no clássico).
 // Registro local do que este jogador já leu: zintLoreLidos() (ids, guardados no navegador em 'tiroteio.lore').
 ZINT.terminal = { nome: 'Terminal', custo: 0, usoR: 1.8, srvR: 2.6, forca: 1, textoS: 8, porLetra: .06, fechaAndar: 1, maxTxt: 160 };
-const ZINT_TERM_TXT = { // id -> { titulo, txt } (texto provisório: trocar aqui)
-  'san-recepcao': { titulo: 'Ficha de admissão nº 0417', txt: 'Paciente chegou sedado, sem nome. Mordida no antebraço, febre de 41 °C. O diretor mandou isolar na ala leste e não registrar a entrada.' },
-  'san-laboratorio': { titulo: 'Registro do laboratório, lote 12', txt: 'A amostra reage à corrente: o tecido morto volta a se contrair. Aumentar a voltagem amanhã. Não contar nada à diretoria.' },
-  'san-necroterio': { titulo: 'Fita da autópsia, gaveta 7', txt: '...o coração não bate há três dias, mas os olhos seguem a lanterna. Vou desligar o gravador e trancar a gaveta.' },
-  'san-psiquiatria': { titulo: 'Prontuário, Ala Psiquiátrica, leito 9', txt: 'Repete que os mortos do porão "escutam a caldeira". Aumentar a dose e conter à noite. Parou de aceitar comida cozida.' },
-  'san-crematorio': { titulo: 'Livro do forno, última página', txt: 'Seis corpos hoje. Dois voltaram a se mexer na esteira. O forno não dá conta: acendi o segundo e tranquei a porta por fora.' },
-  'san-caldeiras': { titulo: 'Painel da caldeira: aviso', txt: 'Pressão acima do limite desde a queda de energia. Religar o gerador antes de abrir as alas. Sem luz, eles sobem do porão.' },
-  'vila-igreja': { titulo: 'Avisos da paróquia', txt: 'Missa suspensa. Quem tiver febre ou mordida não entre na igreja. O sino só toca em caso de perigo. Que Deus tenha piedade da vila.' },
-  'vila-hospital': { titulo: 'Caderno do médico de campanha', txt: 'Amputar não adianta. O ferido do leito 3 morreu às 4h e levantou às 4h20. Poupem munição: tiro na cabeça, só na cabeça.' },
-  'vila-farol': { titulo: 'Rádio do farol', txt: '...aqui é o farol, alguém na escuta? O barco não voltou e tem gente andando na água rasa. Repito: não venham pelo porto.' },
-  'vila-mina': { titulo: 'Escala da mina velha', txt: 'Turno da noite cancelado. A galeria 4 foi lacrada depois do desabamento. Batidas do lado de dentro não são problema nosso.' },
+const ZINT_TERM_TXT = { // id -> { titulo, txt } (lore oficial: docs/overhaul/lore.md §7)
+  'san-recepcao': { titulo: 'Livro de admissões, última linha', txt: 'Família 413. Pessoas: em branco. Procedência: a vila, por fora do cordão. Encaminhar direto ao Programa. Ass.: Dr. A. Vasconcellos, Nº 1.' },
+  'san-laboratorio': { titulo: 'Relatório 31 ao Sr. Diretor', txt: 'O sujeito 214-1 acordou e, ao ouvir o apito da caldeira, levantou e andou junto com os outros. Eles vêm em levas. Sugiro recolher todos assim.' },
+  'san-necroterio': { titulo: 'Fita do necrotério, gaveta 214', txt: '...a 214 bate de novo. Três batidas, pausa, três batidas: o compasso da missa das sete. Eles lembram. Vou desligar antes que eu responda.' },
+  'san-psiquiatria': { titulo: 'Prontuário 171-3, Ala Psiquiátrica', txt: 'Ele não repete a frase: termina a frase. "Ainda não acabou. A fila anda." Os tubos de escuta levam a voz dele a todas as celas. Isolar.' },
+  'san-crematorio': { titulo: 'Livro do forno, turno da noite', txt: 'Vinte e dois de dia, vinte e dois de noite. O Diretor mandou deixar quatro linhas em branco no fim da lista. Para quem? "Para a próxima família."' },
+  'san-caldeiras': { titulo: 'Caderneta do foguista', txt: 'Trancaram a porta por fora. Se eu soltar o apito, eles sobem e vêm. Se eu não soltar, a caldeira estoura. Escolhi o apito. Vicente.' },
+  'vila-igreja': { titulo: 'Avisos da paróquia', txt: 'Por ordem do Sanatório, as famílias 214, 215 e 216 compareçam após a missa das sete. O sino só toca para chamar. Pe. Anselmo.' },
+  'vila-hospital': { titulo: 'Caderno do médico de campanha', txt: 'Cartão cinzento: transferir ao Santa Inês. Hoje foram 40. O Dr. Aurélio pediu a linha 41 em branco. Disse que sempre chega mais um.' },
+  'vila-farol': { titulo: 'Rádio do farol', txt: '...aqui é Quirino, do farol. A cisterna ficou preta. Escuto o mar dentro da torre, e o mar me chama pelo nome. Não bebam. Não durmam.' },
+  'vila-mina': { titulo: 'Quadro da Mina velha', txt: 'A Galeria 7 não desabou: abriu. O 17 subiu e disse que lá embaixo tem lugar para todos. Quem beber primeiro desce primeiro. Ainda não acabou.' },
 };
 // aparência (procedural) de cada variante: rótulo do painel, verbo do F, estilo do painel (san/vila) e o móvel
 // (col: caixa do colisor no espaço do móvel [cx, cz, largura, fundo, altura]; a frente é +z, a parede fica atrás, em z = -0,315)
@@ -24881,7 +24881,7 @@ function zintTermTex(k) {
   const t = canvasTex(W[0], W[1], (g, w, h) => {
     if (k === 'tela') { // tela de fósforo verde com linhas de texto
       g.fillStyle = '#031a0c'; g.fillRect(0, 0, w, h); g.font = 'bold 15px monospace'; g.fillStyle = '#56ff94';
-      ['SANATORIO  SIST. 3', '> PACIENTE 0417', '  ALA: LESTE', '  STATUS: ISOLADO', '> CORRENTE 220V OK', '> GERADOR: ????', '_'].forEach((s, i) => g.fillText(s, 12, 24 + i * 24));
+      ['SANATORIO  SIST. 3', '> FAMILIA 413', '  PESSOAS: EM BRANCO', '  DESTINO: PROGRAMA', '> CORRENTE 220V OK', '> GERADOR: ????', '_'].forEach((s, i) => g.fillText(s, 12, 24 + i * 24));
       g.fillStyle = 'rgba(0,0,0,.28)'; for (let y = 0; y < h; y += 3) g.fillRect(0, y, w, 1); // linhas de varredura
     } else if (k === 'papel') { // ficha presa na prancheta
       g.fillStyle = '#e9e4d4'; g.fillRect(0, 0, w, h); g.fillStyle = '#3a3a3a'; g.font = 'bold 16px sans-serif'; g.fillText('FICHA CLÍNICA', 18, 30);
@@ -24990,7 +24990,7 @@ addEventListener('keydown', e => {
 document.addEventListener('pointerlockchange', () => { if (ZLORE.i >= 0 && !locked()) zintLoreFecha(); });
 ZINT_FN.terminal = {
   est: ['pronto', 'lido'],
-  efeito: (o, D) => `lore: "${ZINT_TERM_TXT[o.id]?.titulo || o.id}" (texto provisório; sem pontos)`,
+  efeito: (o, D) => `lore: "${ZINT_TERM_TXT[o.id]?.titulo || o.id}" (sem pontos)`,
   monta(o, i) {
     if (ZLORE.i >= 0) zintLoreFecha(false); // mapa novo: painel da partida anterior fechado
     const V = ZINT_TERM_VIS[o.v] || ZINT_TERM_VIS.terminal, g = new THREE.Group(), n = o.n || [0, 1], a = Math.atan2(n[0], n[1]);
@@ -25613,6 +25613,272 @@ ZINT_FN.sino = {
 };
 if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { ZINT_BAU_VIS, ZBAU_M, zintIsca, zintBauSorteia, zintWunderOpc }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
 // ===== FIM O2-C10 =====
+// ===== O3-D04: lore em jogo (docs/overhaul/lore.md §8–§10; docs/overhaul/campanha.md §4.2 e §17) =====
+// 1. Notas da campanha (tipo ZINT 'nota'): papel procedural em 3 variantes (v: 'chao' papel dobrado no chão com uma pedra em cima;
+//    'pregada' folha datilografada pregada na parede; 'bilhete' bilhete preso num prego, com lápis no barbante). F lê na MESMA janela
+//    do terminal (#zlore, estilo 'nota'), fecha igual (F, Esc, andando, sozinho), só quem leu vê, sem pontos, entra no registro local
+//    'tiroteio.lore' (ids com o prefixo n-) e o host anota quem leu (E.lidos, para o objetivo 'ler' e o final completo).
+//    Sem colisor: papel não bloqueia passagem nem a grade dos zumbis. Só existe com a campanha ligada (zintNotaLigada) e a partir do
+//    ato da entrada (o.ato); no clássico o monta devolve um marcador vazio (o índice continua na lista: a rede não muda entre os modos)
+//    e as peças só são montadas quando a nota liga (mapa montado antes do CAMP.on, ou ato novo no mesmo mapa).
+//    Posições (D10/D12/D14): ZINT_MAPA.<mapa>.push({ t: 'nota', v, id, x, z, n, ato }). 'pregada' e 'bilhete': (x, z) NA FACE da
+//    parede (como as alavancas do O2-C08) e n para fora; 'chao': (x, z) no chão, n só gira o papel. Texto em CAMP_NOTA_TXT[id].
+// 2. Textos prontos (colados da lore.md) para o painel de rádio, falas e cenas do D02: o texto vai por id, nunca pela rede.
+// 3. Sons sintetizados (sem arquivo): SND.radio (estática 300–3000 Hz com estalos), SND.apito (apito de vapor ao longe),
+//    SND.coro (3 vozes em acorde menor, 1,2 s) e SND.papel (o papel ao ler). Parâmetros em CAMP_SOM.
+ZINT.nota = { nome: 'Nota', custo: 0, usoR: 1.8, srvR: 2.6, forca: 1, textoS: 8, porLetra: .06, fechaAndar: 1, maxTxt: 160 };
+const CAMP_NOTA_TXT = { // id -> { titulo, txt } (docs/overhaul/lore.md §8)
+  'n-praca-cabo': { titulo: 'Aviso pregado no poste', txt: 'A quem ficou: a estação do Pico escuta na frequência da paróquia. Toquem o sino e esperem. Não bebam a água. Cabo Nogueira, 3ª Cia.' },
+  'n-pedreira-dinamite': { titulo: 'Bilhete do capataz', txt: 'O Exército levou a dinamite para o paiol do Forte. Deixou o gerador. Se faltar luz, puxa a alavanca e reza para ele pegar antes deles chegarem.' },
+  'n-castelo-foto': { titulo: 'Verso de uma fotografia 3x4', txt: 'Fotografado, numerado, marcado no mapa. Casa com cruz: não sair. Casa sem cruz: aguardar o caminhão. Ten. Brandão, 3ª Cia, 14º BC.' },
+  'n-base-ordem': { titulo: 'Ordem de serviço, cordão sanitário', txt: 'Positivos: entregar ao veículo do Santa Inês, sem registro em boletim. O que acontece no morro não é assunto da companhia. Cumpra-se.' },
+  'n-estacao-cabo': { titulo: 'Bilhete na bilheteria', txt: 'Desci a serra pelos trilhos. Estou na sala do telégrafo. O Tenente sabe que eu escuto o rádio dele. Venham antes do próximo apito. N.' },
+  'n-forte-paiol': { titulo: 'Inventário do paiol', txt: 'Cargas de demolição: 3, retiradas da Pedreira. Destino previsto: boca da Galeria 7. Ordem suspensa pelo Sanatório. Motivo: "ainda é útil".' },
+  'n-enfermaria-dose': { titulo: 'Bilhete preso na bandeja', txt: 'Dose 1: dorme. Dose 2: não sonha. Dose 3: não reclama mais. Quem acordar no meio da ronda, aplicar outra. As agulhas são de reuso.' },
+  'n-estabulo-fermino': { titulo: 'Folha da baia, letra de Fermino', txt: 'A vaca da baia 4 morreu ontem e hoje pediu ordenha. Abati de novo. Abati três vezes. O Diretor mandou parar de abater e começar a pesar.' },
+  'n-biblioteca-sono': { titulo: 'Página arrancada, "Do sono sem sonho"', txt: 'O medo de acabar é a única doença. Curada a morte, o homem descansa sem perder o lugar. O Veio não mata: guarda. A. V.' },
+  'n-torre-registro': { titulo: 'Placa do registro geral', txt: 'Adução da mina: Galeria 7 → Torre → prédio. Fechar o registro só com ordem do Diretor. O cano desce o morro por dentro. Não entrar no cano.' },
+  'n-forno-pulseira': { titulo: 'Bilhete atrás do forno 3', txt: 'Ele mandou queimar quando acordasse. Abri o forno e ele me olhou. Queimei a pulseira. O resto desceu pelo cano. Que Deus me perdoe. V.' },
+  'n-galeria-diretor': { titulo: 'Folha molhada, letra do Diretor', txt: 'Ninguém mais precisa acabar. A lista era só a ordem da fila. Estou na água com o primeiro deles e daqui chamo os outros. Nº 1.' },
+};
+const CAMP_RADIO_TXT = { // id -> { quem, txt } (docs/overhaul/lore.md §9)
+  // Ato I
+  'r1-inicio': { quem: 'RÁDIO', txt: '(estática) ...famílias que ficaram... toquem o sino da igreja... não bebam... (estática)' },
+  'r1-sino': { quem: 'NOGUEIRA', txt: 'Ouvi o sino! Aqui é o Cabo Nogueira, do Pico. Quem são vocês? Não importa. O sino chama eles também. Saiam daí.' },
+  'r1-energia': { quem: 'NOGUEIRA', txt: 'Meu rádio não alcança a vila sem a torre da Pedreira. Liguem o gerador de lá. Ele demora a pegar. Segurem até pegar.' },
+  'r1-gerador-pegou': { quem: 'NOGUEIRA', txt: 'Agora escuto vocês claro. Fiquem vivos até o fim da noite. Tenho coisa para contar que não se diz com eles por perto.' },
+  'r1-gerador-caiu': { quem: 'NOGUEIRA', txt: 'O gerador morreu. Esperem a próxima leva passar e tentem de novo.' },
+  // Ato II
+  'r2-inicio': { quem: 'NOGUEIRA', txt: 'O hospital de campanha guardava a lista de transferência. Achem a lista. Quero saber para onde o caminhão branco levou essa gente.' },
+  'r2-lista': { quem: 'NOGUEIRA', txt: 'Santa Inês. Assinado pelo Diretor. A companhia assinou embaixo. Eu assinei embaixo. Estou descendo. Me encontrem na Estação.' },
+  'r2-escolta': { quem: 'NOGUEIRA', txt: 'Eu sei dirigir a ambulância e sei onde estão as chaves: no Forte Velho, com o Tenente. Me levem até lá.' },
+  'r2-escolta-ferido': { quem: 'NOGUEIRA', txt: 'Estou sangrando, mas ando. Não me deixem para trás.' },
+  'r2-escolta-caiu': { quem: 'NOGUEIRA', txt: '(estática) ...me arrastei até a sala do telégrafo. Venham me buscar de novo depois desta leva...' },
+  'r2-forte': { quem: 'NOGUEIRA', txt: 'O alçapão da casamata. Ele está lá embaixo, eu escuto o holofote. Abram e eu seguro a porta.' },
+  // Ato III
+  'r3-inicio': { quem: 'NOGUEIRA', txt: 'Deixei a ambulância na Portaria. Fico no rádio dela. O prédio está trancado por fora: entrem pela Recepção, como todo mundo entrou.' },
+  'r3-livro': { quem: 'NOGUEIRA', txt: 'Família 413? Escreveram vocês no livro antes de vocês chegarem. Não assinem nada.' },
+  'r3-chave': { quem: 'NOGUEIRA', txt: 'A enfermeira-chefe levava a chave do laboratório no pescoço. Se ela ainda faz a ronda, a chave faz a ronda com ela.' },
+  'r3-laboratorio': { quem: 'NOGUEIRA', txt: 'O apito. É o apito das Caldeiras que chama eles em leva. Enquanto alguém soltar aquele apito, isto não termina.' },
+  // Ato IV
+  'r4-inicio': { quem: 'NOGUEIRA', txt: 'A Torre bebe da mina pelo cano-mestre. Precisa de força nas três alas para fechar o registro. Comecem pelas Caldeiras.' },
+  'r4-alas': { quem: 'NOGUEIRA', txt: 'Mais uma ala. O prédio está acordando junto com a luz. Cuidado com o que a luz mostra.' },
+  'r4-registro': { quem: 'NOGUEIRA', txt: 'Fechou! A Torre está secando. Agora o apito não para. Tem alguém no Forno soltando aquele apito com raiva.' },
+  // Ato V
+  'r5-inicio': { quem: 'NOGUEIRA', txt: '(estática) ...o cano desce até a Galeria 7. As três cargas do paiol... nos pilares da boca... o rádio não passa na pedra...' },
+  'r5-cargas': { quem: 'NOGUEIRA', txt: '(estática) ...três cargas, três pilares... depois corram para a gaiola... eu puxo vocês...' },
+  'r5-fuga': { quem: 'NOGUEIRA', txt: 'Estou na manivela da gaiola! Corram! Não olhem a água!' },
+  // eventos (qualquer ato)
+  'ev-apagao': { quem: 'NOGUEIRA', txt: 'A luz caiu de vez. Usem a lanterna e não se separem.' },
+  'ev-nevoa': { quem: 'NOGUEIRA', txt: 'Está subindo uma névoa da água. Eu não vejo nada daqui. Vocês também não vão ver.' },
+  'ev-estouro': { quem: 'NOGUEIRA', txt: 'O apito está soltando sem parar. Eles vêm correndo. Muitos.' },
+  'ev-silencio': { quem: 'NOGUEIRA', txt: 'Os tubos de escuta levam cada tiro a todas as alas. Guardem as armas. Só a faca.' },
+  'ev-inchados': { quem: 'NOGUEIRA', txt: 'Esses beberam demais. Estão inchados. Atirem longe deles.' },
+  'ev-relogio': { quem: 'NOGUEIRA', txt: 'A pressão da caldeira está subindo. Vocês têm até o ponteiro chegar no vermelho.' },
+  'ev-suprimento': { quem: 'NOGUEIRA', txt: 'Achei a frequência do avião de suprimentos. Vão cair caixotes. Fumaça vermelha marca o lugar.' },
+};
+const CAMP_FALA_TXT = { // id -> { quem, txt } (docs/overhaul/lore.md §10.1)
+  // Cabo Nogueira (escolta)
+  'cabo-anda': { quem: 'NOGUEIRA', txt: 'Vamos. Eu só ando com alguém do lado.' },
+  'cabo-para': { quem: 'NOGUEIRA', txt: 'Não vou sozinho! Fiquem perto!' },
+  'cabo-cercado': { quem: 'NOGUEIRA', txt: 'Estão em cima de mim!' },
+  'cabo-ferido': { quem: 'NOGUEIRA', txt: 'Estou sangrando, mas ando. Não me deixem para trás.' }, // campanha.md §4.3 (texto do rádio r2-escolta-ferido)
+  'cabo-chegou': { quem: 'NOGUEIRA', txt: 'É aqui. O Forte. Eu conheço o barulho daquele holofote.' },
+  // Tenente Brandão
+  'ten-entrada': { quem: 'TENENTE', txt: 'Família sem número. Fique onde a luz mostrar.' },
+  'ten-varredura': { quem: 'TENENTE', txt: 'Ninguém sai do vale.' },
+  'ten-pelotao': { quem: 'TENENTE', txt: 'Pelotão, em forma!' },
+  'ten-fase2': { quem: 'TENENTE', txt: 'Fotografado. Numerado. Marcado.' },
+  'ten-fase3': { quem: 'TENENTE', txt: 'Sem luz eu marco no escuro.' },
+  'ten-morte': { quem: 'TENENTE', txt: 'A lista... está... completa...' },
+  // Vicente, o foguista
+  'fog-entrada': { quem: 'VICENTE', txt: 'Fechem a porta! Se a pressão cair, eles sobem!' },
+  'fog-apito': { quem: 'VICENTE', txt: 'Mais um sopro. Só mais um.' },
+  'fog-forno': { quem: 'VICENTE', txt: 'O forno está com fome.' },
+  'fog-fase2': { quem: 'VICENTE', txt: 'A pulseira queimou. Ele não.' },
+  'fog-fase3': { quem: 'VICENTE', txt: 'O ponteiro está no vermelho!' },
+  'fog-morte': { quem: 'VICENTE', txt: 'Agora... posso... soltar...' },
+  // Dr. Aurélio, o Diretor
+  'dir-entrada': { quem: 'O DIRETOR', txt: 'Família 413. Sejam bem-vindos ao repouso.' },
+  'dir-chamada': { quem: 'O DIRETOR', txt: 'Família 101. Família 102. Família 104. Compareçam.' },
+  'dir-dose': { quem: 'O DIRETOR', txt: 'Uma dose para dormir.' },
+  'dir-fase2': { quem: 'NÚMERO 1', txt: 'O primeiro da lista fui eu.' },
+  'dir-fase3': { quem: 'NÚMERO 1', txt: 'Ainda não acabou.' },
+  'dir-coro': { quem: 'O CORO', txt: 'Ainda não acabou. Ainda não acabou.' },
+  'dir-morte': { quem: 'NÚMERO 1', txt: 'Então... acabou...' },
+  // Carniceiro (Fermino) — também no clássico, se o coordenador quiser
+  'carn-entrada': { quem: 'O MAGAREFE', txt: 'Mais um para pesar.' },
+};
+const CAMP_CENA_TXT = { // id -> [cartões] (docs/overhaul/lore.md §10.2)
+  'c0-abertura': ['SÃO LÁZARO DO VALE · 1958', 'Vocês passaram por baixo do arame do Exército. A vila está enfeitada para uma festa. Não há ninguém.', 'Ao longe, no alto do morro, um apito de vapor.'],
+  'c1-fim': ['O rádio da Pedreira acende.', 'NOGUEIRA: "Tem uma lista. Quatrocentas e doze famílias. Todas levadas pelo caminhão branco do Sanatório."', 'No Forte Velho, um holofote se acende sozinho e procura a vila.'],
+  'c2-forte': ['FORTE VELHO · CASAMATA', 'O pátio de armas da 3ª Cia. O holofote gira. Embaixo dele, alguém continua de vigia.'],
+  'c2-fim': ['O holofote se apaga.', 'No paiol: três cargas de demolição e as chaves da ambulância branca.', 'NOGUEIRA: "Para o morro. Do jeito que eles levaram todo mundo."'],
+  'c3-abertura': ['SANATÓRIO SANTA INÊS', 'A ambulância para na vaga da Portaria. A vaga ao lado tem um número pintado: 413.'],
+  'c3-fim': ['No Laboratório, a curva do despertar está riscada até o fim do quadro.', 'Do porão, o apito das Caldeiras responde a cada leva.', 'NOGUEIRA: "Enquanto aquilo apitar, eles vêm."'],
+  'c4-forno': ['CASA DO FORNO', 'Quatro fornos acesos. Uma esteira que não para. E o foguista, com a mão na corrente do apito.'],
+  'c4-fim': ['O apito se cala pela primeira vez desde agosto.', 'Atrás do forno 3, o cano-mestre desce o morro por dentro, cheio de água preta.', 'O Veio continua correndo. Para baixo.'],
+  'c5-abertura': ['GALERIA 7', 'Por dentro do cano, a água preta leva até a boca da galeria. Três pilares seguram o teto.', 'No meio da água, um homem de jaleco espera, com a pulseira de quem não tem número.'],
+  'c5-fuga': ['O primeiro pilar estoura.', 'A água preta começa a subir.', 'CORRAM PARA A GAIOLA.'],
+  'c5-final': ['A gaiola sobe. A Galeria 7 desaba atrás de vocês e a água preta fica embaixo da pedra.', 'Na vila, o sino não toca. No morro, o apito não sopra.', 'NOGUEIRA: "Família 413. Risco vocês da lista com gosto."'],
+  'c5-final-completo': ['Nas folhas molhadas do Diretor, a última linha da lista não é a 413.', 'É "chapa 17", com a letra de um mineiro: "lá embaixo tem lugar para todos".', 'A pedra fechou a ferida. Não fechou o lençol.'],
+  'c5-pos': ['Na grade da gaiola, arranhado a unha, por dentro: "ainda não acabou".'],
+};
+// aparência de cada variante: rótulo do painel, verbo do F, textura e medidas (largura, altura, altura do centro no chão/parede)
+const ZINT_NOTA_VIS = {
+  chao: { rot: 'PAPEL NO CHÃO', verbo: 'Ler o papel', tex: 'dobrado', w: .36, h: .25 },
+  pregada: { rot: 'FOLHA PREGADA', verbo: 'Ler a folha', tex: 'folha', w: .3, h: .4, y: 1.45 },
+  bilhete: { rot: 'BILHETE', verbo: 'Ler o bilhete', tex: 'bilhete', w: .18, h: .13, y: 1.3 },
+};
+const ZNOTA = { forca: false, camp: null, css: false, sem: new Set() }; // só nos testes: forca liga as notas sem a campanha, camp troca o CAMP; sem: ids sem texto já avisados
+// a nota existe (é desenhada e o F lê) com a campanha ligada e a partir do ato dela. Adaptador do estado do D02 (CAMP.on, CAMP.ato):
+// typeof evita erro enquanto o CAMP não existir; no clássico CAMP.on é falso e nada aparece
+function zintNotaLigada(o) { const K = ZNOTA.camp || (typeof CAMP === 'undefined' ? null : CAMP); return ZNOTA.forca || !!(K?.on && (K.ato ?? 0) >= (o.ato ?? 0)); }
+// texturas (uma por variante, sorteio com semente: sempre iguais; guardadas entre as partidas)
+const ZINT_NOTA_TEX = {}, ZINT_NOTA_MAT = {};
+function zintNotaTex(k) {
+  if (ZINT_NOTA_TEX[k]) return ZINT_NOTA_TEX[k];
+  let sd = 11; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const linha = (g, x, y, w, cor, lw) => { g.strokeStyle = cor; g.lineWidth = lw; g.beginPath(); g.moveTo(x, y); for (let s = 0; s < w; s += 4) g.lineTo(x + s, y + (rnd() - .5) * 2.6); g.stroke(); };
+  const manchas = (g, w, h, n, cor) => { for (let i = 0; i < n; i++) { g.fillStyle = cor; g.globalAlpha = .08 + rnd() * .12; g.beginPath(); g.arc(rnd() * w, rnd() * h, 6 + rnd() * 26, 0, 7); g.fill(); } g.globalAlpha = 1; };
+  const W = { folha: [192, 256], bilhete: [192, 140], dobrado: [256, 180] }[k];
+  const t = canvasTex(W[0], W[1], (g, w, h) => {
+    g.fillStyle = k === 'bilhete' ? '#e6dcc0' : '#ebe5d2'; g.fillRect(0, 0, w, h);
+    manchas(g, w, h, k === 'dobrado' ? 9 : 4, k === 'dobrado' ? '#4a3a22' : '#8a7448');
+    if (k === 'folha') { // folha datilografada com cabeçalho, carimbo e furos dos pregos
+      g.fillStyle = '#2c2a26'; g.font = 'bold 13px monospace'; g.fillText('3ª CIA · 14º BC', 16, 24); g.fillRect(16, 30, w - 32, 2);
+      for (let y = 48; y < h - 46; y += 13) linha(g, 16, y, w - 40 - rnd() * 40, '#3a3832', 1.6);
+      g.save(); g.translate(130, h - 34); g.rotate(-.2); g.strokeStyle = '#8a1e18'; g.lineWidth = 2.5; g.strokeRect(-36, -13, 72, 26);
+      g.fillStyle = '#8a1e18'; g.font = 'bold 13px sans-serif'; g.fillText('CUMPRA-SE', -33, 5); g.restore();
+    } else if (k === 'bilhete') { // bilhete a lápis, borda rasgada embaixo
+      for (let y = 26; y < h - 26; y += 15) linha(g, 14, y, w - 30 - rnd() * 60, '#4a4440', 1.3);
+      g.fillStyle = '#2a241c'; for (let x = 0; x < w; x += 8) g.fillRect(x, h - 6 - rnd() * 6, 8, 12); // rasgo
+    } else { // papel dobrado e sujo: vinco no meio, escrita dos dois lados do vinco
+      for (const x0 of [14, w / 2 + 12]) for (let y = 22; y < h - 18; y += 13) linha(g, x0, y, w / 2 - 34 - rnd() * 30, '#3e3a30', 1.2);
+      const gr = g.createLinearGradient(w / 2 - 10, 0, w / 2 + 10, 0); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(.5, 'rgba(50,38,20,.4)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(w / 2 - 10, 0, 20, h);
+    }
+  });
+  t.userData.tmp = false; t.anisotropy = MAX_ANISO; return (ZINT_NOTA_TEX[k] = t);
+}
+// papel: Lambert com mapa (o mesmo programa do papel dos terminais, sem shader novo) e um leve brilho próprio para achar no escuro
+const zintNotaMat = k => ZINT_NOTA_MAT[k] || (ZINT_NOTA_MAT[k] = new THREE.MeshLambertMaterial({ map: zintNotaTex(k), emissive: 0x1e1b14 }));
+function zintNotaFolha(g, k, w, h, u0 = 0, u1 = 1) { // plano de papel (u0..u1: pedaço da textura, para as duas metades do papel dobrado)
+  const geo = new THREE.PlaneGeometry(w, h), uv = geo.attributes.uv; for (let j = 0; j < uv.count; j++) uv.setX(j, u0 + uv.getX(j) * (u1 - u0));
+  const p = new THREE.Mesh(geo, zintNotaMat(k)); p.receiveShadow = true; p.castShadow = false; g.add(p); return p;
+}
+const ZINT_NOTA_MONTA = { // frente +z; 'pregada'/'bilhete': a origem é a face da parede
+  pregada(g, V) {
+    zintNotaFolha(g, V.tex, V.w, V.h).position.set(0, V.y, .012);
+    const prego = mc(0x2a2622); for (const sx of [-1, 1]) for (const sy of [-1, 1]) bx(g, .018, .018, .016, sx * (V.w / 2 - .025), V.y + sy * (V.h / 2 - .025), .02, prego);
+  },
+  bilhete(g, V) {
+    const p = zintNotaFolha(g, V.tex, V.w, V.h); p.position.set(0, V.y, .012); p.rotation.z = .14;
+    bx(g, .016, .016, .03, -.01, V.y + V.h / 2 - .015, .026, mc(0x2a2622)); // prego
+    const fio = bx(g, .004, .2, .004, .07, V.y - .005, .018, mc(0xb8ab88)); fio.rotation.z = .5; // barbante
+    const lapis = bx(g, .012, .1, .012, .125, V.y - .135, .02, mc(0xc8a040)); lapis.rotation.z = .1;
+  },
+  chao(g, V, i) {
+    g.rotation.y += ((i * 1.7) % 1.2) - .6; // cada um caído de um jeito
+    const a = zintNotaFolha(g, V.tex, V.w / 2, V.h, 0, .5); a.rotation.x = -Math.PI / 2; a.position.set(-V.w / 4, .004, 0);
+    const dobra = new THREE.Group(); dobra.position.set(0, .004, 0); dobra.rotation.z = .2; g.add(dobra); // metade levantada no vinco
+    const b = zintNotaFolha(dobra, V.tex, V.w / 2, V.h, .5, 1); b.rotation.x = -Math.PI / 2; b.position.set(V.w / 4, 0, 0);
+    zintCil(g, .034, .03, .02, mc(0x5a5650), 7, false).position.set(-.07, .019, .04); // pedra em cima
+  },
+};
+function zintNotaMonta(o, e) { // peças da nota (no monta, ou no primeiro quadro em que ela liga)
+  const V = ZINT_NOTA_VIS[o.v] || ZINT_NOTA_VIS.pregada, g = new THREE.Group(), n = o.n || [0, 1];
+  g.position.set(o.x, 0, o.z); g.rotation.y = Math.atan2(n[0], n[1]);
+  const corpo = new THREE.Group(); g.add(corpo); (ZINT_NOTA_MONTA[o.v] || ZINT_NOTA_MONTA.pregada)(corpo, V, e.i);
+  mergeParts(corpo); world.add(g); cullAdd(g, o.x, o.z, .6);
+  e.g = g; e.corpo = corpo; e.h = (V.y || 0) + V.h / 2;
+}
+// painel: o mesmo #zlore do terminal (zintLoreEl), com o estilo de papel
+function zintNotaCss() {
+  if (ZNOTA.css) return; ZNOTA.css = true;
+  const css = document.createElement('style'); css.textContent = '#zlore[data-m=nota]{background:rgba(233,226,206,.96);border-color:rgba(96,74,44,.6);color:#2a2218}'
+    + '#zlore[data-m=nota] .zlk,#zlore[data-m=nota] .zlh b{color:#7a2418}#zlore[data-m=nota] .zlt{color:#1c160e}#zlore[data-m=nota] .zlx{font-family:Georgia,"Times New Roman",serif;font-style:italic}'
+    + '#zlore[data-m=nota] .zlh{color:#4a3e2c}#zlore[data-m=nota] .zlb{background:#7a2418}';
+  document.head.appendChild(css);
+}
+function zintNotaAbre(i) {
+  const o = ZD.zint?.[i], T = o && CAMP_NOTA_TXT[o.id], V = o && ZINT_NOTA_VIS[o.v], D = ZINT.nota; if (!T || !V) return;
+  const el = zintLoreEl(); zintNotaCss(); const s = Math.max(D.textoS, T.txt.length * D.porLetra), b = el.querySelector('.zlb');
+  el.dataset.m = 'nota'; el.querySelector('.zlk').textContent = V.rot; el.querySelector('.zlt').textContent = T.titulo; el.querySelector('.zlx').textContent = T.txt;
+  b.style.animation = 'none'; void b.offsetWidth; b.style.animation = ''; b.style.animationDuration = s + 's';
+  el.classList.remove('hidden'); ZLORE.i = i; ZLORE.fim = now + s; ZLORE.x = me.pos.x; ZLORE.z = me.pos.z;
+  play('papel'); zintLoreMarca(o.id);
+}
+ZINT_FN.nota = {
+  est: ['pronto', 'lido'],
+  efeito: (o, D) => `lore: "${CAMP_NOTA_TXT[o.id]?.titulo || o.id}" (nota da campanha${o.ato ? ', ato ' + o.ato : ''}; sem pontos)`,
+  monta(o, i) {
+    if (ZLORE.i >= 0) zintLoreFecha(false); // mapa novo: painel da partida anterior fechado
+    if (!CAMP_NOTA_TXT[o.id] && !ZNOTA.sem.has(o.id)) { ZNOTA.sem.add(o.id); console.warn('nota sem texto em CAMP_NOTA_TXT:', o.id); }
+    const e = { i, g: null, corpo: null, h: 0, raio: .3 }; // sem col: o papel não entra no COL
+    if (zintNotaLigada(o)) zintNotaMonta(o, e);
+    return e;
+  },
+  estado(o, e, c, ant, sync) { if (c.st !== 'lido') return; c.st = 'pronto'; if (!sync) zintNotaAbre(e.i); }, // 'lido' só chega a quem leu
+  prompt(o, i, c) { return ZLORE.i === i || !zintNotaLigada(o) ? null : { k: 'zint', id: i, txt: (ZINT_NOTA_VIS[o.v] || ZINT_NOTA_VIS.pregada).verbo }; },
+  quadro(o, e) {
+    const lig = zintNotaLigada(o); if (lig && !e.g) zintNotaMonta(o, e); if (e.corpo && e.corpo.visible !== lig) e.corpo.visible = lig;
+    if (e.i !== ZLORE.i) return; // painel aberto: fecha como o do terminal
+    if (!lig || now >= ZLORE.fim || !me.alive || me.downed || ZC.over || Math.hypot(me.pos.x - ZLORE.x, me.pos.z - ZLORE.z) > ZINT.nota.fechaAndar) zintLoreFecha();
+  },
+  usar(p, i, o, E) { if (!zintNotaLigada(o) || !CAMP_NOTA_TXT[o.id]) return; (E.lidos ||= new Set()).add(p.id); sendTo(p.id, { t: 'zint', i, st: 'lido' }); }, // host: só quem leu recebe
+};
+// host: documentos (terminais e notas) que alguém da sala leu neste mapa, e o total da lore (lore.md §10.3: 10 terminais + 12 notas)
+function campDocs() {
+  const lidos = new Set(); (ZD?.zint || []).forEach((o, i) => { if ((o.t === 'terminal' || o.t === 'nota') && Z.zint?.[i]?.lidos?.size) lidos.add(o.id); });
+  return { lidos: [...lidos].sort(), total: Object.keys(ZINT_TERM_TXT).length + Object.keys(CAMP_NOTA_TXT).length };
+}
+// ---------- sons (síntese, no estilo do SND: só nós do WebAudio criados na hora) ----------
+const CAMP_SOM = {
+  radio: { dur: 1.6, f: 950, q: .45, vol: .16, ataque: .05, estalos: 7, estaloVol: .22, chiado: [5200, .035] }, // faixa de 300 a 3000 Hz (centro ~950, Q baixo)
+  apito: { dur: 2.6, tons: [[370, .07], [466, .05], [554, .035]], desafina: .985, ataque: .35, sopro: [900, 3, .04], longe: 1400 }, // acorde do apito, passa-baixa "ao longe"
+  coro: { dur: 1.2, tons: [220, 261.6, 329.6], vol: .07, ataque: .3, vogal: [700, 5], vibrato: .006 }, // lá menor, filtro de vogal "a"
+  papel: { dur: .22, f: [2600, 1400], vol: .16 },
+};
+function campSomTom(out, f0, f1, dur, vol, type, ataque, delay, filtro) { // tom que entra devagar, sustenta e cai (o tn começa no pico)
+  const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain(); o.type = type;
+  o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(vol, t + ataque); g.gain.setValueAtTime(vol, t + Math.max(ataque, dur * .7)); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+  let s = o; if (filtro) { const f = AC.createBiquadFilter(); f.type = filtro[0]; f.frequency.value = filtro[1]; f.Q.value = filtro[2]; o.connect(f); s = f; }
+  s.connect(g); g.connect(out); o.start(t); o.stop(t + dur + .05); return o;
+}
+function campSomRuido(out, dur, f, q, vol, ataque, type = 'bandpass') { // ruído que sustenta (o nz cai desde o começo)
+  const t = AC.currentTime, s = AC.createBufferSource(), fl = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = NOISE;
+  fl.type = type; fl.frequency.value = f; fl.Q.value = q;
+  g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(vol, t + ataque); g.gain.setValueAtTime(vol, t + dur * .8); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+  s.connect(fl); fl.connect(g); g.connect(out); s.start(t, Math.random() * .4); s.stop(t + dur + .03);
+}
+SND.radio = o => { // estática do rádio por baixo de uma linha: chiado na faixa de voz, chiado fino e estalos soltos
+  const R = CAMP_SOM.radio; campSomRuido(o, R.dur, R.f, R.q, R.vol, R.ataque); campSomRuido(o, R.dur, R.chiado[0], 1, R.chiado[1], R.ataque, 'highpass');
+  for (let k = 0; k < R.estalos; k++) nz(o, .025, 3200, 1800, R.estaloVol * (.5 + Math.random() * .5), 'bandpass', 1.2, Math.random() * R.dur);
+};
+SND.apito = o => { // apito de vapor ao longe (Caldeiras): acorde que entra devagar, abafado pela distância, com o sopro do vapor
+  const A = CAMP_SOM.apito, f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = A.longe; f.connect(o);
+  for (const [hz, v] of A.tons) campSomTom(f, hz, hz * A.desafina, A.dur, v, 'sawtooth', A.ataque, 0);
+  campSomRuido(f, A.dur, A.sopro[0], A.sopro[1], A.sopro[2], A.ataque);
+};
+SND.coro = o => { // coro do Pregador e do Diretor: 3 vozes em acorde menor com filtro de vogal e um vibrato lento
+  const K = CAMP_SOM.coro; for (const hz of K.tons) campSomTom(o, hz, hz * (1 - K.vibrato), K.dur, K.vol, 'sawtooth', K.ataque, Math.random() * .04, ['bandpass', K.vogal[0], K.vogal[1]]);
+};
+SND.papel = o => { const P = CAMP_SOM.papel; nz(o, P.dur, P.f[0], P.f[1], P.vol, 'bandpass', 1.5); nz(o, P.dur * .7, P.f[1], P.f[0], P.vol * .6, 'bandpass', 1.5, P.dur * .6); };
+// testes: toca cada som num contexto offline e devolve o RMS (som mudo ou com NaN é defeito)
+async function campSomTeste(nomes) {
+  audioInit(); const ac0 = AC, m0 = MASTER, sr = 22050, r = {};
+  for (const nm of nomes) {
+    const off = new OfflineAudioContext(1, sr * 3, sr); AC = off; MASTER = off.destination; let err = null;
+    try { SND[nm](off.destination); } catch (e) { err = String(e); } AC = ac0; MASTER = m0;
+    const d = (await off.startRendering()).getChannelData(0); let s = 0, fin = true; for (let k = 0; k < d.length; k++) { if (!Number.isFinite(d[k])) fin = false; s += d[k] * d[k]; }
+    r[nm] = { rms: Math.sqrt(s / d.length), fin, err };
+  }
+  return r;
+}
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_NOTA_TXT, CAMP_RADIO_TXT, CAMP_FALA_TXT, CAMP_CENA_TXT, CAMP_SOM, ZINT_NOTA_VIS, ZNOTA, zintNotaAbre, zintNotaLigada, campDocs, campSomTeste }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+// ===== FIM O3-D04 =====
 
 function srvZHold(p, m) {
   if (!p.alive || p.downed || S.phase === 'over') return;
