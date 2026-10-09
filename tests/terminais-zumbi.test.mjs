@@ -1,7 +1,7 @@
 // Terminais com lore (Onda 2, O2-C07; docs/overhaul/interativos.md §1.5): F perto abre o painel de leitura no HUD.
 // Regras conferidas: F longe não abre; perto, o host anota quem leu (E.lidos, uma vez por jogador) e responde só a ele (sendTo,
 // não broadcast); não dá pontos; o estado global continua 'pronto' (quem entra no meio não abre nada); o painel fecha com F,
-// Esc, andando e sozinho no fim do tempo; os textos provisórios cabem no limite. Sanatório (6) e Vila (4).
+// Esc, andando e sozinho no fim do tempo; os textos (lore oficial, lore.md §7; conferidos com a lore em tests/lore.test.mjs) cabem no limite. Sanatório (6) e Vila (4).
 // Rodar: pnpm test (todos) ou node --test tests/terminais-zumbi.test.mjs
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
