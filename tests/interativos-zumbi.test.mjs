@@ -14,8 +14,9 @@ after(async () => { await J?.fechar(); });
 // prepara a cena dentro da página: rodada sem nascer zumbi novo, jogador num ponto e barris sozinhos (sem vizinho a 12 m)
 const PREP = `(T => {
   const p = T.S.players.get('h'), L = T.ZD.zint;
-  const sozinhos = L.map((o, i) => i).filter(i => L.every((q, j) => j === i || Math.hypot(q.x - L[i].x, q.z - L[i].z) > 12));
-  const par = (() => { for (let i = 0; i < L.length; i++) for (let j = 0; j < L.length; j++) if (i !== j && Math.hypot(L[i].x - L[j].x, L[i].z - L[j].z) < 4.6) return [i, j]; return null; })();
+  const B = L.map((o, i) => i).filter(i => L[i].t === 'barril'); // só os barris (os outros tipos dividem a lista: O2-C07 terminais...)
+  const sozinhos = B.filter(i => B.every(j => j === i || Math.hypot(L[j].x - L[i].x, L[j].z - L[i].z) > 12));
+  const par = (() => { for (const i of B) for (const j of B) if (i !== j && Math.hypot(L[i].x - L[j].x, L[i].z - L[j].z) < 4.6) return [i, j]; return null; })();
   const poe = (x, z) => { p.pos = [x, 0, z]; T.me.pos.set(x, 0, z); };
   const segura = () => { T.Z.toSpawn = 50; T.Z.spawnT = 1e12; };
   const zumbi = (x, z) => { const id = T.Z.nextId; T.zSpawnOne(); const zz = T.Z.zs.get(id); if (!zz) throw new Error('zSpawnOne não criou zumbi');
@@ -28,11 +29,11 @@ test('barril: sala no Sanatório monta os barris (colisor no COL, estado pronto 
   const r = await noJogo(J.page, T => {
     if (T.Z.phase !== 'round') T.zStartRound(); T.sim(.2);
     const L = T.ZD.zint, E = T.ZC.world.zint, COL = T.COL();
-    return { n: L.length, tipos: [...new Set(L.map(o => o.t))], srv: T.Z.zint.every(e => e.st === 'pronto'), cli: T.ZC.zint.every(c => c.st === 'pronto'),
-      col: E.every(e => COL.includes(e.col) && e.col.maxY === e.h), zi: T.zWorldState().zi.length };
+    return { n: L.filter(o => o.t === 'barril').length, tipos: [...new Set(L.map(o => o.t))], srv: T.Z.zint.every(e => e.st === 'pronto'), cli: T.ZC.zint.every(c => c.st === 'pronto'),
+      col: E.every(e => COL.includes(e.col) && e.col.maxY === e.h), zi: T.zWorldState().zi.length, total: L.length };
   });
-  assert.ok(r.n >= 8, `só ${r.n} barris`); assert.deepEqual(r.tipos, ['barril']);
-  assert.ok(r.srv && r.cli, 'estado inicial não é pronto'); assert.ok(r.col, 'colisor fora do COL'); assert.equal(r.zi, r.n);
+  assert.ok(r.n >= 8, `só ${r.n} barris`); assert.ok(r.tipos.includes('barril'));
+  assert.ok(r.srv && r.cli, 'estado inicial não é pronto'); assert.ok(r.col, 'colisor fora do COL'); assert.equal(r.zi, r.total);
 });
 
 test('barril: F longe não faz nada; perto acende o pavio; depois dele explode, mata o zumbi no raio, não o de longe, e dá pontos', { timeout: 60000 }, async () => {
