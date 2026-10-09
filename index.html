@@ -21404,7 +21404,8 @@ function srvHandle(pid, m) {
       if (Math.hypot(m.o[0] - p.pos[0], m.o[1] - p.pos[1] - (p.crouch ? EYE_CROUCH : EYE_STAND), m.o[2] - p.pos[2]) > 3) return srvAnom(p, 'shot:origem'); // boca do cano fica a ~0,8 m da câmera
       if (!fichaOk(p.sb ||= {}, m.w, armaIv(m.w, wd) * .6)) return srvAnom(p, 'shot:cadencia');
       const e = (Array.isArray(m.e) ? m.e : []).slice(0, wd.pellets || 1).filter(vec3);
-      p.shotT = now; p.shotW = m.w; broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e, sup: m.sup ? 1 : undefined }, pid); break;
+      p.shotT = now; p.shotW = m.w; if (S.st.mode === 'zombies' && Z.on && Z.zint?.length && e.length) zintTiro(p, m.o, e); // O2-C04: tiro no barril
+      broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e, sup: m.sup ? 1 : undefined }, pid); break;
     }
     case 'zhit': {
       // o cliente decide o acerto, mas o host confere: arma que ele tem, dano que a arma pode dar
@@ -21668,7 +21669,7 @@ function srvState() {
   const msg = { t: 'state', ph: S.phase, tl: r2(Math.max(0, S.phaseEnd - now)), r: S.round, pl, win: S.winner, pre: S.pre ? r2(Math.max(0, S.pre - now)) : 0, st: full ? S.st : undefined };
   if (isR()) { const B = S.bomb; msg.sc = S.score; msg.bomb = B ? { s: B.st, p: B.pos.map(r2), by: B.by, site: B.site } : null; }
   if (zmode && Z.on) { // mundo dos zumbis: só quando muda algo (ou 1 vez por segundo, por garantia); portas e compras já vão como evento
-    const z = zWorldState(), k = [z.r, z.ph, z.pw, z.d.length, z.box[0], z.box[1], z.box[2], z.pap[0], z.pap[1], z.qr, z.dog, z.dr.map(d => d[0]).join(), z.tr.map(t => t[0]).join(), z.cm.map(c => c[0]).join()].join('|');
+    const z = zWorldState(), k = [z.r, z.ph, z.pw, z.d.length, z.box[0], z.box[1], z.box[2], z.pap[0], z.pap[1], z.qr, z.dog, z.dr.map(d => d[0]).join(), z.tr.map(t => t[0]).join(), z.cm.map(c => c[0]).join(), z.zi.map(t => t[0]).join()].join('|'); // O2-C04: zi
     if (full || k !== S.zKey || S.stN % 4 === 1) msg.z = z; S.zKey = k;
   }
   // as skins eram ~60% do "state" (4 por segundo); agora só vão quando alguém troca, e a cada ~2 s por garantia
@@ -22987,6 +22988,7 @@ function zBuildWorld(M) {
     glow.userData.own = true; glow.scale.set(Math.max(t.w, t.d) * 1.3, 2.6, 1); glow.position.set(t.x, 1.2, t.z); glow.visible = false; world.add(glow);
     return { t, g, lever, lampM, arcs, pos, glow, ends, next: 0, snd: 0 };
   });
+  zintMonta(Wd); // O2-C04: interativos novos (barris...)
   // Caixa Misteriosa
   {
     const g = new THREE.Group();
@@ -23053,6 +23055,7 @@ function zFogDog(on) {
 }
 function zUpdateWorld(dt) {
   const Wd = ZC.world; if (!Wd) return;
+  if (Wd.zint?.length) zintQuadro(dt); // O2-C04
   for (const o of Wd.doors.values()) if (o.open && !o.done) {
     const k = Math.min(1, (now - o.t0) / .9);
     if (o.d.kind === 'gate') o.halves.forEach((h, i) => h.position.x = (i ? 1 : -1) * (1 + k * 1.9)); // portão corre para os lados e fica aberto
@@ -23654,6 +23657,7 @@ function zInteract(dt) {
     else txt = `Armadilha elétrica [${ZTRAP.cost}]`;
     cand(dist, { k: 'trap', id: i, txt, ok, cost: ZTRAP.cost });
   });
+  zintCands(cand, dd); // O2-C04
   ZD.windows.forEach((w, i) => { if (ZC.boards[i] >= 6) return; const dist = dd(w.ix, w.iz); if (dist < 2.2) cand(dist + .3, { k: 'repair', id: i, hold: 1, txt: 'Segure F — consertar a janela' }); });
   for (const rp of R.values()) if (rp.alive && rp.downed) { const dist = dd(rp.pos.x, rp.pos.z); if (dist < 2) cand(dist - 1, { k: 'rev', id: rp.id, hold: 1, txt: `Segure F — reanimar ${nameOf(rp.id)}` }); }
   ZC.act = best;
@@ -23693,6 +23697,7 @@ function zSyncWorld(z) {
   if (Bx.st !== z.box[1]) { Bx.st = z.box[1]; Bx.t0 = now; } Bx.user = z.box[2]; if (Bx.st !== 'roll') Bx.w = z.box[3];
   const P = ZC.pap; if (P.st !== z.pap[0]) { P.st = z.pap[0]; P.t0 = now; } P.user = z.pap[1]; P.w = z.pap[2];
   if (z.tr) z.tr.forEach((t, i) => { const T = ZC.traps[i]; if (T) { T.st = t[0]; T.end = now + t[1]; } });
+  if (z.zi) zintSync(z.zi); // O2-C04
   const ids = new Set(z.dr.map(d => d[0])); for (const d of z.dr) zDropAdd(d); for (const id of [...ZC.drops.keys()]) if (!ids.has(id)) zDropRemove(id);
   if (Array.isArray(z.cm)) { const cs = new Set(z.cm.map(c => c[0])); for (const c of z.cm) zClayAdd(c); for (const id of [...ZC.clays.keys()]) if (!cs.has(id)) zClayRemove(id, false); }
   zFogDog(ZC.dog && ZC.phase === 'round');
@@ -23909,6 +23914,7 @@ function zReset() {
     winT: ZD.windows.map(() => ({ tear: 0, climb: 0, busy: false })), box: { loc: 0, st: 'idle', user: null, w: null, t: 0, uses: 0 }, pap: { st: 'idle', user: null, w: null, t: 0, slot: null },
     qrBuys: 0, lure: null, zsT: 0, ffT: 0, repPts: new Map(), repT: {}, fire: 0, bf: 0, clays: [], clayId: 1, vult: [], vultId: 1, traps: (ZD.traps || []).map(() => ({ st: 'idle', t: 0, by: null, hurt: {} })) });
   Object.assign(Z, { mix: [0, 0, 0, 0, 0, 0], mixN: 0, reQ: [], bossQ: 0, bossAt: 0, nextBoss: zSp().boss, clouds: [], cloudId: 1 }); // especiais, Carniceiro e nuvens tóxicas
+  zintReset(); // O2-C04
   zBuildWalk();
 }
 function zResetPlayer(p) { p.dmEnd = 0; p.phdT = 0; p.chT = 0; p.monkeyHad = false; p.lethal = 'he'; p.clayHad = false; p.clayT = 0; p.widow = 0; p.widowT = 0; p.dwEnd = 0; p.dwCd = 0; p.zbEnd = 0; p.inv = zInv(); p.perks = []; p.maxHp = 100; p.downed = false; p.bowie = false; p.selfRev = 0; p.bleedAt = 0; p.revBy = null; p.revProg = 0; p.revLast = 0; p.lastHurt = 0; }
@@ -23944,6 +23950,7 @@ function zStartRound() {
     if (p.clayHad && !(inv.clay >= 2)) { inv.clay = 2; ch = true; } // Claymores voltam a 2
     if (ch) zSendInv(p);
   }
+  zintRodada(); // O2-C04: barris voltam
   broadcast({ t: 'zround', r: Z.round, dog: Z.dogRound ? 1 : 0, bo: Z.bossQ });
   srvState();
 }
@@ -24447,6 +24454,7 @@ function srvZUse(p, m) {
       zGive(p, Z.pap.w, m.cur, Z.pap.slot); Z.pap.st = 'idle'; broadcast({ t: 'zpap', st: 'idle' }); break;
     }
     case 'power': { const P = ZD.power; if (Z.power || !near(P.x, P.z, 3)) return; Z.power = true; broadcast({ t: 'zpower' }); break; }
+    case 'zint': zintUsar(p, m); break; // O2-C04: interativos novos
     case 'trap': { // armadilha elétrica: perto da alavanca, com energia, pronta e com pontos
       const i = m.id, t = ZD.traps?.[i], T = Z.traps[i]; if (!Number.isInteger(i) || !t || !T || !near(t.sx, t.sz, 2.8)) return;
       if (!Z.power) return err('Sem energia'); if (T.st !== 'idle') return err(T.st === 'on' ? 'Armadilha já ligada' : 'Armadilha recarregando');
@@ -24494,6 +24502,222 @@ function zTickTraps(dt) { // armadilha ligada: mata zumbi que passa (sem pontos)
     } else if (T.st === 'cool' && now >= T.t) { T.st = 'idle'; broadcast({ t: 'ztrap', i, st: 'idle' }); }
   });
 }
+// ===== O2-C04: interativos =====
+// Base comum dos interativos novos da Frente C (docs/overhaul/interativos.md). Cada tipo tem:
+// - os valores de jogo em ZINT[tipo] (preço, dano, raio, recarga...): nada disso fica espalhado no código;
+// - as posições em ZINT_MAPA[mapa] ({ t: tipo, x, z, n: frente [nx, nz], ...parâmetros do tipo });
+// - o código em ZINT_FN[tipo]: est (estados), monta (peças e colisor, no cliente), estado (o que muda nas peças quando o host
+//   avisa), prompt (texto do F), quadro (efeito por quadro), e no host usar (F), tick, rodada, tiro e explosao (opcionais).
+// Rede: F manda { t: 'use', k: 'zint', id } -> zintUsar (host: distância, estado e pontos) -> zintPoe muda o estado e manda
+// { t: 'zint', i, st, s } a todos -> zintMsg (todo cliente, inclusive o do host) mexe nas peças. Quem entra no meio recebe o
+// estado em zWorldState().zi (zintSync). Tiro: o host olha onde as balas do 'shot' pararam (zintTiro); explosão: o fim do
+// zExplode chama zintExplosao (granada, Semtex, Claymore, PhD, macaco e o próprio barril, em corrente).
+// Desempenho: as peças entram depois da junção (zBuildWorld vem depois do mergeStatic: nada daqui entra no O1-B01), cada
+// interativo é um grupo no cullAdd (corte por distância e oclusão do O1-B03, registro automático), as partes de cada estado são
+// juntadas numa malha (mergeParts) e o que some/volta só troca visible (o O1-B05 refaz a sombra do Alto uma vez; nos outros,
+// shadowMap.needsUpdate como nas portas). O colisor nunca sai do COL (a grade dos zumbis não muda): quando o barril explode, só
+// a altura cai para a dos restos (dá para passar por cima).
+const ZINT = {
+  // barril explosivo: F acende o pavio (grátis) ou um tiro detona na hora. Explode como uma granada do jogador: dano nos zumbis
+  // com queda pela distância e linha livre (zExplode; pontos de abate em área para quem acendeu ou atirou), machuca qualquer
+  // jogador perto sem PhD Flopper (como a granada machuca o dono) e acende o pavio curto dos barris vizinhos (corrente).
+  // Volta voltaRodadas rodadas depois, no começo de uma rodada, quando ninguém está em cima.
+  barril: { nome: 'Barril explosivo', custo: 0, usoR: 2.2, srvR: 2.8, pavio: 2.5, raio: 5, dano: 600, danoRodada: 150, danoTeto: 6000,
+    jogR: 4.5, jogDano: 70, cadeia: .25, voltaRodadas: 2, tiroDist: 150, restoH: .25, forca: 3 },
+};
+// aparência dos barris (geometria procedural): raio, altura e cores do corpo, dos aros e da faixa
+const ZINT_BARRIL = {
+  tambor: { r: .3, h: .95, cor: 0x8a2a1e, aro: 0x3a1a14, faixa: 0xc8a020 }, // tambor de óleo vermelho com faixa amarela
+  polvora: { r: .32, h: .82, cor: 0x6b4426, aro: 0x2a2420, faixa: 0x9a2a1a }, // barril de pólvora de madeira (pedreira, mina)
+  gas: { r: .2, h: 1.35, cor: 0x2f5a3a, aro: 0x1d2a22, faixa: 0xd8d8d0 }, // cilindro de gás (hospital, caldeiras)
+};
+const ZINT_MAPA = { // posições: sonda do O2-C04 (encostado na parede, longe de itens, janelas, chão que solta zumbi e portas) e auditoria.mjs sem erro
+  vila: [
+    { t: 'barril', v: 'polvora', x: 80.75, z: -1.25, n: [0, -1] }, // F Pedreira
+    { t: 'barril', v: 'polvora', x: 84.75, z: -1.25, n: [0, -1] }, // F Pedreira (par)
+    { t: 'barril', v: 'tambor', x: 42.75, z: 66.75, n: [-1, 0] }, // G Estação
+    { t: 'barril', v: 'polvora', x: -45.25, z: -39.25, n: [0, -1] }, // I Castelo
+    { t: 'barril', v: 'tambor', x: -57.25, z: 45.75, n: [1, 0] }, // H Acampamento
+    { t: 'barril', v: 'polvora', x: 42.75, z: -112.25, n: [-1, 0] }, // J Mina
+    { t: 'barril', v: 'polvora', x: 42.75, z: -108.25, n: [-1, 0] }, // J Mina (par)
+    { t: 'barril', v: 'tambor', x: -38.25, z: -116.25, n: [1, 0] }, // K Hospital de campanha
+    { t: 'barril', v: 'tambor', x: 124.75, z: -27.25, n: [-1, 0] }, // L Fábrica
+    { t: 'barril', v: 'tambor', x: 117.75, z: 20.75, n: [-1, 0] }, // M Ferrovia
+    { t: 'barril', v: 'tambor', x: 50.25, z: 112.25, n: [-1, 0] }, // N Porto
+    { t: 'barril', v: 'tambor', x: -36.25, z: 133.75, n: [1, 0] }, // O Farol
+    { t: 'barril', v: 'tambor', x: -117.25, z: 40.75, n: [-1, 0] }, // P Floresta
+    { t: 'barril', v: 'polvora', x: -124.75, z: -19.75, n: [0, -1] }, // Q Serraria
+    { t: 'barril', v: 'tambor', x: 105.25, z: -109.75, n: [0, 1] }, // c0 Base militar
+    { t: 'barril', v: 'tambor', x: 121.25, z: 105.25, n: [1, 0] }, // c1 Pântano
+    { t: 'barril', v: 'polvora', x: -101.25, z: 143.75, n: [0, -1] }, // c2 Vinhedo
+    { t: 'barril', v: 'tambor', x: -110.75, z: -108.75, n: [0, 1] }, // c3 Ruínas da cidade
+    { t: 'barril', v: 'polvora', x: 35.75, z: -200.25, n: [0, -1] }, // b01 Mina velha
+    { t: 'barril', v: 'tambor', x: 95.25, z: 197.25, n: [0, -1] }, // b20 Cais
+    { t: 'barril', v: 'tambor', x: -169.75, z: 197.25, n: [0, -1] }, // b22 Estaleiro
+    { t: 'barril', v: 'tambor', x: -199.75, z: -41.75, n: [0, 1] }, // b31 Quartel
+  ],
+  sanatorio: [
+    { t: 'barril', v: 'gas', x: -35.75, z: 45.25, n: [0, 1] }, // P Caldeiras
+    { t: 'barril', v: 'gas', x: -31.75, z: 45.25, n: [0, 1] }, // P Caldeiras (par)
+    { t: 'barril', v: 'gas', x: -51.75, z: 21.25, n: [0, 1] }, // H Cozinha
+    { t: 'barril', v: 'tambor', x: 28.25, z: -29.75, n: [1, 0] }, // M Torre d'água
+    { t: 'barril', v: 'polvora', x: 71.75, z: -54.25, n: [-1, 0] }, // r3 Pedreira
+    { t: 'barril', v: 'polvora', x: 71.75, z: -50.25, n: [-1, 0] }, // r3 Pedreira (par)
+    { t: 'barril', v: 'gas', x: -85.75, z: -21.75, n: [-1, 0] }, // r5 Túneis de serviço
+    { t: 'barril', v: 'gas', x: -114.75, z: 89.25, n: [1, 0] }, // r7 Crematório
+    { t: 'barril', v: 'gas', x: 74.25, z: -16.75, n: [1, 0] }, // r9 Lavanderia
+    { t: 'barril', v: 'tambor', x: -25.25, z: 105.75, n: [-1, 0] }, // r12 Ferro-velho
+    { t: 'barril', v: 'tambor', x: -25.25, z: 109.75, n: [-1, 0] }, // r12 Ferro-velho (par)
+    { t: 'barril', v: 'tambor', x: 0.25, z: -88.75, n: [0, 1] }, // r2 Portaria
+  ],
+};
+const _zintA = new V3(), _zintB = new V3(), _zintP = new V3();
+// a ponta b recuada até a borda do colisor (r) antes de conferir a visada: o próprio interativo tapa o ponto de dentro
+function zintVe(a, b, r) { const d = a.distanceTo(b); if (d > r + .05) b.lerp(a, (r + .05) / d); return losClear(a, b); }
+// ---------- cliente (roda também no host) ----------
+function zintMonta(Wd) { // zBuildWorld: peças, colisores e estado inicial de cada interativo do mapa
+  const L = ZD.zint = ZINT_MAPA[curMapId] || [];
+  ZC.zint = L.map(() => ({ st: 'pronto', end: 0 }));
+  Wd.zint = L.map((o, i) => ZINT_FN[o.t].monta(o, i));
+}
+function zintMsg(m) { // evento do host { i, st, s } (entrada não confiável: conferida)
+  const i = m.i, o = Number.isInteger(i) ? ZD?.zint?.[i] : null, e = o && ZC.world?.zint?.[i], c = o && ZC.zint?.[i];
+  if (!e || !c || !ZINT_FN[o.t].est.includes(m.st)) return;
+  const ant = c.st; c.st = m.st; c.end = now + (finN(m.s) ? clamp(m.s, 0, 600) : 0);
+  ZINT_FN[o.t].estado(o, e, c, ant, !!m.sync);
+}
+function zintSync(a) { if (Array.isArray(a)) a.forEach((s, i) => { if (Array.isArray(s) && ZC.zint?.[i] && ZC.zint[i].st !== s[0]) zintMsg({ i, st: s[0], s: s[1], sync: 1 }); }); } // quem entra no meio
+function zintCands(cand, dd) { // zInteract: o F escolhe o mais perto (mesma regra dos outros itens)
+  const L = ZD.zint; if (!L?.length || !ZC.zint) return;
+  for (let i = 0; i < L.length; i++) { const o = L[i], D = ZINT[o.t], dist = dd(o.x, o.z); if (dist > D.usoR) continue; const a = ZINT_FN[o.t].prompt(o, i, ZC.zint[i], D); if (a) cand(dist, a); }
+}
+function zintQuadro(dt) { const E = ZC.world.zint, L = ZD.zint; for (let i = 0; i < E.length; i++) ZINT_FN[L[i].t].quadro?.(L[i], E[i], ZC.zint[i], dt); }
+// ---------- host ----------
+function zintReset() { Z.zint = (ZD.zint || []).map(() => ({ st: 'pronto', t: 0, by: null, r: 0, volta: false })); }
+function zintPoe(i, st, dur, by) { const E = Z.zint[i]; E.st = st; E.t = now + (dur || 0); if (by !== undefined) E.by = by; broadcast({ t: 'zint', i, st, s: dur ? r2(dur) : 0 }); } // s: segundos até o fim do estado
+function zintUsar(p, m) { // srvZUse k:'zint'
+  const i = m.id, o = Number.isInteger(i) ? ZD.zint?.[i] : null, E = o && Z.zint?.[i], D = o && ZINT[o.t]; if (!E || !D) return;
+  if (Math.hypot(p.pos[0] - o.x, p.pos[2] - o.z) > D.srvR) return;
+  ZINT_FN[o.t].usar?.(p, i, o, E, D, t => sendTo(p.id, { t: 'err', txt: t }));
+}
+function zintTick() { const L = ZD.zint; for (let i = 0; i < Z.zint.length; i++) { const E = Z.zint[i]; if (E.st !== 'pronto') ZINT_FN[L[i].t].tick?.(i, L[i], E, ZINT[L[i].t]); } }
+function zintRodada() { const L = ZD.zint || []; for (let i = 0; i < (Z.zint?.length || 0); i++) ZINT_FN[L[i].t].rodada?.(i, L[i], Z.zint[i], ZINT[L[i].t]); }
+function zintEstado() { return (Z.zint || []).map(E => [E.st, r2(Math.max(0, E.t - now))]); }
+function zintLivre(x, z, r) { // ninguém (jogador ou zumbi) em cima do lugar
+  for (const q of S.players.values()) if (q.alive && Math.hypot(q.pos[0] - x, q.pos[2] - z) < r) return false;
+  for (const zz of Z.zs.values()) if (Math.hypot(zz.body.pos.x - x, zz.body.pos.z - z) < r) return false;
+  return true;
+}
+function zintTiro(p, mo, ends) { // 'shot' do cliente: bala que parou no corpo de um interativo que reage a tiro (visada conferida)
+  const L = ZD.zint, E = ZC.world?.zint; if (!L?.length || !E || !p.alive || p.downed) return;
+  for (const e of ends) for (let i = 0; i < L.length; i++) {
+    const F = ZINT_FN[L[i].t], c = E[i].col, D = ZINT[L[i].t]; if (!F.tiro) continue;
+    if (e[0] < c.minX - .2 || e[0] > c.maxX + .2 || e[2] < c.minZ - .2 || e[2] > c.maxZ + .2 || e[1] < c.minY - .2 || e[1] > c.maxY + .2) continue;
+    _zintA.set(mo[0], mo[1], mo[2]); if (_zintA.distanceTo(_zintB.set(e[0], e[1], e[2])) > D.tiroDist || !zintVe(_zintA, _zintB, .35)) continue;
+    F.tiro(p, i, L[i], Z.zint[i], D);
+  }
+}
+function zintExplosao(pos, r, by) { const L = ZD.zint; if (!L?.length || !Z.zint) return; for (let i = 0; i < L.length; i++) ZINT_FN[L[i].t].explosao?.(i, L[i], Z.zint[i], ZINT[L[i].t], pos, r, by); }
+function zintAud() { // tools/itens/auditoria.mjs: inventário dos interativos novos (corpo = a caixa que está no COL)
+  const E = ZC.world?.zint || [];
+  return (ZD.zint || []).map((o, i) => { const D = ZINT[o.t]; return { id: o.t + ':' + i, tipo: o.t, nome: D.nome, x: o.x, z: o.z, n: o.n || [0, 1], raio: D.usoR, preco: D.custo, forca0: D.forca,
+    efeito: ZINT_FN[o.t].efeito?.(o, D) || '', corpo: E[i]?.col, usoDist: E[i]?.raio ?? .3, fonte: `ZINT_MAPA.${curMapId}[${i}]` }; });
+}
+// ---------- tipos ----------
+function zintCil(g, r, h, y, m, seg = 14, sombra = true) { const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), m); c.position.y = y; c.castShadow = sombra; c.receiveShadow = true; g.add(c); return c; }
+function zintBarrilBoom(i, by) { // host: o barril explode
+  const o = ZD.zint[i], E = Z.zint[i], D = ZINT.barril, V = ZINT_BARRIL[o.v] || ZINT_BARRIL.tambor; if (E.st === 'boom') return;
+  E.r = Z.round; E.volta = false; zintPoe(i, 'boom', 0); // primeiro: o colisor baixa para os restos (a explosão sai de cima deles)
+  if (S.phase === 'over') return;
+  const pos = new V3(o.x, Math.max(D.restoH + .2, V.h * .6), o.z);
+  for (const q of S.players.values()) { // machuca quem está perto (PhD Flopper protege, como nas outras explosões)
+    if (!q.alive || q.downed || q.perks.includes('phd')) continue;
+    const d = Math.hypot(q.pos[0] - o.x, q.pos[2] - o.z); if (d >= D.jogR || Math.abs(q.pos[1] - pos.y) > 3 || !losClear(pos, _zintP.set(q.pos[0], q.pos[1] + 1, q.pos[2]))) continue;
+    zHurt(q, Math.round(D.jogDano * (1 - d / D.jogR)), null);
+  }
+  zExplode(pos, by, D.raio, Math.min(D.danoTeto, D.dano + D.danoRodada * Z.round), 'barril', false); // zumbis (e, no fim, a corrente)
+}
+const ZINT_FN = {
+  barril: {
+    est: ['pronto', 'pavio', 'boom'],
+    efeito: (o, D) => `explode (raio ${D.raio} m, ${D.dano}+${D.danoRodada}/rodada até ${D.danoTeto}); F acende o pavio (${D.pavio} s), tiro detona; volta em ${D.voltaRodadas} rodadas`,
+    monta(o, i) {
+      const V = ZINT_BARRIL[o.v] || ZINT_BARRIL.tambor, g = new THREE.Group(); g.position.set(o.x, 0, o.z); g.rotation.y = (i * 2.4) % 6.28; // cada um virado de um jeito
+      const corpo = new THREE.Group(), restos = new THREE.Group(); g.add(corpo, restos);
+      zintCil(corpo, V.r, V.h, V.h / 2, mc(V.cor));
+      if (o.v === 'gas') { zintCil(corpo, V.r * .5, .14, V.h + .07, mc(V.aro), 10); zintCil(corpo, V.r + .006, .22, V.h * .74, mc(V.faixa)); } // válvula e rótulo
+      else {
+        for (const f of [.1, .5, .9]) zintCil(corpo, V.r + .014, .05, V.h * f, mc(V.aro)); // aros
+        zintCil(corpo, V.r + .007, .17, V.h * .3, mc(V.faixa)); // faixa de perigo
+        zintCil(corpo, .045, .04, V.h + .02, mc(V.aro), 8).position.x = V.r * .5; // bujão da tampa
+      }
+      mergeParts(corpo);
+      zintCil(restos, V.r * 1.08, D_RESTO, D_RESTO / 2, mc(0x1e1a17), 10); zintCil(restos, .85, .012, .006, mc(0x221e1a), 16, false); // fundo queimado e mancha no chão
+      mergeParts(restos); restos.visible = false;
+      const faisca = new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, color: 0xffa838, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      faisca.userData.own = true; faisca.position.set(0, V.h + .14, 0); faisca.scale.setScalar(.45); faisca.visible = false; g.add(faisca);
+      world.add(g); cullAdd(g, o.x, o.z, 1.1);
+      const col = { minX: o.x - V.r - .02, maxX: o.x + V.r + .02, minY: 0, maxY: V.h, minZ: o.z - V.r - .02, maxZ: o.z + V.r + .02 }; COL.push(col);
+      return { g, corpo, restos, faisca, col, h: V.h, raio: V.r, bip: 0 };
+    },
+    estado(o, e, c, ant, sync) {
+      const boom = c.st === 'boom';
+      e.corpo.visible = !boom; e.restos.visible = boom; e.faisca.visible = c.st === 'pavio';
+      e.col.maxY = boom ? D_RESTO : e.h;
+      if ((ant === 'boom') !== boom) renderer.shadowMap.needsUpdate = true;
+      if (sync) return;
+      if (c.st === 'pavio' && ant !== 'pavio') { play('hiss', new V3(o.x, e.h, o.z)); e.bip = now + .4; }
+      if (boom && ant !== 'boom') boomFx(new V3(o.x, Math.max(.45, e.h * .6), o.z));
+    },
+    prompt(o, i, c, D) {
+      if (c.st === 'boom') return null;
+      return c.st === 'pavio' ? { k: 'zint', id: i, ok: false, txt: 'O barril vai explodir!' } : { k: 'zint', id: i, txt: 'Acender o pavio do barril (ou atire nele)' };
+    },
+    quadro(o, e, c) {
+      if (c.st !== 'pavio') return;
+      e.faisca.material.opacity = .55 + Math.random() * .45; e.faisca.scale.setScalar(.32 + Math.random() * .22);
+      if (now >= e.bip) { e.bip = now + .45; play('beep', new V3(o.x, e.h, o.z)); }
+    },
+    usar(p, i, o, E, D, err) {
+      if (E.st !== 'pronto') return err(E.st === 'pavio' ? 'O pavio já está aceso' : 'Barril destruído');
+      if (D.custo && !zPay(p, D.custo)) return;
+      zintPoe(i, 'pavio', D.pavio, p.id);
+    },
+    tick(i, o, E, D) {
+      if (E.st === 'pavio') { if (now >= E.t) zintBarrilBoom(i, E.by); }
+      else if (E.st === 'boom' && E.volta && zintLivre(o.x, o.z, (ZINT_BARRIL[o.v] || ZINT_BARRIL.tambor).r + .6)) { E.volta = false; zintPoe(i, 'pronto', 0, null); }
+    },
+    rodada(i, o, E, D) { if (E.st === 'boom' && Z.round - E.r >= D.voltaRodadas) E.volta = true; },
+    tiro(p, i, o, E) { if (E.st !== 'boom') zintBarrilBoom(i, p.id); },
+    explosao(i, o, E, D, pos, r, by) { // outra explosão perto: pavio curto (a corrente anda barril a barril)
+      if (E.st !== 'pronto') return; const V = ZINT_BARRIL[o.v] || ZINT_BARRIL.tambor;
+      if (Math.hypot(pos.x - o.x, pos.z - o.z) > r + V.r || !zintVe(pos, _zintB.set(o.x, V.h * .5, o.z), V.r + .05)) return;
+      zintPoe(i, 'pavio', D.cadeia, by ?? null);
+    },
+  },
+};
+const D_RESTO = ZINT.barril.restoH; // altura dos restos (colisor e malha)
+// ===== FIM O2-C04 =====
+// Marcas para os blocos dos próximos interativos (um bloco por agente, logo abaixo da marca @@INTERATIVO-n@@ que o coordenador der; ver docs/overhaul/interativos.md §3).
+// Cada bloco: ZINT.<tipo> = {...}; ZINT_FN.<tipo> = {...}; ZINT_MAPA.<mapa>.push(...). As marcas ficam afastadas para os diffs não se encostarem.
+// @@INTERATIVO-1@@
+//
+//
+//
+// @@INTERATIVO-2@@
+//
+//
+//
+// @@INTERATIVO-3@@
+//
+//
+//
+// @@INTERATIVO-4@@
+//
+//
+//
+// @@INTERATIVO-5@@
+
 function srvZHold(p, m) {
   if (!p.alive || p.downed || S.phase === 'over') return;
   if (m.k === 'repair') {
@@ -24512,6 +24736,7 @@ function srvZHold(p, m) {
 }
 function zTickObjects() {
   if (Z.traps.length) zTickTraps();
+  if (Z.zint?.length) zintTick(); // O2-C04
   const Bx = Z.box;
   if (Bx.st === 'roll' && now >= Bx.t) {
     if (Bx.w === 'teddy') { Bx.st = 'teddy'; Bx.t = now + 3; const u = S.players.get(Bx.user), back = Bx.paid ?? 950; if (u) { u.money += back; sendTo(u.id, { t: 'pts', n: back, m: u.money }); } broadcast({ t: 'zbox', st: 'teddy' }); }
@@ -24546,7 +24771,7 @@ function zSnap() {
 function zWorldState() {
   return { r: Z.round, ph: Z.phase, pw: Z.power ? 1 : 0, d: [...Z.doors], box: [Z.box.loc, Z.box.st, Z.box.user, Z.box.st === 'offer' ? Z.box.w : null], pap: [Z.pap.st, Z.pap.user, Z.pap.st === 'ready' ? Z.pap.w : null],
     dr: Z.drops.map(d => [d.id, d.type, r2(d.x), r2(d.z), r2(Math.max(0, 26 - (now - d.t0)))]), qr: Z.qrBuys, dog: Z.dogRound ? 1 : 0,
-    tr: Z.traps.map(T => [T.st, r2(Math.max(0, T.t - now))]), cm: Z.clays.map(zClayArr) };
+    tr: Z.traps.map(T => [T.st, r2(Math.max(0, T.t - now))]), cm: Z.clays.map(zClayArr), zi: zintEstado() }; // O2-C04: zi
 }
 function zExplode(pos, owner, r, dmgMax, w, insta) { // granada / macaco
   if (S.phase === 'over') return;
@@ -24559,6 +24784,7 @@ function zExplode(pos, owner, r, dmgMax, w, insta) { // granada / macaco
     else { z.hp -= z.kind === 6 ? Math.min(dmg, z.maxHp * .12) : dmg; if (z.hp <= 0) zKill(z, null, 'body', w, true, true); }
   }
   if ((w === 'he' || w === 'semtex') && p && p.alive && !p.downed && !p.perks.includes('phd')) { const d = Math.hypot(p.pos[0] - pos.x, p.pos[2] - pos.z); if (d < 4) zHurt(p, Math.round(60 * (1 - d / 4)), null); } // a sua granada te machuca
+  if (Z.zint?.length) zintExplosao(pos, r, owner); // O2-C04: explosão perto de barril acende o pavio curto (corrente)
 }
 
 // ================================================================
@@ -24675,6 +24901,7 @@ function onMsgInner(m) {
       break;
     }
     case 'zdrop': zDropAdd(m.d); break;
+    case 'zint': if (ZC.on) zintMsg(m); break; // O2-C04
     case 'ztrap': { const T = Number.isInteger(m.i) ? ZC.traps[m.i] : null; if (T) { T.st = m.st; T.end = now + (m.t || 0); if (m.st === 'on') { const t = ZD.traps[m.i]; play('power', new V3(t.x, 1.2, t.z)); } } break; }
     case 'zfx': { // choque do Electric Cherry / explosão do PhD Flopper / teia do Widow's Wine / Dying Wish
       if (m.id === C.myId && (m.k === 'web' || m.k === 'wn') && finN(m.n)) ZC.widow = clamp(m.n | 0, 0, ZPK.widowN);
@@ -25879,6 +26106,9 @@ if (DEBUG) window.__T = { startHost, S, C, me, G, R, NET, W, MAPS, COL: () => CO
 // ===== O2-C01: ganchos de teste para a auditoria de itens (tools/itens/auditoria.mjs); só leitura e as funções do próprio jogo, nada de gameplay =====
 if (DEBUG) Object.assign(window.__T, { zBuildWalk, footFreeR, segClearR, zRoomAt, zActive, zDoorOpen, zBoxPlace, zHigh, colQuery, ffCell, ZPERKS, ZTRAP, ZMAXPERKS, ZWEAP, PR, STEP, ZVAULT, ZTOP });
 // ===== FIM O2-C01 =====
+// ===== O2-C04: ganchos de teste dos interativos (tests/interativos-zumbi.test.mjs e tools/itens/auditoria.mjs) =====
+if (DEBUG) Object.assign(window.__T, { ZINT, ZINT_MAPA, ZINT_BARRIL, ZINT_FN, zintUsar, zintTiro, zintExplosao, zintBarrilBoom, zintEstado, zintAud, zintSync, zintMsg, zExplode, zWorldState });
+// ===== FIM O2-C04 =====
 </script>
 </body>
 </html>
