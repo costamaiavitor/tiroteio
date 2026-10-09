@@ -22682,6 +22682,7 @@ let ZRING = null;
 function zLook(kind, id) {
   const R = zSeed(id), pick = a => Math.floor(R() * a.length), s = pick(ZSKIN), c = pick(ZCLOTH), p = pick(ZPANTS), bare = R() < .5, hair = (!!kind || R() < .75) ? 1 + (R() < .5 ? 1 : 0) : 0;
   const wound = R() < .3, stump = !kind && R() < .1, nojaw = !kind && R() < .08;
+  if (kind > 6) return campLook(kind, { s, c, p, bare, hair, wound }); // O3-D06: tipos da campanha (um molde por tipo)
   return { s, c, p, bare, hair, wound, stump, nojaw, key: kind ? kind + ',' + (kind === 6 ? 0 : p) : '0,' + s + ',' + c + ',' + p };
 }
 // cada visual é montado uma vez só e vira UMA malha com ossos (+1 com o que brilha): 2 chamadas de desenho por zumbi.
@@ -22756,6 +22757,7 @@ function zBuildDog(g, I) { // cão do inferno: peito fundo, cintura fina, focinh
   return g;
 }
 function zBuildModel(dog, kind, L) {
+  if (kind > 6 && !dog && !L.cm) return campModelo(kind, L); // O3-D06: tipos da campanha (corpo base com as cores e as peças do tipo)
   const g = new THREE.Group(); g.rotation.order = 'YXZ';
   const inner = zbone(g, 0, 0, 0);
   if (dog) return zBuildDog(g, inner);
@@ -23341,6 +23343,7 @@ function zAnimHuman(zc, ud, dt) {
   const Lt = -ud.torso.rotation.x, b = -I.rotation.x;
   zc.ho = clamp(Math.sin(Lt) * .8 + Math.sin(b) * 1.64, -.6, .95); zc.hd = clamp((1 - Math.cos(Lt)) * .8 + (1 - Math.cos(b)) * 1.64 - I.position.y, -.4, .5);
   zc.hx = -(Math.sin(ud.torso.rotation.z) * .8 + Math.sin(I.rotation.z) * 1.64);
+  if (K > 6) campAnim(zc, ud, dt); // O3-D06: pose, gemido e efeitos dos tipos da campanha
 }
 function zAnimDog(zc, ud, dt) {
   const atk = !!(zc.f & 4), t = now, spd = zc.spd, k = 1 - Math.exp(-dt * 16), I = ud.inner, gal = spd > 4.2, mv = clamp(spd / 3, 0, 1), L = ud.legs, W = ud.lows;
@@ -23410,6 +23413,7 @@ function zAnimDead(zc, ud, dt) {
 // as caixas seguem o desenho: f = metros à frente do pé (para onde o zumbi olha). Antes ficavam todas
 // em cima do pé: na cabeça do corredor (inclinado) quase nunca pegava, e no rastejante o tiro no corpo errava
 function zBoxes(zc) {
+  if (zc.kind > 6) { const cb = campBoxes(zc); if (cb) return cb; } // O3-D06: caixas próprias dos tipos da campanha (Afogado submerso: nenhuma)
   if (zc.fbx) return campChefeCaixas(zc); // O3-D07: chefe da campanha: mais a caixa do ponto fraco (zona 'fraco')
   const p = zc.pos, fx = -Math.sin(zc.yaw), fz = -Math.cos(zc.yaw), s = zc.sz || 1, k = zc.kind | 0; // s = escala do modelo (Brutamonte, Carniceiro, variação dos comuns)
   const bb = (f, r, y0, y1, sd = 0) => { const x = p.x + (fx * f - fz * sd) * s, z = p.z + (fz * f + fx * sd) * s; r *= s; return { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, minY: p.y + y0 * s, maxY: p.y + y1 * s }; };
@@ -27116,6 +27120,442 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP
 // ===== FIM O3-D05 =====
 //
 // @@CAMP-ZK-1@@
+// ===== O3-D06: zumbis da Vila — Penitente (7), Soldado (8) e Afogado do Veio (9) (docs/overhaul/campanha.md §6.2–§6.3; lore.md §12) =====
+// Só nascem com CAMP.on (campanha e infinito), pela CAMP_MIX do O3-D02; no clássico o campTipo nem chama os ganchos daqui.
+// PADRÃO DOS TIPOS DA CAMPANHA (o O3-D08 copia para os tipos 10–13, abaixo da @@CAMP-ZK-2@@):
+//  1. ZKIND[k] = { n, hp, pts, xp, sz, rad } (números da tabela do §6.2: vida ×, pontos, xp, tamanho, raio) e CAMP_ZK[k] = { ... } com TODO
+//     número do comportamento (velocidades, tempos, raios, dano, cores, sons, legenda). Nada de número no meio do código.
+//  2. Quantidade: a CAMP_MIX[k] do D02 (frac / trioCada / base+cada / n, estreia, teto). O sorteio aqui (campZkCotas/campZkTipo) é genérico:
+//     vale para todo k da CAMP_MIX que já tenha ZKIND[k] (o D08 só põe o ZKIND e o CAMP_ZK; não precisa de outro gancho de sorteio).
+//     CAMP_ZK[k].mapas (só na campanha) restringe os mapas; CAMP_MIX[k].agua pede ponto de água (CAMP_AGUA[mapa]).
+//  3. Nascimento, vida, velocidade: campZkStatus (CAMP_G.status) chama CAMP_ZKF.status[k](z, K, D) depois do comum da tabela (sc, vel).
+//  4. IA: CAMP_IA[k] = (z, dt, tgt) => true quando cuidou do zumbi neste tick (false = o zChase do clássico anda e bate).
+//     Estado especial visível ao cliente: z.sc = 3 (o clássico só usa 0-2) + z.atkWind (bit 4 da foto). Voltar sempre a z.scB.
+//  5. Dano e morte: CAMP_ZKF.dano[k](z, dmg, zone, w, p, splash) e CAMP_ZKF.morte[k](z, p, zone, w); 'zhit' recusado: CAMP_ZKF.zhit[k](p, m, z).
+//  6. Cliente: CAMP_ZKF.modelo[k](g, ud, M, L) põe as peças (corpo base já com as cores de CAMP_ZK[k].cores); CAMP_ZKF.anim[k](zc, ud, dt, K)
+//     (depois da pose do zAnimHuman, sem alocar); CAMP_ZKF.boxes[k](zc) devolve caixas próprias ou null; CAMP_ZKF.msg[e](m) para os
+//     efeitos ({ t: 'camp', k: 'zk', e }); gemido próprio em CAMP_ZK[k].geme (campAnim adianta o groanT: o ZGROAN[7..9] é dos comuns).
+//  7. Efeitos de área em InstancedMesh próprios criados na carga (campZkPools: na cena desde o início, o warmUp compila; mesmos
+//     parâmetros de material das poças de luz: o programa já existe), atualizados no próprio laço do cliente (campZkLoop) só com efeito ativo.
+// Ganchos de uma linha fora do bloco (Frente A, // O3-D06): zLook (campLook), zBuildModel (campModelo), zAnimHuman (campAnim), zBoxes (campBoxes).
+// Interfaces para os outros blocos: o peso do evento vem do campEvPeso(k) do D05 (Afogado ×2 na Névoa) e os especiais permitidos do
+// campEvEspeciais() (Estouro, Silêncio); CAMP_ZKV.peso[k] fica para o D15; p.campMarca (até quando o jogador está "marcado" pelo Vigia, D09: o Soldado prefere), CAMP.npc.a (o NPC, D02/D10: o Soldado prefere).
+// Decisões (relatório do O3-D06): curva vidaK do CAMP_CURVA aplicada aqui a todos os tipos (menos chefe e cão); dano dos ataques
+// ×D.dmg/50 (como a rajada do Vigia); o trio do Soldado conta como 1 na estreia; o Afogado só anda submerso até CAMP_ZK[9].sub.r
+// da água onde nasceu (fora disso sai sem agarrar: "ficar longe das poças"); submerso = estado 'rise' do servidor (armadilha,
+// Electric Cherry, separação e a pistola do NPC já pulam), com y -1 (o 'zhit' de explosão passa na conferência do subsolo).
+Object.assign(ZKIND, { 7: { n: 'Penitente', hp: 1.2, pts: 50, xp: 3, sz: 1, rad: .3 }, 8: { n: 'Soldado', hp: 1.5, pts: 60, xp: 4, sz: 1.02, rad: .3 }, 9: { n: 'Afogado do Veio', hp: .9, pts: 50, xp: 3, sz: .95, rad: .3 } });
+const CAMP_ZK = {
+  7: { // Penitente: a 4 m ergue o balde (0,6 s) e joga cal num cone de 3,5 m e 50°; ao morrer, nuvem de cal de 2,5 m por 4 s
+    vel: [3.4, 3.8], sc: 1, mapas: ['vila'], legenda: 'penitente-estreia', geme: 'penitente', gemeS: [4, 9],
+    cal: { alcance: 4, minimo: .6, aviso: .6, cone: 3.5, abre: 50, dano: 10, olhoS: 2.5, cd: 5, depois: .8, dy: 1.5, nPuff: 6 },
+    nuvem: { r: 2.5, s: 4, lento: .5, max: 6, quads: 5, cor: .08, tam: [2, 2.8] },
+    cores: { pele: 0xb9b4a6, roupa: 0x6c6a62, calca: 0x4a4740, olho: [0xfff0b0, 4], cabelo: 0x1a1510, cal: 0xeeeadc, balde: 0x8d9194 }, cabelo: 0,
+    anim: { balanca: .35, ergue: 2.5, joga: 1.2 },
+  },
+  8: { // Soldado: capacete segura o 1º tiro na cabeça (sem multiplicador); nasce em trio; prefere o NPC e o jogador marcado
+    vel: [3.6, 4.3], sc: 1, mapas: ['vila'], trio: 3, legenda: 'soldado-estreia', geme: 'snarl', gemeS: [3, 8], npcR: 25, marcaR: 30,
+    capacete: { voa: [2.2, 4], gira: 9, vida: 2.2 },
+    cores: { pele: 0x7d8a6a, roupa: 0x4b5232, calca: 0x434a2c, olho: [0xffb21a, 4], cabelo: 0x1a1510, capacete: 0x58623a, couro: 0x3a2e1e, perneira: 0x8a8462 }, cabelo: 0,
+    anim: { passo: .5, braco: .3, tronco: -.06 },
+  },
+  9: { // Afogado do Veio: nasce na água, anda submerso (imune a tudo menos explosão); a 4,5 m avisa (0,8 s), sai e agarra
+    vel: [1.3, 1.8], sc: 0, legenda: 'afogado-estreia', geme: 'afogado', gemeS: [4, 9],
+    sub: { vel: 4.5, y: -1, visY: -1.45, r: 14, aviso: .8, avisoR: 4.5, saiS: .35, agarraR: 1.8, dano: 25, lento: .5, lentoS: 1.5, cd: 1.2, travaS: 4, dy: 1.5 },
+    anel: { n: 2, r0: .35, r1: 1.4, per: 1.2, avisoR1: 2.6, avisoPer: .45, cor: 0x7fa49a, k: .55, avisoK: 1.1, y: .07, bolhaS: .1 },
+    cores: { pele: 0x15191b, roupa: 0x252b2b, calca: 0x1b1f20, olho: [0xa8f0d8, 3], cabelo: 0x0b0d0d, brilho: 0x34444a }, cabelo: 2,
+  },
+};
+const CAMP_ZKV = { // números gerais dos tipos da campanha
+  danoRef: 50, // dano dos ataques novos × D.dmg / danoRef (Normal = o número da tabela)
+  infRampa: 4, // infinito: a fração sobe do começo ao fim em infRampa rodadas depois da estreia
+  tetoEsp: .5, // teto de especiais por rodada (como o zMix): ⌊n·0,5⌋ somando os do clássico
+  peso: {}, // k -> multiplicador extra da cota (D15); o do evento vem do campEvPeso do D05
+  explosoes: ['he', 'semtex', 'monkey', 'clay', 'barril', 'bloat', 'phd'], // armas sem W[w].splash que contam como explosão (o Afogado submerso só sente estas)
+  flashK: load('menosFlash', false) ? .5 : 1, // "cal nos olhos" pela metade com a opção de reduzir flashes (chave 'tiroteio.menosFlash'; o menu é da Frente B)
+  calOp: .92, // opacidade da tela branca no acerto (×flashK)
+};
+// textos (lore.md §12): legenda da 1ª aparição de cada tipo na partida (painel de fala do D02, uma vez; o prefixo do id é o limitador por personagem)
+Object.assign(CAMP_FALA_TXT, {
+  'penitente-estreia': { quem: 'PENITENTE', txt: 'Não deixe chegar perto do balde: a cal cega. Mate de longe.' },
+  'soldado-estreia': { quem: 'SOLDADO', txt: 'O capacete segura o primeiro tiro na cabeça. Eles vêm em trio.' },
+  'afogado-estreia': { quem: 'AFOGADO DO VEIO', txt: 'Olhe as ondas na água preta: ele sai onde elas param. Granada na água.' },
+});
+// pontos de água da Vila (margem andável de cada lago, poço e canal; [x, z, área]); o Afogado só nasce nos de área aberta
+CAMP_AGUA.vila.push(
+  [21.2, 32, 'E'], [12, 38.7, 'E'], [2.8, 32, 'E'], [12, 25.3, 'E'], [17.4, 37.4, 'E'], [6.6, 26.6, 'E'], // Lago
+  [53.2, 135, 'N'], [46, 124.8, 'N'], [38.8, 135, 'N'], [46, 145.2, 'N'], [36.2, 135, 'N'], [28, 124.8, 'N'], [19.8, 135, 'N'], [28, 145.2, 'N'], // Porto (docas)
+  [125.9, 127.1, 'c1'], [114.5, 127.1, 'c1'], [93.9, 112.1, 'c1'], [79.5, 112.1, 'c1'], [137.3, 101.2, 'c1'], [126.9, 101.2, 'c1'], [116.3, 89.6, 'c1'], [104.9, 89.6, 'c1'], [110.4, 109.1, 'c1'], [96.4, 130.9, 'c1'], [86, 130.9, 'c1'],
+  [194.8, -139.3, 'b10'], [205.2, -95, 'b10'], [194.8, -50.7, 'b10'], [205.2, -9.3, 'b11'], [194.8, 35, 'b11'], [205.2, 79.3, 'b11'], [-35, 232.2, 'b21'],
+  [-209.2, -171.4, 'b32'], [-218.6, -171.4, 'b32'], [-192.4, -171.7, 'b32'], [-202.8, -171.7, 'b32'], [-222.5, -116.8, 'b32'], [-231.9, -116.8, 'b32'], // Brejo negro
+  [-174.3, -193.3, 'b32'], [-185.7, -193.3, 'b32'], [-190, -130.4, 'b32'], [-199.4, -130.4, 'b32'], [-192.8, -152.2, 'b32'], [-203.2, -152.2, 'b32'],
+);
+const CAMP_ZKF = { status: {}, dano: {}, morte: {}, zhit: {}, modelo: {}, anim: {}, boxes: {}, msg: {} }; // funções por tipo (e msg por efeito)
+// ---------- host: sorteio, nascimento e vida ----------
+const CAMP_ZKS = { zs: null, r: -1, rest: {}, novo: 0, trio: 0, trioK: 0, trioPt: null, vistos: new Set(), nuvens: [], calN: 0, semCap: new Set(), vivos: {} };
+const _zkA = new V3(), _zkB = new V3();
+function campZkReset() { // partida nova ou mapa novo (o zReset troca o Z.zs): zera cotas, nuvens, legendas
+  const S_ = CAMP_ZKS; if (S_.zs === Z.zs) return; S_.zs = Z.zs;
+  Object.assign(S_, { r: -1, rest: {}, novo: 0, trio: 0, trioK: 0, trioPt: null, calN: 0 }); S_.vistos.clear(); S_.nuvens.length = 0; S_.semCap.clear();
+}
+function campZkAgua() { // pontos de água das áreas abertas (lista nova: só no nascimento)
+  const L = CAMP_AGUA[curMapId]; if (!L?.length) return null; const act = zActive(), out = [];
+  for (const a of L) if (act.has(a[2] ?? zRoomAt(a[0], a[1]))) out.push(a);
+  return out.length ? out : null;
+}
+function campZkQtd(M, k, r, n, A, inf) { // quantos deste tipo na rodada (a forma vem da CAMP_MIX)
+  const pk = (CAMP_ZKV.peso[k] ?? 1) * (typeof campEvPeso === 'function' ? campEvPeso(k) : 1); // evento (D05: Afogado ×2 na Névoa)
+  if (M.frac) { const [a, b] = M.frac, r0 = inf ? M.estreia : Math.max(A.rod0, M.estreia), u = inf ? clamp((r - r0) / CAMP_ZKV.infRampa, 0, 1) : clamp((r - r0) / Math.max(1, A.rodMax - r0), 0, 1); return Math.round(n * (a + (b - a) * u) * pk); }
+  if (M.trioCada) return Math.floor(n / M.trioCada * pk);
+  if (M.base != null) return Math.min(M.teto ?? 99, M.base + Math.floor((r - (M.desde ?? M.estreia)) / (M.cada || 1)));
+  if (M.n) { const v = M.n[r] ?? (A && M.n[A.id]); return v ?? (inf ? Math.max(0, ...Object.values(M.n)) : 0); }
+  return 0;
+}
+function campZkCotas() { // cotas da rodada (1ª vez que nasce alguém nela)
+  const S_ = CAMP_ZKS, r = Z.round, inf = CAMP.modo === 'infinito', A = CAMP_ATOS[CAMP.et], n = Z.toSpawn + Z.zs.size;
+  S_.r = r; S_.rest = {}; S_.trio = 0; S_.trioPt = null;
+  if (Z.dogRound || (!inf && (!A || A.chefe))) return; // rodada de cães; rodada de chefe (os lacaios são do D07)
+  let livre = Math.floor(n * CAMP_ZKV.tetoEsp) - (Z.mixN || 0); const esp = typeof campEvEspeciais === 'function' ? campEvEspeciais() : null; // evento que só deixa alguns especiais (D05)
+  for (const k of Object.keys(CAMP_MIX)) {
+    const kk = +k, M = CAMP_MIX[k], K = CAMP_ZK[kk]; if (!ZKIND[kk] || ZKIND[kk].chefe || r < M.estreia || livre <= 0 || (esp && !esp.includes(kk))) continue;
+    if (!inf && K?.mapas && !K.mapas.includes(curMapId)) continue;
+    if (M.agua && !CAMP_AGUA[curMapId]?.length) continue;
+    const un = M.trioCada ? (K?.trio || 3) : 1; let q = campZkQtd(M, kk, r, n, A, inf);
+    if (r === M.estreia) q = Math.min(q, 1); // estreia: só 1 (o trio conta como 1)
+    q = Math.max(0, Math.min(q, Math.floor(livre / un))); livre -= q * un;
+    if (q) S_.rest[kk] = q;
+  }
+}
+const campZkUn = k => CAMP_MIX[k]?.trioCada ? (CAMP_ZK[k]?.trio || 3) : 1; // vagas de comum que uma unidade ocupa
+function campZkVivos() { const V = CAMP_ZKS.vivos; for (const k in V) V[k] = 0; for (const z of Z.zs.values()) if (z.kind > 6) V[z.kind] = (V[z.kind] || 0) + 1; return V; }
+function campZkPode(k, V) { // cabe mais um vivo deste tipo agora (teto e água)
+  const M = CAMP_MIX[k], K = CAMP_ZK[k];
+  if (M.teto != null && !M.base && (V[k] || 0) >= M.teto) return false;
+  if (M.tetoTrios != null && ((V[k] || 0) >= M.tetoTrios * (K?.trio || 3) || Z.toSpawn < (K?.trio || 3))) return false; // trio só se couber inteiro
+  if (M.agua && !campZkAgua()) return false;
+  return true;
+}
+function campZkTipo(k) { // CAMP_G.tipo: troca um comum sorteado por um tipo novo (na proporção do que falta)
+  const S_ = CAMP_ZKS; S_.novo = 0;
+  campZkReset(); if (S_.r !== Z.round) campZkCotas(); // no 1º nascimento da rodada (antes de sair qualquer especial do clássico)
+  if (Z.dogRound) return k;
+  if (S_.trio > 0 && k !== 6 && !Z.reQ.length) { S_.novo = S_.trioK; return S_.trioK; } // o resto do trio, logo atrás do primeiro (o especial do clássico fica para depois)
+  if (k !== 0) return k;
+  let tot = 0; const V = campZkVivos(); // em vagas: o trio ocupa 3 comuns
+  for (const kk in S_.rest) if (S_.rest[kk] > 0 && campZkPode(+kk, V)) tot += S_.rest[kk] * campZkUn(+kk);
+  if (!tot) return 0;
+  const comuns = Math.max(1, Z.toSpawn - (Z.mixN || 0) - (Z.bossQ || 0));
+  if (Math.random() * comuns >= tot) return 0; // espalhado pela rodada; no fim (comuns <= vagas) sai sempre
+  let x = Math.random() * tot;
+  for (const kk in S_.rest) { if (!(S_.rest[kk] > 0) || !campZkPode(+kk, V)) continue; x -= S_.rest[kk] * campZkUn(+kk); if (x < 0) { S_.novo = +kk; return +kk; } }
+  return 0;
+}
+function campZkNasce(z, cands) { // CAMP_G.nasce: Afogado só na água; o trio sai do mesmo ponto do primeiro
+  const S_ = CAMP_ZKS;
+  if (CAMP_MIX[z.kind]?.agua) { const L = campZkAgua(); cands.length = 0; if (L) for (const a of L) cands.push({ i: -1, x: a[0], z: a[1] }); return; }
+  if (S_.trio > 0 && S_.novo === z.kind && S_.trioPt) {
+    const T = S_.trioPt; let n = 0;
+    for (const c of cands) if (T.i >= 0 ? c.i === T.i : c.i < 0 && hyp(c.x - T.x, c.z - T.z) < .1) cands[n++] = c;
+    if (n) cands.length = n;
+  }
+}
+function campZkStatus(z) { // CAMP_G.status (fim do zSpawnOne): curva do ato, cota, legenda, trio e os números do tipo
+  const S_ = CAMP_ZKS, D = zDf();
+  if (CAMP.modo === 'campanha' && !z.dog && !ZKIND[z.kind].chefe) { const A = CAMP_ATOS[CAMP.et], C_ = A && CAMP_CURVA[A.id]; if (C_?.vidaK) z.hp = Math.round(z.hp * C_.vidaK); }
+  const K = CAMP_ZK[z.kind];
+  if (S_.novo && S_.novo === z.kind) { // comum que virou tipo novo: o zSpawnOne desconta da Z.mix do clássico, então soma antes (fica igual)
+    if (Z.mix) Z.mix[z.kind] = (Z.mix[z.kind] || 0) + 1; Z.mixN = (Z.mixN || 0) + 1; S_.novo = 0;
+    if (S_.trio > 0) S_.trio--;
+    else {
+      if (S_.rest[z.kind] > 0) S_.rest[z.kind]--;
+      if (CAMP_MIX[z.kind]?.trioCada) { const P = z.body.pos; let pt = { i: z.win, x: P.x, z: P.z }; if (z.win < 0) for (const r of ZD.risers) if (hyp(r[0] - P.x, r[1] - P.z) < 1.5) { pt = { i: -1, x: r[0], z: r[1] }; break; } S_.trio = (K?.trio || 3) - 1; S_.trioK = z.kind; S_.trioPt = pt; }
+    }
+    if (K?.legenda && !S_.vistos.has(z.kind)) { S_.vistos.add(z.kind); campFala(K.legenda); } // 1ª aparição na partida
+  }
+  if (!K) return;
+  z.sc = z.scB = K.sc; z.speed = rand(K.vel[0], K.vel[1]) * D.spd;
+  CAMP_ZKF.status[z.kind]?.(z, K, D);
+}
+function campZkTick() { // CAMP_GANCHOS.tick: o resto do trio no mesmo tick e as nuvens de cal (cegam e atrasam quem está dentro)
+  campZkReset(); const S_ = CAMP_ZKS;
+  if (S_.trio > 0 && Z.phase === 'round' && Z.toSpawn > 0) for (let i = 0; i < 3 && S_.trio > 0 && Z.toSpawn > 0 && Z.zs.size < zDf().max; i++) if (!zSpawnOne()) break;
+  const N = S_.nuvens; if (!N.length && !S_.calN) return;
+  for (let i = N.length - 1; i >= 0; i--) if (now >= N[i].fim) N.splice(i, 1);
+  const K = CAMP_ZK[7].nuvem; let n = 0;
+  for (const z of Z.zs.values()) {
+    if (ZKIND[z.kind].chefe) continue; const P = z.body.pos; let dentro = false;
+    for (let i = 0; i < N.length && !dentro; i++) if (hyp(P.x - N[i].x, P.z - N[i].z) < K.r && P.y > -.5) dentro = true;
+    if (dentro) { if (!z.calIn) { z.calIn = 1; z.cv = (z.cv || 1) * K.lento; } z.tgt = null; z.tgtT = now + .25; z.cego = now + .3; if (!z.calA && !z.dog) z.atkWind = 0; n++; }
+    else if (z.calIn) { z.calIn = 0; z.cv = (z.cv || 1) / K.lento; }
+  }
+  S_.calN = n;
+}
+const campZkExpl = (w, splash) => !!splash && (CAMP_ZKV.explosoes.includes(w) || (!!W[w]?.splash && !W[w].chain && !W[w].frost));
+const campZkDanoMul = () => zDf().dmg / CAMP_ZKV.danoRef;
+CAMP_G.tipo.push(campZkTipo); CAMP_G.nasce.push(campZkNasce); CAMP_G.status.push(campZkStatus); CAMP_GANCHOS.tick.push(campZkTick);
+CAMP_G.dano.push((z, dmg, zone, w, p, splash) => { const f = CAMP_ZKF.dano[z.kind]; return f ? f(z, dmg, zone, w, p, splash) : dmg; });
+CAMP_G.morte.push((z, p, zone, w) => CAMP_ZKF.morte[z.kind]?.(z, p, zone, w));
+CAMP_G.zhit.push((p, m, z) => { const f = CAMP_ZKF.zhit[z.kind]; return f ? f(p, m, z) : true; });
+CAMP_GANCHOS.cp.push(cp => { // quem entra no meio: Soldados sem capacete e nuvens de cal no ar
+  const S_ = CAMP_ZKS; cp.zk = { c: [], n: S_.nuvens.map(c => [r2(c.x), r2(c.z), r2(c.fim - now)]) };
+  for (const z of Z.zs.values()) if (z.kind === 8 && !z.capacete) cp.zk.c.push(z.id);
+});
+function campZkFx(e, o) { broadcast({ t: 'camp', k: 'zk', e, ...o }); }
+// ---------- Penitente (7) ----------
+CAMP_IA[7] = (z, dt, tgt) => {
+  if (z.st !== 'in') return false;
+  const K = CAMP_ZK[7].cal, P = z.body.pos;
+  if (z.sc === 3 && !z.calA) z.sc = z.scB; // estado especial preso (o gelo devolve o sc antigo)
+  if (z.calA) { // balde erguido: parado, com a mira travada no começo do aviso; no fim do aviso joga
+    if (z.cego > now) { z.calA = 0; z.atkWind = 0; z.sc = z.scB; z.calCd = now + 1; return false; } // dentro da nuvem perde o alvo
+    z.body.vel.x = z.body.vel.z = 0; // a mira travou no começo do aviso: quem sai do cone escapa
+    if (now >= z.calA) { z.calA = 0; z.atkWind = 0; z.sc = z.scB; z.calCd = now + K.cd; z.atkT = Math.max(z.atkT, now + K.depois); campZkCal(z); }
+    return true;
+  }
+  if (!tgt || !S.players.has(tgt.id) || now < (z.calCd || 0) || Z.lure || z.cego > now) return false;
+  const d = hyp(tgt.pos[0] - P.x, tgt.pos[2] - P.z);
+  if (d > K.alcance || d < K.minimo || Math.abs(tgt.pos[1] - P.y) > K.dy) return false;
+  if (!losClear(_zkA.set(P.x, P.y + 1.3, P.z), _zkB.set(tgt.pos[0], tgt.pos[1] + 1.3, tgt.pos[2]))) return false;
+  z.calA = now + K.aviso; z.yaw = Math.atan2(-(tgt.pos[0] - P.x), -(tgt.pos[2] - P.z)); z.atkWind = z.calA; z.atkQ = null; z.sc = 3; // aviso: bit 4 + sc 3 na foto (o cliente ergue o balde)
+  return true;
+};
+function campZkCal(z) { // a cal: cone na frente (abre° e cone m), com linha livre; dano e "cal nos olhos" para quem estava dentro
+  const K = CAMP_ZK[7].cal, P = z.body.pos, fx = -Math.sin(z.yaw), fz = -Math.cos(z.yaw), cmin = Math.cos(K.abre / 2 * Math.PI / 180), dano = Math.max(1, Math.round(K.dano * campZkDanoMul()));
+  _zkA.set(P.x, P.y + 1.3, P.z);
+  for (const q of S.players.values()) {
+    if (!q.alive || q.downed) continue; const dx = q.pos[0] - P.x, dz = q.pos[2] - P.z, d = hyp(dx, dz);
+    if (d > K.cone || Math.abs(q.pos[1] - P.y) > K.dy || (d > .3 && (dx * fx + dz * fz) / d < cmin)) continue;
+    if (!losClear(_zkA, _zkB.set(q.pos[0], q.pos[1] + 1.3, q.pos[2]))) continue;
+    zHurt(q, dano, P); sendTo(q.id, { t: 'camp', k: 'zk', e: 'olho', s: K.olhoS });
+  }
+  campZkFx('joga', { id: z.id, x: r2(P.x), z: r2(P.z), a: r2(z.yaw) });
+}
+CAMP_ZKF.morte[7] = z => { // o balde quebra: nuvem de cal (a mais velha sai se passar do máximo)
+  const K = CAMP_ZK[7].nuvem, P = z.body.pos, N = CAMP_ZKS.nuvens; if (N.length >= K.max) N.shift();
+  N.push({ x: P.x, z: P.z, fim: now + K.s }); campZkFx('nuvem', { x: r2(P.x), z: r2(P.z), s: K.s });
+};
+// ---------- Soldado (8) ----------
+CAMP_ZKF.status[8] = z => { z.capacete = 1; };
+CAMP_IA[8] = z => { // prefere o NPC da escolta e o jogador marcado pelo Vigia; o resto é o zChase do clássico (anda e bate)
+  if (z.st !== 'in' || z.cego > now) return false;
+  const K = CAMP_ZK[8], P = z.body.pos, a = CAMP.npc?.a;
+  if (a?.alive && hyp(a.pos[0] - P.x, a.pos[2] - P.z) < K.npcR) { z.tgt = a; return false; }
+  let best = null, bd = K.marcaR;
+  for (const q of S.players.values()) if (q.alive && !q.downed && q.campMarca > now) { const d = hyp(q.pos[0] - P.x, q.pos[2] - P.z); if (d < bd) { bd = d; best = q; } }
+  if (best) z.tgt = best;
+  return false;
+};
+CAMP_ZKF.dano[8] = (z, dmg, zone, w, p, splash) => { // capacete: o 1º tiro na cabeça vale como no corpo (sem o multiplicador da arma) e o capacete voa
+  if (!z.capacete || zone !== 'head' || splash || w === 'knife' || !p) return dmg;
+  z.capacete = 0; campZkFx('cap', { id: z.id });
+  return dmg / ((W[w]?.head || 4) * (p.perks?.includes('ds') ? 1.5 : 1));
+};
+// ---------- Afogado do Veio (9) ----------
+CAMP_ZKF.status[9] = (z, K, D) => { // nasce submerso (estado 'rise' do servidor, y fixo), longe da vista
+  const S_ = K.sub, P = z.body.pos; z.sub = 1; z.st = 'rise'; P.y = S_.y; z.subV = S_.vel * D.spd; z.subChk = now + S_.travaS; z.subCx = P.x; z.subCz = P.z;
+  let best = null, bd = 1e9; for (const a of CAMP_AGUA[curMapId] || []) { const d = hyp(a[0] - P.x, a[1] - P.z); if (d < bd) { bd = d; best = a; } }
+  z.aguaX = best ? best[0] : P.x; z.aguaZ = best ? best[1] : P.z;
+};
+CAMP_IA[9] = (z, dt, tgt) => {
+  if (!z.sub) return false; // fora d'água: um comum lento (zChase)
+  const K = CAMP_ZK[9].sub, b = z.body, P = b.pos;
+  if (z.sub === 3) { // saindo: sobe rápido e agarra quem estiver perto
+    const k = clamp((now - z.subT) / K.saiS, 0, 1); P.y = lerp(K.y, 0, k);
+    if (k >= 1) campZkSai(z, K);
+    return true;
+  }
+  P.y = K.y; b.vel.x = b.vel.z = 0;
+  const lure = Z.lure, gx = lure ? lure[0] : tgt?.pos[0], gz = lure ? lure[1] : tgt?.pos[2];
+  if (z.sub === 2 && now >= z.subT) { z.sub = 3; z.subT = now; z.subAg = 1; z.atkWind = 0; z.sc = z.scB; return true; }
+  if (gx === undefined || z.cego > now) return true; // sem alvo: espera na água
+  const dx = gx - P.x, dz = gz - P.z, d = hyp(dx, dz);
+  if (z.sub === 1 && !lure && tgt && S.players.has(tgt.id) && d <= K.avisoR && Math.abs(tgt.pos[1]) < K.dy) { z.sub = 2; z.subT = now + K.aviso; z.atkWind = z.subT; z.atkQ = null; z.sc = 3; } // bolhas e anel maior
+  if (now >= z.losT) { z.losT = now + .35 + Math.random() * .1; z.los = d < 14 && segClearH(P.x, P.z, gx, gz, STEP, 0); }
+  let mx = 0, mz = 0;
+  if ((z.los || d < 1.2) && d > .01) { mx = dx / d; mz = dz / d; } else { const f = zFlowDir(P.x, P.z); if (f) { mx = f[0]; mz = f[1]; } else if (d > .01) { mx = dx / d; mz = dz / d; } }
+  if (d < .6) mx = mz = 0;
+  const s = z.subV * dt, ax = hyp(P.x - z.aguaX, P.z - z.aguaZ), nx = P.x + mx * s, nz = P.z + mz * s;
+  if (z.sub === 1 && ax > K.r && hyp(nx - z.aguaX, nz - z.aguaZ) > ax) { z.sub = 3; z.subT = now; z.subAg = 0; return true; } // longe da água: sai sem agarrar
+  const ok = (x, zz) => { const c = ffCell(x, zz); return c >= 0 && FF.walk[c]; };
+  if (ok(nx, nz)) { P.x = nx; P.z = nz; } else if (ok(nx, P.z)) P.x = nx; else if (ok(P.x, nz)) P.z = nz;
+  if (mx || mz) z.yaw += clamp(angDiff(z.yaw, Math.atan2(-mx, -mz)), -8 * dt, 8 * dt);
+  if (now >= z.subChk) { if (z.sub === 1 && hyp(P.x - z.subCx, P.z - z.subCz) < .5 && d > K.avisoR) { z.sub = 3; z.subT = now; z.subAg = 0; } z.subChk = now + K.travaS; z.subCx = P.x; z.subCz = P.z; } // travado: sai
+  return true;
+};
+function campZkSai(z, K) { // fora d'água: vira comum lento; com o agarrão armado, pega o jogador mais perto
+  const b = z.body, P = b.pos; z.sub = 0; z.st = 'in'; P.y = 0; b.vel.set(0, 0, 0); b.onGround = true; z.sc = z.scB; z.atkWind = 0;
+  z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z; z.stuck = 0; z.losT = 0;
+  if (!z.subAg) return; z.subAg = 0;
+  let best = null, bd = K.agarraR; for (const q of S.players.values()) { if (!q.alive || q.downed || Math.abs(q.pos[1] - P.y) > K.dy) continue; const d = hyp(q.pos[0] - P.x, q.pos[2] - P.z); if (d < bd) { bd = d; best = q; } }
+  campZkFx('sai', { id: z.id, x: r2(P.x), z: r2(P.z), g: best ? 1 : 0 });
+  if (!best) return;
+  zHurt(best, Math.max(1, Math.round(K.dano * campZkDanoMul())), P); z.atkT = Math.max(z.atkT, now + K.cd);
+  if (best.alive) sendTo(best.id, { t: 'camp', k: 'zk', e: 'agarra', s: K.lentoS, v: K.lento });
+}
+CAMP_ZKF.dano[9] = (z, dmg, zone, w, p, splash) => z.sub === 1 || z.sub === 2 ? (campZkExpl(w, splash) ? dmg : 0) : dmg; // submerso: só explosão
+CAMP_ZKF.zhit[9] = (p, m, z) => !(z.sub === 1 || z.sub === 2) || (!!m.sp && campZkExpl(m.w, true)); // tiro na água não passa (sem pontos)
+// ---------- cliente: modelo (gancho no zLook e no zBuildModel) ----------
+function campLook(kind, L) { // um molde por tipo (as cores são do tipo, não do sorteio)
+  const K = CAMP_ZK[kind] || {}; return { s: 0, c: 0, p: 0, bare: false, hair: K.cabelo ?? L.hair, wound: L.wound, stump: false, nojaw: false, key: kind + ',camp' };
+}
+function campModelo(kind, L) { // corpo base do zBuildModel com as cores do tipo e as peças próprias (CAMP_ZKF.modelo[kind])
+  const K = CAMP_ZK[kind], C_ = K?.cores, g = zBuildModel(false, kind, { ...L, cm: 1 }), ud = g.userData;
+  if (C_) {
+    const troca = new Map([[mc(ZSKIN[L.s]), mc(C_.pele)], [mc(ZCLOTH[L.c]), mc(C_.roupa)], [mc(ZPANTS[L.p]), mc(C_.calca)], [zGlow(0xffc21a, 4), zGlow(C_.olho[0], C_.olho[1])], [mc(0x1a1510), mc(C_.cabelo ?? 0x1a1510)]]);
+    g.traverse(o => { if (o.isMesh && troca.has(o.material)) o.material = troca.get(o.material); });
+  }
+  CAMP_ZKF.modelo[kind]?.(g, ud, C_ || {}, L);
+  return g;
+}
+CAMP_ZKF.modelo[7] = (g, ud, C_) => { // capuz cônico branco-cal, túnica cinza até o joelho, balde de zinco na mão esquerda, cruz de cal no peito
+  const cal = mc(C_.cal), tun = mc(C_.roupa), zin = mc(C_.balde), esc_ = mc(0x0c0a08), olho = zGlow(C_.olho[0], C_.olho[1]), T = ud.torso, H = ud.head;
+  zcy(H, .006, .16, .44, 0, .36, .01, cal); zsp(H, .15, .15, .155, 0, .15, .012, cal); // capuz: cone e a parte que cobre a cabeça
+  zbx(H, .14, .05, .02, 0, .15, -.155, esc_); for (const sx of [-1, 1]) zbx(H, .03, .02, .012, .04 * sx, .155, -.165, olho); // furos dos olhos
+  zcy(T, .2, .29, .52, 0, -.16, 0, tun).scale.z = .78; // túnica
+  zbx(T, .045, .24, .014, 0, .38, -.165, cal); zbx(T, .17, .045, .014, 0, .43, -.166, cal); // cruz de cal
+  const bal = zbone(ud.handL, 0, -.1, -.02); ud.balde = bal;
+  zcy(bal, .095, .075, .19, 0, -.11, 0, zin); zcy(bal, .085, .085, .01, 0, -.02, 0, cal); zbx(bal, .2, .012, .012, 0, .05, 0, zin); // balde, cal por cima, alça
+};
+CAMP_ZKF.modelo[8] = (g, ud, C_) => { // capacete M1 (osso próprio: some quando voa), farda verde-oliva, cinto com cartucheiras, perneiras
+  const cap = zbone(ud.head, 0, .2, .012); ud.capacete = cap;
+  const ca = mc(C_.capacete), cou = mc(C_.couro), per = mc(C_.perneira), fiv = mc(0x8a7a4a);
+  zsp(cap, .162, .115, .172, 0, .03, 0, ca); zcy(cap, .19, .19, .018, 0, -.02, 0, ca); zbx(cap, .012, .1, .012, .13, -.09, 0, cou); zbx(cap, .012, .1, .012, -.13, -.09, 0, cou);
+  zbx(ud.inner, .37, .065, .28, 0, .96, 0, cou); zbx(ud.inner, .06, .05, .02, 0, .96, -.142, fiv);
+  for (const sx of [-1, 1]) { zbx(ud.inner, .07, .08, .05, .12 * sx, .95, -.13, cou); zbx(ud.torso, .045, .5, .012, .08 * sx, .34, -.158, cou).rotation.z = .35 * sx; }
+  for (const S of [ud.shinL, ud.shinR]) zcy(S, .062, .056, .2, 0, -.26, 0, per);
+};
+CAMP_ZKF.modelo[9] = (g, ud, C_) => { // pele preta encharcada (reflexos de água: pontos que brilham fraco), boca escancarada, lodo escorrendo
+  const br = zGlow(C_.brilho, 1), lodo = mc(0x07090a), H = ud.head, T = ud.torso;
+  zbx(H, .07, .02, .02, .03, .27, -.06, br); zbx(H, .02, .05, .02, -.08, .2, -.09, br); zbx(T, .08, .02, .02, -.12, .58, -.1, br); zbx(T, .02, .1, .02, .14, .4, -.15, br);
+  for (const A of [ud.foreL, ud.foreR]) zbx(A, .02, .14, .02, .02, -.16, -.03, br);
+  zbx(ud.jaw, .05, .12, .02, .01, -.1, -.1, lodo); zbx(T, .05, .22, .012, -.06, .32, -.158, lodo); zbx(T, .04, .16, .012, .09, .2, -.156, lodo);
+};
+// ---------- cliente: caixas de acerto, animação e som ----------
+const CAMP_ZBOX_FUNDO = [['head', { minX: 0, maxX: 0, minY: -99, maxY: -99, minZ: 0, maxZ: 0 }], ['body', { minX: 0, maxX: 0, minY: -99, maxY: -99, minZ: 0, maxZ: 0 }], ['legs', { minX: 0, maxX: 0, minY: -99, maxY: -99, minZ: 0, maxZ: 0 }]]; // longe de todo raio
+function campBoxes(zc) { const f = CAMP_ZKF.boxes[zc.kind]; return f ? f(zc) : null; }
+CAMP_ZKF.boxes[9] = zc => (zc.f & 64) && zc.pos.y <= CAMP_ZK[9].sub.y + .05 ? CAMP_ZBOX_FUNDO : null; // submerso: nada para acertar (o host também recusa)
+function campAnim(zc, ud, dt) { // gancho no fim do zAnimHuman (só tipos > 6): gemido próprio e a pose/efeito do tipo
+  const K = CAMP_ZK[zc.kind]; if (!K) return; campZkMundo();
+  if (zc.groanT <= dt) { zc.groanT = rand(K.gemeS[0], K.gemeS[1]); if (ZC.groanN < 3 && !(zc.f & 64) && zc.pos.distanceTo(camera.position) < 28) { ZC.groanN++; play(K.geme, zc.pos); } } // antes do ZGROAN do updateZombies
+  CAMP_ZKF.anim[zc.kind]?.(zc, ud, dt, K);
+  campZkGarante();
+}
+CAMP_ZKF.anim[7] = (zc, ud, dt, K) => { // balde balança no andar; aviso: ergue o balde por cima do ombro; depois joga para a frente
+  const A = K.anim, k = Math.min(1, dt * 18), esp = (zc.f & 3) === 3 && (zc.f & 4);
+  if (esp && !zc.espA) { zc.espA = now; play('penitente', zc.pos); }
+  if (!esp && zc.espA) { zc.espA = 0; zc.espJ = now; }
+  if (ud.balde) ud.balde.rotation.x = A.balanca * Math.sin(zc.anim) * clamp(zc.spd, 0, 1);
+  if (esp) { const u = zEase((now - (zc.espA || now)) / K.cal.aviso); zR(ud.armL, A.ergue * u + .3 * (1 - u), 0, -.25, k); zR(ud.foreL, .9 * u, 0, 0, k); zR(ud.armR, .25, 0, .15, k); zR(ud.foreR, .3, 0, 0, k); } // só o braço do balde sobe
+  else if (now - (zc.espJ || -9) < .4) { const u = (now - zc.espJ) / .4; zR(ud.armL, A.joga * (1 - u) + .3 * u, 0, -.2, k); zR(ud.foreL, .2, 0, 0, k); }
+  else if (!(zc.f & 4)) zR(ud.armL, .3, 0, -.18, k * .5); // segura o balde à frente
+};
+CAMP_ZKF.anim[8] = (zc, ud, dt, K) => { // marcha rígida: pernas quase retas, braços curtos, tronco ereto
+  if (zc.semCapChk !== 1) { zc.semCapChk = 1; if (CAMP_ZKC.semCap.has(zc.id)) zHide(ud.capacete, 1); }
+  const f = zc.f; if (f & (4 | 8 | 32 | 64 | 1024) || now - zc.hitT < .5) return;
+  const A = K.anim, k = Math.min(1, dt * 16), mv = clamp(zc.spd / 1.5, 0, 1), s = Math.sin(zc.anim);
+  zR(ud.legL, A.passo * s * mv, 0, 0, k); zR(ud.legR, -A.passo * s * mv, 0, 0, k); zR(ud.shinL, -.06, 0, 0, k); zR(ud.shinR, -.06, 0, 0, k);
+  zR(ud.armL, -A.braco * s * mv + .08, 0, -.06, k); zR(ud.armR, A.braco * s * mv + .08, 0, .06, k); zR(ud.foreL, .25, 0, 0, k); zR(ud.foreR, .25, 0, 0, k);
+  zR(ud.torso, A.tronco, 0, 0, k); zR(ud.head, -.04, 0, 0, k);
+};
+CAMP_ZKF.anim[9] = (zc, ud, dt, K) => { // submerso: só o anel de ondas (o corpo fica fundo); aviso: anel maior e bolhas; fora: boca aberta
+  const S_ = K.sub, f = zc.f, M_ = zc.model;
+  if (!(f & 64)) { zR(ud.jaw, -.6 - .12 * Math.sin(now * 3 + zc.id), 0, 0, Math.min(1, dt * 10)); return; }
+  zc.dk = now + 1; // sem a terra do 'rise' do clássico
+  const sai = clamp((zc.pos.y - S_.y) / -S_.y, 0, 1); M_.position.y = lerp(S_.visY, 0, sai); // saindo: sobe do fundo até o chão
+  const av = (f & 3) === 3 && (f & 4);
+  if (av && !zc.espA) { zc.espA = now; play('bolhas', zc.pos); }
+  if (!av) zc.espA = 0;
+  if (sai > .05) return;
+  const A = K.anel, C_ = CAMP_ZKC;
+  if (av && now >= (zc.bolT || 0)) { zc.bolT = now + A.bolhaS; puff(_zv.set(zc.pos.x + rand(-.5, .5), A.y + .05, zc.pos.z + rand(-.5, .5)), 0x1c2a2a, rand(.25, .45), .5, .5); }
+  for (let j = 0; j < A.n; j++) campZkAnel(zc.pos.x, zc.pos.z, ((now / (av ? A.avisoPer : A.per)) + zc.id * .37 + j / A.n) % 1, av ? A.avisoR1 : A.r1, av ? A.avisoK : A.k, A);
+};
+// ---------- cliente: efeitos (pools instanciados, laço próprio só com efeito ativo) ----------
+const CAMP_ZKC = { raf: 0, mundo: null, t: 0, anel: null, anelN: 0, anelNow: -1, nuvem: null, nuvens: [], caps: [], semCap: new Set(), calEl: null, agarra: null, ax: 0, az: 0 };
+const _zkM = new THREE.Matrix4(), _zkO = new THREE.Object3D(), _zkC = new THREE.Color();
+function campZkPools() { // na cena desde o início (invisíveis): o warmUp compila e sobe tudo junto com o mapa
+  const C_ = CAMP_ZKC; C_.raiz = new THREE.Group(); scene.add(C_.raiz); const add = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }; // os mesmos parâmetros das poças de luz (mesmo programa)
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 18, 32, 32, 31);
+  gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(.55, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const anelTex = new THREE.CanvasTexture(cv), mk = (geo, mat, n) => { const m = new THREE.InstancedMesh(geo, mat, n); for (let i = 0; i < n; i++) { m.setMatrixAt(i, _zkM.identity()); m.setColorAt(i, _zkC.setRGB(0, 0, 0)); } m.count = 0; m.visible = false; m.frustumCulled = false; m.renderOrder = 2; m.userData.noShadow = true; C_.raiz.add(m); return m; };
+  C_.anel = mk(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: anelTex, ...add }), 16);
+  const Kn = CAMP_ZK[7].nuvem; C_.nuvem = mk(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: SOFT, ...add }), Kn.max * Kn.quads);
+  const ca = mc(CAMP_ZK[8].cores.capacete), dome = new THREE.SphereGeometry(.162, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), aba = new THREE.CylinderGeometry(.19, .19, .018, 12);
+  for (let i = 0; i < 3; i++) { const p = new THREE.Group(); p.add(new THREE.Mesh(dome, ca), new THREE.Mesh(aba, ca)); p.visible = false; C_.raiz.add(p); C_.caps.push({ g: p, v: new V3(), w: 0, fim: 0 }); }
+}
+campZkPools();
+function campZkGarante() { if (!CAMP_ZKC.raf) CAMP_ZKC.raf = requestAnimationFrame(campZkLoop); }
+function campZkAnel(x, z, u, r1, k, A) { // um anel de ondas (instância): cresce e some
+  const C_ = CAMP_ZKC, m = C_.anel; if (C_.anelNow !== now) { C_.anelNow = now; C_.anelN = 0; } if (C_.anelN >= m.instanceMatrix.count) return; // quadro novo: recomeça a lista
+  const i = C_.anelN++, s = (A.r0 + (r1 - A.r0) * u) * 2; _zkM.makeScale(s, 1, s); _zkM.setPosition(x, A.y, z); m.setMatrixAt(i, _zkM);
+  m.setColorAt(i, _zkC.setHex(A.cor).multiplyScalar(k * (1 - u))); m.count = C_.anelN; m.visible = true; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true;
+}
+const campZkMundo = () => { if (CAMP_ZKC.mundo !== ZC.world) campZkLimpaCli(); }; // mapa novo: os efeitos do anterior saem (antes de pôr um novo)
+function campZkLimpaCli() { const C_ = CAMP_ZKC; C_.mundo = ZC.world; C_.nuvens.length = 0; C_.semCap.clear(); C_.agarra = null; for (const c of C_.caps) { c.g.visible = false; c.fim = 0; } C_.nuvem.count = 0; C_.nuvem.visible = false; C_.anelN = 0; C_.anel.count = 0; C_.anel.visible = false; }
+function campZkLoop() { // depois do quadro do jogo (o pedido dele vem antes): apaga os anéis que o quadro não refez, anima nuvens e capacetes, segura o agarrado
+  const C_ = CAMP_ZKC; C_.raf = 0; const dt = clamp(now - (C_.t || now), 0, .05); C_.t = now; let vivo = false;
+  campZkMundo();
+  if (C_.anelN) { vivo = true; if (C_.anelNow !== now) { C_.anelN = 0; C_.anel.count = 0; C_.anel.visible = false; } } // nenhum Afogado submerso neste quadro
+  const N = C_.nuvens, Kn = CAMP_ZK[7].nuvem, m = C_.nuvem; let q = 0;
+  for (let i = N.length - 1; i >= 0; i--) if (now >= N[i].fim) N.splice(i, 1);
+  for (const c of N) { const a = Math.min(1, (now - c.t0) / .3, (c.fim - now) / 1.2);
+    for (let j = 0; j < Kn.quads; j++) { const an = j * 2.4 + c.s, rr = j ? Kn.r * .45 : 0, x = c.x + Math.cos(an + now * .15) * rr, z = c.z + Math.sin(an + now * .15) * rr, sz = Kn.tam[0] + (Kn.tam[1] - Kn.tam[0]) * ((j * .37 + c.s) % 1);
+      _zkO.position.set(x, .45 + (j % 3) * .35, z); _zkO.rotation.set(0, Math.atan2(camera.position.x - x, camera.position.z - z), 0); _zkO.scale.set(sz, sz * .8, 1); _zkO.updateMatrix();
+      m.setMatrixAt(q, _zkO.matrix); m.setColorAt(q, _zkC.setRGB(1, 1, .96).multiplyScalar(Kn.cor * a)); q++; } }
+  m.count = q; m.visible = q > 0; if (q) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; vivo = true; }
+  for (const c of C_.caps) { if (!c.g.visible) continue; if (now >= c.fim) { c.g.visible = false; continue; } vivo = true;
+    const P = c.g.position; c.v.y -= 9.8 * dt; P.addScaledVector(c.v, dt); if (P.y < .08) { P.y = .08; c.v.set(0, 0, 0); c.w = 0; } c.g.rotation.x += c.w * dt; c.g.rotation.z += c.w * .6 * dt; }
+  if (C_.agarra) { // agarrado: anda a ×v (desfaz parte do passo que o jogo deu neste quadro)
+    if (now >= C_.agarra.fim || !me.alive || me.downed) C_.agarra = null;
+    else { vivo = true; const k = 1 - C_.agarra.v, nx = me.pos.x - (me.pos.x - C_.ax) * k, nz = me.pos.z - (me.pos.z - C_.az) * k; if (!blockedAt(nx, me.pos.y + .01, nz, me.h)) { me.pos.x = nx; me.pos.z = nz; } }
+    C_.ax = me.pos.x; C_.az = me.pos.z;
+  }
+  if (vivo) campZkGarante();
+}
+CAMP_GANCHOS.msg.zk = m => { // efeitos dos tipos da Vila (host -> todos; forma conferida)
+  const f = CAMP_ZKF.msg[m.e]; if (typeof m.e === 'string' && f) { campZkMundo(); f(m); }
+};
+const campZkXZ = m => finN(m.x) && finN(m.z) && Math.abs(m.x) < 1e4 && Math.abs(m.z) < 1e4;
+CAMP_ZKF.msg.joga = m => { // a cal sai do balde num leque (fumaça do pool)
+  if (!campZkXZ(m) || !finN(m.a)) return; const K = CAMP_ZK[7].cal, fx = -Math.sin(m.a), fz = -Math.cos(m.a);
+  for (let i = 0; i < K.nPuff; i++) { const d = .6 + i * K.cone / K.nPuff, l = rand(-.35, .35) * d; puff(_zv.set(m.x + fx * d - fz * l, 1.1 - i * .1, m.z + fz * d + fx * l), CAMP_ZK[7].cores.cal, .7 + i * .25, .9, .2); }
+  play('smoke', _zv.set(m.x, 1.2, m.z));
+};
+CAMP_ZKF.msg.olho = m => { // "cal nos olhos": tela branca que some (metade com menos flashes)
+  const s = finN(m.s) ? clamp(m.s, .2, 6) : CAMP_ZK[7].cal.olhoS; let el = CAMP_ZKC.calEl;
+  if (!el?.isConnected) { el = CAMP_ZKC.calEl = document.createElement('div'); el.id = 'campCal'; el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9;opacity:0;background:radial-gradient(ellipse at center,#fbfaf4 35%,#e9e5d8)'; document.body.appendChild(el); }
+  el.style.transition = 'none'; el.style.opacity = CAMP_ZKV.calOp * CAMP_ZKV.flashK; void el.offsetWidth; el.style.transition = `opacity ${s}s ease-in`; el.style.opacity = 0;
+  CAMP_ZKC.calAte = now + s; play('smoke');
+};
+CAMP_ZKF.msg.nuvem = m => { // nuvem de cal da morte do Penitente
+  if (!campZkXZ(m)) return; const N = CAMP_ZKC.nuvens, K = CAMP_ZK[7].nuvem; if (N.length >= K.max) N.shift();
+  N.push({ x: m.x, z: m.z, t0: now, fim: now + (finN(m.s) ? clamp(m.s, 0, 20) : K.s), s: Math.random() }); play('smoke', _zv.set(m.x, 1, m.z)); campZkGarante();
+};
+CAMP_ZKF.msg.cap = m => { // capacete do Soldado voa (osso some, a peça do pool cai girando)
+  const zc = Number.isInteger(m.id) ? ZC.zs.get(m.id) : null; if (!zc) { if (Number.isInteger(m.id) && CAMP_ZKC.semCap.size < 64) CAMP_ZKC.semCap.add(m.id); return; }
+  const ud = zc.model.userData; zHide(ud.capacete, 1); if (!ud.head) return;
+  const K = CAMP_ZK[8].capacete, c = CAMP_ZKC.caps.reduce((a, b) => a.fim < b.fim ? a : b); ud.head.getWorldPosition(c.g.position); c.g.position.y += .2;
+  c.v.set(rand(-1, 1), rand(K.voa[0], K.voa[1]), rand(-1, 1)); c.w = K.gira; c.fim = now + K.vida; c.g.visible = true; c.g.rotation.set(0, zc.yaw, 0);
+  play('capacete', c.g.position); campZkGarante();
+};
+CAMP_ZKF.msg.sai = m => { if (!campZkXZ(m)) return; _zv.set(m.x, .2, m.z); puff(_zv, 0x1c2626, 1.4, .7, .5); play(m.g ? 'afogado' : 'bolhas', _zv); }; // espirro de água preta
+CAMP_ZKF.msg.agarra = m => { // só para o agarrado: anda devagar por s segundos, sem correr
+  const s = finN(m.s) ? clamp(m.s, 0, 5) : CAMP_ZK[9].sub.lentoS, v = finN(m.v) ? clamp(m.v, .1, 1) : CAMP_ZK[9].sub.lento;
+  CAMP_ZKC.agarra = { fim: now + s, v }; CAMP_ZKC.ax = me.pos.x; CAMP_ZKC.az = me.pos.z; me.noSprintUntil = Math.max(me.noSprintUntil || 0, now + s); me.sprinting = false; campZkGarante();
+};
+CAMP_GANCHOS.sync.push(cp => { // quem entra no meio
+  const z = cp?.zk; if (!z || typeof z !== 'object') return; campZkMundo();
+  if (Array.isArray(z.c)) for (const id of z.c.slice(0, 64)) if (Number.isInteger(id)) { CAMP_ZKC.semCap.add(id); const zc = ZC.zs.get(id); if (zc) zHide(zc.model.userData.capacete, 1); }
+  if (Array.isArray(z.n)) for (const a of z.n.slice(0, CAMP_ZK[7].nuvem.max)) if (Array.isArray(a) && a.length === 3) CAMP_ZKF.msg.nuvem({ x: a[0], z: a[1], s: a[2] });
+});
+// ---------- sons (síntese, no estilo do SND) ----------
+SND.penitente = o => { campSomTom(o, 98, 96, .8, .08, 'sawtooth', .12, 0, ['bandpass', 520, 4]); campSomTom(o, 87, 85, .9, .08, 'sawtooth', .12, .42, ['bandpass', 520, 4]); vox(o, rand(70, 85), .9, .8, .12); }; // coro grave de 2 notas
+SND.capacete = o => { tn(o, .3, 2700, 2350, .3, 'triangle'); tn(o, .22, 4100, 3700, .12, 'sine', .01); nz(o, .07, 6000, 3000, .3, 'highpass'); }; // crack metálico agudo
+SND.bolhas = o => { for (let i = 0; i < 7; i++) nz(o, .07, rand(380, 620), 180, .28, 'lowpass', 2, i * .085 + rand(0, .03)); }; // bolhas: ruído com passa-baixa
+SND.afogado = o => { vox(o, rand(52, 70), .8, .9, .3); nz(o, .7, 420, 160, .24, 'bandpass', 5); nz(o, .3, 300, 120, .2, 'lowpass', 2, .35); }; // gorgolejo molhado
+if (typeof campEvUltimos === 'function') campEvUltimos(); // os registros do evento (O3-D05) voltam para o fim das listas: o evento vale por cima dos tipos daqui
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_ZK, CAMP_ZKV, CAMP_ZKF, CAMP_ZKS, CAMP_ZKC, CAMP_MIX, CAMP_AGUA, CAMP_ATOS, CAMP_CURVA, campZkCotas, campZkTipo, campZkAgua, campLook, campModelo, campBoxes, campAnim, campZkLoop, zombieModel, zDf, campLibera, zBoxes, CAMP_GANCHOS }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+// ===== FIM O3-D06 =====
 //
 // @@CAMP-CHEFE@@
 // ===== O3-D07: base comum dos chefes da campanha (docs/overhaul/campanha.md §7.1, §8 e §4.2) =====
