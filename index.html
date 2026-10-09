@@ -11955,7 +11955,7 @@ function b02Cull(cam) {
       const m = o.matrixWorld.elements, w = e.w;
       if (e.dyn || m[12] !== w[4] || m[13] !== w[5] || m[14] !== w[6] || m[0] !== w[7]) { // esfera no mundo (refeita só se a peça andou)
         _b02c.copy(e.c).applyMatrix4(o.matrixWorld); w[0] = _b02c.x; w[1] = _b02c.y; w[2] = _b02c.z; w[3] = e.r * o.matrixWorld.getMaxScaleOnAxis(); w[4] = m[12]; w[5] = m[13]; w[6] = m[14]; w[7] = m[0]; }
-      fora = -((w[0] - px) * fx + (w[1] - py) * fy + (w[2] - pz) * fz) - w[3] > lim; // profundidade do ponto mais perto da esfera além da névoa
+      fora = -((w[0] - px) * fx + (w[1] - py) * fy + (w[2] - pz) * fz) - w[3] > lim && b02Chao(e, px, py, pz); // profundidade do ponto mais perto da esfera além da névoa (e só com chão atrás, O2-B02s)
     }
     if (fora !== e.fora) { e.fora = fora; fora ? o.layers.disable(0) : o.layers.enable(0); }
   }
@@ -11966,6 +11966,28 @@ ATMOS_POST.push(mapId => {
   if (B02.on && !B02.hook) { B02.hook = true; const ob = scene.onBeforeRender; scene.onBeforeRender = function (r, s, c, rt) { ob.call(this, r, s, c, rt); b02Cull(c); }; }
 });
 // ===== O1-B02 fim =====
+// ===== O2-B02s: recorte do O1-B02 só com o chão atrás =====
+// A peça além da névoa sai na cor da névoa, mas o que fica atrás dela pode ser céu (pilares, torre d'água e chaminés acima dos
+// muros, vistos do anel de fora, ou a borda do mapa): recortada, o céu aparecia no lugar (B22: até 196 px, 53/255).
+// Só recorta a peça cujos raios do olho pelos 4 cantos do topo da sua caixa no mundo descem e batem no chão dentro do retângulo
+// dele (B02.chao: x0, x1, z0, z1, y do topo): atrás de cada pixel dela só há chão ou outra coisa ainda mais longe, tudo na cor da
+// névoa. Peça com topo na altura do olho ou acima continua desenhada.
+B02.chao = { sanatorio: [-140, 140, -108, 132, -.003] }; B02.ch = null; // o piso B(0, 12, 280, 240, 1, 'floor', -1.003)
+const _b02v = new V3();
+function b02Chao(e, px, py, pz) {
+  const C = B02.ch; if (!C || px < C[0] || px > C[1] || pz < C[2] || pz > C[3]) return false;
+  const o = e.o, m = o.matrixWorld.elements; let b = e.bb;
+  if (!b) { b = e.bb = [0, 0, 0, 0, 0, NaN, 0, 0, 0]; b.l = o.isInstancedMesh ? (o.boundingBox || o.computeBoundingBox(), o.boundingBox) : (o.geometry.boundingBox || (o.geometry.computeBoundingBox(), o.geometry.boundingBox)); }
+  if (e.dyn || m[12] !== b[5] || m[13] !== b[6] || m[14] !== b[7] || m[0] !== b[8]) { // caixa no mundo (refeita só se a peça andou)
+    const l = b.l; b[0] = b[2] = Infinity; b[1] = b[3] = b[4] = -Infinity;
+    for (let i = 0; i < 8; i++) { _b02v.set(i & 1 ? l.max.x : l.min.x, i & 2 ? l.max.y : l.min.y, i & 4 ? l.max.z : l.min.z).applyMatrix4(o.matrixWorld);
+      if (_b02v.x < b[0]) b[0] = _b02v.x; if (_b02v.x > b[1]) b[1] = _b02v.x; if (_b02v.z < b[2]) b[2] = _b02v.z; if (_b02v.z > b[3]) b[3] = _b02v.z; if (_b02v.y > b[4]) b[4] = _b02v.y; }
+    b[5] = m[12]; b[6] = m[13]; b[7] = m[14]; b[8] = m[0]; }
+  const t = b[4]; if (!(t < py)) return false; const k = (py - C[4]) / (py - t); // o raio pelo topo chega ao chão em k vezes a distância
+  return px + (b[0] - px) * k >= C[0] && px + (b[1] - px) * k <= C[1] && pz + (b[2] - pz) * k >= C[2] && pz + (b[3] - pz) * k <= C[3];
+}
+ATMOS_POST.push(mapId => { B02.ch = B02.chao[mapId] || null; });
+// ===== O2-B02s fim =====
 // ===== O1-B16: Baixo leve: decoração miúda de longe não é desenhada =====
 // No Baixo o quadro é limitado pela CPU (chamadas de desenho): na Vila ~1/3 das chamadas eram peças do cenário com menos de
 // 4 px de raio na tela (parafusos, pedrinhas, folhas, placas e vidros pequenos de longe, quase sempre já dentro da névoa).
