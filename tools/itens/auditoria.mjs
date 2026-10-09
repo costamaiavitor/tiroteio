@@ -26,6 +26,7 @@
 //     perto: item sem nenhum ponto livre onde ele seja o escolhido é ERRO);
 //  5. regiões (zoneAt) sem nenhum interativo, Caixa com 'n' que não aponta para dentro, portas cujos lados não batem com rooms;
 //  6. força × risco: custo de portas até o item, caminho a pé desde o nascimento e pontos de nascimento de zumbi por perto.
+// Interativos novos (O2-C04: ZINT_MAPA do jogo, barris e os próximos tipos) entram pelo __T.zintAud(), sem mexer aqui; tipo novo só ganha cor e legenda.
 // Ganchos: usa os do O2-C01 em window.__T quando existem (zBuildWalk, footFreeR, ZPERKS...); sem eles, refaz as mesmas contas.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -95,6 +96,8 @@ function auditar(cfg) {
   (ZD.traps || []).forEach((t, i) => { const o = { id: 'armadilha:' + i, tipo: 'armadilha', cat: 'item', x: t.sx, z: t.sz, n: t.n, nome: 'Armadilha elétrica', preco: TRAP.cost, efeito: `choque em ${t.w}×${t.d} m por ${TRAP.on ?? 25} s, recarga ${TRAP.cool ?? 60} s; precisa de energia`, area: [t.x, t.z, t.w, t.d], raio: 2.2, fonte: 'M.z.traps', post: !!t.post };
     if (t.post) { o.corpo = aabb(t.sx, t.sz, t.n, .5, .4, 2.3); o.col = colDe(o.corpo); uso(o, .2 + PR + .25); } else { o.parede = { y: 1.3 }; uso(o, .08 + PR + .3); }
     add(o); });
+  // O2-C04: interativos novos (ZINT_MAPA do jogo): corpo = a caixa que ele põe no COL, ponto de uso na frente (n)
+  for (const q of (T.zintAud?.() || [])) { const o = { ...q, cat: 'item' }; o.col = colDe(o.corpo); uso(o, (q.usoDist ?? .3) + PR + .25); add(o); }
   const boxCur = Wd?.boxCol ? colDe(Wd.boxCol) : -1;
   ZD.boxes.forEach((L, i) => { const sw = Math.abs(L.n[0]) > 0, hw = sw ? .45 : .9, hd = sw ? .9 : .45;
     const o = { id: 'caixa:' + i, tipo: 'caixa', cat: 'item', x: L.x, z: L.z, n: L.n, nome: 'Caixa misteriosa' + (i === 0 ? ' (início)' : ''), preco: 950, efeito: 'arma sorteada (10 na Liquidação); muda de lugar depois do ursinho', raio: 2.3, fonte: 'M.z.boxes',
@@ -273,7 +276,7 @@ function auditar(cfg) {
   const faltaBebida = Object.keys(PERK).filter(k => !ZD.perks.some(p => p.k === k)); if (faltaBebida.length) ach('aviso', 'bebida_ausente', `bebidas que não existem no mapa: ${faltaBebida.join(', ')}`, []);
 
   // ---------- 6. força × risco ----------
-  const forca = o => { const p = o.preco ?? 0;
+  const forca = o => { const p = o.preco ?? 0; if (o.forca0 != null) return o.forca0; // O2-C04: interativo novo traz a força da tabela ZINT
     if (o.tipo === 'pap') return 5; if (o.tipo === 'caixa') return 4; if (o.tipo === 'energia') return 3; if (o.tipo === 'armadilha') return 3; if (o.tipo === 'bowie') return 4; if (o.tipo === 'letal') return 2;
     if (o.tipo === 'bebida') return p >= 4000 ? 5 : p >= 2500 ? 4 : p >= 2000 ? 3 : 2;
     if (o.tipo === 'arma_parede') return p >= 2000 ? 4 : p >= 1500 ? 3 : p >= 1000 ? 2 : 1; return 0; };
@@ -308,8 +311,8 @@ function auditar(cfg) {
     for (const e of extras) { if (e.tipo === 'janela') { g.fillStyle = '#4fd1ff'; g.fillRect(X(e.x) - 2, Y(e.z) - 2, 5, 5); }
       else if (e.tipo === 'zumbi_do_chao') { g.fillStyle = '#b06cff'; g.beginPath(); g.arc(X(e.x), Y(e.z), 2.5, 0, 7); g.fill(); }
       else { g.fillStyle = '#4cff6a'; g.beginPath(); g.arc(X(e.x), Y(e.z), 4, 0, 7); g.fill(); } }
-    const COR = { porta: '#ff9a2e', arma_parede: '#f2f2f2', letal: '#ffd84a', bowie: '#ffd84a', bebida: '#ff4f9a', pap: '#a77bff', energia: '#ffe14a', armadilha: '#5fd0ff', caixa: '#3fe0c0' };
-    const rot = o => o.tipo === 'porta' ? `${o.id.slice(6)} ${o.preco}` : o.tipo === 'caixa' ? `?${o.id.slice(6)}` : o.tipo === 'bebida' ? o.nome : o.tipo === 'pap' ? 'PaP' : o.tipo === 'energia' ? 'ENERGIA' : o.tipo === 'armadilha' ? 'armadilha' : `${o.nome} ${o.preco}`;
+    const COR = { porta: '#ff9a2e', arma_parede: '#f2f2f2', letal: '#ffd84a', bowie: '#ffd84a', bebida: '#ff4f9a', pap: '#a77bff', energia: '#ffe14a', armadilha: '#5fd0ff', caixa: '#3fe0c0', barril: '#ff6a3d' };
+    const rot = o => o.tipo === 'porta' ? `${o.id.slice(6)} ${o.preco}` : o.tipo === 'caixa' ? `?${o.id.slice(6)}` : o.tipo === 'bebida' ? o.nome : o.tipo === 'pap' ? 'PaP' : o.tipo === 'energia' ? 'ENERGIA' : o.tipo === 'armadilha' ? 'armadilha' : o.tipo === 'barril' ? 'barril' : `${o.nome} ${o.preco}`;
     for (const o of itens) { const c = COR[o.tipo] || '#fff', ruim = o.problemas?.some(p => p !== 'meio_sombreado' && p !== 'nasce_em_cima' && p !== 'apertado');
       if (o.tipo === 'porta') { const t = [-o.n[1], o.n[0]]; g.strokeStyle = c; g.lineWidth = 4; g.beginPath(); g.moveTo(X(o.x - t[0] * 2), Y(o.z - t[1] * 2)); g.lineTo(X(o.x + t[0] * 2), Y(o.z + t[1] * 2)); g.stroke(); txt(rot(o), X(o.x) + 4, Y(o.z) - 4, c, 10); continue; }
       if (o.area) { const [ax, az, aw, ad] = o.area; g.fillStyle = 'rgba(95,208,255,.25)'; g.fillRect(X(ax - aw / 2), Y(az - ad / 2), aw * esc, ad * esc); }
@@ -321,7 +324,7 @@ function auditar(cfg) {
     // legenda
     const lx = cw - LEG + 14; let ly = 50; g.fillStyle = '#1d2023'; g.fillRect(cw - LEG, 0, LEG, ch);
     txt(`${T.curMapId ?? ''} — planta dos interativos`, lx, 28, '#fff', 15);
-    const leg = [['porta', 'porta / portão / entulho (preço)'], ['arma_parede', 'arma de parede (preço)'], ['letal', 'granada, Semtex, Claymore, Bowie'], ['bebida', 'bebida'], ['pap', 'Pack-a-Punch'], ['energia', 'energia'], ['armadilha', 'armadilha (área do choque)'], ['caixa', 'lugar da Caixa (?n)']];
+    const leg = [['porta', 'porta / portão / entulho (preço)'], ['arma_parede', 'arma de parede (preço)'], ['letal', 'granada, Semtex, Claymore, Bowie'], ['bebida', 'bebida'], ['pap', 'Pack-a-Punch'], ['energia', 'energia'], ['armadilha', 'armadilha (área do choque)'], ['caixa', 'lugar da Caixa (?n)'], ['barril', 'barril explosivo (O2-C04)']];
     for (const [k, s] of leg) { g.fillStyle = COR[k]; g.beginPath(); g.arc(lx + 5, ly - 4, 5, 0, 7); g.fill(); txt(s, lx + 16, ly, '#ddd', 12); ly += 20; }
     for (const [cor, s] of [['#4fd1ff', 'janela (zumbi entra)'], ['#b06cff', 'zumbi sai do chão'], ['#4cff6a', 'nascimento do jogador'], ['#ff2a2a', 'problema (círculo) / perto demais (tracejado)']]) { g.fillStyle = cor; g.fillRect(lx, ly - 9, 10, 10); txt(s, lx + 16, ly, '#ddd', 12); ly += 20; }
     ly += 6; txt('fundo: área andável (cor por região;', lx, ly, '#aaa', 11); txt('mais clara = área inicial)', lx, ly + 14, '#aaa', 11); txt('preto = parede; marrom = dá para pular', lx, ly + 28, '#aaa', 11); txt('traço = para onde o item está virado', lx, ly + 42, '#aaa', 11);
@@ -330,7 +333,7 @@ function auditar(cfg) {
     png = cv.toDataURL('image/png');
   }
 
-  const limpa = o => { const { corpo, parede, alterna, cat, ...r } = o; void corpo; void parede; void alterna; void cat; for (const k of ['x', 'z', 'ux', 'uz']) if (typeof r[k] === 'number') r[k] = r2(r[k]); return r; };
+  const limpa = o => { const { corpo, parede, alterna, cat, forca0, usoDist, ...r } = o; void forca0; void usoDist; void corpo; void parede; void alterna; void cat; for (const k of ['x', 'z', 'ux', 'uz']) if (typeof r[k] === 'number') r[k] = r2(r[k]); return r; };
   return { inventario: { itens: itens.map(limpa), nascimentos: extras, lampadas: lamps, start, ff: { x0: gx0, z0: gz0, nx: GW, nz: GD }, colisores: COL.length },
     grade: { mesmaDoJogo, areaInicialM2: r2([...Djf].filter(v => v !== Infinity).length * .25) }, achados, regioes, pares, forca: { itens: fx, correl }, bloqueio, png };
 }
