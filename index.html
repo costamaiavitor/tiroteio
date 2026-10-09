@@ -26258,7 +26258,7 @@ function campObjPos(id) { // onde fica o objetivo (para a seta): interativo, zon
 }
 function campHud(dt) { // gancho no fim do zHud (cada quadro do cliente)
   if (!NET.isHost) CAMP.on = campCliOn(); // cliente: CAMP.on espelha a partida (só o host roda os ganchos do servidor; a nota do O3-D04 lê CAMP.on e CAMP.ato)
-  if (!campCliOn()) { const E = CAMP.c.el; if (E?.root?.isConnected && E.root.style.display !== 'none') { E.root.style.display = 'none'; E.cena.style.display = 'none'; } return; }
+  if (!campCliOn()) { if (C.st?.mode === 'zombies' && C.st.zmode === 'infinito') for (const f of CAMP_GANCHOS.hud) f(dt); /* coordenador: avisos e barra do chefe e eventos também no infinito */ const E = CAMP.c.el; if (E?.root?.isConnected && E.root.style.display !== 'none') { E.root.style.display = 'none'; E.cena.style.display = 'none'; } return; }
   const c = CAMP.c, E = campHudEl(); if (E.root.style.display === 'none') E.root.style.display = '';
   // troca de mapa: avisa o host quando o mapa novo está montado e aquecido
   if (c.trans && !c.prontoEnv && curMapId === c.trans && !WARM && ZC.world) { c.prontoEnv = true; sendToHost({ t: 'camp', k: 'pronto' }); }
