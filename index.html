@@ -26761,6 +26761,357 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP
 // ===== FIM O3-D04 =====
 //
 // @@CAMP-EV@@
+// ===== O3-D05: eventos especiais da campanha (docs/overhaul/campanha.md §5; textos do rádio em lore.md §9) =====
+// O que tem aqui (dono: O3-D05):
+// - CAMP_EV: os 7 eventos (regra no host, visual no cliente, banner, pontos). CAMP_AGENDA: rodadas da campanha com evento, cães e
+//   Carniceiro (§5.2, §6.4: os do clássico ficam desligados na campanha). CAMP_INF.ev: sorteio do infinito (§5.3; o resto do
+//   infinito é do D14, que chama campEvLiga/os ganchos daqui).
+// - Host: o evento vale a rodada inteira em que cai (nunca em rodada de cães nem de chefe; a fuga do D14 é exceção, campEvLiga(id,
+//   { fuga: 1 })). Entra pelos CAMP_GANCHOS do D02 (inicio, rodada, fimRodada, tick, cp) e pelos registros do D03 (CAMP_G.tipo,
+//   nasce, status, dano, morte, zhit), sempre no fim de cada lista (campEvUltimos: o evento vale por cima dos tipos novos e da curva).
+//   Rede: { t: 'camp', k: 'ev', id, r, s, x } (s = segundos do prazo do Relógio; x = 1 quando estourou), o estado vai no cp (ev, cx).
+// - Hora do Silêncio de verdade no host: o 'zhit' só passa com w === 'knife' (CAMP_G.zhit) e todo dano de explosão/arma pelo zHit
+//   vira 0 (CAMP_G.dano; a perna arrancada pela explosão volta no tick seguinte). O cliente troca para a faca e avisa.
+// - Lançamento aéreo: caixotes dinâmicos (até 5 por rodada) atrás de UM interativo 'suprimento' por mapa (ZINT_MAPA vila e
+//   sanatorio). O interativo fica parado no lugar auditado (x0, z0) e, na campanha/infinito, o quadro do cliente o leva para o
+//   caixote mais perto (o F de sempre); o host confere a distância de verdade ao caixote (CAMP_EV.suprimento.srvR).
+// - Cliente: o visual roda num item do MAP_ANIM (depois do zUpdateWorld e do B19, todo quadro, inclusive no infinito); entra e sai
+//   desfazendo tudo o que mudou (névoa, luzes, sons, moldes do Explosivo). Nada aqui roda no clássico: sem CAMP.on o host não chama
+//   nenhum gancho, o cliente ignora 'ev' fora da campanha/infinito e o interativo vira stub ({ off: 1 }).
+const CAMP_EV = { // §5.1 (nome = banner; sub = subtítulo; pts = multiplicador dos pontos por abate)
+  apagao: { nome: 'APAGÃO', sub: 'A luz caiu de vez · lanterna: L', qtdK: .85, pts: 1.25,
+    vis: { luzK: .35, bulbo: .1, farK: .6 } }, // pool de luz 0, bulbos e halos a 10%, hemisférica e preenchimento ×0,35, névoa far ×0,6
+  nevoa: { nome: 'NÉVOA DO VEIO', sub: 'Eles sobem da água', cv: .9, pesoAfogado: 2, pts: 1.15, afogado: 9,
+    vis: { far: 16, perto: 1, cor: 0x0c140f, gemidoK: 1.41 } }, // +3 dB nos gemidos
+  estouro: { nome: 'ESTOURO', sub: 'O apito não para: eles vêm correndo', qtdK: 1.3, atrasoK: .5, maxMais: 4, vidaK: .6, corre: [5, 5.5], especiais: [3],
+    fuga: { repoe: 6, especiais: [9] }, // fuga do final (D14): reposição contínua, só Afogados e comuns correndo
+    vis: { apitoS: 8 } },
+  silencio: { nome: 'HORA DO SILÊNCIO', sub: 'Tiro e explosão não ferem: só a faca', qtdK: .6, vidaK: .5, vidaMin: 150, faca: 3, ptsFaca: 1.5, especiais: [11],
+    semSaco: ['insta', 'nuke', 'death'], // Insta-Kill e Nuke fora do saco (§5.1); a Máquina da Morte também (decisão D05: seria arma de fogo inútil)
+    saco: ['max', 'dbl', 'carp', 'fire', 'zblood', 'bonus'], // saco de reposição sem os de cima
+    vis: { aviso: 'Hora do Silêncio: só a faca' } },
+  inchados: { nome: 'INCHADOS', sub: 'Atirem longe deles: o estouro pega os outros', inchaP: .6, raioK: 1.2, danoK: 2,
+    raio0: 4.5, danoBase: 1.4, semDono: ['bloat', 'm1911'], // raio0/danoBase = os do zBloatBoom; semDono: mortes sem jogador que ainda estouram
+    vis: { brilhoK: 1.5 } },
+  relogio: { nome: 'CONTRA O RELÓGIO', sub: 'Limpem a rodada antes do ponteiro chegar no vermelho', prazo: [60, 2.5], premio: 250, atrasoPrazo: .25, corre: [5, 5.5], brutos: 1,
+    vis: { vermelhoS: 15, bipeS: 10 } },
+  suprimento: { nome: 'LANÇAMENTO AÉREO', sub: 'Fumaça vermelha marca o caixote · F abre', qtdK: 1.15, cada: 25, primeiro: 10, max: 5, vida: 40, dist: [10, 30],
+    chance: [.6, .25], perkDe: 5, tentativas: 40, tentaS: 2, livreR: 1.2, tetoY: 1.8, entre: 4, srvR: 2.8, usoR: 2.2,
+    vis: { queda: 14, quedaS: 2.4, fumacaS: .35, fumacaR: 60 } },
+};
+const CAMP_AGENDA = { // §5.2 e §6.4 (rodada -> evento, cães, Carniceiro); fora da agenda a campanha não tem cães nem Carniceiro
+  3: { ev: 'nevoa' }, 6: { ev: 'suprimento' }, 8: { caes: 1 }, 9: { ev: 'apagao' }, 13: { ev: 'silencio', carn: 1 }, 14: { caes: 1 },
+  15: { ev: 'estouro' }, 17: { ev: 'inchados' }, 18: { carn: 1 }, 19: { ev: 'relogio' }, 22: { ev: 'nevoa' }, 23: { carn: 1 }, 24: { ev: 'nevoa' },
+};
+const CAMP_EV_AG = { carnAt: .65 }; // o Carniceiro da agenda nasce a 65% da rodada, como no clássico (zStartRound)
+const CAMP_INF = { // §5.3 (só a parte dos eventos; o D14 acrescenta estreias, chefes de campo e recorde)
+  ev: { de: 5, cada: 5, semRepetir: 2, relogioDe: 10, chefeDe: 20, chefeCada: 10, lista: ['apagao', 'nevoa', 'estouro', 'silencio', 'inchados', 'relogio', 'suprimento'] },
+};
+// ---------- host ----------
+const CAMP_EVS = { id: null, r: 0, t0: 0, fuga: false, fim: 0, estourou: false, premio: false, cx: [], cxId: 1, cxN: 0, cxT: 0, hit: null, hitSp: false, pernas: [],
+  inf: { vistoR: 0, prox: CAMP_INF.ev.de, ult: [] } };
+const campEvDef = () => CAMP_EVS.id ? CAMP_EV[CAMP_EVS.id] : null;
+const campEvPeso = k => CAMP_EVS.id === 'nevoa' && k === CAMP_EV.nevoa.afogado ? CAMP_EV.nevoa.pesoAfogado : 1; // D06: peso do Afogado na mistura
+function campEvEspeciais() { const E = CAMP_EVS, D = campEvDef(); return !D ? null : E.fuga && D.fuga ? D.fuga.especiais : D.especiais || null; }
+function campEvPode(r) { // nunca em rodada de cães nem de chefe
+  if (Z.dogRound) return false;
+  if (CAMP.modo === 'campanha') return !CAMP_ATOS[CAMP.et]?.chefe;
+  const I = CAMP_INF.ev; return !Z.bossQ && !(r >= I.chefeDe && (r - I.chefeDe) % I.chefeCada === 0);
+}
+function campEvLiga(id, opc) { // host: liga o evento nesta rodada (agenda, infinito, D14 na fuga, testes)
+  if (!CAMP.on || !Object.hasOwn(CAMP_EV, id)) return false;
+  const E = CAMP_EVS, D = CAMP_EV[id]; campEvDesliga();
+  Object.assign(E, { id, r: Z.round, t0: now, fuga: !!opc?.fuga, fim: 0, estourou: false, premio: false, cxN: 0, cxT: now + (D.primeiro ?? 0), hit: null });
+  campEvUltimos();
+  if (Z.phase === 'round') { // começo da rodada: quantidade, ritmo e mistura (proporcional: guarda os tipos que os outros blocos puseram)
+    if (D.qtdK) { const n0 = Z.toSpawn; Z.toSpawn = Math.max(1, Math.round(n0 * D.qtdK)); campEvMix(Z.toSpawn / Math.max(1, n0)); }
+    if (D.atrasoK) Z.spawnDelay *= D.atrasoK;
+    const esp = campEvEspeciais(); if (esp) for (let j = 1; j < Z.mix.length; j++) if (!esp.includes(j) && Z.mix[j]) { Z.mixN -= Z.mix[j]; Z.mix[j] = 0; }
+  }
+  if (id === 'relogio') E.fim = now + D.prazo[0] + D.prazo[1] * Math.max(0, Z.toSpawn);
+  if (id === 'silencio') { Z.insta = 0; campEvSaco(); }
+  broadcast({ t: 'camp', k: 'ev', id, r: E.r, s: E.fim ? r2(E.fim - now) : 0 });
+  campRadio('ev-' + id);
+  return true;
+}
+function campEvMix(k) { // a mistura acompanha a quantidade nova (teto de metade da rodada, como no zMix)
+  let t = 0; for (let j = 1; j < Z.mix.length; j++) { Z.mix[j] = Math.round(Z.mix[j] * k); t += Z.mix[j]; }
+  const cap = Math.floor(Z.toSpawn * .5); while (t > cap) { let i = 1; for (let j = 2; j < Z.mix.length; j++) if (Z.mix[j] > Z.mix[i]) i = j; Z.mix[i]--; t--; }
+  Z.mixN = t;
+}
+function campEvDesliga() { const E = CAMP_EVS; if (!E.id) return; E.id = null; E.fuga = false; E.fim = 0; E.hit = null; broadcast({ t: 'camp', k: 'ev', id: null, r: E.r }); }
+function campEvSaco() { // Silêncio: Insta-Kill e Nuke fora do saco (o zDrop só refaz o saco vazio: aqui ele nunca fica vazio)
+  const D = CAMP_EV.silencio; Z.bag = Z.bag.filter(t => !D.semSaco.includes(t));
+  if (!Z.bag.length) { Z.bag = D.saco.slice(); shuffle(Z.bag); }
+}
+// registros do D03 (no fim de cada lista: o evento manda por cima dos tipos novos e da curva)
+function campEvTipo(k) {
+  const E = CAMP_EVS; if (!E.id || Z.dogRound) return k;
+  const D = CAMP_EV[E.id], esp = campEvEspeciais(), volta = Z.reQ.length > 0; // volta: o zSpawnOne pegou da fila (não mexe na mistura)
+  if (esp && k && !ZKIND[k]?.chefe && !esp.includes(k)) { if (!volta && Z.mix[k] > 0) { Z.mix[k]--; Z.mixN--; } return 0; }
+  if (D.inchaP && k === 0 && !volta && Math.random() < D.inchaP) { Z.mix[2] = (Z.mix[2] | 0) + 1; Z.mixN++; return 2; } // o zSpawnOne desconta
+  return k;
+}
+function campEvNasce(z, cands) { // Névoa: só chão (risers) e água (CAMP_AGUA); janela só se não houver nenhum
+  const E = CAMP_EVS; if (E.id !== 'nevoa') return;
+  const act = zActive(); let n = 0;
+  for (let i = 0; i < cands.length; i++) if (cands[i].i < 0) cands[n++] = cands[i];
+  for (const a of CAMP_AGUA[curMapId] || []) if (act.has(zRoomAt(a[0], a[1]))) cands[n++] = { i: -1, x: a[0], z: a[1] };
+  if (n) cands.length = n; // sem chão nem água: ficam as janelas que já estavam
+}
+function campEvStatus(z) {
+  const E = CAMP_EVS; if (!E.id || z.dog) return;
+  const D = CAMP_EV[E.id];
+  if (D.cv) z.cv = (z.cv || 1) * D.cv;
+  if (D.vidaK) z.hp = Math.max(Math.min(z.hp, D.vidaMin || 1), Math.round(z.hp * D.vidaK));
+  const corre = D.corre && (E.id !== 'relogio' || E.estourou) ? D.corre : null;
+  if (corre && !z.kind) { z.sc = 2; z.speed = rand(corre[0], corre[1]) * zDf().spd; }
+}
+function campEvDano(z, dmg, zone, w, p, splash) {
+  const E = CAMP_EVS; if (!E.id) return dmg;
+  E.hit = z; E.hitSp = !!splash;
+  if (E.id !== 'silencio') return dmg;
+  if (splash || w !== 'knife') { if (!z.crawler) E.pernas.push(z); return 0; } // explosão e arma de fogo não ferem
+  return p?.bowie ? dmg : dmg * CAMP_EV.silencio.faca; // faca ×3; a Bowie fica nos 1000
+}
+const campEvZhit = (p, m) => CAMP_EVS.id !== 'silencio' || m.w === 'knife';
+function campEvMorte(z, p, zone, w) {
+  const E = CAMP_EVS; if (!E.id) return;
+  const D = CAMP_EV[E.id], sp = E.hit === z ? E.hitSp : null; if (E.hit === z) E.hit = null;
+  if (p && sp !== null) { // pontos do evento: o mesmo cálculo do zKill, vezes (k - 1)
+    const k = D.ptsFaca ? (w === 'knife' ? D.ptsFaca : 1) : D.pts || 1;
+    if (k !== 1) zPts(p, Math.round(zGain((w === 'knife' ? 130 : sp ? 50 : zone === 'head' ? 100 : zone === 'legs' ? 50 : 60) + (ZKIND[z.kind]?.pts || 0)) * (k - 1)));
+  }
+  if (E.id === 'silencio') campEvSaco(); // antes do zDrop deste mesmo abate
+  else if (E.id === 'relogio' && !E.estourou && !E.premio && Z.phase === 'round' && Z.toSpawn <= 0 && Z.zs.size === 0) { // limpou antes do prazo
+    E.premio = true; zDrop('max', z.body.pos.x, z.body.pos.z, true);
+    for (const q of S.players.values()) if (q.alive) { q.money += D.premio; sendTo(q.id, { t: 'pts', n: D.premio, m: q.money }); }
+  } else if (E.id === 'inchados' && z.kind === 2 && (p || D.semDono.includes(w))) campEvIncha(z, p);
+}
+function campEvIncha(z, p) { // Inchados: o estouro pega 1,2× mais longe e dá 2× nos zumbis (o clássico soma a parte dele logo depois)
+  const D = CAMP_EV.inchados, R0 = D.raio0, R = R0 * D.raioK, P = z.body.pos, c = new V3(P.x, Math.max(0, P.y) + 1, P.z), dz = zHp(Z.round) * zHpK(Z.round) * D.danoBase, t = new V3();
+  for (const o of [...Z.zs.values()]) {
+    if (!Z.zs.has(o.id)) continue;
+    t.set(o.body.pos.x, o.body.pos.y + (o.dog ? .5 : 1), o.body.pos.z); const d = t.distanceTo(c);
+    if (d > R || !losClear(c, t)) continue;
+    const dmg = D.danoK * dz * (1 - d / (R * 1.3)) - (d <= R0 ? dz * (1 - d / (R0 * 1.3)) : 0); if (!(dmg > 0)) continue;
+    if (p) zHit(p, o.id, dmg, 'body', 'bloat', true); else { o.hp -= ZKIND[o.kind].chefe ? Math.min(dmg, o.maxHp * ZKIND[o.kind].capGolpe) : dmg; if (o.hp <= 0) zKill(o, null, 'body', 'bloat', true, false); }
+  }
+}
+const CAMP_EV_G = { tipo: campEvTipo, nasce: campEvNasce, status: campEvStatus, dano: campEvDano, morte: campEvMorte, zhit: campEvZhit };
+function campEvUltimos() { for (const k in CAMP_EV_G) { const L = CAMP_G[k], f = CAMP_EV_G[k], i = L.indexOf(f); if (i >= 0 && i === L.length - 1) continue; if (i >= 0) L.splice(i, 1); L.push(f); } }
+campEvUltimos();
+// ganchos do D02
+CAMP_GANCHOS.inicio.push(e => { // começo da etapa (campanha): sem evento nem caixote; cães e Carniceiro da agenda para a primeira rodada
+  const E = CAMP_EVS; campEvDesliga(); E.cx = []; E.inf.vistoR = 0;
+  campEvAgendaProx(Math.max(Z.round, CAMP_ATOS[e].rod0 - 1) + 1);
+});
+function campEvAgendaProx(r) { const ag = CAMP_AGENDA[r]; Z.nextDog = ag?.caes ? r : 1e9; Z.nextBoss = ag?.carn ? r : 1e9; } // o zStartRound do clássico faz o resto
+CAMP_GANCHOS.rodada.push(r => { // depois da curva do D02
+  Z.nextDog = Z.nextBoss = 1e9; // o zStartRound marcou os próximos pelo clássico: na campanha só vale a agenda
+  const ag = CAMP_AGENDA[r];
+  if (ag?.ev && campEvPode(r)) campEvLiga(ag.ev);
+  if (Z.bossQ && CAMP_CURVA[CAMP_ATOS[CAMP.et]?.id]) { Z.toSpawn++; Z.bossAt = Math.max(1, Math.floor(Z.toSpawn * CAMP_EV_AG.carnAt)); } // a curva tirou o +1 do Carniceiro
+});
+CAMP_GANCHOS.fimRodada.push(r => { campEvDesliga(); campEvAgendaProx(r + 1); });
+CAMP_GANCHOS.tick.push(campEvTick);
+CAMP_GANCHOS.cp.push(cp => { const E = CAMP_EVS; if (E.id) cp.ev = [E.id, E.r, E.fim ? r2(Math.max(0, E.fim - now)) : 0, E.estourou ? 1 : 0]; if (E.cx.length) cp.cx = campEvCxArr(); });
+function campEvTick(dt) {
+  const E = CAMP_EVS;
+  if (CAMP.modo === 'infinito') campEvInf();
+  for (const z of E.pernas) z.crawler = false; E.pernas.length = 0; // Silêncio: a explosão não arranca perna
+  if (E.id && !E.fuga && (Z.phase !== 'round' || Z.round !== E.r)) campEvDesliga(); // a rodada acabou (o infinito não tem o fimRodada)
+  if (E.cx.length) campEvCxTick();
+  const D = campEvDef(); if (!D || Z.phase !== 'round') return;
+  if (D.maxMais && Z.toSpawn > 0 && now >= Z.spawnT) { const mx = zDf().max; if (Z.zs.size >= mx && Z.zs.size < mx + D.maxMais) Z.spawnT = now + (zSpawnOne() ? Z.spawnDelay : .5); } // Estouro: max +4
+  if (E.fuga && D.fuga && Z.toSpawn < D.fuga.repoe) Z.toSpawn = D.fuga.repoe;
+  if (E.id === 'relogio' && !E.estourou && now >= E.fim) campEvEstoura();
+  if (E.id === 'suprimento' && E.cxN < D.max && now >= E.cxT) E.cxT = now + (campEvCxSolta() ? D.cada : D.tentaS);
+}
+function campEvEstoura() { // Relógio no prazo: o resto nasce depressa, os comuns vivos correm e entra 1 Brutamonte
+  const E = CAMP_EVS, D = CAMP_EV.relogio, sp = zDf().spd; E.estourou = true;
+  Z.spawnDelay *= D.atrasoPrazo; Z.spawnT = Math.min(Z.spawnT, now + Z.spawnDelay);
+  for (const z of Z.zs.values()) if (!z.kind && !z.dog && !z.crawler && !z.frzT) { z.sc = 2; z.speed = rand(D.corre[0], D.corre[1]) * sp; }
+  Z.toSpawn += D.brutos; Z.mix[1] += D.brutos; Z.mixN += D.brutos;
+  broadcast({ t: 'camp', k: 'ev', id: 'relogio', r: E.r, s: 0, x: 1 });
+}
+function campEvInf() { // infinito: um evento a cada 5 rodadas a partir da 5ª, sem repetir os 2 últimos; o Relógio só da 10ª em diante
+  const I = CAMP_EVS.inf, D = CAMP_INF.ev, r = Z.round;
+  if (r < I.vistoR) { I.vistoR = 0; I.prox = D.de; I.ult = []; CAMP_EVS.cx = []; } // partida nova
+  if (Z.phase !== 'round' || r === I.vistoR) return; I.vistoR = r;
+  if (r < I.prox || !campEvPode(r)) return; // cães ou chefe: fica para a próxima
+  const L = D.lista.filter(id => !I.ult.includes(id) && (id !== 'relogio' || r >= D.relogioDe)); if (!L.length) return;
+  const id = L[Math.floor(Math.random() * L.length)]; I.ult.push(id); while (I.ult.length > D.semRepetir) I.ult.shift();
+  I.prox = Math.max(I.prox + D.cada, r + 1);
+  campEvLiga(id);
+}
+// caixotes do Lançamento aéreo (host)
+const campEvCxArr = () => CAMP_EVS.cx.map(c => [c.id, r2(c.x), r2(c.y), r2(c.z), r2(Math.max(0, c.fim - now))]);
+function campEvCxEnvia() { broadcast({ t: 'camp', k: 'cx', a: campEvCxArr() }); }
+function campEvCeu(x, z, teto) { const L = colQuery(x - .3, x + .3, z - .3, z + .3, CG.q2); for (let k = 0; k < L.length; k++) { const b = COL[L[k]]; if (b.minY >= teto && x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ) return false; } return true; } // céu aberto (sem teto em cima)
+function campEvChao(x, z) { const L = colQuery(x - .2, x + .2, z - .2, z + .2, CG.q2); let y = 0; for (let k = 0; k < L.length; k++) { const b = COL[L[k]]; if (b.maxY <= STEP && b.maxY > y && x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ) y = b.maxY; } return y; }
+function campEvCxSolta() { // célula andável e alcançável, de céu aberto e com 1,2 m livres, a 10–30 m de um jogador sorteado
+  const E = CAMP_EVS, D = CAMP_EV.suprimento, tg = [...S.players.values()].filter(p => p.alive && !p.downed); if (!tg.length) return false;
+  const act = zActive(), q = tg[Math.floor(Math.random() * tg.length)];
+  for (let k = 0; k < D.tentativas; k++) {
+    const a = Math.random() * Math.PI * 2, d = rand(D.dist[0], D.dist[1]), x = q.pos[0] + Math.cos(a) * d, z = q.pos[2] + Math.sin(a) * d, c = ffCell(x, z);
+    if (c < 0 || !FF.walk[c] || !isFinite(FF.dist[c]) || !act.has(zRoomAt(x, z)) || !footFreeR(x, z, D.livreR) || !campEvCeu(x, z, D.tetoY) || E.cx.some(o => Math.hypot(o.x - x, o.z - z) < D.entre)) continue;
+    E.cx.push({ id: E.cxId++, x, y: campEvChao(x, z), z, fim: now + D.vida }); E.cxN++; campEvCxEnvia(); return true;
+  }
+  return false;
+}
+function campEvCxTick() { const E = CAMP_EVS, n = E.cx.length; E.cx = E.cx.filter(c => now < c.fim); if (E.cx.length !== n) campEvCxEnvia(); }
+function campEvCxAbre(p) { // F no caixote (o interativo 'suprimento'): 60% power-up do saco, 25% munição cheia de quem abriu, 15% bebida (rodada 5+)
+  const E = CAMP_EVS, D = CAMP_EV.suprimento; let c = null, bd = D.srvR;
+  for (const o of E.cx) { const d = Math.hypot(p.pos[0] - o.x, p.pos[2] - o.z); if (d <= bd) { bd = d; c = o; } }
+  if (!c) return false;
+  E.cx.splice(E.cx.indexOf(c), 1);
+  const r = Math.random(); let q = r < D.chance[0] ? 'pwr' : r < D.chance[0] + D.chance[1] ? 'mun' : Z.round >= D.perkDe ? 'perk' : 'pwr';
+  if (q === 'perk' && !campEvPerk(p)) q = 'pwr';
+  if (q === 'pwr') zDrop(null, c.x, c.z, true);
+  else if (q === 'mun') sendTo(p.id, { t: 'camp', k: 'cxm' });
+  broadcast({ t: 'camp', k: 'cxo', id: c.id, q, by: p.id }); campEvCxEnvia();
+  return true;
+}
+function campEvPerk(p) { // a Bebida Grátis do zPower, só para quem abriu
+  const solo = S.players.size === 1, opts = Object.keys(ZPERKS).filter(k => !p.perks.includes(k) && ZD.perks.some(x => x.k === k) && !(k === 'qr' && solo && Z.qrBuys >= 3)); if (!opts.length) return false;
+  const k = opts[Math.floor(Math.random() * opts.length)]; zPerkGot(p, k); if (k === 'qr' && solo) Z.qrBuys++;
+  broadcast({ t: 'zperk', id: p.id, k }); return true;
+}
+// o interativo do caixote: um por mapa, parado no lugar auditado; na campanha/infinito vai para o caixote mais perto (quadro do cliente)
+const campEvZintOn = () => C.st?.mode === 'zombies' && (C.st.zmode === 'campanha' || C.st.zmode === 'infinito');
+ZINT.suprimento = { nome: 'Caixote do lançamento aéreo', custo: 0, usoR: CAMP_EV.suprimento.usoR, srvR: 1e4, forca: 1 }; // srvR: quem confere é o campEvCxAbre (distância ao caixote)
+ZINT_FN.suprimento = {
+  est: ['pronto'],
+  efeito: (o, D) => `campanha/infinito: caixotes do Lançamento aéreo (F abre a até ${CAMP_EV.suprimento.srvR} m); sem evento não aparece`,
+  monta(o) {
+    if (o.x0 === undefined) { o.x0 = o.x; o.z0 = o.z; } o.x = o.x0; o.z = o.z0;
+    if (!campEvZintOn()) return CAMP_STUB();
+    const cx = [];
+    for (let k = 0; k < CAMP_EV.suprimento.max; k++) {
+      const g = new THREE.Group(), cai = new THREE.Group(), pq = new THREE.Group(); g.add(cai, pq);
+      campPeca(cai, .9, .7, .9, 0, .35, 0, mc(0x5a4228)); for (const y of [.12, .58]) campPeca(cai, .94, .08, .94, 0, y, 0, mc(0x2a2826));
+      campPeca(cai, .5, .02, .3, 0, .71, 0, mc(0xc8c0a8)); mergeParts(cai); // tábuas, cintas e a etiqueta
+      campPeca(pq, 2.6, .12, 2.6, 0, 3.1, 0, mc(0xd8d0b8)); for (const [x, z] of [[-1.1, -1.1], [1.1, -1.1], [-1.1, 1.1], [1.1, 1.1]]) { const f = campPeca(pq, .03, 2.5, .03, x * .55, 1.9, z * .55, mc(0x2a2826)); f.rotation.set(z * .35, 0, -x * .35); }
+      mergeParts(pq); g.visible = false; world.add(g); cx.push({ g, pq }); // sem cullAdd: anda com o caixote
+    }
+    return { cx, raio: .5 };
+  },
+  estado() {},
+  prompt(o, i, c, D) { const e = ZC.world?.zint?.[i]; if (!e || e.off || !campEvZintOn() || !CAMP_EVC.perto) return null; return { k: 'zint', id: i, txt: 'Abrir o caixote' }; },
+  quadro(o, e, c, dt) { if (!e.off) campEvCxQuadro(o, e); },
+  usar(p, i, o, E, D, err) { if (CAMP.on && !campEvCxAbre(p)) err('Chegue mais perto do caixote'); },
+};
+// lugares auditados (tools/itens/auditoria.mjs): no pátio do começo de cada mapa, longe dos itens, janelas e chão que solta zumbi
+ZINT_MAPA.vila.push({ t: 'suprimento', id: 'ev-suprimento', x: 0, z: 7.5, n: [0, 1] });
+ZINT_MAPA.sanatorio.push({ t: 'suprimento', id: 'ev-suprimento', x: 0, z: -1, n: [0, 1] });
+// ---------- cliente ----------
+const CAMP_EVC = { id: null, r: 0, fim: 0, tot: 1, x: 0, banner: 0, cx: [], perto: null, vis: null, visW: null, salvo: null, hemiW: NaN, hemiB: 0, fillW: NaN, fillB: 0, apitoT: 0, avisoT: 0, bip: -1, molT: 0, man: null, manK: '' };
+function campEvCli(id, r, s, x, sync) { // estado do evento no cliente ({ k: 'ev' } e cp.ev)
+  if (id !== null && (typeof id !== 'string' || !Object.hasOwn(CAMP_EV, id))) return;
+  if (!campEvZintOn()) id = null; // fora da campanha/infinito o evento não existe
+  const c = CAMP_EVC, rr = Number.isInteger(r) ? r : 0, novo = id && (id !== c.id || rr !== c.r);
+  c.id = id; c.r = rr; c.fim = id === 'relogio' && finN(s) ? now + clamp(s, 0, 600) : 0; c.x = x ? 1 : 0; if (novo) c.tot = Math.max(1, c.fim - now);
+  if (novo && !sync && rr === ZC.round && ZC.phase === 'round') c.banner = 1; // infinito: o 'ev' chega depois do 'zround'
+  if (id) campEvAnimLiga();
+}
+function campEvCxCli(a, sync) { // lista dos caixotes (cx e cp.cx)
+  const c = CAMP_EVC, D = CAMP_EV.suprimento.vis, L = [];
+  if (Array.isArray(a) && campEvZintOn()) for (const v of a.slice(0, CAMP_EV.suprimento.max)) {
+    if (!Array.isArray(v) || v.length !== 5 || !v.every(finN) || Math.abs(v[1]) > 1e4 || Math.abs(v[3]) > 1e4) continue;
+    const ant = c.cx.find(o => o.id === v[0]), t0 = ant ? ant.t0 : sync ? now - D.quedaS : now;
+    L.push({ id: v[0], x: v[1], y: v[2], z: v[3], fim: now + clamp(v[4], 0, 600), t0, fumT: 0 });
+    if (!ant && !sync && campEvZintOn()) play('beep', new V3(v[1], v[2] + 1, v[3]));
+  }
+  c.cx = L; if (L.length) campEvAnimLiga();
+}
+Object.assign(CAMP_GANCHOS.msg, {
+  ev: m => campEvCli(m.id ?? null, m.r, m.s, m.x, false),
+  cx: m => campEvCxCli(m.a, false),
+  cxo: m => { const o = CAMP_EVC.cx.find(c => c.id === m.id); if (o) { const p = new V3(o.x, o.y + .6, o.z); play('buy', p); puff(p, 0x8a7a64, 1.4, .6, .3); } },
+  cxm: () => { // munição cheia nas armas de quem abriu (como a Munição Máxima, sem as granadas)
+    for (const w of [G.inv.primary, G.inv.secondary, G.inv.third]) if (w && W[w]) { const a = G.ammo[w] || (G.ammo[w] = { mag: wMag(w), res: 0 }); a.res = W[w].res; }
+    play('pwr'); toast('Caixote: munição cheia', 2.5);
+  },
+});
+CAMP_GANCHOS.sync.push(cp => { const v = Array.isArray(cp.ev) ? cp.ev : null; campEvCli(v ? v[0] : null, v?.[1], v?.[2], v?.[3], true); campEvCxCli(cp.cx || [], true); });
+CAMP_GANCHOS.roundFx.push((r, dog) => { const c = CAMP_EVC; if (dog || !c.id || c.r !== r) return false; c.banner = 1; return true; }); // o banner sai no quadro seguinte (por cima do "Algo grande" do Carniceiro)
+CAMP_GANCHOS.hud.push(() => { if (CAMP_EVC.id || CAMP_EVC.vis) campEvAnimLiga(); });
+function campEvAnimLiga() { if (!MAP_ANIM.includes(campEvAnim)) MAP_ANIM.push(campEvAnim); } // o MAP_ANIM zera a cada mapa montado
+function campEvAnim(dt) { // todo quadro, depois do zUpdateWorld (lâmpadas) e do B19 (hemisférica do Sanatório)
+  const c = CAMP_EVC, id = c.id && ZC.on && ZC.world && campEvZintOn() ? c.id : null;
+  if (c.vis !== id || (id && c.visW !== ZC.world)) { campEvVisSai(); if (id) campEvVisEntra(id); }
+  if (!id) { if (c.man && c.man.style.display !== 'none') c.man.style.display = 'none'; return; }
+  const D = CAMP_EV[id], V = D.vis;
+  if (c.banner) { c.banner = 0; centerMsg(D.nome, `Rodada ${c.r} · ${D.sub}`, 4); }
+  if (id === 'apagao') {
+    const Wd = ZC.world; for (const P of Wd.pool) P.L.intensity = 0;
+    for (const l of Wd.lights) if (l.bulb.visible) l.bulb.material.color.multiplyScalar(V.bulbo); // o zUpdateWorld acabou de pintar
+    if (hemi.intensity !== c.hemiW) c.hemiB = hemi.intensity; c.hemiW = hemi.intensity = c.hemiB * V.luzK; // detecta quem reescreveu (visMap, B19)
+    if (VIS.fill.parent) { if (VIS.fill.intensity !== c.fillW) c.fillB = VIS.fill.intensity; c.fillW = VIS.fill.intensity = c.fillB * V.luzK; }
+  } else if (id === 'nevoa') {
+    ZC.fogDog = true; const f = scene.fog; if (f) f.color.setHex(V.cor); scene.background.setHex(V.cor); const u = skyMat.uniforms; u.hor.value.setHex(V.cor); u.top.value.setHex(V.cor); u.bot.value.setHex(V.cor); // fogDog: o nevFog (cor da área) não puxa de volta; a saída é o zFogDog(false)
+  } else if (id === 'estouro') { if (now >= c.apitoT) { c.apitoT = now + V.apitoS; if (SND.apito) play('apito'); } }
+  else if (id === 'silencio') {
+    if (me.alive && !me.downed && W[G.cur]?.slot !== 'knife' && G.cur !== 'dmach' && hasW('knife')) { equip('knife'); if (now >= c.avisoT) { c.avisoT = now + 2; toast(V.aviso, 2); } }
+  } else if (id === 'inchados') { if (now >= c.molT) { c.molT = now + .5; campEvMoldes(V.brilhoK); } }
+  else if (id === 'relogio') campEvManometro();
+  if (c.man && id !== 'relogio' && c.man.style.display !== 'none') c.man.style.display = 'none';
+}
+function campEvVisEntra(id) {
+  const c = CAMP_EVC, V = CAMP_EV[id].vis, S_ = c.salvo = {}, f = scene.fog; c.vis = id; c.visW = ZC.world;
+  if ((id === 'apagao' || id === 'nevoa') && f) { // névoa: far fixo (Névoa) ou ×0,6 (Apagão); o atmos adota o valor novo como base e segue respirando
+    const b = AT?.fogBase && AT.fogSet === f.far ? AT.fogBase : [f.near, f.far]; S_.fog = { f, near: b[0], far: b[1] };
+    if (id === 'apagao') { f.near = b[0] * V.farK; f.far = b[1] * V.farK; } else { f.near = Math.min(b[0], V.perto); f.far = Math.min(b[1], V.far); }
+  }
+  if (id === 'apagao') { if (LUZ) { S_.luz = { L: LUZ, b: LUZ.base.slice() }; for (let i = 0; i < LUZ.base.length; i++) LUZ.base[i] *= V.bulbo; } play('lightning'); }
+  if (id === 'nevoa') { S_.snd = {}; for (const nm of new Set(ZGROAN.filter(Boolean))) { const f0 = SND[nm]; if (!f0) continue; S_.snd[nm] = f0; SND[nm] = o => { const g = AC.createGain(); g.gain.value = V.gemidoK; g.connect(o); f0(g); }; } }
+  if (id === 'inchados') { S_.mol = new Map(); c.molT = 0; }
+  if (id === 'relogio') c.bip = -1;
+}
+function campEvVisSai() { // desfaz o que o evento mudou (só nos mesmos objetos: mapa novo já nasce limpo)
+  const c = CAMP_EVC, S_ = c.salvo, id = c.vis; c.vis = null; c.visW = null; c.salvo = null; if (!id || !S_) return;
+  if (S_.fog && scene.fog === S_.fog.f) { S_.fog.f.near = S_.fog.near; S_.fog.f.far = S_.fog.far; }
+  if (S_.luz && LUZ === S_.luz.L) LUZ.base.set(S_.luz.b);
+  if (id === 'apagao') { if (hemi.intensity === c.hemiW) hemi.intensity = c.hemiB; if (VIS.fill.intensity === c.fillW) VIS.fill.intensity = c.fillB; c.hemiW = c.fillW = NaN; }
+  if (id === 'nevoa' && ZC.on && curMap && !ZC.dog) { ZC.fogDog = true; zFogDog(false); } // a cor e o céu de sempre pelo próprio zFogDog
+  if (S_.snd) Object.assign(SND, S_.snd);
+  if (S_.mol) for (const [geo, a] of S_.mol) { geo.attributes.color.array.set(a); geo.attributes.color.needsUpdate = true; }
+}
+function campEvMoldes(k) { // Inchados: o que brilha no Explosivo (barriga e olhos, a malha 'B' do molde) ×1,5; moldes novos entram a cada 0,5 s
+  const M = CAMP_EVC.salvo?.mol; if (!M) return;
+  for (const [key, t] of ZTPL) { const g = t.geo?.B; if (!key.startsWith('2,') || !g || M.has(g)) continue; const a = g.attributes.color.array; M.set(g, a.slice()); for (let i = 0; i < a.length; i++) a[i] *= k; g.attributes.color.needsUpdate = true; }
+}
+function campEvManometro() { // Relógio: manômetro no HUD (vermelho nos últimos 15 s, bipe a cada 1 s nos últimos 10 s)
+  const c = CAMP_EVC, V = CAMP_EV.relogio.vis;
+  if (!c.man?.isConnected) { const el = document.createElement('div'); el.id = 'campEvMan'; el.style.cssText = 'position:absolute;top:12px;left:50%;transform:translateX(150px);width:74px;text-align:center;font:700 13px/1.1 sans-serif;color:#eee;text-shadow:0 1px 2px #000;pointer-events:none';
+    el.innerHTML = '<div style="position:relative;width:58px;height:58px;margin:0 auto;border-radius:50%;border:3px solid #9a8a6a;background:conic-gradient(from 225deg,#3a5a2a 0 180deg,#8a6a1a 180deg 230deg,#a8100c 230deg 270deg,transparent 270deg)"><i style="position:absolute;left:50%;top:50%;width:3px;height:24px;margin:-24px 0 0 -1.5px;background:#eee;transform-origin:50% 100%"></i></div><b></b>';
+    ($('#zhud') || document.body).appendChild(el); c.man = el; c.manK = ''; }
+  const rest = Math.max(0, c.fim - now), fr = c.x ? 1 : clamp(1 - rest / Math.max(rest, c.tot), 0, 1);
+  const s = Math.ceil(rest), k = c.x ? 'x' : s + ':' + Math.round(fr * 60);
+  if (c.man.style.display === 'none') c.man.style.display = '';
+  if (k !== c.manK) { c.manK = k; const verm = c.x || rest <= V.vermelhoS; c.man.querySelector('i').style.transform = `rotate(${-135 + fr * 270}deg)`; c.man.querySelector('div').style.borderColor = verm ? '#ff3a2a' : '#9a8a6a';
+    const b = c.man.querySelector('b'); b.textContent = c.x ? 'NO VERMELHO' : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; b.style.color = verm ? '#ff6a5a' : '#eee'; }
+  if (!c.x && s <= V.bipeS && s > 0 && s !== c.bip) { c.bip = s; play('beep'); }
+}
+function campEvCxQuadro(o, e) { // caixotes no cliente: queda com paraquedas, fumaça vermelha e o interativo no mais perto
+  const c = CAMP_EVC, V = CAMP_EV.suprimento.vis, L = c.cx; let best = null, bd = CAMP_EV.suprimento.usoR + 1;
+  if (L.length) campEvAnimLiga();
+  for (let k = 0; k < e.cx.length; k++) {
+    const G_ = e.cx[k], C_ = L[k]; if (!C_ || now >= C_.fim) { if (G_.g.visible) G_.g.visible = false; continue; }
+    const q = clamp((now - C_.t0) / V.quedaS, 0, 1), y = C_.y + V.queda * (1 - q) * (1 - q * .5);
+    G_.g.position.set(C_.x, y, C_.z); G_.g.visible = true; G_.pq.visible = q < 1;
+    if (q < 1) continue;
+    if (now >= C_.fumT) { C_.fumT = now + V.fumacaS; if (Math.hypot(C_.x - camera.position.x, C_.z - camera.position.z) < V.fumacaR) puff(new V3(C_.x + rand(-.2, .2), C_.y + 1, C_.z + rand(-.2, .2)), 0xb01a10, 1.2, 2.2, 1.6); }
+    const d = Math.hypot(C_.x - me.pos.x, C_.z - me.pos.z); if (d < bd) { bd = d; best = C_; }
+  }
+  c.perto = best; if (best) { o.x = best.x; o.z = best.z; } else { o.x = o.x0; o.z = o.z0; }
+}
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_EV, CAMP_AGENDA, CAMP_INF, CAMP_EVS, CAMP_EVC, CAMP_EV_G, campEvLiga, campEvDesliga, campEvPode, campEvPeso, campEvAnim, campEvCxSolta, campEvCxAbre, campEvInf, campEvTipo, V3, ZDIFF, zHpK,
+  campEvVis: () => ({ far: scene.fog?.far, near: scene.fog?.near, cor: scene.fog?.color.getHex(), fundo: scene.background?.getHex?.(), hemi: hemi.intensity, fill: VIS.fill.intensity, pool: ZC.world?.pool?.map(P => P.L.intensity) || [],
+    luz: LUZ ? LUZ.base[0] : null, anim: MAP_ANIM.includes(campEvAnim), cur: G.cur, man: !!CAMP_EVC.man?.isConnected && CAMP_EVC.man.style.display !== 'none', manTxt: CAMP_EVC.man?.querySelector('b')?.textContent || '', vis: CAMP_EVC.vis,
+    molde: (() => { for (const [k, t] of ZTPL) if (k.startsWith('2,') && t.geo?.B) return Math.max(...t.geo.B.attributes.color.array); return null; })() }) }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+// ===== FIM O3-D05 =====
 //
 // @@CAMP-ZK-1@@
 //
