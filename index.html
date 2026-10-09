@@ -737,6 +737,151 @@ const MAPS = {
   },
 };
 // @@CAMP-MAPAS@@ (O3: arenas da campanha, MAPS.<arena> = { ..., zonly: 1, camp: 1 }: D09, D11, D13 em sequência)
+// ===== O3-D09: arena Forte Velho (MAPS.forte; docs/overhaul/campanha.md §8.1, lore.md: o pátio de armas da 3ª Cia, o holofote, o paiol) =====
+// Mapa pequeno e só da campanha (camp: 1: fora dos cartões do clássico e do PvP). Pátio de armas de 44 x 44 m, muralha de 6 m com ameias,
+// 4 portões com grade (as "janelas" por onde entram os zumbis e o pelotão), casamata ao sul (onde se nasce: o alçapão da Vila desce
+// aqui), paiol a leste, torre do holofote no meio (plataforma de 3 m com duas escadas íngremes: só o Vigia sobe; num mapa zumbi nada
+// acima de 1,21 m é degrau para o jogador, ZTOP). Pilares, barris, gerador do holofote, nota e Caixa ficam no ZINT_MAPA.forte (bloco do
+// O3-D09, abaixo da @@CAMP-CHEFE-1@@). Desempenho: o cenário fixo entra na junção (mergeStatic), sinalizadores numa malha de pontos só,
+// 6 lâmpadas do pool, sem atmosfera (atmos) e sem luz por inimigo.
+const FORTE = { // tudo de tabela: metros, centro do pátio na origem, -z = norte
+  meia: 22, muroH: 6, muroT: 1.5, fora: 32, // pátio 44 x 44; muralha de 6 m; chão de fora até 32 m (os zumbis nascem a 4–7 m dos portões)
+  portoes: [[0, -9], [0, 9], [3, -4], [1, -10]], // [lado (0 norte, 1 leste, 2 sul, 3 oeste), posição ao longo do muro]
+  ameia: { w: 1, h: .8, passo: 2.2 },
+  torre: { x: 0, z: 0, w: 5, h: 3, laje: .35, poste: .4, esc: [[0, -1], [0, 1]], escC: 2.4, escL: 1.6, cancela: .7, guarda: 1 },
+  mastro: [-17, -19, 8], // x, z, altura // escadas ao norte e ao sul
+  casamata: { x0: -7, x1: 7, z0: 14.5, z1: 22, h: 3.2, porta: 2.5, t: .6 },
+  paiol: { x0: 15, x1: 22, z0: 6, z1: 14, h: 3.2, porta: [9, 11], t: .5 },
+  arame: [[-14, -4, -17.6, -16.4], [15.8, 17, -15, -5]], // faixas de arame farpado [x0, x1, z0, z1] na frente do portão norte-oeste e do leste
+  lampadas: [[-21.3, -14, 4.6], [21.3, 2, 4.6], [-21.3, 12, 4.6], [-2, -21.3, 4.6], [0, 18.3, 2.85], [12, 21.3, 4.6]], // x, z, y (6 do pool)
+  sinal: [[-22.75, -22.75], [22.75, -22.75], [-22.75, 22.75], [22.75, 22.75], [0, -22.75], [0, 22.75], [-22.75, 8], [22.75, -2]], // sinalizadores no alto do muro
+  sinalY: 6.9, sinalCor: 0xff3a1a, sinalTam: 2.2,
+  cone: { r: 4.2, c: 22, seg: 18, cor: 0xfff1c8, op: .16, tilt: .17 }, // cone falso do holofote do Vigia (plano aditivo, sem luz)
+  vala: [0, -12, 3, 1.4], // trincheira de onde o Vigia sobe (x, z, w, d)
+  cores: { areiaE: 0x5e523a, pedra: 0x6a665c, pedraE: 0x4e4b44, ferro: 0x26282c, madeira: 0x5a4330, madeiraE: 0x3a2a1c, concreto: 0x6e6d66, areia: 0x8a7a56, arame: 0x3a3632,
+    lona: 0x46502e, lama: 0x2a241c, bandeira: 0x3d4a26, poste: 0x2e2620 },
+};
+function forteJanelas() { // portões = janelas do zumbi (centro do muro, n para fora), com os pontos de fora/dentro como no Sanatório
+  const F = FORTE, m = F.meia + F.muroT / 2;
+  return F.portoes.map(([s, a]) => { const w = s === 0 ? { x: a, z: -m, n: [0, -1] } : s === 2 ? { x: a, z: m, n: [0, 1] } : s === 1 ? { x: m, z: a, n: [1, 0] } : { x: -m, z: a, n: [-1, 0] };
+    w.room = 'A'; w.ox = w.x + w.n[0] * .9; w.oz = w.z + w.n[1] * .9; w.ix = w.x - w.n[0] * 1.2; w.iz = w.z - w.n[1] * 1.2; w.tx = -w.n[1]; w.tz = w.n[0]; return w; });
+}
+function forteCaixas() { // colisores (B: desenhados e no COL; 'col': só no COL)
+  const F = FORTE, m = F.meia + F.muroT / 2, L = F.meia + F.muroT, P = s => F.portoes.filter(q => q[0] === s).map(q => zWin(q[1])), T = F.torre, C = F.casamata, Pa = F.paiol;
+  const o = [floor(F.fora * 2, F.fora * 2),
+    ...zWall('x', -m, -L, L, P(0), F.muroH, 'stone', F.muroT), ...zWall('x', m, -L, L, P(2), F.muroH, 'stone', F.muroT),
+    ...zWall('z', -m, -F.meia, F.meia, P(3), F.muroH, 'stone', F.muroT), ...zWall('z', m, -F.meia, F.meia, P(1), F.muroH, 'stone', F.muroT),
+    B(T.x, T.z, T.w, T.w, T.laje, 'wood', T.h - T.laje), // laje da torre (por baixo passa gente: o campo dos zumbis ignora o que começa acima de 1,7 m)
+    ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => B(T.x + a * (T.w / 2 - T.poste / 2), T.z + b * (T.w / 2 - T.poste / 2), T.poste, T.poste, T.h - T.laje, 'wood')),
+    ...T.esc.map(([dx, dz]) => { const n = T.escC + T.cancela, c = T.w / 2 + n / 2; return B(T.x + dx * c, T.z + dz * c, dx ? n : T.escL, dx ? T.escL : n, T.h, 'col'); }), // escada íngreme e cancela: parede para o jogador
+    B(FORTE.mastro[0], FORTE.mastro[1], .3, .3, FORTE.mastro[2], 'col'), // mastro da bandeira
+    // casamata (sul): parede da frente com a porta, laterais e laje
+    ...zWall('x', C.z0 + C.t / 2, C.x0, C.x1, [zGap(-C.porta, C.porta)], C.h, 'concrete', C.t),
+    ...zWall('z', C.x0 + C.t / 2, C.z0 + C.t, F.meia, [], C.h, 'concrete', C.t), ...zWall('z', C.x1 - C.t / 2, C.z0 + C.t, F.meia, [], C.h, 'concrete', C.t),
+    B((C.x0 + C.x1) / 2, (C.z0 + F.meia) / 2, C.x1 - C.x0 + .3, F.meia - C.z0 + .3, .45, 'concrete', C.h),
+    // paiol (leste): porta a oeste
+    ...zWall('x', Pa.z0 + Pa.t / 2, Pa.x0, F.meia, [], Pa.h, 'brick', Pa.t), ...zWall('x', Pa.z1 - Pa.t / 2, Pa.x0, F.meia, [], Pa.h, 'brick', Pa.t),
+    ...zWall('z', Pa.x0 + Pa.t / 2, Pa.z0 + Pa.t, Pa.z1 - Pa.t, [zGap(Pa.porta[0], Pa.porta[1])], Pa.h, 'brick', Pa.t),
+    B((Pa.x0 + F.meia) / 2, (Pa.z0 + Pa.z1) / 2, F.meia - Pa.x0 + .3, Pa.z1 - Pa.z0 + .3, .35, 'wood', Pa.h),
+  ];
+  return o;
+}
+function buildForte(M) { // cenário procedural (fixo: a junção do mergeStatic junta por material e bloco)
+  const F = FORTE, K = F.cores, G = new THREE.Group(); world.add(G);
+  const p = (w, h, d, x, y, z, c, ry = 0, rx = 0, rz = 0) => { const b = bx(G, w, h, d, x, y, z, mc(c)); b.rotation.set(rx, ry, rz); return b; };
+  const m = F.meia + F.muroT / 2, L = F.meia + F.muroT, top = F.muroH, A = F.ameia;
+  // ameias por cima da muralha (pulando os portões)
+  for (const [ax, c, s] of [['x', -m, 0], ['x', m, 2], ['z', -m, 3], ['z', m, 1]]) {
+    const vaos = F.portoes.filter(q => q[0] === s).map(q => q[1]);
+    for (let a = -L + A.w / 2; a <= L - A.w / 2 + 1e-6; a += A.passo) { if (vaos.some(v => Math.abs(v - a) < 1.6)) continue; ax === 'x' ? p(A.w, A.h, F.muroT, a, top + A.h / 2, c, K.pedraE) : p(F.muroT, A.h, A.w, c, top + A.h / 2, a, K.pedraE); }
+    ax === 'x' ? p(2 * L, .25, F.muroT + .2, 0, top - .12, c, K.pedra) : p(F.muroT + .2, .25, 2 * L, c, top - .12, 0, K.pedra); // cornija
+  }
+  // portões: pilastras, arco e a grade levantada até a verga (as tábuas são do zBuildWorld)
+  for (const w of forteJanelas()) {
+    const g = new THREE.Group(); g.position.set(w.x, 0, w.z); g.rotation.y = Math.atan2(w.n[0], w.n[1]); G.add(g);
+    const q = (ww, h, d, x, y, z, c) => bx(g, ww, h, d, x, y, z, mc(c));
+    for (const sx of [-1, 1]) q(.7, 4.4, F.muroT + .5, sx * 1.25, 2.2, 0, K.pedraE);
+    q(3.2, .6, F.muroT + .5, 0, 4.6, 0, K.pedraE); q(3.6, .3, F.muroT + .6, 0, 5.05, 0, K.pedra);
+    for (let i = 0; i < 9; i++) q(.07, 2.3, .07, -.8 + i * .2, 3.35, F.muroT / 2 + .12, K.ferro); // grade (levantada: os zumbis passam por baixo)
+    for (const y of [2.35, 3.4, 4.4]) q(1.75, .07, .07, 0, y, F.muroT / 2 + .12, K.ferro);
+    for (let i = 0; i < 5; i++) q(.06, .3, .06, -.8 + i * .4, 2.12, F.muroT / 2 + .12, K.ferro); // pontas da grade
+  }
+  // torre do holofote: guarda-corpo, escadas, suporte do holofote vazio (o holofote está nas costas do Vigia) e o cabo até o gerador
+  { const T = F.torre, hw = T.w / 2, y = T.h;
+    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) p(.12, T.guarda, .12, T.x + a * (hw - .06), y + T.guarda / 2, T.z + b * (hw - .06), K.madeiraE);
+    for (const s of [-1, 1]) { p(T.w, .08, .08, T.x, y + T.guarda, T.z + s * (hw - .06), K.madeira); p(.08, .08, T.w, T.x + s * (hw - .06), y + T.guarda, T.z, K.madeira); p(T.w, .08, .08, T.x, y + T.guarda * .5, T.z + s * (hw - .06), K.madeira); }
+    for (const [dx, dz] of T.esc) { // escada íngreme: duas longarinas e degraus
+      const ang = Math.atan2(T.h, T.escC), comp = Math.hypot(T.h, T.escC), cx = T.x + dx * (hw + T.escC / 2), cz = T.z + dz * (hw + T.escC / 2), ry = Math.atan2(dx, dz);
+      const g = new THREE.Group(); g.position.set(cx, 0, cz); g.rotation.y = ry; G.add(g);
+      for (const s of [-1, 1]) { const l = bx(g, .12, .22, comp, s * (T.escL / 2 - .06), T.h / 2, 0, mc(K.madeiraE)); l.rotation.x = ang; }
+      for (let i = 1; i < 9; i++) { const k = i / 9; bx(g, T.escL - .1, .06, .28, 0, T.h * (1 - k), -T.escC / 2 + T.escC * k, mc(K.madeira)); }
+      for (const s of [-1, 1]) { const c = bx(g, .05, .05, 1.3, s * .5, .45, T.escC / 2 + .25, mc(K.ferro)); c.rotation.x = .25; } // corrente na base
+      bx(g, T.escL - .2, .4, .06, 0, .45, T.escC / 2 + .55, mc(K.madeiraE)); // cancela
+    }
+    p(1.2, .3, 1.2, T.x, y + .15, T.z, K.ferro); p(.18, 1.1, .18, T.x, y + .85, T.z, K.ferro); // pedestal do holofote (vazio)
+    p(.06, .06, 6.2, T.x + 2.9, .03, T.z - .6, K.ferro); p(3, .06, .06, T.x + 4.4, .03, T.z - 3.7, K.ferro); // cabo até o gerador do holofote
+  }
+  // casamata: sacos de areia na porta, placa e a escada do alçapão (desce da laje)
+  { const C = F.casamata, zf = C.z0;
+    for (const s of [-1, 1]) for (let k = 0; k < 3; k++) p(1.1, .28, .55, s * (C.porta + .8), .14 + k * .28, zf - .45, k % 2 ? K.areia : 0x7a6a4a, 0, 0, .04 * s);
+    for (const s of [-1, 1]) p(.08, 2.8, .08, s * .3, 1.4, 20.6, K.ferro); for (let y = .3; y < 2.8; y += .35) p(.6, .05, .05, 0, y, 20.6, K.ferro); // escada de ferro
+    p(1.4, .1, 1.4, 0, C.h + .02, 20.6, K.ferro); // tampa do alçapão (aberta por baixo)
+    p(5, .7, .08, 0, C.h - .5, zf - C.t / 2 - .05, K.concreto); // viga com a placa
+  }
+  // paiol: porta aberta e caixotes de munição
+  { const Pa = F.paiol;
+    const d = p(.08, 2.2, 2, Pa.x0 - .6, 1.1, Pa.porta[0] - .6, K.madeira); d.rotation.y = .9;
+    for (const [x, z, s] of [[19.5, 7.5, .9], [20.6, 7.5, .9], [20, 8.6, .8], [19.8, 12.5, 1], [20.6, 11.3, .7]]) p(s, s * .7, s * .8, x, s * .35, z, K.madeiraE);
+  }
+  // mastro com a bandeira rasgada da 3ª Cia (pano em 3 tiras)
+  { const [x, z, h] = F.mastro; p(.14, h, .14, x, h / 2, z, K.poste); for (let i = 0; i < 3; i++) p(1.4 - i * .25, .32, .03, x + .75 - i * .1, h - .5 - i * .34, z, K.bandeira, 0, 0, .05 * i); }
+  // arame farpado: estacas e rolos (malha instanciada: 1 chamada)
+  { const ps = []; for (const [x0, x1, z0, z1] of F.arame) { const lx = x1 - x0 >= z1 - z0; const n = Math.max(2, Math.round((lx ? x1 - x0 : z1 - z0) / .9));
+      for (let i = 0; i <= n; i++) { const x = lx ? x0 + (x1 - x0) * i / n : (x0 + x1) / 2, z = lx ? (z0 + z1) / 2 : z0 + (z1 - z0) * i / n; ps.push([x, z, lx]); if (i % 3 === 0) p(.07, 1.1, .07, x, .55, z, K.poste); } }
+    const tor = new THREE.TorusGeometry(.42, .018, 4, 12), im = new THREE.InstancedMesh(tor, mc(K.arame), ps.length), o3 = new THREE.Object3D();
+    ps.forEach(([x, z, lx], i) => { o3.position.set(x, .42, z); o3.rotation.set(0, lx ? 0 : Math.PI / 2, (i % 2) * .4); o3.scale.set(1, 1, 1); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); });
+    im.computeBoundingSphere(); world.add(im); }
+  // trincheira de onde o Vigia sobe (borda de sacos)
+  { const [x, z, w, d] = F.vala; p(w, .02, d, x, .01, z, K.lama); for (const s of [-1, 1]) { p(w + .6, .3, .4, x, .15, z + s * (d / 2 + .2), K.areiaE); p(.4, .3, d, x + s * (w / 2 + .2), .15, z, K.areiaE); } }
+  // suportes das lâmpadas
+  for (const [x, z, y] of F.lampadas) { if (Math.abs(x) > F.meia - 1 || Math.abs(z) > F.meia - 1) { const nx = Math.abs(x) > F.meia - 1 ? Math.sign(x) : 0, nz = nx ? 0 : Math.sign(z); p(.08 + Math.abs(nx) * .5, .08, .08 + Math.abs(nz) * .5, x + nx * .3, y + .2, z + nz * .3, K.ferro); } }
+  // sinalizadores no alto do muro (pontos aditivos: 1 chamada; a única luz da fase 3)
+  { const pos = new Float32Array(F.sinal.length * 3); F.sinal.forEach(([x, z], i) => { pos.set([x, F.sinalY, z], i * 3); p(.1, .5, .1, x, F.sinalY - .3, z, K.ferro); });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: F.sinalCor, size: F.sinalTam, map: SOFT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, fog: false }));
+    pts.userData.own = true; pts.frustumCulled = false; const dyn = new THREE.Group(); dyn.userData.dyn = 1; dyn.add(pts); world.add(dyn); FORTE_V.sinal = pts; }
+  // cone falso do holofote (segue o Vigia no forteAnim; escondido sem chefe e na fase 3)
+  { const C = F.cone, geo = new THREE.ConeGeometry(C.r, C.c, C.seg, 1, true); geo.translate(0, -C.c / 2, 0); geo.rotateX(Math.PI / 2); // ponta na origem, abre para -z
+    { const P = geo.attributes.position, cor = new Float32Array(P.count * 3); for (let i = 0; i < P.count; i++) { const k = Math.max(0, 1 - Math.pow(-P.getZ(i) / C.c, .7)); cor.fill(k, i * 3, i * 3 + 3); } geo.setAttribute('color', new THREE.BufferAttribute(cor, 3)); } // some ao longe (aditivo: preto = nada)
+    const cone = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: C.cor, vertexColors: true, transparent: true, opacity: C.op, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
+    cone.userData.own = true; cone.userData.noShadow = true; cone.frustumCulled = false; cone.visible = false; const dyn = new THREE.Group(); dyn.userData.dyn = 1; dyn.add(cone); world.add(dyn); FORTE_V.cone = cone; }
+  MAP_ANIM.push(forteAnim);
+}
+const FORTE_V = { sinal: null, cone: null }; // peças do cliente que o forteAnim mexe (o resto do estado do cliente fica no bloco do Vigia)
+MAPS.forte = {
+  name: 'Forte Velho', desc: 'arena da campanha: o pátio de armas da 3ª Cia, o holofote e o paiol', zonly: 1, zombie: 1, camp: 1, w: FORTE.fora * 2, d: FORTE.fora * 2,
+  sky: 0x05070c, skyTop: 0x010206, stars: 1, exposure: 1.35, fogC: 0x0b0d12, fog: [10, 62],
+  hemi: .7, hemiC: [0x8494b8, 0x2a2824], sunI: .45, sunC: 0x9fb4ff, sun: [-20, 42, 18],
+  theme: { floor: ['dirt', 0x2e2a22], wall: ['rock', 0x6a665c], stone: ['rock', 0x6a665c], concrete: ['concrete', 0x6e6d66], wood: ['wood', 0x5a4330], brick: ['brick', 0x6a4434], metal: ['metal', 0x55585c] },
+  boxes: forteCaixas,
+  build: buildForte,
+  spawns: [[-3, 18.6], [3, 18.6], [-3, 20.6], [3, 20.6]],
+  z: (() => {
+    const F = FORTE, s = F.meia;
+    const d = {
+      ff: { x0: -F.fora, z0: -F.fora, nx: F.fora * 2, nz: F.fora * 2 },
+      start: 'A', rooms: { A: [-s, s, -s, s] }, roomNames: { A: 'Pátio de armas' }, floors: { A: ['dirt', 0x4b4234] },
+      windows: forteJanelas(), risers: [], doors: [], wall: [], perks: [], traps: [],
+      pap: { x: 0, z: F.fora - 2, n: [0, -1] }, power: { x: 4, z: F.fora - 2, n: [0, -1] }, // fora da muralha e escondidos (forteEsconde): a arena não tem PaP e a energia já vem ligada
+      boxes: [{ x: -s + .55, z: 9, n: [1, 0] }], // 1 lugar da Caixa (muro oeste)
+      lamps: F.lampadas.map(([x, z, y]) => ({ x, z, y, base: 15, dist: 24, c: 0xffc070 })),
+      spawns: [[-3, 18.6], [3, 18.6], [-3, 20.6], [3, 20.6]], // dentro da casamata
+    };
+    d.zoneAt = (x, z) => (Math.abs(x) <= s && Math.abs(z) <= s ? 'A' : null);
+    return d;
+  })(),
+};
+// ===== FIM O3-D09 (mapa) =====
 
 function siteDeco(M) { // chão pintado e letra flutuando em cada bomb
   for (const [k, r] of Object.entries(M.sites)) {
@@ -28067,6 +28212,307 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP
 // @@CAMP-ZK-2@@
 //
 // @@CAMP-CHEFE-1@@
+// ===== O3-D09: O Vigia (Tenente Brandão, tipo 14) e a arena Forte Velho (docs/overhaul/campanha.md §7.2, §8.1; lore.md: falas ten-*) =====
+// O que tem aqui (dono: O3-D09; o mapa é o MAPS.forte, logo abaixo da @@CAMP-MAPAS@@):
+// - ZKIND[14] (números do §7.2) e CAMP_CHEFE[14] pela base do O3-D07: 3 fases (100–66–33%), varredura do holofote (setor que gira e
+//   MARCA quem fica 0,3 s na luz: o Vigia, a rajada e os Soldados do O3-D06 preferem o marcado, p.campMarca), rajada de fuzil (3 tiros,
+//   pilar segura, abre o fraco), granada de cal (cal nos olhos), pelotão (3 Soldados pelos portões, aviso de apito; a cada 30/20/15 s,
+//   teto 6/6/9) e, na fase 3, investida de baioneta (atordoado se bater em pilar ou parede). Fase 2: sobe na torre do holofote (3 m) pela
+//   escada mais perto e atira de cima; fase 3: o holofote quebra (apagão local: só os sinalizadores do muro), ele desce, leva ×1,15 e
+//   marca no escuro quem corre (o som). Ponto fraco: a lente do holofote nas costas (sempre por trás, e na janela da rajada/atordoado).
+// - Etapa C1 (rodada 10): CAMP_OBJ['C1.1'] (matar o tipo 14); a energia da arena já vem ligada (campEnergia); 16 comuns pelos portões
+//   (CAMP_CURVA.C1 do O3-D02); na morte, a base (O3-D07) derruba lacaios e comuns e a etapa acaba: cenas c2-fim + c3-abertura e a troca
+//   para o Sanatório (rodada 11) pelo motor do O3-D02.
+// - Interativos da arena (ZINT_MAPA.forte): 6 pilares de sacos de areia, 2 muretas, 4 barris de pólvora do paiol (8% no chefe, O3-D07),
+//   o gerador do holofote ('curto', tipo novo: F atordoa 4 s, cancela o ataque e abre o fraco; recarga 40 s; sem efeito na fase 3),
+//   a máquina de munição (O2-C10), a nota n-forte-paiol (O3-D04) e a Caixa (M.z.boxes). Arame farpado: 2 faixas (×0,5 e 10/s em
+//   jogador e zumbi, menos no chefe), regra no host e o passo mais curto no cliente (como o agarrão do O3-D06).
+// - Cliente: modelo pelo registro do O3-D06 (CAMP_ZK[14].cores e CAMP_ZKF.modelo/anim[14]: quepe, dragonas, fuzil com baioneta e o
+//   holofote nas costas com a lente em osso próprio, que some na fase 3); sem o O3-D06 o Vigia sai com o corpo comum (só o visual muda).
+//   forteAnim (MAP_ANIM da arena): cone falso do holofote (1 malha aditiva, gira com a varredura), apagão local da fase 3, sinalizadores,
+//   traçantes e o som dos 3 tiros da rajada (pelo aviso que já chegou: nada a mais na rede), arame. Mensagens { t: 'camp', k: 'vg', e }.
+// Nenhum gancho fora dos blocos além da marca @@CAMP-MAPAS@@. ZKIND: os tipos 7–13 que ainda não existem viram null (sem buraco: o
+// ZKIND.map(() => 0) do zMix soma só elementos presentes; buraco virava NaN e tirava os especiais do clássico).
+for (let k = 7; k < 14; k++) if (!(k in ZKIND)) ZKIND[k] = null; // D06/D08 trocam pelo tipo de verdade (Object.assign(ZKIND, { k: ... }))
+ZKIND[14] = { n: 'O Vigia', pts: 1000, xp: 50, sz: 1.45, rad: .45, chefe: 1, capGolpe: .06, capFraco: .1, capArmadilha: .02, capNuke: .05, capBarril: .08, fracoK: 3, fracoTras: 110 };
+const CAMP_VIGIA = { // números do Vigia que não são de ataque (§7.2 e §8.1; o D15 ajusta)
+  k: 14, nasce: { x: 0, z: -12 }, // sobe da trincheira na frente da torre
+  marca: { s: 6, dentro: .3, r: 30, olhoY: 1.45 }, // varredura: 0,3 s na luz (com linha livre do holofote) = marcado por 6 s
+  som: { vel: 6.2, r: 26, cada: .25 }, // fase 3: quem corre (acima de 6,2 m/s; andar com arma é ~5,1) a até 26 m fica marcado
+  pel: { primeiro: 15, cada: [30, 20, 15] }, // pelotão: o primeiro aos 15 s, depois a cada 30/20/15 s (fase 1/2/3)
+  sobe: { vChao: 2.6, vEsc: 1.3, pe: .6, topo: .35 }, // torre: velocidade no chão e na escada; folga do pé da escada e da borda da laje
+  calS: 1.5, // granada de cal: cal nos olhos (s)
+  arame: { lento: .5, dps: 10, passo: 5, dy: .4 }, // arame farpado: ×0,5, 10/s em parcelas de 5; acima de dy do chão não pega
+  cli: { lenteCor: 0xfff4d6, lenteK: 6, coneVarre: 2.2, coneOcio: 1, apagaoLuz: .3, bulbo: .08, sinalPulso: [.65, .35, 7], rastro: 0xffd890, marcaCor: 'rgba(170,20,10,.38)', calCor: 'rgba(245,244,236,.92)' },
+  cores: { pele: 0x8a8c78, roupa: 0x4c5432, calca: 0x434a2c, olho: [0xffe8a0, 5], cabelo: 0x1a1510, quepe: 0x3e4628, aba: 0x1b1a16, dourado: 0xa8893e, couro: 0x3a2a18,
+    madeira: 0x5a3c22, aco: 0x8c9096, ferro: 0x2a2c30, holofote: 0x3c4038, vidro: 0x0c0d0e },
+};
+CAMP_CH_EF.vgCal = q => { sendTo(q.id, { t: 'camp', k: 'vg', e: 'cal', s: CAMP_VIGIA.calS }); }; // granada de cal: cal nos olhos
+const vgAng = (P, q) => Math.atan2(-(q.pos[0] - P.x), -(q.pos[2] - P.z));
+const VG_LAC = { n: 3, max: [6, 6, 9], onde: 'portoes', get tipo() { return ZKIND[8] ? 8 : 0; } }; // Soldado do O3-D06 (sem ele, comum)
+const VG_PEL = { aviso: 1.5, ativo: 0, rec: 0, forma: null, lacaios: VG_LAC, fala: 'ten-pelotao', som: 'vgapito', ok: () => false, peso: 0 }; // fora do sorteio: o relógio (vgTick) chama
+CAMP_CHEFE[14] = {
+  nome: 'O Vigia', rodada: 10, base: 6, porJog: 4, vel: 2.2, dm: 1.5, aw: .7, ac: 1.4,
+  nasce: CAMP_VIGIA.nasce, entrada: 'ten-entrada', primeiroS: 3,
+  fases: [{ de: 1, vel: 2.2 }, { de: .66, vel: 2.2, fala: 'ten-fase2' }, { de: .33, vel: 3, fala: 'ten-fase3', danoK: 1.15, baixa: 1 }],
+  ataques: [
+    { id: 'varredura', fases: [1], peso: 3, cd: 7, aviso: 1, ativo: 2.4, rec: 1, forma: 'setor', dims: [22, 60], gira: 120, chao: 0, vista: 0, som: 'power', fala: 'ten-varredura', alcance: [0, 30], pos: vgVarrePos },
+    { id: 'varredura-2', fases: [2], peso: 3, cd: 6, aviso: 1, ativo: 1.6, rec: 1, forma: 'setor', dims: [22, 60], gira: 150, chao: 0, vista: 0, som: 'power', fala: 'ten-varredura', alcance: [0, 30], pos: vgVarrePos },
+    { id: 'rajada', fases: [1, 2, 3], peso: 4, cd: 3.5, aviso: .8, ativo: .45, rec: 1.4, forma: 'linha', dims: [30, .6], golpes: 3, dano: 22, chao: 0, cobre: 1, pilar: 250, fraco: 1, som: 'vgsilvo', alcance: [0, 30], pos: vgLinhaPos },
+    { id: 'granada', fases: [1, 2, 3], peso: 2, cd: 7, aviso: 1.2, ativo: 0, rec: .8, forma: 'disco', dims: [3.5], onde: 'alvo', dano: 35, efeito: 'vgCal', pilar: 400, som: 'smoke', alcance: [4, 26], pos: vgAlvoPos },
+    { id: 'baioneta', fases: [3], peso: 4, cd: 4, aviso: .7, ativo: 14 / 9, rec: 1.2, forma: 'linha', dims: [14, 1.6], investe: 9, atordoa: 2.5, dano: 55, empurra: 4, pilar: 600, som: 'snarl', alcance: [3, 14], pos: vgLinhaPos, fim: vgBateu },
+    { id: 'pelotao', fases: [1], ...VG_PEL }, { id: 'pelotao-2', fases: [2], ...VG_PEL }, { id: 'pelotao-3', fases: [3], ...VG_PEL },
+  ],
+  fraco: { caixa: { f: -.24, r: .21, y0: 1.2, y1: 1.6 } }, // a lente do holofote nas costas (×sz)
+  alvo: vgAlvo, ia: vgIA, tick: vgTick, fase: vgFase, inicio: vgInicio, morte: z => { campFala('ten-morte'); VGSRV.z = null; },
+  cliFase: vgCliFase, cliQuadro: vgCliQuadro,
+};
+CAMP_OBJ['C1.1'] = { tipo: 'matar', titulo: 'Derrube o Vigia', chefe: 14 }; // etapa C1 (O3-D02): o chefe entra pelo relógio do O3-D07
+// ---------- host: estado do Vigia (um por vez) ----------
+const VGSRV = { z: null, modo: 'chao', rota: [], ri: 0, pelT: 0, somT: 0, ult: new Map(), luz: new Map() };
+function vgInicio(z) { Object.assign(VGSRV, { z, modo: 'chao', rota: [], ri: 0, pelT: now + CAMP_VIGIA.pel.primeiro, somT: 0 }); VGSRV.ult.clear(); VGSRV.luz.clear(); }
+function vgAlvo(z) { // o marcado mais perto (o Vigia e a rajada o preferem)
+  let best = null, bd = 1e9; const P = z.body.pos;
+  for (const q of S.players.values()) { if (!q.alive || q.downed || !(q.campMarca > now)) continue; const d = hyp(q.pos[0] - P.x, q.pos[2] - P.z); if (d < bd) { bd = d; best = q; } }
+  return best;
+}
+function vgMarca(q, s) { const novo = !(q.campMarca > now); q.campMarca = Math.max(q.campMarca || 0, now + s); if (novo) sendTo(q.id, { t: 'camp', k: 'vg', e: 'marca', s: r2(s) }); }
+function vgVarrePos(z, tg) { const P = z.body.pos, a = this?.gira ?? 120; // this = o ataque (a base chama a.pos(...))
+  return [[P.x, 0, P.z, vgAng(P, tg) - a * Math.PI / 360]]; } // começa antes do alvo e passa por ele
+function vgLinhaPos(z, tg) { const P = z.body.pos; return [[P.x, Math.min(P.y, tg.pos[1]), P.z, vgAng(P, tg)]]; } // aviso no chão (do alto da torre também)
+function vgBateu(z, A) { // a investida parou antes do fim (a grade dos zumbis para ~1 m antes do pilar): o pilar à frente leva o golpe
+  if (A.anda >= A.d1 - .05) return; const P = z.body.pos, fx = -Math.sin(A.ang), fz = -Math.cos(A.ang), r = z.rad + 1.2, pi = campPilarCorta(P.x, P.z, P.x + fx * r, P.z + fz * r, P.y + .5);
+  if (pi >= 0) campChefePilarDano(A, pi);
+}
+function vgAlvoPos(z, tg) { return [[tg.pos[0], tg.pos[1], tg.pos[2], vgAng(z.body.pos, tg)]]; }
+// torre: rota até o topo pela escada mais perto (fase 2) e de volta ao chão (fase 3), cinemática (sem física, como o NPC da escolta)
+function vgEscada(P) { // escada mais perto: pé (chão), topo (laje) e o centro
+  const T = FORTE.torre, S_ = CAMP_VIGIA.sobe; let best = null, bd = 1e9;
+  for (const [dx, dz] of T.esc) {
+    const pe = T.w / 2 + T.escC + T.cancela + S_.pe, tp = T.w / 2 - S_.topo, f = [T.x + dx * pe, T.z + dz * pe], t = [T.x + dx * tp, T.z + dz * tp], d = hyp(P.x - f[0], P.z - f[1]);
+    if (d < bd) { bd = d; best = { pe: f, topo: t }; }
+  }
+  return best;
+}
+function vgFase(z, n) { // n: 0, 1, 2 (fase 1, 2, 3)
+  const P = z.body.pos, E = vgEscada(P), T = FORTE.torre, S_ = CAMP_VIGIA.sobe; if (!E) return;
+  VGSRV.pelT = Math.min(VGSRV.pelT, now + CAMP_VIGIA.pel.cada[n]);
+  if (curMapId !== 'forte') return; // versão de campo (infinito): sem torre
+  if (n === 1) { VGSRV.modo = 'sobe'; VGSRV.ri = 0; VGSRV.rota = [[E.pe[0], 0, E.pe[1], S_.vChao], [E.topo[0], T.h, E.topo[1], S_.vEsc], [T.x, T.h, T.z, S_.vChao]]; }
+  else if (n === 2) { if (P.y > .3 || VGSRV.modo !== 'chao') { VGSRV.modo = 'desce'; VGSRV.ri = 0; VGSRV.rota = [[E.topo[0], T.h, E.topo[1], S_.vChao], [E.pe[0], 0, E.pe[1], S_.vEsc]]; if (P.y < .3) VGSRV.rota.shift(); } }
+}
+function vgAnda(z, dt) { // segue a rota; true enquanto anda
+  const P = z.body.pos, w = VGSRV.rota[VGSRV.ri]; if (!w) return false;
+  const dx = w[0] - P.x, dy = w[1] - P.y, dz = w[2] - P.z, d = Math.hypot(dx, dy, dz), s = w[3] * dt;
+  if (d > .01) z.yaw = Math.abs(dx) + Math.abs(dz) > .01 ? Math.atan2(-dx, -dz) : z.yaw;
+  if (d <= s) { P.set(w[0], w[1], w[2]); VGSRV.ri++; } else { P.x += dx / d * s; P.y += dy / d * s; P.z += dz / d * s; }
+  z.body.vel.set(0, 0, 0); z.body.onGround = true; z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z; z.stuck = 0;
+  return VGSRV.ri < VGSRV.rota.length;
+}
+function vgIA(z, dt, tgt, CH) { // true = cuidou (parado, subindo, na torre); false = a base (avisa/ataca/atordoado) e depois a perseguição
+  if (VGSRV.z !== z) vgInicio(z);
+  const mk = vgAlvo(z); if (mk) { z.tgt = mk; z.tgtT = now + .5; } // o marcado vira o alvo
+  if (VGSRV.modo === 'sobe' || VGSRV.modo === 'desce') {
+    if (z.atord > now) { z.atkWind = 0; return true; } // atordoado (curto) no meio da escada: espera
+    CH.prox = Math.max(CH.prox, now + .3); z.atkWind = 0;
+    if (!vgAnda(z, dt)) VGSRV.modo = VGSRV.modo === 'sobe' ? 'torre' : 'chao';
+    return true;
+  }
+  if (VGSRV.modo === 'torre') { // lá em cima: só gira para o alvo (a base cuida dos ataques); nada de física
+    const P = z.body.pos; P.y = FORTE.torre.h; z.body.vel.set(0, 0, 0); z.body.onGround = true; z.chkT = now + 6; z.stuck = 0; z.atkWind = 0;
+    const q = mk || z.tgt; if (q && !(z.atord > now)) z.yaw = vgAng(P, q);
+    return true;
+  }
+  return false;
+}
+function vgTick(z, dt, CH) { // marcação (varredura e som), pelotão
+  if (VGSRV.z !== z) vgInicio(z);
+  const V = CAMP_VIGIA, A = CH.atk, P = z.body.pos;
+  if (A && A.a.forma === 'setor' && A.a.id.startsWith('varredura') && now >= A.fa && now < A.fb) { // quem fica 0,3 s na luz (com linha livre do holofote) fica marcado
+    const s = A.sh[0], ang = campChefeAngAgora(A, s), sz = ZKIND[z.kind].sz || 1;
+    _chA.set(P.x, P.y + V.marca.olhoY * sz, P.z);
+    for (const q of S.players.values()) {
+      if (!q.alive || q.downed) continue; let t = VGSRV.luz.get(q.id) || 0;
+      _chB.set(q.pos[0], q.pos[1] + 1.3, q.pos[2]);
+      const den = campChefeDentro(A, s, q, ang, A.len[0]) && losClear(_chA, _chB) && campPilarCorta(P.x, P.z, q.pos[0], q.pos[2], Math.min(_chA.y, _chB.y)) < 0;
+      t = den ? t + dt : 0; VGSRV.luz.set(q.id, t);
+      if (t >= V.marca.dentro) vgMarca(q, V.marca.s);
+    }
+  } else if (VGSRV.luz.size) VGSRV.luz.clear();
+  if (CH.fase === 2 && now >= VGSRV.somT) { // fase 3: no escuro, marca pelo som quem corre
+    VGSRV.somT = now + V.som.cada;
+    for (const q of S.players.values()) {
+      const u = VGSRV.ult.get(q.id), x = q.pos[0], zz = q.pos[2]; VGSRV.ult.set(q.id, [x, zz, now]);
+      if (!u || !q.alive || q.downed || q.crouch || q.isBot) continue;
+      const v = hyp(x - u[0], zz - u[1]) / Math.max(.05, now - u[2]);
+      if (v > V.som.vel && hyp(x - P.x, zz - P.z) < V.som.r) vgMarca(q, V.marca.s);
+    }
+  }
+  if (now >= VGSRV.pelT && !CH.atk && now >= CH.inv && !(z.atord > now) && (VGSRV.modo === 'chao' || VGSRV.modo === 'torre')) { // pelotão (aviso: apito)
+    const tg = campChefeAlvo(z) || [...S.players.values()].find(q => q.alive && !q.downed);
+    const a = CH.def.ataques.find(x => x.id === (CH.fase ? 'pelotao-' + (CH.fase + 1) : 'pelotao'));
+    if (tg && a) { campChefeAtaca(z, a, tg); VGSRV.pelT = now + V.pel.cada[CH.fase]; }
+  }
+}
+// ---------- host: arame farpado (rodada da arena; jogador e zumbi, menos o chefe) ----------
+const vgArame = (x, z) => { for (const r of FORTE.arame) if (x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3]) return true; return false; };
+function vgArameTick(dt) {
+  if (!CAMP.on || curMapId !== 'forte' || !Z.on) return;
+  const K = CAMP_VIGIA.arame;
+  for (const q of S.players.values()) {
+    if (!q.alive || q.downed || q.pos[1] > K.dy || !vgArame(q.pos[0], q.pos[2])) { q.vgAr = 0; continue; }
+    q.vgAr = (q.vgAr || 0) + K.dps * dt; if (q.vgAr >= K.passo) { q.vgAr -= K.passo; zHurt(q, K.passo, { x: q.pos[0], z: q.pos[2] }); }
+  }
+  for (const z of Z.zs.values()) {
+    if (ZKIND[z.kind]?.chefe) continue; const P = z.body.pos, den = z.st === 'in' && P.y <= K.dy && vgArame(P.x, P.z);
+    if (den && !z.vgAr) { z.vgCv = z.cv; z.cv = (z.cv || 1) * K.lento; z.vgAr = 1e-6; } else if (!den && z.vgAr) { z.cv = z.vgCv; z.vgAr = 0; }
+    if (!den) continue;
+    z.vgAr += K.dps * dt; if (z.vgAr >= K.passo) { z.vgAr -= K.passo; z.hp -= K.passo; if (z.hp <= 0) zKill(z, null, 'body', 'arame', false, false); }
+  }
+}
+CAMP_GANCHOS.tick.push(vgArameTick);
+CAMP_GANCHOS.rodada.push(() => { // rodada 10 (§8.1): só os 16 comuns da curva (os especiais do clássico ficam fora; os lacaios são do Vigia)
+  if (CAMP.modo === 'campanha' && CAMP_ATOS[CAMP.et]?.mapa === 'forte' && Z.mix) { Z.mix = ZKIND.map(() => 0); Z.mixN = 0; }
+});
+// menu: a arena nunca vira mapa do clássico/PvP. O formulário parte do st da partida (lobby e pausa): na arena o st.map é 'forte' e,
+// trocando para o Clássico, viraria o zmap. O saneamento do campForm0 (O3-D02) ganha esta regra aqui (proposta: mover para o campForm0).
+{ const f0 = campForm0; campForm0 = st => { f0(st); if (MAPS[st.zmap]?.camp) st.zmap = 'vila'; if (st.mode !== 'zombies' && MAPS[st.map]?.camp) st.map = 'arena'; }; }
+CAMP_GANCHOS.inicio.push(e => { // etapa da arena: energia ligada (máquina de munição; a arena não tem chave de energia)
+  if (CAMP_ATOS[e]?.mapa === 'forte' && curMapId === 'forte') campEnergia();
+  VGSRV.z = null;
+});
+// ---------- interativo novo: gerador do holofote ('curto'; §4.2) ----------
+ZINT.curto = { nome: 'Gerador do holofote', custo: 0, usoR: 2.2, srvR: 2.8, atordoa: 4, recarga: 40, forca: 2 }; // F sobrecarrega o holofote do Vigia
+function forteEsconde() { const W_ = ZC.world; if (curMapId !== 'forte' || !W_) return; for (const o of [W_.pap?.g, W_.power?.g]) if (o) o.visible = false; } // a arena não tem PaP nem chave de energia (estão fora do muro)
+ZINT_FN.curto = {
+  est: ['pronto', 'recarga'],
+  efeito: (o, D) => `campanha: F sobrecarrega o holofote do Vigia (atordoa ${D.atordoa} s e abre o ponto fraco; recarga de ${D.recarga} s; sem efeito com o holofote quebrado)`,
+  monta(o, i) {
+    forteEsconde();
+    if (!campZintOn()) return CAMP_STUB();
+    const C_ = CAMP_VIGIA.cores, g = zintGrupo(o), corpo = new THREE.Group(); g.add(corpo);
+    campPeca(corpo, 1.4, .14, .9, 0, .07, 0, mc(0x26241f)); campPeca(corpo, 1.05, .78, .66, -.05, .53, 0, mc(0x3d4a30)); // base e motor
+    { const bob = zintCil(corpo, .24, .62, .55, mc(0x6a4a24), 12); bob.rotation.z = Math.PI / 2; bob.position.set(.1, .55, 0); } // bobina de cobre
+    campPeca(corpo, .34, .44, .08, .45, .62, .38, mc(0x1d1f22)); for (const x of [-.35, .05]) campPeca(corpo, .08, .5, .08, x, 1.1, -.2, mc(C_.ferro)); // painel e isoladores
+    campPeca(corpo, .04, .04, .7, -.15, 1.36, -.2, mc(C_.ferro)); mergeParts(corpo);
+    const luz = { pronto: bx(g, .1, .1, .03, .45, .76, .43, zGlow(0x60ff60, 1.2)), recarga: bx(g, .1, .1, .03, .45, .76, .43, zGlow(0xff3020, 1.2)) }; luz.recarga.visible = false;
+    world.add(g); cullAdd(g, o.x, o.z, 1.3);
+    return { g, corpo, luz, col: zintCaixaCol(o, 1.4, .9, 1.2), raio: .6 };
+  },
+  estado(o, e, c, ant, sync) {
+    if (e.off) return; e.luz.pronto.visible = c.st === 'pronto'; e.luz.recarga.visible = c.st === 'recarga';
+    if (sync || ant === c.st || c.st !== 'recarga') return;
+    const p = zintPos(o, 1.2); play('zap', p); play('power', p); puff(p, 0xbfe8ff, 1.4, .5, .6); puff(p, 0x4a4a4a, 1, 1.2, .8);
+  },
+  prompt(o, i, c, D) {
+    if (!campCliOn()) return null; const ch = CAMP.c.ch;
+    if (c.st === 'recarga') return { k: 'zint', id: i, ok: false, txt: `${D.nome}: recarregando (${Math.max(1, Math.ceil(c.end - now))} s)` };
+    if (ch?.k === CAMP_VIGIA.k && ch.f >= 3) return { k: 'zint', id: i, ok: false, txt: `${D.nome}: o holofote quebrou` };
+    if (ch?.k !== CAMP_VIGIA.k) return { k: 'zint', id: i, ok: false, txt: `${D.nome}: ninguém no holofote` };
+    return { k: 'zint', id: i, txt: 'Sobrecarregar o holofote (atordoa o Vigia)' };
+  },
+  quadro(o, e, c) { if (!e.off && c.st === 'recarga') e.corpo.position.x = Math.max(0, c.end - now - (ZINT.curto.recarga - 1.5)) > 0 ? (Math.random() - .5) * .03 : 0; },
+  usar(p, i, o, E, D, err) {
+    if (!CAMP.on) return; if (E.st !== 'pronto') return err('O gerador está recarregando');
+    const CH = CAMP_CH, z = CH.z; if (CH.k !== CAMP_VIGIA.k || !z || !Z.zs.has(z.id)) return err('Ninguém no holofote agora');
+    if (CH.fase >= 2) return err('O holofote já quebrou');
+    z.atord = now + D.atordoa; z.fracoAte = Math.max(z.fracoAte || 0, z.atord); z.atkWind = 0;
+    if (CH.atk) { CH.atk = null; broadcast({ t: 'camp', k: 'telx' }); } // cancela a varredura (e o que estiver no ar)
+    CH.prox = Math.max(CH.prox, z.atord + rand(...CAMP_CHEFE_BASE.pausa));
+    zintPoe(i, 'recarga', D.recarga, p.id); campChefeEnvia();
+  },
+  tick(i, o, E) { if (E.st === 'recarga' && now >= E.t) zintPoe(i, 'pronto', 0, null); },
+};
+ZINT_MAPA.forte = [ // posições de mão (pátio aberto; auditoria.mjs --mapas forte): cobertura em volta da torre e dos portões
+  { t: 'pilar', id: 'forte-sacos-1', v: 'sacos', x: -9, z: -11, n: [0, -1] }, { t: 'pilar', id: 'forte-sacos-2', v: 'sacos', x: 9, z: -12, n: [0, -1] },
+  { t: 'pilar', id: 'forte-sacos-3', v: 'sacos', x: -14, z: 3, n: [1, 0] }, { t: 'pilar', id: 'forte-sacos-4', v: 'sacos', x: 13, z: 0, n: [-1, 0] },
+  { t: 'pilar', id: 'forte-sacos-5', v: 'sacos', x: -8, z: 9, n: [0, -1] }, { t: 'pilar', id: 'forte-sacos-6', v: 'sacos', x: 8, z: 9, n: [0, -1] },
+  { t: 'pilar', id: 'forte-mureta-1', v: 'mureta', x: -16, z: -9, n: [1, 0] }, { t: 'pilar', id: 'forte-mureta-2', v: 'mureta', x: -13, z: 15.5, n: [0, -1] },
+  { t: 'barril', v: 'polvora', x: 14.3, z: 8.2, n: [-1, 0] }, { t: 'barril', v: 'polvora', x: 14.3, z: 11.8, n: [-1, 0] }, // na porta do paiol
+  { t: 'barril', v: 'polvora', x: -21.2, z: -14.5, n: [1, 0] }, { t: 'barril', v: 'polvora', x: 21.2, z: 18, n: [-1, 0] },
+  { t: 'curto', id: 'forte-gerador', x: 6.6, z: -3.7, n: [1, 0] }, // gerador do holofote (o cabo vem da torre)
+  { t: 'municao', x: -5, z: 14.05, n: [0, -1] }, // na frente da casamata
+  { t: 'nota', v: 'pregada', id: 'n-forte-paiol', x: 18.5, z: 6, n: [0, -1], ato: 1 }, // na parede norte do paiol
+];
+// ---------- sons (sintetizados) ----------
+SND.vgapito = o => { for (let k = 0; k < 2; k++) { tn(o, .55, 2650, 2600, .07, 'sine', k * .7); tn(o, .55, 2720, 2680, .05, 'square', k * .7); nz(o, .5, 3200, 2400, .03, 'bandpass', 2, k * .7); } }; // apito do pelotão: dois sopros longos
+SND.vgsilvo = o => { tn(o, .16, 2900, 2800, .07, 'sine'); nz(o, .14, 3400, 2600, .03, 'bandpass', 2); }; // apito curto antes da rajada
+// ---------- cliente: modelo pelo registro do O3-D06 (sem ele, o corpo comum) ----------
+function vgModelo(g, ud, C0) { // farda com dragonas, quepe, fuzil com baioneta e o holofote nas costas (lente em osso próprio)
+  const C_ = CAMP_VIGIA.cores, T = ud.torso, H = ud.head, q = mc(C_.quepe), dou = mc(C_.dourado), cou = mc(C_.couro), aco = mc(C_.aco), fe = mc(C_.ferro), ma = mc(C_.madeira);
+  zcy(H, .128, .122, .07, 0, .25, .005, q); zcy(H, .14, .14, .025, 0, .29, .005, q); zbx(H, .2, .02, .09, 0, .215, -.12, mc(C_.aba)); zbx(H, .27, .03, .255, 0, .22, 0, mc(C_.aba)); zbx(H, .05, .03, .01, 0, .25, -.13, dou); // quepe com aba e o distintivo
+  for (const sx of [-1, 1]) { zbx(T, .15, .035, .13, .2 * sx, .6, 0, dou); for (let i = 0; i < 4; i++) zbx(T, .018, .06, .012, (.14 + i * .035) * sx, .555, -.06, dou); } // dragonas com franja
+  zbx(T, .045, .52, .014, .03, .34, -.158, cou).rotation.z = .55; zbx(ud.inner, .37, .06, .28, 0, .95, 0, cou); zbx(ud.inner, .06, .05, .02, 0, .95, -.142, dou); // tiracolo e cinto
+  for (let i = 0; i < 3; i++) zbx(T, .02, .02, .012, 0, .48 - i * .09, -.152, dou); // botões
+  const fz = zbone(ud.handR, 0, -.06, -.02); ud.fuzil = fz; // fuzil com baioneta (ao longo do -y da mão: aponta para a frente com o braço erguido)
+  zbx(fz, .045, .78, .06, 0, -.25, 0, ma); zbx(fz, .03, .5, .03, 0, -.82, .01, fe); zbx(fz, .05, .2, .09, 0, .2, .02, ma); zbx(fz, .012, .3, .028, 0, -1.2, .01, aco); zbx(fz, .04, .08, .02, 0, -.06, .05, fe);
+  const hb = zbone(T, 0, .5, .2); ud.holofote = hb; // holofote nas costas: armação, tambor com aletas e a lente (osso próprio: some na fase 3)
+  zbx(hb, .34, .46, .08, 0, -.12, -.03, fe); zbx(hb, .04, .3, .04, -.12, .12, .01, fe); zbx(hb, .04, .3, .04, .12, .12, .01, fe);
+  const tb = zcy(hb, .15, .15, .26, 0, .2, .08, mc(C_.holofote)); tb.rotation.x = Math.PI / 2; for (const zz of [.0, .08, .16]) { const al = zcy(hb, .165, .165, .02, 0, .2, zz, fe); al.rotation.x = Math.PI / 2; }
+  const ln = zbone(hb, 0, .2, .21); ud.lente = ln; const l1 = zcy(ln, .13, .13, .02, 0, 0, 0, zGlow(CAMP_VIGIA.cli.lenteCor, CAMP_VIGIA.cli.lenteK)); l1.rotation.x = Math.PI / 2; // atrás: a lâmpada exposta (o ponto fraco)
+  const lf = zcy(ln, .12, .12, .02, 0, 0, -.27, zGlow(CAMP_VIGIA.cli.lenteCor, CAMP_VIGIA.cli.lenteK)); lf.rotation.x = Math.PI / 2; // na frente: a lente acesa
+  const lq = zbone(hb, 0, .2, .21); ud.lenteQ = lq; const v = zcy(lq, .13, .13, .02, 0, 0, 0, mc(C_.vidro)); v.rotation.x = Math.PI / 2; for (const a of [.4, -.7, 1.6]) zbx(lq, .2, .015, .015, 0, 0, .012, fe).rotation.z = a; // quebrada
+  zHide(lq, 1);
+}
+const VG_POSE = { // braços (armR, foreR, armL, foreL, abre R, abre L) e o tronco: fuzil em posição, mirando (rajada/granada) e baioneta à frente
+  porta: [.3, 1.2, .5, 1.3, -.1, .35, 0], mira: [1.45, .1, 1.45, .35, -.06, .32, 0], baioneta: [1.15, .3, 1.3, .4, -.1, .28, .3] };
+function vgAnim(zc, ud, dt) { // a pose dos braços é do Vigia (sobrescreve a do comum, suavizada aqui); lente quebrada na fase 3
+  const ch = CAMP.c.ch, f = ch?.k === CAMP_VIGIA.k ? ch.f : 1;
+  zHide(ud.lente, f >= 3); zHide(ud.lenteQ, f < 3);
+  if (zc.f & (8 | 32 | 64)) return;
+  const tel = vgTelAtivo(), P = VG_POSE[tel?.a === 'baioneta' ? 'baioneta' : tel && (tel.a === 'rajada' || tel.a === 'granada') ? 'mira' : 'porta'], k = 1 - Math.exp(-dt * 10), v = zc.vgP ||= P.slice();
+  for (let i = 0; i < v.length; i++) v[i] += (P[i] - v[i]) * k;
+  ud.armR.rotation.set(v[0], 0, v[4]); ud.foreR.rotation.set(v[1], 0, 0); ud.handR.rotation.set(0, 0, 0); ud.handL.rotation.set(0, 0, 0); ud.armL.rotation.set(v[2], 0, v[5]); ud.foreL.rotation.set(v[3], 0, 0); ud.torso.rotation.x += v[6];
+}
+function vgTelAtivo() { const L = CAMP.c?.tel; if (!L) return null; for (let i = L.length - 1; i >= 0; i--) { const t = L[i]; if (now < t.t0 + t.s + Math.max(t.at, .3)) return t; } return null; }
+if (typeof CAMP_ZK === 'object' && typeof CAMP_ZKF === 'object' && CAMP_ZKF?.modelo) { // registro do O3-D06 (gancho no zLook/zBuildModel/zAnimHuman)
+  CAMP_ZK[14] = { cores: CAMP_VIGIA.cores, cabelo: 0, geme: 'snarl', gemeS: [6, 11], sc: 0, vel: [2.2, 2.2] }; // sc/vel: o status do O3-D06 lê (a base do O3-D07 põe a velocidade da fase depois)
+  CAMP_ZKF.modelo[14] = vgModelo; CAMP_ZKF.anim[14] = vgAnim;
+}
+// ---------- cliente: fase, mensagens e a arena ----------
+const VGCLI = { cal: null, calFim: 0, calS: 1, marca: null, marcaFim: 0, ax: 0, az: 0, aOk: false, ap: false, hemiB: NaN, hemiW: NaN, fillB: NaN, fillW: NaN };
+function vgCliFase(zc, f) { // o holofote quebra na fase 3 (o apagão é pelo estado, no forteAnim: vale para quem entra no meio)
+  if (f === 3 && zc) { const p = zc.pos.clone(); p.y += 2; play('crack', p); play('lightning', p); puff(p, 0xeef4ff, 1.6, .5, .4); }
+  if (f === 2 && zc) play('power', zc.pos);
+}
+function vgCliQuadro(zc) { const ud = zc.model?.userData; if (ud?.lente) { const f = CAMP.c.ch?.f || 1; zHide(ud.lente, f >= 3); zHide(ud.lenteQ, f < 3); } }
+function vgTela(id, cor) { let el = document.getElementById(id); if (!el) { el = document.createElement('div'); el.id = id; el.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;background:${cor}`; document.body.appendChild(el); } return el; }
+CAMP_GANCHOS.msg.vg = m => { // { e: 'marca' | 'cal', s }
+  if (typeof m.e !== 'string' || !finN(m.s)) return; const s = clamp(m.s, .2, 10);
+  if (m.e === 'marca') { VGCLI.marcaFim = now + s; VGCLI.marca = vgTela('vgMarca', `radial-gradient(ellipse at center, transparent 55%, ${CAMP_VIGIA.cli.marcaCor})`); toast('MARCADO: o Vigia te viu', 2); play('beep'); }
+  else if (m.e === 'cal') { if (typeof CAMP_ZKF === 'object' && CAMP_ZKF?.msg?.olho) return CAMP_ZKF.msg.olho({ s }); VGCLI.calS = s * (load('menosFlash', false) ? .5 : 1); VGCLI.calFim = now + VGCLI.calS; VGCLI.cal = vgTela('vgCal', CAMP_VIGIA.cli.calCor); } // a do O3-D06 quando existe
+};
+function forteAnim(dt) { // MAP_ANIM da arena (cliente): sinalizadores, cone do holofote, apagão da fase 3, rajada, arame, telas
+  const V = FORTE_V, C_ = CAMP_VIGIA.cli, camp = campCliOn() && ZC.on, ch = camp ? CAMP.c.ch : null, vig = ch?.k === CAMP_VIGIA.k ? ch : null;
+  if (ZC.powT !== -1e9) ZC.powT = -1e9; // a energia da arena já vem ligada: sem o marcador do Pack-a-Punch (não há PaP aqui)
+  if (V.sinal) { const P = C_.sinalPulso; V.sinal.material.opacity = P[0] + P[1] * Math.abs(Math.sin(now * P[2])) * (.7 + .3 * Math.sin(now * 13.1)); }
+  const zc = vig ? ZC.zs.get(vig.z) : null, tel = vig ? vgTelAtivo() : null;
+  if (V.cone) { // cone falso: preso ao holofote, gira com a varredura; sem chefe ou na fase 3, some
+    const on = !!(zc && !zc.dead && vig.f < 3 && zc.model.visible);
+    V.cone.visible = on;
+    if (on) { const s = zc.sz || 1, y = zc.yaw, cn = FORTE.cone; let a = y, k = C_.coneOcio;
+      if (tel && tel.a.startsWith('varredura') && tel.p[0]) { const ta = tel.t0 + tel.s; a = tel.p[0][3] + (now >= ta ? (tel.g * Math.PI / 180) * clamp((now - ta) / Math.max(.01, tel.at), 0, 1) : 0); k = C_.coneVarre; }
+      V.cone.position.set(zc.pos.x + Math.sin(y) * .2 * s, zc.pos.y + 1.42 * s, zc.pos.z + Math.cos(y) * .2 * s); V.cone.rotation.order = 'YXZ'; V.cone.rotation.set(-cn.tilt, a, 0);
+      V.cone.material.opacity = cn.op * k * (.9 + .1 * Math.sin(now * 31)); }
+  }
+  const apaga = !!(vig && vig.f >= 3); // apagão local: só os sinalizadores (o pool e os bulbos que o zUpdateWorld acabou de pintar)
+  if (apaga) { const W_ = ZC.world; if (W_) { for (const P of W_.pool) P.L.intensity = 0; for (const l of W_.lights) if (l.bulb.visible) l.bulb.material.color.multiplyScalar(C_.bulbo); }
+    if (hemi.intensity !== VGCLI.hemiW) VGCLI.hemiB = hemi.intensity; VGCLI.hemiW = hemi.intensity = VGCLI.hemiB * C_.apagaoLuz;
+    if (VIS.fill.parent) { if (VIS.fill.intensity !== VGCLI.fillW) VGCLI.fillB = VIS.fill.intensity; VGCLI.fillW = VIS.fill.intensity = VGCLI.fillB * C_.apagaoLuz; } VGCLI.ap = true; }
+  else if (VGCLI.ap) { VGCLI.ap = false; if (hemi.intensity === VGCLI.hemiW) hemi.intensity = VGCLI.hemiB; if (VIS.fill.intensity === VGCLI.fillW) VIS.fill.intensity = VGCLI.fillB; VGCLI.hemiW = VGCLI.fillW = NaN; }
+  if (tel && tel.a === 'rajada' && zc && tel.p[0]) { // os 3 tiros (o host aplica o dano no mesmo compasso)
+    const ta = tel.t0 + tel.s, n = Math.min(3, Math.floor((now - ta) / Math.max(.01, tel.at) * 3) + 1); tel.vgN ||= 0;
+    while (now >= ta && tel.vgN < n) { tel.vgN++; const s = tel.p[0], a = s[3], o = new V3(zc.pos.x - Math.sin(a) * .9, zc.pos.y + 1.35 * (zc.sz || 1), zc.pos.z - Math.cos(a) * .9), d = tel.d1; tracer(o, new V3(s[0] - Math.sin(a) * d, s[1] + 1.1, s[2] - Math.cos(a) * d), C_.rastro); play('rifle', o); }
+  }
+  if (camp && me.alive && !me.downed && me.pos.y < CAMP_VIGIA.arame.dy && vgArame(me.pos.x, me.pos.z)) { // arame: anda a ×0,5 (desfaz metade do passo do quadro)
+    if (VGCLI.aOk) { const k = 1 - CAMP_VIGIA.arame.lento, nx = me.pos.x - (me.pos.x - VGCLI.ax) * k, nz = me.pos.z - (me.pos.z - VGCLI.az) * k; if (!blockedAt(nx, me.pos.y + .01, nz, me.h)) { me.pos.x = nx; me.pos.z = nz; } }
+    VGCLI.aOk = true; VGCLI.ax = me.pos.x; VGCLI.az = me.pos.z; me.sprinting = false;
+  } else VGCLI.aOk = false;
+  if (VGCLI.marca) VGCLI.marca.style.opacity = now < VGCLI.marcaFim ? (.75 + .25 * Math.sin(now * 8)).toFixed(2) : '0';
+  if (VGCLI.cal) VGCLI.cal.style.opacity = now < VGCLI.calFim ? clamp((VGCLI.calFim - now) / VGCLI.calS, 0, 1).toFixed(2) : '0';
+}
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { matchForm, campForm0, CAMP_VIGIA, VGSRV, VGCLI, FORTE, FORTE_V, vgAlvo, vgFase, vgTick, vgIA, vgArame, vgArameTick, vgMarca, vgEscada, forteAnim, forteEsconde, vgModelo, forteEstado: () => ({ mapa: curMapId, anim: MAP_ANIM.includes(forteAnim), cone: FORTE_V.cone ? !!scene.getObjectById(FORTE_V.cone.id) : null, pap: ZC.world?.pap?.g.visible ?? null, hemi: hemi.intensity }) }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); }
+// ===== FIM O3-D09 =====
 //
 // @@CAMP-ATO-1@@
 // ===== O3-D10: Atos I e II da campanha na Vila (docs/overhaul/campanha.md §4.3; textos em docs/overhaul/lore.md §8–§10) =====
