@@ -161,7 +161,7 @@ Não podem mudar dano, vida nem velocidade das armas existentes (regra da Onda 2
   - Valores: 2000 pontos, uma vez por jogador por rodada, precisa de energia.
   - Rede: host → `ammo` de cada arma (mensagem que já existe).
 - **Wunderfizz** (bebida sorteada): sorteia uma bebida que o jogador não tem, como o power-up `perk`.
-  - Valores: 1500, respeita `ZMAXPERKS`; muda de lugar depois de 3 usos, como a Caixa.
+  - Valores: 2500 (média das 13 bebidas, O2-C10), respeita `ZMAXPERKS`; fica num lugar só (não há outro lugar por mapa).
   - Rede: `zperk` (já existe).
 
 - **Visual**: armário de metal com luz (munição) ou máquina redonda com globo (Wunderfizz).
@@ -173,7 +173,7 @@ Não podem mudar dano, vida nem velocidade das armas existentes (regra da Onda 2
   - Vila: "baú do armeiro" (explosivos e armas de parede da Vila, macaco com peso alto).
   - Sanatório: "armário de evidências" (armas de mão e especiais leves).
   - Uma vez por jogador por rodada.
-- **Valores**: `ZINT.bau = { custo: 1500, lista: { arma: peso }, porRodada: 1, gira: 3, oferta: 10, usoR: 2.3, srvR: 3, forca: 4 }`.
+- **Valores**: `ZINT.bau = { custo: 1000 (O2-C10: entre a Caixa e a arma de parede mais cara), lista: { arma: peso }, porRodada: 1, gira: 3, oferta: 10, usoR: 2.3, srvR: 3, forca: 4 }`.
 - **Rede**:
   - estados `pronto` → `gira` (`s` = gira) → `oferta` (`s` = oferta; quem pode pegar vai em `quem`, um campo novo do evento) → `pronto`;
   - pegar = `use` com `k: 'zint'` e o estado `oferta`;

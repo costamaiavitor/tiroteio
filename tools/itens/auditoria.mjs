@@ -26,6 +26,7 @@
 //     perto: item sem nenhum ponto livre onde ele seja o escolhido é ERRO);
 //  5. regiões (zoneAt) sem nenhum interativo, Caixa com 'n' que não aponta para dentro, portas cujos lados não batem com rooms;
 //  6. força × risco: custo de portas até o item, caminho a pé desde o nascimento e pontos de nascimento de zumbi por perto.
+//     O2-E02: a correlação principal conta só as compras de poder; a geral (todos os itens e interativos) vai junto em correl.geral.
 // Interativos novos (O2-C04: ZINT_MAPA do jogo, barris e os próximos tipos) entram pelo __T.zintAud(), sem mexer aqui; tipo novo só ganha cor e legenda.
 // O2-C08: atalhos (porta com atalho: 1) ficam fora do custo de portas; erro se uma área, um item ou o interruptor de uma trava só
 // se alcança por um atalho (softlock), e o relatório mostra quanto cada atalho encurta.
@@ -308,7 +309,12 @@ function auditar(cfg) {
   const rank = a => { const s = a.map((v, i) => [v, i]).sort((p, q) => p[0] - q[0]), r = new Array(a.length); for (let i = 0; i < s.length;) { let j = i; while (j + 1 < s.length && s[j + 1][0] === s[i][0]) j++; for (let k = i; k <= j; k++) r[s[k][1]] = (i + j) / 2; i = j + 1; } return r; };
   const spear = (a, b) => { const ra = rank(a), rb = rank(b), n = a.length, ma = ra.reduce((s, v) => s + v, 0) / n, mb = rb.reduce((s, v) => s + v, 0) / n; let num = 0, da = 0, db = 0; for (let i = 0; i < n; i++) { num += (ra[i] - ma) * (rb[i] - mb); da += (ra[i] - ma) ** 2; db += (rb[i] - mb) ** 2; } return da && db ? r2(num / Math.sqrt(da * db)) : 0; };
   const fxv = fx.filter(f => f.tipo !== 'caixa' || f.id === 'caixa:0');
-  const correl = { forca_x_custoPortas: spear(fxv.map(f => f.forca), fxv.map(f => f.custoPortas ?? 0)), forca_x_caminho: spear(fxv.map(f => f.forca), fxv.map(f => f.caminho === Infinity ? 999 : f.caminho)), forca_x_nascimentos: spear(fxv.map(f => f.forca), fxv.map(f => f.nasc15)), n: fxv.length };
+  const correlDe = L => ({ forca_x_custoPortas: spear(L.map(f => f.forca), L.map(f => f.custoPortas ?? 0)), forca_x_caminho: spear(L.map(f => f.forca), L.map(f => f.caminho === Infinity ? 999 : f.caminho)), forca_x_nascimentos: spear(L.map(f => f.forca), L.map(f => f.nasc15)), n: L.length });
+  // O2-E02 (decisão do coordenador): a correlação principal conta só as COMPRAS DE PODER (bebidas, PaP, armas/letais de parede, Bowie,
+  // Caixa, Wunderfizz, baú/armário, munição e armadilhas pagas); energia, interruptor, sino, barril, terminal e barricada ficam só na geral
+  const COMPRA = new Set(['bebida', 'pap', 'arma_parede', 'letal', 'bowie', 'caixa', 'wunderfizz', 'bau', 'municao', 'armadilha', 'fogo']);
+  const fxc = fxv.filter(f => COMPRA.has(f.tipo) && (f.tipo !== 'armadilha' && f.tipo !== 'fogo' || (itens.find(o => o.id === f.id)?.preco ?? 0) > 0));
+  const correl = { ...correlDe(fxc), geral: correlDe(fxv) };
   for (const f of fxv) if (f.forca >= 4 && (f.custoPortas ?? 0) <= 1000 && f.caminho < 30 && f.tipo !== 'caixa') ach('aviso', 'forte_seguro', `${f.id} (${f.nome}, força ${f.forca}) a ${f.caminho} m do nascimento com ${f.custoPortas} pontos de porta`, [f.id]);
 
   // ---------- planta (PNG) ----------
@@ -389,7 +395,9 @@ function relatorio(mapa, r) {
     for (const p of r.pares) L.push(`  ${p.grav === 'erro' ? 'ERRO ' : '     '}${p.a} — ${p.b}: ${fmt(p.d)} m${p.visada ? '' : ' (parede no meio)'}`);
     L.push('bloqueio de passagem (campo de fluxo com × sem itens):');
     for (const b of r.bloqueio) if (b.perdidas || b.desvios || b.rotulo.startsWith('itens')) L.push(`  ${b.rotulo}: ${b.perdidas} sem caminho, ${b.desvios} com desvio > ${CFG.desvio} m, máx ${fmt(b.maxDesvio)} m`);
-    L.push(`força × risco (Spearman, n=${r.forca.correl.n}): × custo de portas ${fmt(r.forca.correl.forca_x_custoPortas)}, × caminho ${fmt(r.forca.correl.forca_x_caminho)}, × nascimentos a 15 m ${fmt(r.forca.correl.forca_x_nascimentos)}`);
+    { const c = r.forca.correl, g = c.geral || c; // O2-E02: só compras de poder (principal) e geral (todos os itens e interativos)
+      L.push(`força × risco, só compras de poder (Spearman, n=${c.n}): × custo de portas ${fmt(c.forca_x_custoPortas)}, × caminho ${fmt(c.forca_x_caminho)}, × nascimentos a 15 m ${fmt(c.forca_x_nascimentos)}`);
+      L.push(`força × risco, geral (Spearman, n=${g.n}): × custo de portas ${fmt(g.forca_x_custoPortas)}, × caminho ${fmt(g.forca_x_caminho)}, × nascimentos a 15 m ${fmt(g.forca_x_nascimentos)}`); }
     L.push('regiões (custo de portas | m² | itens):');
     for (const g of r.regioes) L.push(`  ${String(g.nome).slice(0, 28).padEnd(28)} ${String(g.custo ?? '—').padStart(5)} ${String(g.m2).padStart(6)}  ${g.itens.length ? g.itens.join(' ') : '(nenhum)'}`);
   }
