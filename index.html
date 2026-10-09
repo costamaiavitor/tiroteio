@@ -24705,6 +24705,195 @@ const D_RESTO = ZINT.barril.restoH; // altura dos restos (colisor e malha)
 //
 //
 // @@INTERATIVO-2@@
+// ===== O2-C07: terminais com lore (docs/overhaul/interativos.md §1.5) =====
+// F perto de um terminal (Sanatório: terminal de mesa, prontuário, gravador; Vila: quadro de avisos, diário, rádio) abre um painel de
+// leitura no HUD. O host confere a distância (zintUsar), anota quem leu (E.lidos, para a campanha da Onda 3) e responde só a quem leu
+// (sendTo, { t: 'zint', i, st: 'lido' }): o estado global continua 'pronto' (nada a sincronizar para quem entra no meio).
+// O painel não pausa o jogo: fecha com F, Esc, andando (fechaAndar) ou sozinho depois do tempo de leitura. Não dá pontos nem itens.
+// Texto PROVISÓRIO (uma linha, até maxTxt letras) em ZINT_TERM_TXT, por id: a lore oficial vem em docs/overhaul/lore.md (Onda 3).
+// Registro local do que este jogador já leu: zintLoreLidos() (ids, guardados no navegador em 'tiroteio.lore').
+ZINT.terminal = { nome: 'Terminal', custo: 0, usoR: 1.8, srvR: 2.6, forca: 1, textoS: 8, porLetra: .06, fechaAndar: 1, maxTxt: 160 };
+const ZINT_TERM_TXT = { // id -> { titulo, txt } (texto provisório: trocar aqui)
+  'san-recepcao': { titulo: 'Ficha de admissão nº 0417', txt: 'Paciente chegou sedado, sem nome. Mordida no antebraço, febre de 41 °C. O diretor mandou isolar na ala leste e não registrar a entrada.' },
+  'san-laboratorio': { titulo: 'Registro do laboratório, lote 12', txt: 'A amostra reage à corrente: o tecido morto volta a se contrair. Aumentar a voltagem amanhã. Não contar nada à diretoria.' },
+  'san-necroterio': { titulo: 'Fita da autópsia, gaveta 7', txt: '...o coração não bate há três dias, mas os olhos seguem a lanterna. Vou desligar o gravador e trancar a gaveta.' },
+  'san-psiquiatria': { titulo: 'Prontuário, Ala Psiquiátrica, leito 9', txt: 'Repete que os mortos do porão "escutam a caldeira". Aumentar a dose e conter à noite. Parou de aceitar comida cozida.' },
+  'san-crematorio': { titulo: 'Livro do forno, última página', txt: 'Seis corpos hoje. Dois voltaram a se mexer na esteira. O forno não dá conta: acendi o segundo e tranquei a porta por fora.' },
+  'san-caldeiras': { titulo: 'Painel da caldeira: aviso', txt: 'Pressão acima do limite desde a queda de energia. Religar o gerador antes de abrir as alas. Sem luz, eles sobem do porão.' },
+  'vila-igreja': { titulo: 'Avisos da paróquia', txt: 'Missa suspensa. Quem tiver febre ou mordida não entre na igreja. O sino só toca em caso de perigo. Que Deus tenha piedade da vila.' },
+  'vila-hospital': { titulo: 'Caderno do médico de campanha', txt: 'Amputar não adianta. O ferido do leito 3 morreu às 4h e levantou às 4h20. Poupem munição: tiro na cabeça, só na cabeça.' },
+  'vila-farol': { titulo: 'Rádio do farol', txt: '...aqui é o farol, alguém na escuta? O barco não voltou e tem gente andando na água rasa. Repito: não venham pelo porto.' },
+  'vila-mina': { titulo: 'Escala da mina velha', txt: 'Turno da noite cancelado. A galeria 4 foi lacrada depois do desabamento. Batidas do lado de dentro não são problema nosso.' },
+};
+// aparência (procedural) de cada variante: rótulo do painel, verbo do F, estilo do painel (san/vila) e o móvel
+// (col: caixa do colisor no espaço do móvel [cx, cz, largura, fundo, altura]; a frente é +z, a parede fica atrás, em z = -0,315)
+const ZINT_TERM_VIS = {
+  terminal: { rot: 'TERMINAL', verbo: 'Ler o terminal', est: 'san', col: [0, 0, 1, .55, 1.14] },
+  prontuario: { rot: 'PRONTUÁRIO', verbo: 'Ler o prontuário', est: 'san', col: [0, -.025, .5, .5, 1.07] },
+  gravador: { rot: 'GRAVADOR', verbo: 'Ouvir a fita', est: 'san', col: [0, 0, .85, .5, 1.02] },
+  quadro: { rot: 'QUADRO DE AVISOS', verbo: 'Ler os avisos', est: 'vila', col: [0, -.2, 1, .16, 1.71] },
+  diario: { rot: 'DIÁRIO', verbo: 'Ler o diário', est: 'vila', col: [0, 0, .9, .5, .92] },
+  radio: { rot: 'RÁDIO', verbo: 'Ouvir o rádio', est: 'vila', col: [0, 0, .7, .48, 1.06] },
+};
+ZINT_MAPA.vila.push( // sonda do O2-C07 (móvel rente à parede, 2,5 m livres na frente, 3,5 m de portas, janelas, chão que solta zumbi e itens; 4 m dos barris)
+  { t: 'terminal', v: 'quadro', id: 'vila-igreja', x: -18.25, z: -26.68, n: [0, 1] }, // B Igreja
+  { t: 'terminal', v: 'diario', id: 'vila-hospital', x: -23.31, z: -115.75, n: [-1, 0] }, // K Hospital de campanha
+  { t: 'terminal', v: 'radio', id: 'vila-farol', x: -22.75, z: 128.69, n: [0, -1] }, // O Farol
+  { t: 'terminal', v: 'quadro', id: 'vila-mina', x: 30.25, z: -203.68, n: [0, 1] }, // b01 Mina velha
+);
+ZINT_MAPA.sanatorio.push(
+  { t: 'terminal', v: 'terminal', id: 'san-recepcao', x: -8.18, z: 4.25, n: [1, 0] }, // A Recepção (ficha de admissão)
+  { t: 'terminal', v: 'terminal', id: 'san-laboratorio', x: -26.18, z: 17.25, n: [1, 0] }, // D Laboratório
+  { t: 'terminal', v: 'gravador', id: 'san-necroterio', x: -24.98, z: 40.25, n: [1, 0] }, // I Necrotério
+  { t: 'terminal', v: 'prontuario', id: 'san-psiquiatria', x: 26.19, z: 28.25, n: [-1, 0] }, // J Ala Psiquiátrica
+  { t: 'terminal', v: 'prontuario', id: 'san-crematorio', x: -97.25, z: 87.19, n: [0, -1] }, // r7 Crematório
+  { t: 'terminal', v: 'terminal', id: 'san-caldeiras', x: -52.89, z: 53.25, n: [1, 0] }, // P Caldeiras (manual da caldeira)
+);
+// texturas de canvas (uma por tipo de face, desenhadas uma vez e guardadas entre as partidas; sorteio com semente: sempre iguais)
+const ZINT_TERM_TEX = {};
+function zintTermTex(k) {
+  if (ZINT_TERM_TEX[k]) return ZINT_TERM_TEX[k];
+  let sd = 7; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const rabisco = (g, x, y, w, cor, lw = 1.4) => { g.strokeStyle = cor; g.lineWidth = lw; g.beginPath(); g.moveTo(x, y); for (let s = 0; s < w; s += 4) g.lineTo(x + s, y + (rnd() - .5) * 3); g.stroke(); };
+  const W = { tela: [256, 192], papel: [192, 256], avisos: [256, 192], livro: [256, 128], radio: [192, 128] }[k];
+  const t = canvasTex(W[0], W[1], (g, w, h) => {
+    if (k === 'tela') { // tela de fósforo verde com linhas de texto
+      g.fillStyle = '#031a0c'; g.fillRect(0, 0, w, h); g.font = 'bold 15px monospace'; g.fillStyle = '#56ff94';
+      ['SANATORIO  SIST. 3', '> PACIENTE 0417', '  ALA: LESTE', '  STATUS: ISOLADO', '> CORRENTE 220V OK', '> GERADOR: ????', '_'].forEach((s, i) => g.fillText(s, 12, 24 + i * 24));
+      g.fillStyle = 'rgba(0,0,0,.28)'; for (let y = 0; y < h; y += 3) g.fillRect(0, y, w, 1); // linhas de varredura
+    } else if (k === 'papel') { // ficha presa na prancheta
+      g.fillStyle = '#e9e4d4'; g.fillRect(0, 0, w, h); g.fillStyle = '#3a3a3a'; g.font = 'bold 16px sans-serif'; g.fillText('FICHA CLÍNICA', 18, 30);
+      for (let y = 52; y < h - 20; y += 16) rabisco(g, 16, y, 150 - rnd() * 50, '#4a4a5a');
+      g.strokeStyle = '#a02020'; g.lineWidth = 3; g.strokeRect(100, 180, 76, 30); g.fillStyle = '#a02020'; g.font = 'bold 14px sans-serif'; g.fillText('ISOLAR', 110, 201);
+    } else if (k === 'avisos') { // cortiça com papéis pregados
+      g.fillStyle = '#7a5530'; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 6; i++) { const x = 10 + (i % 3) * 82 + rnd() * 6, y = 10 + (i / 3 | 0) * 92 + rnd() * 6; g.save(); g.translate(x + 35, y + 40); g.rotate((rnd() - .5) * .18);
+        g.fillStyle = ['#ece4cc', '#e2d9b8', '#f1ead6'][i % 3]; g.fillRect(-35, -40, 70, 78); for (let l = -26; l < 30; l += 10) rabisco(g, -28, l, 50 - rnd() * 18, '#3b342a', 1.2);
+        g.fillStyle = '#9a1c1c'; g.beginPath(); g.arc(0, -34, 3.5, 0, 7); g.fill(); g.restore(); }
+    } else if (k === 'livro') { // livro aberto escrito à mão
+      g.fillStyle = '#e8dcbc'; g.fillRect(0, 0, w, h); const gr = g.createLinearGradient(w / 2 - 14, 0, w / 2 + 14, 0); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(.5, 'rgba(60,40,20,.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(w / 2 - 14, 0, 28, h);
+      for (let y = 16; y < h - 8; y += 11) { rabisco(g, 10, y, 100 - rnd() * 30, '#40301c', 1.1); rabisco(g, w / 2 + 10, y, 100 - rnd() * 40, '#40301c', 1.1); }
+    } else { // frente do rádio: tela de pano, mostrador e botões
+      g.fillStyle = '#4a2c18'; g.fillRect(0, 0, w, h); g.fillStyle = '#8a7350'; g.fillRect(12, 12, 104, 104);
+      g.strokeStyle = '#5a4630'; g.lineWidth = 1; for (let s = 12; s < 116; s += 5) { g.beginPath(); g.moveTo(12, s); g.lineTo(116, s); g.stroke(); g.beginPath(); g.moveTo(s, 12); g.lineTo(s, 116); g.stroke(); }
+      g.fillStyle = '#e8cf8a'; g.fillRect(126, 18, 54, 26); g.strokeStyle = '#4a2c18'; for (let s = 130; s < 178; s += 6) { g.beginPath(); g.moveTo(s, 30); g.lineTo(s, 42); g.stroke(); }
+      g.fillStyle = '#c03018'; g.fillRect(150, 20, 2, 22); g.fillStyle = '#2a1a0e'; for (const x of [140, 168]) { g.beginPath(); g.arc(x, 82, 11, 0, 7); g.fill(); }
+    }
+  });
+  t.userData.tmp = false; t.anisotropy = MAX_ANISO; return (ZINT_TERM_TEX[k] = t);
+}
+const ZINT_TERM_MAT = {};
+const zintTermMat = (k, basico) => ZINT_TERM_MAT[k] || (ZINT_TERM_MAT[k] = basico ? new THREE.MeshBasicMaterial({ map: zintTermTex(k) }) : new THREE.MeshLambertMaterial({ map: zintTermTex(k) }));
+function zintPlano(g, k, w, h, x, y, z, rx = 0, basico = false) { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), zintTermMat(k, basico)); p.position.set(x, y, z); p.rotation.x = rx; p.receiveShadow = true; g.add(p); return p; }
+const ZINT_TERM_MONTA = { // móvel de cada variante (frente +z; medidas só de aparência)
+  terminal(g) { // mesa de metal com monitor de tubo, tela verde e teclado
+    const cin = mc(0x6d737a), esc = mc(0x4a4f55), bege = mc(0xb9b29a);
+    bx(g, 1, .04, .55, 0, .74, 0, cin); for (const sx of [-.46, .46]) for (const sz of [-.235, .235]) bx(g, .04, .72, .04, sx, .36, sz, esc);
+    bx(g, .34, .5, .5, .3, .47, 0, mc(0x5e646b)); for (const y of [.36, .6]) bx(g, .3, .012, .006, .3, y, .252, esc);
+    bx(g, .2, .03, .2, -.12, .775, -.04, bege); bx(g, .44, .38, .38, -.12, .98, -.04, bege); bx(g, .4, .03, .14, -.08, .775, .17, mc(0x9c9682));
+    zintPlano(g, 'tela', .34, .27, -.12, .99, .1505, 0, true);
+  },
+  prontuario(g) { // arquivo de aço com a prancheta da ficha pendurada na parede
+    const esc = mc(0x3a3f3c); bx(g, .5, 1.05, .5, 0, .525, -.025, mc(0x7c8a84));
+    for (const y of [.36, .71]) bx(g, .46, .012, .006, 0, y, .226, esc); for (const y of [.2, .55, .9]) bx(g, .12, .025, .03, 0, y, .24, esc);
+    bx(g, .3, .02, .22, .03, 1.06, 0, mc(0xc8b88a)); // pasta em cima do arquivo
+    bx(g, .28, .38, .012, 0, 1.45, -.303, mc(0x6b4a2a)); bx(g, .1, .03, .02, 0, 1.63, -.293, mc(0x9a9a9a));
+    zintPlano(g, 'papel', .25, .33, 0, 1.44, -.2965);
+  },
+  gravador(g) { // carrinho de metal com gravador de rolo, microfone e a transcrição
+    const met = mc(0x8a9096), esc = mc(0x2a2a2e);
+    bx(g, .85, .04, .5, 0, .72, 0, met); bx(g, .8, .02, .45, 0, .2, 0, met); for (const sx of [-.4, .4]) for (const sz of [-.22, .22]) bx(g, .03, .7, .03, sx, .36, sz, mc(0x5a5f64));
+    bx(g, .46, .12, .32, -.05, .8, -.02, mc(0x3b3f45)); bx(g, .44, .006, .3, -.05, .863, -.02, mc(0x9aa0a6));
+    for (const x of [-.16, .06]) { zintCil(g, .085, .02, .876, esc, 16).position.set(x, .876, -.06); zintCil(g, .02, .03, .88, mc(0xbbbbbb), 8).position.set(x, .88, -.06); }
+    bx(g, .07, .03, .006, -.05, .82, .142, mcE(0xffcc55, 0x664400)); // ponteiro do volume aceso
+    zintCil(g, .008, .24, .86, esc, 6).position.set(.28, .86, .1); bx(g, .05, .07, .05, .28, 1.0, .1, esc);
+    zintPlano(g, 'papel', .17, .23, .26, .742, -.1, -Math.PI / 2);
+  },
+  quadro(g) { // quadro de avisos de madeira em dois postes, com telhadinho
+    const mad = mc(0x5a3f26); for (const sx of [-.46, .46]) bx(g, .08, 1.7, .08, sx, .85, -.2, mad);
+    bx(g, 1, .78, .04, 0, 1.25, -.2, mc(0x6e4b2c)); bx(g, 1.12, .05, .3, 0, 1.68, -.13, mc(0x4a3420));
+    zintPlano(g, 'avisos', .92, .7, 0, 1.25, -.178);
+  },
+  diario(g) { // mesa rústica com o diário aberto, vela e tinteiro
+    const mad = mc(0x4f3720); bx(g, .9, .05, .5, 0, .74, 0, mc(0x6a4a2c)); for (const sx of [-.4, .4]) for (const sz of [-.2, .2]) bx(g, .06, .72, .06, sx, .36, sz, mad);
+    bx(g, .4, .025, .28, -.05, .775, .02, mc(0x5a1e14)); zintPlano(g, 'livro', .38, .26, -.05, .7885, .02, -Math.PI / 2);
+    zintCil(g, .025, .12, .825, mc(0xe8e0c8), 10).position.set(.3, .825, -.1); zintCil(g, .012, .035, .9, mcE(0xffb040, 0xff8a20), 6, false).position.set(.3, .9, -.1);
+    zintCil(g, .03, .05, .79, mc(0x1a1a22), 10).position.set(.25, .79, .12);
+  },
+  radio(g) { // caixote com o rádio de válvula, mostrador aceso e antena
+    bx(g, .7, .7, .48, 0, .35, 0, mc(0x5e4128)); for (const y of [.2, .45]) bx(g, .7, .02, .005, 0, y, .242, mc(0x3e2a18));
+    bx(g, .52, .36, .28, 0, .88, -.04, mc(0x4a2c18)); zintPlano(g, 'radio', .46, .3, 0, .88, .1005);
+    bx(g, .1, .03, .004, .1, .955, .103, mcE(0xffd890, 0x8a5a10)); // mostrador aceso
+    const ant = zintCil(g, .006, .7, 1.35, mc(0x2a2a2a), 6); ant.position.set(.2, 1.35, -.12); ant.rotation.z = -.3;
+  },
+};
+// ---------- painel de leitura no HUD (cliente) ----------
+const ZLORE = { el: null, i: -1, fim: 0, x: 0, z: 0, lidos: new Set() };
+function zintLoreEl() {
+  if (ZLORE.el) return ZLORE.el;
+  const css = document.createElement('style'); css.textContent = '#zlore{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);width:min(460px,calc(100vw - 32px));max-height:42vh;overflow:hidden;box-sizing:border-box;padding:12px 16px 14px;border-radius:8px;background:rgba(10,14,12,.93);border:1px solid rgba(127,224,164,.45);color:#eef4ee;font-size:17px;line-height:1.45;text-align:left;pointer-events:none;box-shadow:0 4px 18px rgba(0,0,0,.6);z-index:5}'
+    + '#zlore .zlk{font-size:12px;letter-spacing:2px;font-weight:700;color:#7fe0a4}#zlore .zlt{font-size:19px;font-weight:700;margin:2px 0 6px;color:#fff}#zlore .zlx{margin:0}'
+    + '#zlore[data-m=san] .zlx{font-family:Consolas,"Courier New",monospace;font-size:16px}#zlore .zlh{margin-top:8px;font-size:13px;color:#c8d0c8}#zlore .zlh b{color:#7fe0a4}'
+    + '#zlore .zlb{position:absolute;left:0;right:0;bottom:0;height:3px;background:#7fe0a4;transform-origin:left;animation:zlb 8s linear forwards}@keyframes zlb{from{transform:scaleX(1)}to{transform:scaleX(0)}}'
+    + '#zlore[data-m=vila]{background:rgba(26,18,10,.93);border-color:rgba(240,194,122,.45)}#zlore[data-m=vila] .zlk,#zlore[data-m=vila] .zlh b{color:#f0c27a}#zlore[data-m=vila] .zlb{background:#f0c27a}#zlore[data-m=vila] .zlx{font-style:italic}'
+    + '@media(max-width:600px){#zlore{bottom:128px;font-size:15px;padding:10px 12px 12px}#zlore .zlt{font-size:17px}#zlore[data-m=san] .zlx{font-size:14px}}@media(prefers-reduced-motion:reduce){#zlore .zlb{animation:none}}';
+  document.head.appendChild(css);
+  const el = document.createElement('div'); el.id = 'zlore'; el.className = 'hidden'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-live', 'polite'); el.setAttribute('aria-labelledby', 'zloreT');
+  el.innerHTML = '<div class="zlk"></div><div class="zlt" id="zloreT"></div><p class="zlx"></p><div class="zlh"><b>F</b>, <b>Esc</b> ou ande para fechar</div><i class="zlb"></i>';
+  ($('#zhud') || document.body).appendChild(el); return (ZLORE.el = el);
+}
+function zintLoreAbre(i) {
+  const o = ZD.zint?.[i], T = o && ZINT_TERM_TXT[o.id], V = o && ZINT_TERM_VIS[o.v], D = ZINT.terminal; if (!T || !V) return;
+  const el = zintLoreEl(), s = Math.max(D.textoS, T.txt.length * D.porLetra), b = el.querySelector('.zlb');
+  el.dataset.m = V.est; el.querySelector('.zlk').textContent = V.rot; el.querySelector('.zlt').textContent = T.titulo; el.querySelector('.zlx').textContent = T.txt;
+  b.style.animation = 'none'; void b.offsetWidth; b.style.animation = ''; b.style.animationDuration = s + 's'; // barra do tempo até fechar sozinho
+  el.classList.remove('hidden'); ZLORE.i = i; ZLORE.fim = now + s; ZLORE.x = me.pos.x; ZLORE.z = me.pos.z;
+  play('beep'); zintLoreMarca(o.id);
+}
+function zintLoreFecha(som = true) { if (ZLORE.i < 0) return; ZLORE.i = -1; ZLORE.el?.classList.add('hidden'); if (som) play('chat'); }
+function zintLoreMarca(id) { // registro do que este jogador leu (campanha da Onda 3)
+  ZLORE.lidos.add(id);
+  try { const a = JSON.parse(localStorage.getItem('tiroteio.lore') || '[]'); if (Array.isArray(a) && !a.includes(id)) { a.push(id); localStorage.setItem('tiroteio.lore', JSON.stringify(a)); } } catch (e) { }
+}
+function zintLoreLidos() { // ids dos terminais que este jogador já leu (nesta e nas outras partidas, neste navegador)
+  let a = []; try { a = JSON.parse(localStorage.getItem('tiroteio.lore') || '[]'); } catch (e) { }
+  return [...new Set([...(Array.isArray(a) ? a.filter(s => typeof s === 'string') : []), ...ZLORE.lidos])].sort();
+}
+function zintQuemLeu() { const r = {}; (ZD.zint || []).forEach((o, i) => { if (o.t === 'terminal') r[o.id] = [...(Z.zint?.[i]?.lidos || [])]; }); return r; } // host: id do terminal -> jogadores que leram nesta partida
+// F com o painel aberto só fecha (não compra nada sem querer); Esc fecha (e segue para a pausa); perder a trava do mouse fecha
+addEventListener('keydown', e => {
+  if (ZLORE.i < 0 || C.chatOpen) return;
+  if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); e.stopPropagation(); zintLoreFecha(); } else if (e.code === 'Escape') zintLoreFecha();
+}, true);
+document.addEventListener('pointerlockchange', () => { if (ZLORE.i >= 0 && !locked()) zintLoreFecha(); });
+ZINT_FN.terminal = {
+  est: ['pronto', 'lido'],
+  efeito: (o, D) => `lore: "${ZINT_TERM_TXT[o.id]?.titulo || o.id}" (texto provisório; sem pontos)`,
+  monta(o, i) {
+    if (ZLORE.i >= 0) zintLoreFecha(false); // mapa novo: painel da partida anterior fechado
+    const V = ZINT_TERM_VIS[o.v] || ZINT_TERM_VIS.terminal, g = new THREE.Group(), n = o.n || [0, 1], a = Math.atan2(n[0], n[1]);
+    g.position.set(o.x, 0, o.z); g.rotation.y = a;
+    const corpo = new THREE.Group(); g.add(corpo); (ZINT_TERM_MONTA[o.v] || ZINT_TERM_MONTA.terminal)(corpo);
+    corpo.traverse(m => { if (m.isMesh && !m.material.map) { m.castShadow = !m.material.emissive?.getHex(); m.receiveShadow = true; } }); // o aceso (vela, mostrador) não faz sombra
+    mergeParts(corpo);
+    world.add(g); cullAdd(g, o.x, o.z, 1.2);
+    const [cx, cz, w, d, h] = V.col, ca = Math.cos(a), sa = Math.sin(a), X = o.x + cx * ca + cz * sa, Zc = o.z - cx * sa + cz * ca;
+    const ex = Math.abs(ca) * w / 2 + Math.abs(sa) * d / 2, ez = Math.abs(sa) * w / 2 + Math.abs(ca) * d / 2;
+    const col = { minX: X - ex, maxX: X + ex, minY: 0, maxY: h, minZ: Zc - ez, maxZ: Zc + ez }; COL.push(col);
+    return { g, col, h, raio: .3, i };
+  },
+  estado(o, e, c, ant, sync) { // 'lido' só chega a quem leu: abre o painel e volta ao estado global
+    if (c.st !== 'lido') return; c.st = 'pronto'; if (!sync) zintLoreAbre(e.i);
+  },
+  prompt(o, i, c, D) { return ZLORE.i === i ? null : { k: 'zint', id: i, txt: (ZINT_TERM_VIS[o.v] || ZINT_TERM_VIS.terminal).verbo }; },
+  quadro(o, e) { // painel aberto: fecha sozinho no fim do tempo, andando, caído, morto ou no fim da partida
+    if (e.i !== ZLORE.i) return;
+    if (now >= ZLORE.fim || !me.alive || me.downed || ZC.over || Math.hypot(me.pos.x - ZLORE.x, me.pos.z - ZLORE.z) > ZINT.terminal.fechaAndar) zintLoreFecha();
+  },
+  usar(p, i, o, E) { (E.lidos ||= new Set()).add(p.id); sendTo(p.id, { t: 'zint', i, st: 'lido' }); }, // host: só quem leu recebe
+};
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { ZINT_TERM_TXT, ZINT_TERM_VIS, ZLORE, zintLoreAbre, zintLoreFecha, zintLoreLidos, zintQuemLeu }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+// ===== FIM O2-C07 =====
 //
 //
 //
