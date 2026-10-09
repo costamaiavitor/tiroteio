@@ -20644,10 +20644,10 @@ function shoot() {
       ends.push([r3(res.p.x), r3(res.p.y), r3(res.p.z)]);
       if (i < 4) tracer(mz, res.p, w.tracer);
       if (res.id) {
-        const mult = res.zone === 'head' ? (w.head || 4) * (zPerk('ds') ? 1.5 : 1) : res.zone === 'legs' ? .75 : 1;
+        const mult = res.zone === 'head' ? (w.head || 4) * (zPerk('ds') ? 1.5 : 1) : res.zone === 'legs' ? .75 : res.zone === 'fraco' ? campFracoMult(res.id) : 1; // O3-D07: ponto fraco do chefe
         const dmg = w.dmg * mult * Math.pow(w.rm || 1, res.t / 10 / attStat(G.cur, 'rangeX')) * attStat(G.cur, 'dmgX');
         const cur = dmgBy.get(res.id) || { dmg: 0, zone: 'legs', sp: false };
-        cur.dmg += dmg; cur.sp = false; if (res.zone === 'head' || (res.zone === 'body' && cur.zone === 'legs')) cur.zone = res.zone;
+        cur.dmg += dmg; cur.sp = false; if (res.zone === 'fraco' || (res.zone === 'head' && cur.zone !== 'fraco') || (res.zone === 'body' && cur.zone === 'legs')) cur.zone = res.zone; // O3-D07: 'fraco' vale mais que a cabeça
         dmgBy.set(res.id, cur); puff(res.p, zmode ? 0x6a0000 : 0xa01010, .35, .3, 0); bloodSplat(res.p);
       } else if (!w.splash) impact(res.p, res.n);
       if (w.splash && zmode) zSplash(res.p, w, dmgBy, res.n);
@@ -23410,6 +23410,7 @@ function zAnimDead(zc, ud, dt) {
 // as caixas seguem o desenho: f = metros à frente do pé (para onde o zumbi olha). Antes ficavam todas
 // em cima do pé: na cabeça do corredor (inclinado) quase nunca pegava, e no rastejante o tiro no corpo errava
 function zBoxes(zc) {
+  if (zc.fbx) return campChefeCaixas(zc); // O3-D07: chefe da campanha: mais a caixa do ponto fraco (zona 'fraco')
   const p = zc.pos, fx = -Math.sin(zc.yaw), fz = -Math.cos(zc.yaw), s = zc.sz || 1, k = zc.kind | 0; // s = escala do modelo (Brutamonte, Carniceiro, variação dos comuns)
   const bb = (f, r, y0, y1, sd = 0) => { const x = p.x + (fx * f - fz * sd) * s, z = p.z + (fz * f + fx * sd) * s; r *= s; return { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, minY: p.y + y0 * s, maxY: p.y + y1 * s }; };
   if (zc.dog) { const o = zc.ho || 0, h = zc.hd || 0, y = zc.oy || 0; return [['head', bb(.5 + o, .2, .62 + h, 1 + h)], ['body', bb(o * .5, .45, .15 + y, .85 + y)]]; } // bote do cão sobe e avança, no uivo a cabeça sobe
@@ -27117,6 +27118,511 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP
 // @@CAMP-ZK-1@@
 //
 // @@CAMP-CHEFE@@
+// ===== O3-D07: base comum dos chefes da campanha (docs/overhaul/campanha.md §7.1, §8 e §4.2) =====
+// O que tem aqui (dono: O3-D07; os chefes de verdade, 14 a 16, são do D09, D11 e D13 e só preenchem CAMP_CHEFE[k] e o ZKIND[k]):
+// - CAMP_CHEFE_BASE: números comuns (tetos padrão, invulnerável na troca de fase, aviso mínimo e por dificuldade, recompensa, pool).
+// - CAMP_CHEFE[k]: estrutura de cada chefe (formato abaixo). O ZKIND[k] traz n, sz, rad, pts, xp, chefe e os tetos (capGolpe,
+//   capFraco, capArmadilha, capNuke, capBarril); o que faltar sai de CAMP_CHEFE_BASE.caps (campChefeDef), para o teto nunca dar NaN.
+// - Host: nascimento (campChefeNasce: pelo zSpawnOne, com o tipo e o lugar forçados e o toSpawn intacto), máquina de fases pela vida
+//   (o golpe para no limite da fase e a troca dá CAMP_CHEFE_BASE.invS de invulnerável e cancela o ataque), sorteio por peso entre os
+//   ataques fora do cooldown e válidos (alcance e linha de visão) ou em ordem fixa (padrão aprendível), aviso { t:'camp', k:'tel' }
+//   com tempo nunca abaixo de avisoMin, dano por forma (disco, linha, setor) só depois do aviso, com altura (ataque de chão), cobertura
+//   (parede e pilar) e pilar que segura a linha; investida; ponto fraco (z.fracoAte na recuperação ou atordoado); lacaios fora do
+//   toSpawn com teto de vivos; morte: recompensa, lacaios (e, na rodada de chefe da campanha, o resto) caem sem pontos, campEvento.
+// - Versão de campo (infinito): campChefeNasce(k, { campo: 1 }) usa só os ataques sem campo: 0 e põe os lacaios perto dos jogadores.
+// - Cliente: pool de avisos no chão (3 InstancedMesh: disco 8, linha 8, setor 4; aditivo, sem escrita de profundidade, escondido sem
+//   ataque), barra do chefe (a do Carniceiro, o bo da foto, com o nome e as marcas das fases), caixa do ponto fraco (zona 'fraco'
+//   no tiro do cliente, gancho no zBoxes), empurrão. Quem entra no meio recebe o chefe, a fase e o aviso no ar pelo cp.
+// - Interativos genéricos (ZINT, só na campanha): 'pilar' (pronto = inteiro, rachado, caido) e 'juncao' (pronto = inteira, rompida),
+//   destrutíveis por tiro (zintTiro), explosão (zintExplosao) e golpe de chefe (campDanoPilar). O colisor fica no COL (a pegada não
+//   muda; caído só baixa a altura, como os restos do barril).
+// Ganchos fora do bloco (uma linha cada, // O3-D07): zSnap (bo do chefe da campanha), zBoxes (caixa do fraco) e o tiro do cliente
+// (multiplicador e prioridade da zona 'fraco'). A morte do chefe vem pelo CAMP_G.morte (o campMorte do zKill, do O3-D03).
+//
+// Formato de CAMP_CHEFE[k] (todos os campos de jogo em tabela; funções opcionais para o que é de cada chefe):
+//   { nome, rodada, base, porJog,               vida = zHp(rodada)·zHpK(rodada)·(base + porJog·np) (rodada fixa: chega atrasado, mesma vida)
+//     vel, dm, aw, ac,                          velocidade (×ZDIFF.spd), dano, preparo e recarga do golpe corpo a corpo
+//     nasce: { x, z } | 'portoes' | 'perto',    onde nasce na campanha (no campo: perto de um jogador)
+//     entrada: id de fala, encerra: false       (a rodada de chefe da campanha acaba quando ele morre; false: só os lacaios caem)
+//     fases: [{ de: 1, ... }, { de: .66, vel, danoK, avisoK, lacCada, fala, ordem: [ids], baixa: 1 }, ...]
+//            de = fração da vida em que a fase começa; danoK: dano que leva (número ou (z, CH) => número); avisoK: × no aviso
+//     ataques: [{ id, fases: [1, 2], peso, cd, aviso, ativo, rec, forma: 'disco'|'linha'|'setor'|null, dims: [d1, d2],
+//                 onde: 'chefe'|'alvo', n, leque (linhas em leque, graus), gira (setor girando no ativo, graus), alcance: [min, max],
+//                 vista (0: não precisa de linha de visão), chao (0: pega quem está no alto), cobre (parede e pilar protegem),
+//                 dano (uma vez por jogador), golpes (n tiros no ativo), dps, danoDif (0: não escala com ZDIFF.dmg), empurra (m),
+//                 efeito (CAMP_CH_EF[efeito]), pilar (dano no pilar) | pilarFrac, investe (m/s, até d1), atordoa (s), fraco (abre na
+//                 recuperação), lacaios: { tipo, n, max, onde }, campo (0: fora da versão de campo), fala, som,
+//                 pos(z, alvo, CH) => [[x, y, z, ang], ...], ok(z, alvo, CH), inicio/ativa/fim(z, A, CH) }]
+//            d1: raio (disco, setor) ou comprimento (linha); d2: largura (linha) ou abertura em graus (setor)
+//     fraco: { caixa: { f, r, y0, y1, sd } }    caixa do ponto fraco no corpo (×sz; f à frente, negativo = costas)
+//     lacaios: { tipo, n, cada, max (número ou por fase), onde },  lacaios periódicos (lacCada da fase troca o cada)
+//     alvo(z, CH), ia(z, dt, tgt, CH), tick(z, dt, CH), fase(z, n, CH), objeto(o, i, st, CH), morte(z, p, CH), inicio(z, CH)   (host)
+//     cliFase(zc, f, ch), cliQuadro(zc, dt, ch)   (cliente: ch = CAMP.c.ch, com f, fr = fim do fraco aberto, inv, at = fim do atordoado) }
+const CAMP_CHEFE_BASE = {
+  caps: { capGolpe: .06, capFraco: .1, capArmadilha: .02, capNuke: .05, capBarril: .08 }, // tetos por golpe (§7.1) quando o ZKIND não traz
+  invS: 2, // troca de fase: invulnerável
+  avisoMin: .6, avisoDif: [1.25, 1, .9, .8], // aviso nunca abaixo de 0,6 s (ping de 150 ms + reação); × por dificuldade (Fácil a Pesadelo)
+  pausa: [.8, 1.6], pensaS: .3, primeiroS: 2.5, // entre ataques; sem ataque válido tenta de novo em pensaS; o primeiro depois de nascer
+  alturaChao: 1.5, corpo: .3, peito: [1.3, .8], origemY: 1.2, // ataque de chão; raio do jogador; peito em pé/agachado; boca do ataque
+  danoDif: 50, dpsPasso: 4, // dano × ZDIFF.dmg / 50 (Normal = 1); dano por segundo vai em parcelas de 4
+  empV: 10, // empurrão: velocidade do tranco (dura distância / empV)
+  lacPorJog: 2, lacPerto: [7, 14], nascePerto: [9, 16], // teto de lacaios + 2 por jogador a partir do segundo; raios "perto"
+  busca: .5, // de quanto em quanto o host vê se um objetivo 'matar' ativo precisa do chefe
+  recompensa: { pts: 500, drops: ['max', 'perk'] }, // +500 para cada jogador; drops garantidos
+  hpChefe: 1, // multiplicador geral de vida (o D15 ajusta)
+  pool: { disco: 8, linha: 8, setor: 4, seg: 32, y: .03, borda: .1, miolo: .3, aviso: 0xffc83a, ativo: 0xff2a14, pulso: [3, 10], flashS: .3 },
+  txt: { inv: 'INVULNERÁVEL', protegido: 'PROTEGIDO', atordoado: 'ATORDOADO', morto: 'derrotado' },
+};
+const CAMP_CHEFE = {}; // tipo -> definição (D09: 14 Vigia, D11: 15 Foguista, D13: 16 Diretor)
+const CAMP_CH_EF = {}; // efeitos dos ataques por nome (host): (jogador, chefe, ataque, CH) => void (D09: marca, cal; D13: dose...)
+CAMP_GANCHOS.chefe = []; // (tipo, z, p) host: chefe morto (D14: rodízio do infinito)
+// estado do host (um chefe da campanha por vez)
+const CAMP_CH = { z: null, k: -1, def: null, fase: 0, inv: 0, atk: null, cd: {}, prox: 0, lacT: 0, oi: 0, campo: false, vidaK: 1, rod: 0, encerra: false, buscaT: 0, tag: null, cand: [] };
+const _chA = new V3(), _chB = new V3();
+function campChefeLimpa() { Object.assign(CAMP_CH, { z: null, k: -1, def: null, fase: 0, inv: 0, atk: null, cd: {}, prox: 0, lacT: 0, oi: 0, campo: false, vidaK: 1, rod: 0, encerra: false, tag: null }); }
+function campChefeDef(k) { // definição do chefe, com os tetos que faltam no ZKIND (senão o teto do zHit dá NaN) e a IA registrada
+  const d = CAMP_CHEFE[k], K = ZKIND[k]; if (!d || !K) return null;
+  K.chefe = 1; for (const c in CAMP_CHEFE_BASE.caps) if (!(K[c] > 0)) K[c] = CAMP_CHEFE_BASE.caps[c];
+  if (!CAMP_IA[k]) CAMP_IA[k] = campChefeIA;
+  return d;
+}
+const campChefeNp = () => { let n = 0; for (const p of S.players.values()) if (!p.isBot) n++; return Math.max(1, n); };
+// ---------- host: nascer (chefe e lacaios) pelo zSpawnOne, com o tipo e o lugar forçados e sem mexer na conta da rodada ----------
+function campChefeOnde(cands, onde) { // CAMP_G.nasce durante o nascimento forçado: troca os pontos (lista mexida no lugar)
+  if (!onde) return;
+  if (finN(onde.x) && finN(onde.z)) { cands.length = 0; cands.push({ i: -1, x: onde.x, z: onde.z }); return; }
+  if (onde === 'portoes' || Array.isArray(onde.win)) { const ok = cands.filter(c => c.i >= 0 && (!onde.win || onde.win.includes(c.i))); if (ok.length) { cands.length = 0; cands.push(...ok); } return; }
+  if (onde === 'chao') { const ok = cands.filter(c => c.i < 0); if (ok.length) { cands.length = 0; cands.push(...ok); } return; }
+  const R = onde.perto || (onde === 'perto' ? CAMP_CHEFE_BASE.lacPerto : null); if (!R) return;
+  const tg = [...S.players.values()].filter(p => p.alive && !p.downed), act = zActive(); if (!tg.length) return;
+  for (let k = 0; k < 30; k++) { // como o Carniceiro: um raio em volta de um jogador, em chão andável de sala aberta
+    const q = tg[Math.floor(Math.random() * tg.length)], a = Math.random() * Math.PI * 2, d = rand(R[0], R[1]), x = q.pos[0] + Math.cos(a) * d, z = q.pos[2] + Math.sin(a) * d, c = ffCell(x, z);
+    if (c >= 0 && FF.walk[c] && isFinite(FF.dist[c]) && act.has(zRoomAt(x, z)) && footFreeR(x, z, .6)) { cands.length = 0; cands.push({ i: -1, x, z }); return; }
+  }
+}
+function campZNasce(kind, onde) { // nasce 1 zumbi do tipo, fora do toSpawn e do sorteio de especiais da rodada (devolve o zumbi ou null)
+  if (!CAMP.on || !Z.on || !ZKIND[kind] || Z.dogRound) return null;
+  const id = Z.nextId, G = CAMP_G, sv = [Z.toSpawn, Z.mix?.[kind], Z.mixN, Z.reQ, Z.bossQ, G.tipo, G.nasce];
+  Z.reQ = []; Z.bossQ = 0; Z.toSpawn++; G.tipo = [() => kind]; G.nasce = [(z, c) => campChefeOnde(c, onde)];
+  let ok = false; try { ok = zSpawnOne(); } finally { Z.toSpawn = sv[0]; if (Z.mix) Z.mix[kind] = sv[1]; Z.mixN = sv[2]; Z.reQ = sv[3]; Z.bossQ = sv[4]; G.tipo = sv[5]; G.nasce = sv[6]; }
+  return ok ? Z.zs.get(id) || null : null;
+}
+function campChefeNasce(k, o = {}) { // host: o chefe entra (campanha: objetivo 'matar'; infinito: D14 com { campo: 1, vidaK, rodada })
+  if (!CAMP.on || !Z.on || (CAMP_CH.z && Z.zs.has(CAMP_CH.z.id))) return null;
+  const d = campChefeDef(k); if (!d) return null;
+  const B = CAMP_CHEFE_BASE, campo = !!o.campo || CAMP.modo === 'infinito';
+  campChefeLimpa();
+  Object.assign(CAMP_CH, { k, def: d, campo, vidaK: o.vidaK || 1, rod: o.rodada ?? d.rodada ?? Z.round, encerra: o.encerra ?? (CAMP.modo === 'campanha' && d.encerra !== false), prox: now + (d.primeiroS ?? B.primeiroS) });
+  CAMP_CH.lacT = now + campChefeLacCada();
+  const z = campZNasce(k, o.onde ?? (campo ? { perto: B.nascePerto } : d.nasce ?? { perto: B.nascePerto }));
+  if (!z) { campChefeLimpa(); return null; }
+  CAMP_CH.z = z; z.chefeC = 1;
+  if (d.entrada) campFala(d.entrada);
+  d.inicio?.(z, CAMP_CH);
+  campChefeEnvia();
+  return z;
+}
+CAMP_G.status.push(z => { // vida, velocidade e golpe do chefe (a rodada da tabela fixa a vida); fora dos chefes da campanha não faz nada
+  const d = CAMP_CHEFE[z.kind]; if (!d) return;
+  const r = CAMP_CH.k === z.kind && CAMP_CH.rod ? CAMP_CH.rod : d.rodada ?? Z.round, D = zDf();
+  z.hp = Math.max(1, Math.round(zHp(r) * zHpK(r) * ((d.base ?? 6) + (d.porJog ?? 4) * campChefeNp()) * (CAMP_CH.k === z.kind ? CAMP_CH.vidaK : 1) * CAMP_CHEFE_BASE.hpChefe));
+  z.sc = 0; z.speed = (d.fases?.[0]?.vel ?? d.vel ?? 2) * D.spd; z.dm = d.dm ?? 1.5; z.aw = d.aw ?? .7; z.ac = d.ac ?? 1.4; z.rad = ZKIND[z.kind].rad || z.rad;
+});
+// ---------- host: dano no chefe (CAMP_G.dano, antes do Insta-Kill e do teto) ----------
+CAMP_G.dano.push((z, dmg, zone, w, p, splash) => {
+  const CH = CAMP_CH; if (z !== CH.z || !CH.def) return dmg;
+  if (CH.inv > now) return 0; // troca de fase
+  const F = CH.def.fases?.[CH.fase]; let k = F?.danoK; if (typeof k === 'function') k = k(z, CH); if (finN(k) && k >= 0) dmg *= k;
+  const K = ZKIND[z.kind];
+  if (w === 'barril' && K.capBarril > K.capGolpe) { const extra = Math.min(dmg, z.maxHp * K.capBarril) - Math.min(dmg, z.maxHp * K.capGolpe); if (extra > 0) z.hp = Math.max(1, z.hp - extra); } // barril: 8% (o teto do zHit corta em capGolpe)
+  const nx = CH.def.fases?.[CH.fase + 1]; // o golpe para no limite da fase seguinte: nenhuma fase é pulada, e a troca acontece aqui
+  if (nx && z.hp - dmg <= nx.de * z.maxHp) { dmg = Math.max(0, z.hp - nx.de * z.maxHp); campChefeFase(CH.fase + 1); }
+  return dmg;
+});
+CAMP_G.morte.push((z, p) => { if (z === CAMP_CH.z) campChefeMorre(z, p); }); // campMorte (zKill)
+function campChefeMorre(z, p) {
+  const CH = CAMP_CH, k = CH.k, d = CH.def, B = CAMP_CHEFE_BASE, P = z.body.pos, enc = CH.encerra;
+  CH.z = null; if (CH.atk) broadcast({ t: 'camp', k: 'telx' }); CH.atk = null;
+  const L = []; for (const o of Z.zs.values()) if (o.lac || enc) L.push(o);
+  for (const o of L) zKill(o, null, 'body', 'nuke', false, true); // "o apito se cala": lacaios (e, na rodada de chefe, o resto) sem pontos
+  if (enc) { Z.toSpawn = 0; Z.reQ = []; }
+  for (const q of S.players.values()) if (!q.isBot) zPts(q, B.recompensa.pts);
+  B.recompensa.drops.forEach((t, i) => zDrop(t, P.x + i * 1.2, P.z, true));
+  broadcast({ t: 'camp', k: 'chefe', id: k, f: 0 });
+  d?.morte?.(z, p, CH);
+  campChefeLimpa();
+  campEvento('chefe', k); // objetivo 'matar' (O3-D02)
+  for (const f of CAMP_GANCHOS.chefe) f(k, z, p);
+}
+// ---------- host: fases, envio e quem entra no meio ----------
+function campChefeLacCada() { const CH = CAMP_CH, L = CH.def?.lacaios; if (!L) return 0; return CH.def.fases?.[CH.fase]?.lacCada ?? L.cada ?? 0; }
+function campChefeFase(n) {
+  const CH = CAMP_CH, d = CH.def, z = CH.z, F = d.fases?.[n]; if (!F || !z) return;
+  CH.fase = n; CH.inv = now + CAMP_CHEFE_BASE.invS; CH.oi = 0;
+  if (CH.atk) { CH.atk = null; broadcast({ t: 'camp', k: 'telx' }); } // o ataque em curso é cancelado
+  z.speed = (F.vel ?? d.vel ?? 2) * zDf().spd; z.atkWind = 0;
+  const c = campChefeLacCada(); if (c) CH.lacT = Math.max(CH.lacT, now + Math.min(c, CAMP_CHEFE_BASE.invS));
+  CH.prox = Math.max(CH.prox, CH.inv + rand(...CAMP_CHEFE_BASE.pausa));
+  if (F.fala) campFala(F.fala);
+  d.fase?.(z, n, CH);
+  campChefeEnvia();
+}
+function campChefeMsg() { const CH = CAMP_CH, z = CH.z; return { t: 'camp', k: 'chefe', id: CH.k, z: z.id, f: CH.fase + 1, fr: r2(Math.max(0, (z.fracoAte || 0) - now)), inv: r2(Math.max(0, CH.inv - now)), at: r2(Math.max(0, (z.atord || 0) - now)), c: CH.campo ? 1 : 0, tag: CH.tag || undefined }; }
+function campChefeEnvia() { if (CAMP_CH.z) broadcast(campChefeMsg()); }
+function campChefeBo(bo) { const z = CAMP_CH.z; return CAMP.on && z && Z.zs.has(z.id) ? r2(Math.max(.01, Math.max(0, z.hp) / z.maxHp)) : bo; } // gancho no zSnap: a barra é a do chefe da campanha
+CAMP_GANCHOS.cp.push(cp => { // quem entra no meio: chefe, fase e o aviso no ar
+  const CH = CAMP_CH; if (!CH.z || !Z.zs.has(CH.z.id)) return;
+  const m = campChefeMsg(); cp.ch = [m.id, m.z, m.f, m.fr, m.inv, m.at, m.c, m.tag || null];
+  const A = CH.atk; if (A?.msg) cp.tel = [{ ...A.msg, s: r2(Math.max(0, A.fa - now)), at: r2(Math.max(0, A.fb - Math.max(now, A.fa))) }];
+});
+CAMP_GANCHOS.inicio.push(() => { if (CAMP_CH.z) broadcast({ t: 'camp', k: 'telx' }); campChefeLimpa(); }); // etapa nova (checkpoint, troca de mapa)
+// ---------- host: relógio (CAMP_GANCHOS.tick, campanha e infinito) ----------
+function campChefeBusca() { // campanha: objetivo 'matar' ativo com chefe na tabela e nenhum vivo = o chefe entra (na rodada)
+  const CH = CAMP_CH; if (CAMP.modo !== 'campanha' || CH.z || now < CH.buscaT || Z.phase !== 'round') return; CH.buscaT = now + CAMP_CHEFE_BASE.busca;
+  for (const id in CAMP.obj) { const O = CAMP.obj[id], D = CAMP_OBJ[id]; if (O.st === 'ativo' && D?.tipo === 'matar' && CAMP_CHEFE[D.chefe]) { campChefeNasce(D.chefe, D.onde ? { onde: D.onde } : {}); return; } }
+}
+CAMP_GANCHOS.rodada.push(() => { CAMP_CH.buscaT = 0; });
+function campChefeTick(dt) {
+  if (!CAMP.on) return;
+  campChefeBusca();
+  const CH = CAMP_CH; let z = CH.z; if (!z) return;
+  if (!Z.zs.has(z.id)) { // voltou para a fila (sem caminho) ou o mundo zerou
+    let n = null; for (const o of Z.zs.values()) if (o.kind === CH.k && !o.lac) { n = o; break; }
+    if (n) { CH.z = z = n; z.chefeC = 1; campChefeEnvia(); } else { if (!Z.reQ.some(q => q[0] === CH.k)) campChefeLimpa(); return; }
+  }
+  const F = CH.def.fases; if (F) while (F[CH.fase + 1] && z.hp <= F[CH.fase + 1].de * z.maxHp) campChefeFase(CH.fase + 1); // Nuke, armadilha e fogo não passam pelo zHit
+  if (z.st !== 'in') return;
+  CH.def.tick?.(z, dt, CH);
+  const L = CH.def.lacaios, c = campChefeLacCada(); if (L && c > 0 && now >= CH.lacT && now >= CH.inv) { CH.lacT = now + c; campChefeLacaios(L); }
+  if (CH.atk) campChefeAtk(z, CH.atk, dt);
+  else if (now >= CH.prox && now >= CH.inv && !(z.atord > now)) campChefeSorteia(z);
+}
+CAMP_GANCHOS.tick.push(campChefeTick);
+// ---------- host: lacaios ----------
+function campChefeLacMax(L) { const CH = CAMP_CH; let m = Array.isArray(L.max) ? L.max[Math.min(CH.fase, L.max.length - 1)] : L.max ?? 6; return m + CAMP_CHEFE_BASE.lacPorJog * (campChefeNp() - 1); }
+function campChefeLacVivos() { let n = 0; for (const o of Z.zs.values()) if (o.lac) n++; return n; }
+function campChefeLacaios(L) { // nasce até L.n, sem passar do teto de vivos; marcados lac (fora do toSpawn, caem quando o chefe morre)
+  const CH = CAMP_CH, max = campChefeLacMax(L); let vivos = campChefeLacVivos(), feitos = 0;
+  const onde = CH.campo && (!L.onde || L.onde === 'portoes') ? 'perto' : L.onde ?? 'portoes';
+  for (let i = 0; i < (L.n ?? 1) && vivos < max; i++) { const o = campZNasce(L.tipo ?? 0, onde); if (!o) break; o.lac = 1; vivos++; feitos++; }
+  return feitos;
+}
+// ---------- host: ataques ----------
+function campChefeAlvo(z) { const CH = CAMP_CH, a = CH.def.alvo?.(z, CH); return a && a.alive && !a.downed ? a : z.tgt && z.tgt.alive && !z.tgt.downed ? z.tgt : null; }
+function campChefeVe(z, q) { const P = z.body.pos, s = ZKIND[z.kind].sz || 1; _chA.set(P.x, P.y + 1.4 * s, P.z); _chB.set(q.pos[0], q.pos[1] + 1.4, q.pos[2]); return losClear(_chA, _chB); }
+function campChefeAviso(a) { const F = CAMP_CH.def.fases?.[CAMP_CH.fase], B = CAMP_CHEFE_BASE; return Math.max(B.avisoMin, (a.aviso ?? 1) * (B.avisoDif[S.st?.zdiff ?? 1] ?? 1) * (F?.avisoK ?? 1)); }
+function campChefeValido(z, a, tg, dist, fase) {
+  const CH = CAMP_CH; if (a.fases && !a.fases.includes(fase)) return false; if (CH.campo && a.campo === 0) return false; if ((CH.cd[a.id] || 0) > now) return false;
+  if (a.alcance && (dist < a.alcance[0] || dist > a.alcance[1])) return false;
+  if (a.forma && a.vista !== 0 && !campChefeVe(z, tg)) return false;
+  return !a.ok || !!a.ok(z, tg, CH);
+}
+function campChefeSorteia(z) {
+  const CH = CAMP_CH, d = CH.def, tg = campChefeAlvo(z); if (!tg) { CH.prox = now + CAMP_CHEFE_BASE.pensaS; return; }
+  const P = z.body.pos, dist = hyp(tg.pos[0] - P.x, tg.pos[2] - P.z), fase = CH.fase + 1, L = CH.cand, ord = d.fases?.[CH.fase]?.ordem; L.length = 0;
+  let a = null;
+  if (ord?.length) { for (let i = 0; i < ord.length && !a; i++) { const x = (d.ataques || []).find(q => q.id === ord[(CH.oi + i) % ord.length]); if (x && campChefeValido(z, x, tg, dist, fase)) { a = x; CH.oi = (CH.oi + i + 1) % ord.length; } } } // padrão fixo da fase
+  else { let tot = 0; for (const x of d.ataques || []) if (campChefeValido(z, x, tg, dist, fase)) { L.push(x); tot += x.peso ?? 1; } let r = Math.random() * tot; for (const x of L) { r -= x.peso ?? 1; if (r <= 0) { a = x; break; } } if (!a && L.length) a = L[L.length - 1]; }
+  L.length = 0;
+  if (!a) { CH.prox = now + CAMP_CHEFE_BASE.pensaS; return; }
+  campChefeAtaca(z, a, tg);
+}
+function campChefeAtaca(z, a, tg) { // começa o aviso: o host manda a forma, a posição e os tempos; o dano só vem depois do aviso
+  const CH = CAMP_CH, P = z.body.pos, aviso = campChefeAviso(a), ativo = a.ativo ?? 0, ang = Math.atan2(-(tg.pos[0] - P.x), -(tg.pos[2] - P.z));
+  z.yaw = ang; z.atkWind = 0;
+  let sh;
+  if (a.pos) sh = a.pos(z, tg, CH);
+  else if (a.onde === 'alvo') sh = [[tg.pos[0], tg.pos[1], tg.pos[2], ang]];
+  else { const n = a.n || 1, lq = (a.leque || 0) * Math.PI / 180; sh = []; for (let i = 0; i < n; i++) sh.push([P.x, P.y, P.z, ang + (n > 1 ? (i / (n - 1) - .5) * lq : 0)]); }
+  sh = (sh || []).slice(0, 8).map(s => [r2(s[0]), r2(s[1] || 0), r2(s[2]), r2(s[3] ?? ang)]);
+  const d1 = a.dims?.[0] ?? 3, d2 = a.dims?.[1] ?? (a.forma === 'setor' ? 60 : 1);
+  const A = { a, t0: now, fa: now + aviso, fb: now + aviso + ativo, fc: now + aviso + ativo + (a.rec ?? 0), sh, d1, d2, len: sh.map(() => d1), hit: new Set(), pil: new Set(), golpe: 0, acc: {}, ini: false, anda: 0, ang, tg, msg: null };
+  CH.atk = A; CH.cd[a.id] = now + (a.cd ?? 0);
+  A.msg = { t: 'camp', k: 'tel', a: a.id, f: a.forma || null, p: sh, d1: r2(d1), d2: r2(d2), g: a.gira || 0, s: r2(aviso), at: r2(ativo), som: a.som || undefined };
+  broadcast(A.msg);
+  if (a.fala) campFala(a.fala);
+  a.inicio?.(z, A, CH);
+}
+function campChefeAtk(z, A, dt) {
+  const CH = CAMP_CH, a = A.a;
+  if (now < A.fa) return; // aviso: nada de dano
+  if (!A.ini) { A.ini = true; campChefeLinhaPilar(A); if (a.lacaios) campChefeLacaios(a.lacaios); a.ativa?.(z, A, CH); }
+  if (now < A.fb || A.golpe === 0) { // ativo (o instantâneo passa uma vez)
+    if (a.investe) campChefeInvesteDano(z, A);
+    else if (a.forma) {
+      const n = a.golpes || 1, at = Math.max(0, A.fb - A.fa);
+      if (n > 1) while (A.golpe < n && now >= A.fa + at * A.golpe / n) { A.golpe++; A.hit.clear(); campChefeForma(z, A, 0); } // n tiros no ativo
+      else if (a.dps) { if (now < A.fb) campChefeForma(z, A, dt); } // dano por segundo enquanto estiver dentro
+      else campChefeForma(z, A, 0); // uma vez por jogador no ativo inteiro (o setor que gira pega quem ele cruzar)
+    }
+    A.golpe ||= 1;
+    return;
+  }
+  if (now < A.fc) { if (a.fraco && !A.frAb) { A.frAb = true; z.fracoAte = Math.max(z.fracoAte || 0, A.fc); campChefeEnvia(); } return; } // recuperação: ponto fraco aberto
+  CH.atk = null; CH.prox = now + rand(...CAMP_CHEFE_BASE.pausa); a.fim?.(z, A, CH);
+}
+function campChefeAngAgora(A, s) { const a = A.a; if (!a.gira) return s[3]; const at = Math.max(.01, A.fb - A.fa); return s[3] + (a.gira * Math.PI / 180) * clamp((now - A.fa) / at, 0, 1); }
+function campChefeDentro(A, s, q, ang, len) { // o jogador está na forma? (raio do corpo de folga; ataque de chão não pega quem está no alto)
+  const a = A.a, B = CAMP_CHEFE_BASE, dx = q.pos[0] - s[0], dz = q.pos[2] - s[2], r = B.corpo;
+  if (a.chao !== 0 && q.pos[1] - s[1] > B.alturaChao) return false;
+  if (a.forma === 'disco') return dx * dx + dz * dz <= (A.d1 + r) * (A.d1 + r);
+  const fx = -Math.sin(ang), fz = -Math.cos(ang), al = dx * fx + dz * fz;
+  if (a.forma === 'linha') return al >= -r && al <= len + r && Math.abs(dx * fz - dz * fx) <= A.d2 / 2 + r;
+  if (a.forma === 'setor') { const d = hyp(dx, dz); if (d > A.d1 + r) return false; if (d <= r * 2) return true; return Math.acos(clamp(al / d, -1, 1)) <= A.d2 * Math.PI / 360 + Math.asin(Math.min(1, r / d)); }
+  return false;
+}
+function campChefeCoberto(A, s, q) { // parede ou pilar entre a boca do ataque e o peito do jogador (só com cobre)
+  const B = CAMP_CHEFE_BASE, py = q.pos[1] + (q.crouch ? B.peito[1] : B.peito[0]);
+  _chA.set(s[0], s[1] + B.origemY, s[2]); _chB.set(q.pos[0], py, q.pos[2]);
+  const pi = campPilarCorta(s[0], s[2], q.pos[0], q.pos[2], Math.min(py, s[1] + B.origemY));
+  if (pi >= 0) { campChefePilarDano(A, pi); return true; }
+  return !losClear(_chA, _chB);
+}
+function campChefeForma(z, A, dt) { // dano nos jogadores dentro da forma
+  const a = A.a, B = CAMP_CHEFE_BASE, k = a.danoDif === 0 ? 1 : zDf().dmg / B.danoDif;
+  for (let si = 0; si < A.sh.length; si++) {
+    const s = A.sh[si], ang = campChefeAngAgora(A, s);
+    for (const q of S.players.values()) {
+      if (!q.alive || q.downed || (!dt && A.hit.has(q.id))) continue;
+      if (!campChefeDentro(A, s, q, ang, A.len[si])) continue;
+      if (a.cobre && campChefeCoberto(A, s, q)) continue;
+      if (dt) { const c = (A.acc[q.id] || 0) + a.dps * k * dt; if (c >= B.dpsPasso) { A.acc[q.id] = 0; zHurt(q, Math.round(c), { x: s[0], z: s[2] }); } else A.acc[q.id] = c; continue; }
+      A.hit.add(q.id);
+      if (a.dano) zHurt(q, Math.round(a.dano * k), { x: s[0], z: s[2] });
+      if (a.empurra) { let ex = q.pos[0] - s[0], ez = q.pos[2] - s[2]; if (a.forma === 'linha') { ex = -Math.sin(ang); ez = -Math.cos(ang); } campEmpurra(q, ex, ez, a.empurra); }
+      if (a.efeito) CAMP_CH_EF[a.efeito]?.(q, z, A, CAMP_CH);
+    }
+  }
+  if (a.forma === 'disco' && (a.pilar || a.pilarFrac)) for (const s of A.sh) campPilaresEm(s[0], s[2], A.d1, i => campChefePilarDano(A, i));
+}
+function campEmpurra(q, x, z, dist) { const d = hyp(x, z) || 1, v = CAMP_CHEFE_BASE.empV; sendTo(q.id, { t: 'camp', k: 'emp', x: r2(x / d * v), z: r2(z / d * v), s: r2(dist / v) }); }
+function campChefeInveste(z, A, dt) { // investida: anda em linha reta até d1; parede, chão sem caminho ou pilar = atordoado
+  const a = A.a, P = z.body.pos, st = Math.min(a.investe * dt, A.d1 - A.anda); if (st <= 0) { A.fb = Math.min(A.fb, now); return; }
+  const fx = -Math.sin(A.ang), fz = -Math.cos(A.ang), nx = P.x + fx * st, nz = P.z + fz * st, c = ffCell(nx, nz), pi = campPilarCorta(P.x, P.z, nx + fx * z.rad, nz + fz * z.rad, P.y + 1);
+  if (pi >= 0 || c < 0 || !FF.walk[c] || blockedAt(nx, P.y + .3, nz, 1.2)) {
+    if (pi >= 0) campChefePilarDano(A, pi);
+    if (a.atordoa) { z.atord = now + a.atordoa; z.fracoAte = Math.max(z.fracoAte || 0, z.atord); campChefeEnvia(); }
+    A.fb = Math.min(A.fb, now); A.fc = Math.min(A.fc, now + (a.rec ?? 0)); return;
+  }
+  P.x = nx; P.z = nz; A.anda += st; z.yaw = A.ang;
+}
+function campChefeInvesteDano(z, A) { // quem estiver no caminho do corpo leva o golpe (uma vez)
+  const a = A.a, P = z.body.pos, k = a.danoDif === 0 ? 1 : zDf().dmg / CAMP_CHEFE_BASE.danoDif, R = z.rad + CAMP_CHEFE_BASE.corpo + .3;
+  for (const q of S.players.values()) {
+    if (!q.alive || q.downed || A.hit.has(q.id) || Math.abs(q.pos[1] - P.y) > CAMP_CHEFE_BASE.alturaChao || hyp(q.pos[0] - P.x, q.pos[2] - P.z) > R) continue;
+    A.hit.add(q.id); if (a.dano) zHurt(q, Math.round(a.dano * k), { x: P.x, z: P.z }); if (a.empurra) campEmpurra(q, -Math.sin(A.ang), -Math.cos(A.ang), a.empurra); if (a.efeito) CAMP_CH_EF[a.efeito]?.(q, z, A, CAMP_CH);
+  }
+}
+// ---------- IA do chefe (CAMP_IA[k]): parado enquanto avisa, ataca, recupera, troca de fase ou está atordoado; senão persegue ----------
+function campChefeIA(z, dt, tgt) {
+  const CH = CAMP_CH; if (z !== CH.z || z.st !== 'in' || !CH.def) return false;
+  if (CH.def.ia && CH.def.ia(z, dt, tgt, CH)) return true;
+  if (z.atord > now || CH.inv > now) { z.atkWind = 0; return true; }
+  const A = CH.atk; if (!A) return false;
+  if (A.a.investe && now >= A.fa && now < A.fb) campChefeInveste(z, A, dt);
+  return true;
+}
+// ---------- pilares e junções (host) ----------
+const CAMP_DESTR = { pilar: { fim: 'caido', racha: 'rachado' }, juncao: { fim: 'rompida' } };
+function campPilarHpMax(o, E) { return E.hpMax || o.hp || CAMP_PILAR[o.v]?.hp || ZINT[o.t].hp; }
+function campDanoPilar(i, dmg, frac, quem) { // dano num pilar/junção (tiro, explosão, golpe do chefe); devolve true se pegou
+  const o = ZD?.zint?.[i], E = Z.zint?.[i], T = o && CAMP_DESTR[o.t]; if (!T || !E || !CAMP.on || E.st === T.fim) return false;
+  const max = campPilarHpMax(o, E); if (E.hp == null) E.hp = max;
+  E.hp -= Math.max(0, dmg || 0) + Math.max(0, frac || 0) * max;
+  if (E.hp <= 0) { E.hp = 0; zintPoe(i, T.fim, 0, quem?.id ?? null); campChefeObjeto(o, i, T.fim); }
+  else if (T.racha && E.st === 'pronto' && E.hp <= max * (ZINT[o.t].rachaPct ?? .5)) { zintPoe(i, T.racha, 0, null); campChefeObjeto(o, i, T.racha); }
+  return true;
+}
+function campPilarRestaura(i, hp) { const o = ZD?.zint?.[i], E = Z.zint?.[i]; if (!o || !E || !CAMP_DESTR[o.t]) return; if (hp > 0) E.hpMax = hp; E.hp = campPilarHpMax(o, E); zintPoe(i, 'pronto', 0, null); } // D13: junções voltam na fase 3; tanques com a vida do chefe
+function campChefeObjeto(o, i, st) { const CH = CAMP_CH; if (CH.def?.objeto) CH.def.objeto(o, i, st, CH); }
+function campChefePilarDano(A, i) { const a = A.a; if (A.pil.has(i) || !(a.pilar || a.pilarFrac)) return; A.pil.add(i); campDanoPilar(i, a.pilar || 0, a.pilarFrac || 0, null); }
+function campPilarCol(i) { const o = ZD?.zint?.[i], E = Z.zint?.[i], c = ZC.world?.zint?.[i]?.col; return o?.t === 'pilar' && E && E.st !== 'caido' && c && c.maxX > c.minX ? c : null; }
+function campPilarCorta(ax, az, bx2, bz, y) { // primeiro pilar de pé (mais alto que y) no segmento a -> b (2D); -1 se nenhum
+  const L = ZD?.zint; if (!L) return -1; let best = -1, bt = 2;
+  for (let i = 0; i < L.length; i++) {
+    if (L[i].t !== 'pilar') continue; const c = campPilarCol(i); if (!c || c.maxY <= y) continue;
+    const dx = bx2 - ax, dz = bz - az; let t0 = 0, t1 = 1, ok = true;
+    for (const [p, d, lo, hi] of [[ax, dx, c.minX, c.maxX], [az, dz, c.minZ, c.maxZ]]) { if (Math.abs(d) < 1e-9) { if (p < lo || p > hi) ok = false; continue; } let u = (lo - p) / d, v = (hi - p) / d; if (u > v) [u, v] = [v, u]; t0 = Math.max(t0, u); t1 = Math.min(t1, v); if (t0 > t1) ok = false; }
+    if (ok && t0 < bt) { bt = t0; best = i; }
+  }
+  return best;
+}
+function campPilaresEm(x, z, r, fn) { const L = ZD?.zint; if (!L) return; for (let i = 0; i < L.length; i++) { if (L[i].t !== 'pilar') continue; const c = campPilarCol(i); if (c && hyp(clamp(x, c.minX, c.maxX) - x, clamp(z, c.minZ, c.maxZ) - z) <= r) fn(i); } }
+function campChefeLinhaPilar(A) { // a linha para no primeiro pilar de pé (quem está atrás dele não leva) e o pilar leva o golpe
+  const a = A.a; if (a.forma !== 'linha' || a.atravessa) return;
+  for (let si = 0; si < A.sh.length; si++) { const s = A.sh[si], fx = -Math.sin(s[3]), fz = -Math.cos(s[3]), pi = campPilarCorta(s[0], s[2], s[0] + fx * A.d1, s[2] + fz * A.d1, s[1] + CAMP_CHEFE_BASE.peito[0]);
+    if (pi < 0) continue; const c = campPilarCol(pi); A.len[si] = Math.max(0, Math.min(A.d1, hyp(clamp(s[0], c.minX, c.maxX) - s[0], clamp(s[2], c.minZ, c.maxZ) - s[2]) - CAMP_CHEFE_BASE.corpo)); campChefePilarDano(A, pi); }
+}
+// ---------- interativos genéricos da campanha: pilar e junção (ZINT; posições e vidas: agentes das arenas) ----------
+Object.assign(ZINT, {
+  pilar: { nome: 'Pilar', custo: 0, usoR: 0, srvR: 0, hp: 1500, rachaPct: .5, restoH: .25, tiroDist: 150, explosao: 600, forca: 0 }, // destrutível; caído só baixa a altura
+  juncao: { nome: 'Junção do cano', custo: 0, usoR: 0, srvR: 0, hp: 800, tiroDist: 150, explosao: 600, forca: 0 }, // destrutível por tiro e explosão
+});
+const CAMP_PILAR = { // aparência (procedural) e vida padrão de cada variante; o mapa pode trocar w, d, h e hp na entrada
+  sacos: { w: 1.6, d: .7, h: 1.1, hp: 1500, cor: 0x8a7a56, esc: 0x5a4e36 }, // sacos de areia (cobertura agachado)
+  mureta: { w: 2.4, d: .6, h: 1.8, hp: 4000, cor: 0x77726a, esc: 0x46423c }, // mureta de pedra
+  tijolo: { w: 1, d: 1, h: 3, hp: 3000, cor: 0x7a3a2a, esc: 0x3a1c14 }, // pilar de tijolo
+  tanque: { r: .8, h: 2.2, hp: 3000, cor: 0x3a463a, esc: 0x1a241c, cil: 1 }, // tanque do Veio
+  juncao: { r: .26, h: .7, hp: 800, cor: 0x5a4a3a, esc: 0x241a14, cil: 1 }, // junção do cano-mestre (na parede)
+};
+const CAMP_COL0 = { minX: 1e9, maxX: -1e9, minY: 0, maxY: 0, minZ: 1e9, maxZ: -1e9 }; // sem campanha: colisor vazio (zintTiro não pega)
+function campPilarMonta(o, i) {
+  if (!campZintOn()) return { off: 1, col: CAMP_COL0 };
+  const V = CAMP_PILAR[o.v] || CAMP_PILAR[o.t === 'juncao' ? 'juncao' : 'sacos'], cil = !!V.cil, w = o.w ?? (cil ? (o.r ?? V.r) * 2 : V.w), d = o.d ?? (cil ? w : V.d), h = o.h ?? V.h;
+  const g = zintGrupo(o), inteiro = new THREE.Group(), rachado = new THREE.Group(), restos = new THREE.Group(); g.add(inteiro, rachado, restos);
+  const m = mc(V.cor), me_ = mc(V.esc);
+  const corpo = (G, hh, rach) => {
+    if (o.t === 'juncao') { const c = zintCil(G, w / 2 * .8, hh, hh / 2, m, 10); c.rotation.x = Math.PI / 2; c.position.set(0, .9, hh / 2); for (const zf of [.08, hh - .08]) { const f = zintCil(G, w / 2 * 1.15, .08, 0, me_, 10); f.rotation.x = Math.PI / 2; f.position.set(0, .9, zf); } if (rach) campPeca(G, w * .9, .04, .3, 0, .9 + w * .3, hh / 2, mc(0x111111)); return; }
+    if (cil) { zintCil(G, w / 2, hh, hh / 2, m, 14); for (const f of [.15, .85]) zintCil(G, w / 2 + .02, .08, hh * f, me_, 14); }
+    else if (o.v === 'sacos') { const n = Math.max(2, Math.round(hh / .27)); for (let k = 0; k < n; k++) { const y = (k + .5) * hh / n, sh = (k % 2) * .18; for (let s = -1; s <= 1; s += 2) campPeca(G, w / 2 - .04, hh / n * .9, d * .92, s * w / 4 + sh * s * .2, y, 0, k % 2 ? me_ : m); } }
+    else { campPeca(G, w, hh, d, 0, hh / 2, 0, m); campPeca(G, w + .06, .1, d + .06, 0, hh - .05, 0, me_); if (o.v === 'tijolo') for (let y = .3; y < hh; y += .3) campPeca(G, w + .01, .025, d + .01, 0, y, 0, me_); }
+    if (rach) { for (const [x, y, a] of [[-.15, hh * .55, .7], [.12, hh * .35, -.5]]) { const r = campPeca(G, .05, hh * .45, (cil ? w : d) + .02, x * w, y, 0, mc(0x111111)); r.rotation.z = a; } }
+  };
+  corpo(inteiro, h, false); mergeParts(inteiro);
+  corpo(rachado, h * .94, true); mergeParts(rachado); rachado.visible = false;
+  const rh = ZINT.pilar.restoH; if (o.t === 'juncao') corpo(restos, h * .4, true); else { for (const [x, z, s] of [[-.25, .1, .5], [.3, -.1, .4], [0, .2, .35]]) campPeca(restos, w * s, rh, (cil ? w : d) * s + .1, x * w, rh / 2, z * d, me_); } mergeParts(restos); restos.visible = false;
+  world.add(g); cullAdd(g, o.x, o.z, Math.max(w, d) + .5);
+  const col = o.t === 'juncao' ? zintCaixaCol({ x: o.x + o.n[0] * h / 2, z: o.z + o.n[1] * h / 2, n: o.n }, w, h, 1.2) : zintCaixaCol(o, w, d, h);
+  if (o.t === 'juncao') { col.minY = .9 - w / 2 - .1; col.maxY = .9 + w / 2 + .1; }
+  return { g, inteiro, rachado, restos, col, h: col.maxY, y0: col.minY, raio: Math.max(w, d) / 2 };
+}
+function campPilarEstado(o, e, c, ant, sync) {
+  if (e.off) return; const fim = CAMP_DESTR[o.t].fim, caiu = c.st === fim;
+  e.inteiro.visible = c.st === 'pronto'; e.rachado.visible = c.st === 'rachado'; e.restos.visible = caiu;
+  if (o.t === 'pilar') e.col.maxY = caiu ? ZINT.pilar.restoH : e.h;
+  if ((ant === fim) !== caiu || ant !== c.st) renderer.shadowMap.needsUpdate = true;
+  if (sync || ant === c.st) return;
+  const p = zintPos(o, o.t === 'juncao' ? .9 : e.h * .6); if (c.st !== 'pronto') { play(caiu ? 'slam' : 'crack', p); puff(p, 0x8a7a64, caiu ? 2.4 : 1.2, 1, .4); }
+}
+function campPilarTiro(p, i, o, E, D) { if (CAMP.on) campDanoPilar(i, W[p.shotW]?.dmg || 0, 0, p); } // cada bala que parou no colisor (o host conferiu a visada)
+function campPilarExplosao(i, o, E, D, pos, r, by) { if (!CAMP.on) return; const d = Math.hypot(pos.x - o.x, pos.z - o.z); if (d > r + 1) return; campDanoPilar(i, D.explosao * clamp(1 - d / (r * 1.3), .2, 1), 0, S.players.get(by) || null); }
+ZINT_FN.pilar = {
+  est: ['pronto', 'rachado', 'caido'], // pronto = inteiro
+  efeito: (o, D) => `campanha: pilar destrutível (vida ${o.hp ?? CAMP_PILAR[o.v]?.hp ?? D.hp}; tiro, explosão e golpe de chefe); cobre de ataques`,
+  monta: campPilarMonta, estado: campPilarEstado, prompt: () => null, tiro: campPilarTiro, explosao: campPilarExplosao,
+};
+ZINT_FN.juncao = {
+  est: ['pronto', 'rompida'], // pronto = inteira
+  efeito: (o, D) => `campanha: junção destrutível por tiro e explosão (vida ${o.hp ?? CAMP_PILAR.juncao.hp})`,
+  monta: campPilarMonta, estado: campPilarEstado, prompt: () => null, tiro: campPilarTiro, explosao: campPilarExplosao,
+};
+// ---------- cliente: mensagens ----------
+const campChOk = (v, lo, hi) => finN(v) && v >= lo && v <= hi;
+Object.assign(CAMP_GANCHOS.msg, {
+  chefe(m) { // { id, z, f, fr, inv, at, c, tag }: f = fase (1..), 0 = morto
+    if (!Number.isInteger(m.id) || !CAMP_CHEFE[m.id] || !Number.isInteger(m.f)) return;
+    const c = CAMP.c;
+    if (m.f === 0) { const d = CAMP_CHEFE[m.id]; c.ch = null; c.tel = []; play('win'); centerMsg((d.nome || ZKIND[m.id]?.n || '').toUpperCase(), CAMP_CHEFE_BASE.txt.morto, 3.5); return; }
+    if (!Number.isInteger(m.z) || m.f < 1 || m.f > 8) return;
+    const ant = c.ch?.k === m.id ? c.ch.f : 0;
+    c.ch = { k: m.id, z: m.z, f: m.f, fr: now + (campChOk(m.fr, 0, 60) ? m.fr : 0), inv: now + (campChOk(m.inv, 0, 10) ? m.inv : 0), at: now + (campChOk(m.at, 0, 30) ? m.at : 0), campo: !!m.c, tag: typeof m.tag === 'string' && Object.hasOwn(CAMP_CHEFE_BASE.txt, m.tag) ? m.tag : null };
+    if (ant !== m.f) CAMP_CHEFE[m.id].cliFase?.(ZC.zs.get(m.z) || null, m.f, c.ch); // visual da fase (D09/D11/D13)
+  },
+  tel(m) { // aviso de ataque: forma, posições, medidas, tempo do aviso (s) e do ativo (at)
+    if (typeof m.a !== 'string' || m.a.length > 40 || !campChOk(m.s, 0, 10) || !campChOk(m.at, 0, 30)) return;
+    const f = ['disco', 'linha', 'setor'].includes(m.f) ? m.f : null, p = f && Array.isArray(m.p) ? m.p.slice(0, 8).filter(s => Array.isArray(s) && s.length === 4 && s.every(v => campChOk(v, -1e4, 1e4))) : [];
+    const c = CAMP.c, L = c.tel ||= []; if (L.length >= 12) L.shift();
+    L.push({ a: m.a, f, p, d1: campChOk(m.d1, 0, 100) ? m.d1 : 0, d2: campChOk(m.d2, 0, 360) ? m.d2 : 0, g: campChOk(m.g, -720, 720) ? m.g : 0, s: m.s, at: m.at, t0: now });
+    if (typeof m.som === 'string' && /^[a-z]{1,16}$/.test(m.som)) play(m.som, p[0] ? new V3(p[0][0], p[0][1] + 1, p[0][2]) : undefined);
+  },
+  telx() { if (CAMP.c.tel) CAMP.c.tel.length = 0; },
+  emp(m) { // empurrão do golpe do chefe (só a vítima recebe): usa o tranco do bote da faca
+    if (!campChOk(m.x, -30, 30) || !campChOk(m.z, -30, 30) || !campChOk(m.s, 0, 2) || !me.alive || me.downed) return;
+    me.lungeX = m.x; me.lungeZ = m.z; me.lungeEnd = now + m.s;
+  },
+});
+CAMP_GANCHOS.sync.push(cp => { // quem entra no meio
+  if (Array.isArray(cp.ch) && cp.ch.length >= 7) { const [id, z, f, fr, inv, at, c, tag] = cp.ch; CAMP_GANCHOS.msg.chefe({ id, z, f, fr, inv, at, c, tag }); }
+  if (Array.isArray(cp.tel)) for (const m of cp.tel.slice(0, 2)) if (m && typeof m === 'object') CAMP_GANCHOS.msg.tel({ ...m, som: undefined });
+});
+// ---------- cliente: ponto fraco (zona 'fraco' no tiro) ----------
+function campChefeCaixas(zc) { // gancho no zBoxes: as caixas de sempre e a do ponto fraco (por último: o zBoxes(zc)[0] continua a cabeça)
+  const b = zc.fbx; zc.fbx = null; const L = zBoxes(zc); zc.fbx = b;
+  const p = zc.pos, fx = -Math.sin(zc.yaw), fz = -Math.cos(zc.yaw), s = zc.sz || 1, f = b.f || 0, sd = b.sd || 0, r = (b.r || .2) * s, x = p.x + (fx * f - fz * sd) * s, z = p.z + (fz * f + fx * sd) * s;
+  L.push(['fraco', { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, minY: p.y + (b.y0 ?? 1.2) * s, maxY: p.y + (b.y1 ?? 1.5) * s }]);
+  return L;
+}
+function campFracoMult(rid) { // tiro do cliente na caixa do fraco: o multiplicador só vale com a janela aberta ou por trás (o host confere de novo)
+  const zc = ZC.zs.get(+String(rid).slice(1)), ch = CAMP.c?.ch, K = zc && ZKIND[zc.kind]; if (!zc || !ch || zc.id !== ch.z || !K) return 1;
+  let aberto = ch.fr > now || ch.at > now;
+  if (!aberto && K.fracoTras) { const dx = me.pos.x - zc.pos.x, dz = me.pos.z - zc.pos.z, d = hyp(dx, dz) || 1; aberto = (-Math.sin(zc.yaw) * dx - Math.cos(zc.yaw) * dz) / d < Math.cos(K.fracoTras * Math.PI / 180); }
+  return aberto ? K.fracoK || CAMP_FRACO.k : 1;
+}
+// ---------- cliente: pool de avisos no chão (3 InstancedMesh; materiais compilados uma vez, na primeira tela da campanha) ----------
+let CAMP_AV = null;
+function campAvGeo(tipo) { // y = 0; disco raio 1; linha x ∈ [-0,5; 0,5], z ∈ [0; -1]; setor: x = fração do ângulo (-0,5..0,5), z = raio (o shader abre)
+  const P = CAMP_CHEFE_BASE.pool, pos = [], col = [], n = P.seg, mio = P.miolo, bd = 1 - P.borda;
+  const v = (x, z, k) => { pos.push(x, 0, z); col.push(k, k, k); };
+  const quad = (a, b, c, d, k) => { v(...a, k); v(...b, k); v(...c, k); v(...a, k); v(...c, k); v(...d, k); };
+  if (tipo === 'linha') { quad([-.5 + P.borda * 2, 0], [.5 - P.borda * 2, 0], [.5 - P.borda * 2, -1], [-.5 + P.borda * 2, -1], mio); quad([-.5, 0], [-.5 + P.borda * 2, 0], [-.5 + P.borda * 2, -1], [-.5, -1], 1); quad([.5 - P.borda * 2, 0], [.5, 0], [.5, -1], [.5 - P.borda * 2, -1], 1); }
+  else for (let i = 0; i < n; i++) {
+    if (tipo === 'disco') { const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2, c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1); v(0, 0, mio); v(c1 * bd, s1 * bd, mio); v(c0 * bd, s0 * bd, mio); quad([c0 * bd, s0 * bd], [c0, s0], [c1, s1], [c1 * bd, s1 * bd], 1); }
+    else { const u0 = i / n - .5, u1 = (i + 1) / n - .5; v(0, 0, mio); v(u0, bd, mio); v(u1, bd, mio); quad([u0, bd], [u0, 1], [u1, 1], [u1, bd], 1); }
+  }
+  if (tipo === 'disco') for (let i = 0; i < pos.length; i += 3) { const z = pos[i + 1]; pos[i + 1] = 0; pos[i + 2] = z; } // círculo no plano xz
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.userData.keep = true; return g;
+}
+function campAvisosMonta() {
+  if (CAMP_AV) return CAMP_AV;
+  const P = CAMP_CHEFE_BASE.pool, mat = () => new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const mb = mat(), ms = mat();
+  ms.onBeforeCompile = sh => { sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aSpan;').replace('#include <begin_vertex>', 'vec3 transformed = vec3(-sin(position.x * aSpan) * position.z, 0.0, -cos(position.x * aSpan) * position.z);'); };
+  ms.customProgramCacheKey = () => 'campSetor';
+  const AV = CAMP_AV = { m4: new THREE.Matrix4(), q: new THREE.Quaternion(), v: new V3(), e: new V3(), up: new V3(0, 1, 0), cor: new THREE.Color(), n: {} };
+  for (const t of ['disco', 'linha', 'setor']) {
+    const g = campAvGeo(t); if (t === 'setor') { AV.span = new THREE.InstancedBufferAttribute(new Float32Array(P.setor), 1); AV.span.setUsage(THREE.DynamicDrawUsage); g.setAttribute('aSpan', AV.span); }
+    const M = new THREE.InstancedMesh(g, t === 'setor' ? ms : mb, P[t]); M.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    for (let i = 0; i < P[t]; i++) M.setColorAt(i, AV.cor.set(P.aviso)); // cor por instância já criada: o shader não muda depois
+    M.count = 0; M.visible = false; M.frustumCulled = false; M.renderOrder = 3; M.castShadow = M.receiveShadow = false; M.userData.noShadow = true; M.name = 'campAviso-' + t;
+    scene.add(M); AV[t] = M;
+  }
+  try { // compila agora (na cena/carga do começo da campanha) e já entra no aquecimento de todo mapa seguinte (fica na cena)
+    for (const t of ['disco', 'linha', 'setor']) { const M = AV[t]; M.count = 1; M.visible = true; renderer.setRenderTarget(CFG.gfx === 'alto' ? composer.readBuffer : null); try { renderer.compile(M, camera); } finally { renderer.setRenderTarget(null); M.count = 0; M.visible = false; } }
+  } catch (e) { }
+  return AV;
+}
+function campChefeAvisos() { // a cada quadro: some quem acabou; amarelo pulsando no aviso, vermelho no ativo
+  const c = CAMP.c, L = c.tel, AV = CAMP_AV; if (!AV) return;
+  const P = CAMP_CHEFE_BASE.pool, n = AV.n; n.disco = n.linha = n.setor = 0;
+  if (L) for (let i = L.length - 1; i >= 0; i--) { const t = L[i]; if (now > t.t0 + t.s + Math.max(t.at, P.flashS)) L.splice(i, 1); }
+  if (L) for (const t of L) {
+    if (!t.f) continue; const M = AV[t.f], ta = t.t0 + t.s, ativo = now >= ta, k = clamp((now - t.t0) / Math.max(.01, t.s), 0, 1);
+    if (ativo) AV.cor.set(P.ativo); else { const hz = P.pulso[0] + (P.pulso[1] - P.pulso[0]) * k; AV.cor.set(P.aviso).multiplyScalar(.45 + .55 * (.5 + .5 * Math.sin((now - t.t0) * hz * Math.PI * 2))); }
+    const gi = t.g && ativo ? (t.g * Math.PI / 180) * clamp((now - ta) / Math.max(.01, t.at), 0, 1) : 0;
+    for (const s of t.p) {
+      const j = n[t.f]; if (j >= P[t.f]) break; n[t.f]++;
+      AV.q.setFromAxisAngle(AV.up, s[3] + gi); AV.v.set(s[0], s[1] + P.y, s[2]);
+      if (t.f === 'linha') AV.e.set(t.d2, 1, t.d1); else AV.e.set(t.d1, 1, t.d1);
+      M.setMatrixAt(j, AV.m4.compose(AV.v, AV.q, AV.e)); M.setColorAt(j, AV.cor);
+      if (t.f === 'setor') AV.span.setX(j, t.d2 * Math.PI / 180);
+    }
+  }
+  for (const t of ['disco', 'linha', 'setor']) { const M = AV[t], k = n[t]; if (k !== M.count || k) { M.count = k; M.visible = k > 0; if (k) { M.instanceMatrix.needsUpdate = true; M.instanceColor.needsUpdate = true; if (t === 'setor') AV.span.needsUpdate = true; } } }
+}
+// ---------- cliente: barra do chefe (a do Carniceiro, com nome, marcas das fases e estado) ----------
+const CAMP_CH_CSS = '#zboss>div{position:relative}#zboss .campMk{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:#ffd36a;box-shadow:0 0 2px #000}';
+function campChefeBarra() {
+  const zb = document.getElementById('zboss'); if (!zb || !zb.firstChild) return;
+  const ch = CAMP.c.ch, d = ch && CAMP_CHEFE[ch.k], T = CAMP_CHEFE_BASE.txt;
+  const est = !d ? '' : ch.inv > now ? T.inv : ch.at > now ? T.atordoado : ch.tag ? T[ch.tag] : '', key = d ? ch.k + ':' + ch.f + ':' + est : '';
+  if ((zb.dataset.camp || '') === key) return; zb.dataset.camp = key;
+  if (!document.getElementById('campChCss')) document.head.appendChild(Object.assign(document.createElement('style'), { id: 'campChCss', textContent: CAMP_CH_CSS }));
+  zb.dataset.orig ||= zb.firstChild.nodeValue; const bar = zb.querySelector('div'); zb.querySelectorAll('.campMk').forEach(e => e.remove());
+  if (!d) { zb.firstChild.nodeValue = zb.dataset.orig; return; }
+  zb.firstChild.nodeValue = `${(d.nome || ZKIND[ch.k]?.n || '').toUpperCase()} · FASE ${ch.f}${est ? ' · ' + est : ''}`; // numa linha só (a legenda do rádio fica logo abaixo)
+  for (const F of (d.fases || []).slice(1)) if (finN(F.de)) bar.appendChild(Object.assign(document.createElement('span'), { className: 'campMk', style: `left:${(clamp(F.de, 0, 1) * 100).toFixed(1)}%` }));
+}
+function campChefeQuadro(dt) { // CAMP_GANCHOS.hud (cada quadro do cliente na campanha)
+  const ch = CAMP.c.ch; if (ch) { const zc = ZC.zs.get(ch.z), d = CAMP_CHEFE[ch.k], fb = d?.fraco?.caixa; if (zc && fb && zc.fbx !== fb) zc.fbx = fb; if (zc && d?.cliQuadro) d.cliQuadro(zc, dt, ch); } // cliQuadro: brilho do fraco, efeitos (D09/D11/D13)
+  if (!CAMP_AV) campAvisosMonta(); // primeira tela da campanha (cena/carga): compila aqui, e o aquecimento dos mapas seguintes já acha
+  campChefeBarra(); campChefeAvisos();
+}
+CAMP_GANCHOS.hud.push(campChefeQuadro);
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_CHEFE, CAMP_CHEFE_BASE, CAMP_CH, CAMP_CH_EF, CAMP_PILAR, campChefeNasce, campChefeDef, campZNasce, campChefeFase, campChefeAtaca, campChefeLacaios,
+  campChefeBo, campDanoPilar, campPilarRestaura, campPilarCorta, campChefeCaixas, campFracoMult, campAvisosMonta, campChefeAvisos, campChefeQuadro, campChefeDentro, campChefeSorteia, campChefeLacVivos, zBoxes, campCliReset,
+  campChefeEstado: () => ({ k: CAMP_CH.k, id: CAMP_CH.z?.id ?? null, fase: CAMP_CH.fase, inv: CAMP_CH.inv, atk: CAMP_CH.atk ? { id: CAMP_CH.atk.a.id, fa: CAMP_CH.atk.fa, fb: CAMP_CH.atk.fb, fc: CAMP_CH.atk.fc, len: CAMP_CH.atk.len } : null, campo: CAMP_CH.campo, encerra: CAMP_CH.encerra, lac: campChefeLacVivos() }) }) && Object.defineProperty(window.__T, 'CAMP_AV', { get: () => CAMP_AV, configurable: true }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); }
+// ===== FIM O3-D07 =====
 //
 // @@CAMP-ZK-2@@
 //
@@ -27178,6 +27684,7 @@ function zSnap() {
     a.push(z.id, r2(P.x), r2(P.y), r2(P.z), r2(wrapA(z.yaw)), f);
     if (ZKIND[z.kind].chefe) bo = Math.max(bo, r2(Math.max(0, z.hp) / z.maxHp));
   }
+  if (CAMP_CH.z) bo = campChefeBo(bo); // O3-D07: com um chefe da campanha vivo, a barra é a dele
   const bk = Z.boards.join(), sendB = bk !== Z.lastB || (Z.snapN = (Z.snapN || 0) + 1) % 10 === 0; Z.lastB = bk;
   const msg = { t: 'zs', ts: r3(now), z: a, b: sendB ? zBoardsEnc(Z.boards) : undefined, ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0, rem: Z.phase === 'round' ? Z.toSpawn + Z.zs.size : 0 };
   if (Z.fire > now) msg.fs = r2(Z.fire - now); if (Z.bf > now) msg.bf = r2(Z.bf - now); if (Z.phase === 'break') msg.nx = r2(Math.max(0, Z.phaseEnd - now)); // só vai quando tem
