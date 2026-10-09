@@ -24275,6 +24275,7 @@ function zHit(p, zid, dmg, zone, w, splash) {
   const z = Z.zs.get(zid); if (!z || !(dmg > 0) || S.phase === 'over') return;
   dmg = Math.min(dmg, 1e7); const K = ZKIND[z.kind];
   dmg = campDano(z, dmg, zone, w, p, splash); // O3-D03: capacete, crosta, Silêncio (no clássico devolve o mesmo)
+  if (CAMP.on && !(dmg > 0)) return; // O3-D05: dano zerado pela campanha (Silêncio) não dá pontos nem efeitos
   if (Z.insta > now) dmg = K.chefe ? dmg * 2 : z.hp; // Insta-Kill (no chefe só dobra o dano)
   if (K.chefe) dmg = Math.min(dmg, z.maxHp * (zone === 'fraco' && K.capFraco || K.capGolpe)); // nenhum golpe tira mais de capGolpe do chefe (Carniceiro 12%: Arma Trovão, macaco, Insta-Kill)
   z.hp -= dmg;
