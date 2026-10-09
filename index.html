@@ -23664,7 +23664,7 @@ function zInteract(dt) {
   for (const rp of R.values()) if (rp.alive && rp.downed) { const dist = dd(rp.pos.x, rp.pos.z); if (dist < 2) cand(dist - 1, { k: 'rev', id: rp.id, hold: 1, txt: `Segure F — reanimar ${nameOf(rp.id)}` }); }
   ZC.act = best;
   if (best?.hold && keys.KeyF && locked()) {
-    ZC.holdT -= dt; if (ZC.holdT <= 0) { ZC.holdT = .15; sendToHost({ t: 'hold', k: best.k === 'rev' ? 'rev' : 'repair', id: best.id }); }
+    ZC.holdT -= dt; if (ZC.holdT <= 0) { ZC.holdT = .15; sendToHost({ t: 'hold', k: best.k === 'rev' || best.k === 'zint' ? best.k : 'repair', id: best.id }); } // O2-C09: k:'zint' (barricada)
     if (best.k === 'rev') ZC.revLocal += dt; else ZC.revLocal = 0;
   } else { ZC.holdT = 0; ZC.revLocal = 0; }
 }
@@ -24121,7 +24121,7 @@ function zTickZombies(dt) {
         if (k >= 1) { z.st = 'in'; P.y = z.vy + .001; z.body.vel.set(0, 0, 0); z.body.onGround = true; z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z; z.losT = 0; }
         break;
       }
-      case 'in': zChase(z, dt); if (z.kind === 5 && now >= z.scrT && Z.zs.has(z.id)) zScream(z); break;
+      case 'in': if (ZD.zint?.length) zintBarrZ(z); zChase(z, dt); if (z.kind === 5 && now >= z.scrT && Z.zs.has(z.id)) zScream(z); break; // O2-C09: barricada (lento e arranca tábua)
     }
   }
   // separação: não empilhar zumbis
@@ -24160,7 +24160,7 @@ function zChase(z, dt) {
     if (!Z.lure && tgt) { if (z.los || z.atkWind) zTryAttack(z, tgt, z.dog ? 1.5 : z.kind === 6 ? 2.3 : z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35); if (dist < (z.dog ? .9 : .85 + (z.rad - .3) * 2)) dX = dZ = 0; } // sem linha livre (grade no meio) não bate
     else if (Z.lure && dist < 1) dX = dZ = 0;
   }
-  const spd = (z.crawler ? .9 : z.speed * (z.buffT > now ? 1.3 : 1) * (z.kind === 6 && z.hp < z.maxHp * .5 ? 1.4 : 1) * (z.slowT > now ? .6 : 1) * (z.webT > now ? .2 : 1)) * (z.atkWind ? .35 : 1) * (z.fogoT > now ? ZINT.fogo.lento : 1), k = Math.min(1, dt * 8); // O2-C06: queimando anda mais devagar (armadilha de fogo); grito: +30%; Carniceiro furioso abaixo da metade
+  const spd = (z.crawler ? .9 : z.speed * (z.buffT > now ? 1.3 : 1) * (z.kind === 6 && z.hp < z.maxHp * .5 ? 1.4 : 1) * (z.slowT > now ? .6 : 1) * (z.webT > now ? .2 : 1)) * (z.atkWind ? .35 : 1) * (z.fogoT > now ? ZINT.fogo.lento : 1) * (z.barrL ? ZINT.barricada.lento : 1), k = Math.min(1, dt * 8); // O2-C06: queimando anda mais devagar (armadilha de fogo); O2-C09: barricada com tábuas; grito: +30%; Carniceiro furioso abaixo da metade
   b.vel.x += (dX * spd - b.vel.x) * k; b.vel.z += (dZ * spd - b.vel.z) * k;
   const face = (dX || dZ) ? Math.atan2(-dX, -dZ) : has ? Math.atan2(-(gx - P.x), -(gz - P.z)) : z.yaw;
   z.yaw += clamp(angDiff(z.yaw, face), -8 * dt, 8 * dt);
@@ -25203,6 +25203,100 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { ZINT
 //
 //
 // @@INTERATIVO-4@@
+// ===== O2-C09: barricadas reparáveis fora das janelas (docs/overhaul/interativos.md §1.7) =====
+// Tábuas atravessadas numa passagem larga (beco, quintal, corredor de serviço). NÃO bloqueiam: não têm colisor no COL (a grade
+// dos zumbis e as rotas do jogador não mudam: sem softlock por construção). O zumbi que entra na faixa da barricada com tábuas
+// anda a lento × a velocidade e, depois de arranca s dentro dela, arranca uma tábua (uma por passagem). O jogador conserta
+// segurando F (hold com k:'zint', como as janelas: uma tábua a cada conserto s), com ptsTabua pontos por tábua, no mesmo teto
+// por rodada das janelas (Z.repPts). Rede: estados 'pronto' (inteira) e '0'..'4' (tábuas que sobraram), pelo zintPoe; quem entra
+// no meio recebe pelo zi. Ganchos fora da base: srvZHold (k:'zint' -> zintSegura), zInteract (o hold manda k:'zint') e
+// zTickZombies (estado 'in': zintBarrZ antes do zChase; a velocidade lê z.barrL).
+ZINT.barricada = { nome: 'Barricada', custo: 0, tabuas: 5, lento: .5, arranca: .6, conserto: .5, ptsTabua: 10, ptsTeto: 500, fundo: 1.6, sobra: .3,
+  usoR: 2.2, srvR: 2.6, forca: 2 };
+// aparência por mapa (procedural): tábuas de madeira (Vila) ou tábuas pintadas de hospital presas em pés de maca (Sanatório)
+const ZINT_BARR = {
+  tabuas: { tabua: 0x6a4a30, tabua2: 0x5a3c26, poste: 0x4a3220 },
+  hospital: { tabua: 0x9aa89a, tabua2: 0x6f7a70, poste: 0x7a7e80, cruz: 0xa02020 },
+};
+const zintTabuas = st => st === 'pronto' ? ZINT.barricada.tabuas : clamp(+st | 0, 0, ZINT.barricada.tabuas); // tábuas de cada estado
+const ZBARR = { L: null, i: [] }; // índices das barricadas do mapa atual (refeito quando o ZD.zint muda)
+// n: direção da passagem (as tábuas atravessam na perpendicular); w: largura da passagem (de parede a parede)
+// lugares: sonda do O2-C09 (C09/sonda.mjs: passagem entre duas paredes altas, largura de 3 a 6,5 m constante por 3 m, livre ao
+// longo, longe de itens, portas, janelas e chão que solta zumbi); as 4 da Vila ficam nos corredores de acesso das áreas de fora
+ZINT_MAPA.vila.push(
+  { t: 'barricada', v: 'tabuas', x: 95, z: 30, n: [1, 0], w: 4 }, // M Ferrovia: fim do corredor que vem do G
+  { t: 'barricada', v: 'tabuas', x: 30, z: 95, n: [0, 1], w: 4 }, // N Porto: fim do corredor que vem do G
+  { t: 'barricada', v: 'tabuas', x: 30, z: -95, n: [0, -1], w: 4 }, // J Mina: fim do corredor que vem do F
+  { t: 'barricada', v: 'tabuas', x: -30, z: 95, n: [0, 1], w: 4 }, // O Farol: fim do corredor que vem do H
+);
+ZINT_MAPA.sanatorio.push( // macas e tábuas de hospital
+  { t: 'barricada', v: 'hospital', x: -56, z: -44.5, n: [0, -1], w: 4.6 }, // r1 Cemitério: corredor que vem da Biblioteca
+  { t: 'barricada', v: 'hospital', x: -12, z: 62.5, n: [0, 1], w: 4.6 }, // r13 Brejo: meio do corredor que vem do Necrotério
+  { t: 'barricada', v: 'hospital', x: -98.5, z: 1.15, n: [1, 0], w: 4.1 }, // r5 Túneis de serviço: corredor de serviço
+);
+// host: zumbi andando ('in') dentro da faixa de uma barricada com tábuas fica lento e arranca uma tábua por passagem
+function zintBarrZ(z) {
+  if (ZBARR.L !== ZD.zint) { ZBARR.L = ZD.zint; ZBARR.i = ZD.zint.map((o, i) => o.t === 'barricada' ? i : -1).filter(i => i >= 0); }
+  z.barrL = false; if (!ZBARR.i.length || !Z.zint) return;
+  const P = z.body.pos, D = ZINT.barricada; let dentro = -1;
+  for (const i of ZBARR.i) { const o = ZD.zint[i], dx = P.x - o.x, dz = P.z - o.z, a = dx * o.n[0] + dz * o.n[1], c = -dx * o.n[1] + dz * o.n[0];
+    if (Math.abs(a) < D.fundo / 2 && Math.abs(c) < o.w / 2 + D.sobra && P.y < 1.5) { dentro = i; break; } }
+  if (dentro !== z.barrI) { z.barrI = dentro; z.barrE = now; z.barrF = false; } // entrou (ou saiu): passagem nova
+  if (dentro < 0) return;
+  const E = Z.zint[dentro], n = zintTabuas(E.st); if (!n) return;
+  z.barrL = true;
+  if (!z.barrF && now - z.barrE >= D.arranca) { z.barrF = true; zintPoe(dentro, String(n - 1), 0); } // arranca uma tábua
+}
+// host: segurar F (srvZHold k:'zint'): o tipo que tem segura() decide (hoje só a barricada)
+function zintSegura(p, m) {
+  const i = m.id, o = Number.isInteger(i) ? ZD.zint?.[i] : null, E = o && Z.zint?.[i], F = o && ZINT_FN[o.t]; if (!E || !F?.segura) return;
+  if (Math.hypot(p.pos[0] - o.x, p.pos[2] - o.z) > ZINT[o.t].srvR) return;
+  F.segura(p, i, o, E, ZINT[o.t]);
+}
+ZINT_FN.barricada = {
+  est: ['pronto', '0', '1', '2', '3', '4'],
+  efeito: (o, D) => `${D.tabuas} tábuas numa passagem de ${o.w} m; zumbi passa a ${Math.round(D.lento * 100)}% e arranca 1 tábua por passagem; segure F para consertar (${D.ptsTabua} pontos por tábua, teto ${D.ptsTeto} por rodada com as janelas); sem colisor`,
+  monta(o, i) {
+    const V = ZINT_BARR[o.v] || ZINT_BARR.tabuas, D = ZINT.barricada, g = new THREE.Group(); g.position.set(o.x, 0, o.z); g.rotation.y = Math.atan2(o.n[0], o.n[1]); // x local: atravessa a passagem
+    const hw = o.w / 2, corpo = new THREE.Group(); g.add(corpo);
+    for (const s of [-1, 1]) { // postes nas pontas, rentes às paredes (sem colisor: só desenho)
+      const px = s * (hw - .08);
+      if (o.v === 'hospital') { bx(corpo, .06, 1.5, .06, px, .75, -.1, mc(V.poste)).castShadow = true; bx(corpo, .06, 1.5, .06, px, .75, .1, mc(V.poste)).castShadow = true; bx(corpo, .06, .06, .26, px, 1.48, 0, mc(V.poste)); } // pé de maca
+      else bx(corpo, .14, 1.6, .14, px, .8, 0, mc(V.poste)).castShadow = true;
+      bx(corpo, .1, .1, .1, px, .08, .14, mc(V.poste)); // calço
+    }
+    if (o.v === 'hospital') { bx(corpo, .26, .07, .012, -hw + .5, 1.62, .03, mc(V.cruz)); bx(corpo, .07, .26, .012, -hw + .5, 1.62, .03, mc(V.cruz)); } // cruz vermelha pintada no poste
+    mergeParts(corpo);
+    // tábuas: uma malha instanciada (tábua arrancada = escala zero, como nas janelas); sem sombra (como as das janelas)
+    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(o.w + .25, .17, .045), mc(V.tabua), D.tabuas), m4 = [], ob = new THREE.Object3D();
+    for (let k = 0; k < D.tabuas; k++) { const y = .38 + k * .26, alt = k % 2 ? 1 : -1;
+      ob.position.set(0, y, .1 * alt); ob.rotation.set(0, 0, (((i * 7 + k * 3) % 5) - 2) * .04 + (k === 2 ? .18 : 0)); ob.scale.set(1 - (k % 3) * .05, 1, 1); ob.updateMatrix();
+      m4.push(ob.matrix.clone()); im.setMatrixAt(k, ob.matrix); }
+    im.receiveShadow = true; im.userData.own = true; im.computeBoundingSphere(); g.add(im);
+    const restos = new THREE.Group(); g.add(restos); // tábuas quebradas no chão (aparecem quando falta tábua)
+    bx(restos, .9, .05, .17, -hw * .4, .03, .55, mc(V.tabua2)).rotation.y = .5; bx(restos, .7, .05, .17, hw * .35, .03, -.6, mc(V.tabua)).rotation.y = -.3; bx(restos, .5, .05, .15, .2, .03, .7, mc(V.tabua)).rotation.y = 1.2;
+    mergeParts(restos); restos.visible = false;
+    world.add(g); cullAdd(g, o.x, o.z, hw + 1);
+    return { g, im, m4, restos, raio: .3, n: D.tabuas };
+  },
+  estado(o, e, c, ant, sync) {
+    const n = zintTabuas(c.st), a = e.n; e.n = n;
+    for (let k = 0; k < e.m4.length; k++) e.im.setMatrixAt(k, k < n ? e.m4[k] : ZERO_M4);
+    e.im.instanceMatrix.needsUpdate = true; e.restos.visible = n < e.m4.length;
+    if (sync || n === a) return;
+    const p = new V3(o.x, .9, o.z);
+    if (n < a) { play('crack', p); puff(p, 0x6b4a2e, .6, .5, .2); } else play('hammer', p);
+  },
+  prompt(o, i, c, D) { return zintTabuas(c.st) >= D.tabuas ? null : { k: 'zint', id: i, hold: 1, txt: 'Segure F — consertar a barricada' }; },
+  segura(p, i, o, E, D) { // host: uma tábua a cada conserto s por jogador; pontos como nas janelas, no mesmo teto por rodada
+    const n = zintTabuas(E.st); if (n >= D.tabuas) return;
+    const key = p.id + ':z' + i; if ((Z.repT[key] || 0) > now) return; Z.repT[key] = now + D.conserto;
+    zintPoe(i, n + 1 >= D.tabuas ? 'pronto' : String(n + 1), 0);
+    const got = Z.repPts.get(p.id) || 0; if (got < D.ptsTeto) { zPts(p, D.ptsTabua); Z.repPts.set(p.id, got + D.ptsTabua); }
+  },
+};
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { zintBarrZ, zintSegura, zintTabuas, ZINT_BARR }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+// ===== FIM O2-C09 =====
 //
 //
 //
@@ -25210,6 +25304,7 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { ZINT
 
 function srvZHold(p, m) {
   if (!p.alive || p.downed || S.phase === 'over') return;
+  if (m.k === 'zint') return zintSegura(p, m); // O2-C09: conserto da barricada (segurar F)
   if (m.k === 'repair') {
     const i = m.id | 0, w = ZD.windows[i]; if (!w || Math.hypot(p.pos[0] - w.ix, p.pos[2] - w.iz) > 2.6 || Z.boards[i] >= 6) return;
     const key = p.id + ':' + i; if ((Z.repT[key] || 0) > now) return; Z.repT[key] = now + .5;
