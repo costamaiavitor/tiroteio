@@ -5,7 +5,8 @@
 // Uso:
 //   node tools/itens/auditoria.mjs [--pagina index.html] [--mapas sanatorio,vila] [--min 3] [--perto 6] [--desvio 2]
 //                                  [--risco 3] [--saida auditoria-itens.json] [--png docs/overhaul/img] [--gfx baixo]
-//                                  [--falhar-em erro|aviso] [--sem-gpu] [--quieto]
+//                                  [--falhar-em erro|aviso] [--sem-gpu] [--quieto] [--camp]
+//   --camp    O3-D10: monta o mapa como na campanha (gerador, alçapão e notas com corpo e posição; portas fechadas)
 //   --min     distância mínima (m) entre dois itens que se enxergam: abaixo dela é ERRO (atrás de parede é aviso)
 //   --perto   lista os pares abaixo desta distância (aviso para os que se enxergam)
 //   --desvio  desvio máximo (m) que os itens podem causar no caminho a pé (campo dos zumbis) antes de virar ERRO
@@ -43,6 +44,7 @@ const flag = k => process.argv.includes('--' + k);
 const PAGINA = path.resolve(arg('pagina', path.join(RAIZ, 'index.html')));
 const MAPAS = arg('mapas', 'sanatorio,vila').split(',');
 const CFG = { min: +arg('min', 3), perto: +arg('perto', 6), desvio: +arg('desvio', 2), risco: +arg('risco', 3) };
+const CAMPF = flag('camp'); // O3-D10: interativos e notas da campanha montados (senão ficam { off: 1 }, sem corpo)
 const SAIDA = arg('saida', null), PNG = arg('png', null), GFX = arg('gfx', 'baixo'), FALHAR = arg('falhar-em', 'erro'), QUIETO = flag('quieto');
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.png': 'image/png', '.jpg': 'image/jpeg', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav' };
@@ -375,9 +377,10 @@ async function abrir(br, port) {
   return { pg, erros };
 }
 async function carregar(pg, mapa) {
-  await pg.evaluate(({ mapa, GFX }) => { const T = window.__T; T.CFG.gfx = GFX; try { T.applyQuality(); } catch { }
+  await pg.evaluate(({ mapa, GFX, CAMP }) => { const T = window.__T; T.CFG.gfx = GFX; try { T.applyQuality(); } catch { }
     T.startHost({ map: mapa, zmap: mapa, mode: 'zombies', rounds: 8, frags: 20, bots: 0, diff: 1, zdiff: 1 });
-    window.__simLock = true; T.curMapId = mapa; }, { mapa, GFX }); // relógio travado: nenhum zumbi nasce nem a Caixa muda durante a leitura
+    if (CAMP) { T.C.st = { ...T.C.st, zmode: 'campanha' }; if (T.ZNOTA) T.ZNOTA.forca = true; T.buildMap(mapa); } // O3-D10: --camp monta os interativos e as notas da campanha (portas fechadas, como no clássico)
+    window.__simLock = true; T.curMapId = mapa; }, { mapa, GFX, CAMP: CAMPF }); // relógio travado: nenhum zumbi nasce nem a Caixa muda durante a leitura
   await pg.waitForFunction(() => !document.getElementById('warmMsg') && window.__T.ZC.world, null, { timeout: 600000, polling: 250 });
 }
 

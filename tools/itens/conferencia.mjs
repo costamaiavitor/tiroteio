@@ -1,6 +1,6 @@
 // O2-E01 (+ O2-C08: caminho de portas sem os atalhos, RAIZ por variável; O2-E02: interruptor da ala antes da armadilha, preço por armadilha, seção zint2): conferência de gameplay das redistribuições (C02 Vila, C03 Sanatório).
 // Anda de verdade (teclas W/Espaço no laço do jogo, colisão real) do nascimento até cada item, abrindo as portas com F,
-// e compra com F (zUse -> srvZUse). Uso: node conferencia.mjs <mapa> [saida.json] [--so perk,pap,wall,box]
+// e compra com F (zUse -> srvZUse). Uso: node conferencia.mjs <mapa> [saida.json] [--so perk,pap,wall,box] [--camp --so camp]
 import { createRequire } from 'node:module';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -11,6 +11,7 @@ const RAIZ = process.env.RAIZ || 'C:/dev/tiroteio'; // O2-C08: RAIZ=<cópia do r
 const MAPA = process.argv[2] || 'sanatorio', SAIDA = process.argv[3] || null;
 const SO = (process.argv.includes('--so') ? process.argv[process.argv.indexOf('--so') + 1] : 'power,perk,pap,wall,box,trap,zint,zint2').split(','); // O2-E02: trap e zint2 (outros interativos e atalhos) no padrão // O2-C10: zint = interativos do C10 (munição, Wunderfizz, baú, sino)
 const SEMGPU = process.argv.includes('--sem-gpu');
+const CAMPF = process.argv.includes('--camp'); // O3-D10: partida de campanha (Ato I) com as notas ligadas; a seção 'camp' anda até os interativos da campanha
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.png': 'image/png', '.jpg': 'image/jpeg', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav' };
 const srv = http.createServer((req, res) => {
   let rel; try { rel = decodeURIComponent(new URL(req.url, 'http://x').pathname).replace(/^\/+/, ''); } catch { res.writeHead(400); return res.end(); }
@@ -148,7 +149,10 @@ async function main() {
   await pg.route(u => !/^http:\/\/(localhost|127\.0\.0\.1)/.test(String(u)), r => r.abort());
   await pg.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: 'domcontentloaded', timeout: 180000 });
   await pg.waitForFunction(() => window.__T && window.__T.MAPS, null, { timeout: 240000 });
-  await pg.evaluate(mapa => { const T = window.__T; T.CFG.gfx = 'baixo'; try { T.applyQuality(); } catch { } T.startHost({ map: mapa, zmap: mapa, mode: 'zombies', rounds: 8, frags: 20, bots: 0, diff: 1, zdiff: 1 }); }, MAPA);
+  await pg.evaluate(([mapa, camp]) => { const T = window.__T; T.CFG.gfx = 'baixo'; try { T.applyQuality(); } catch { }
+    if (camp) T.campLibera?.(1, 1); // O3-D10: Ato II liberado no Normal (a partida começa no Ato I do mesmo jeito)
+    T.startHost({ map: mapa, zmap: mapa, mode: 'zombies', rounds: 8, frags: 20, bots: 0, diff: 1, zdiff: 1, ...(camp ? { zmode: 'campanha', ato: 0 } : {}) });
+    if (camp && T.ZNOTA) T.ZNOTA.forca = true; }, [MAPA, CAMPF]);
   await pg.waitForFunction(() => !document.getElementById('warmMsg') && window.__T.ZC.world && window.__T.S.players.get('h')?.alive, null, { timeout: 600000, polling: 250 });
   await pg.evaluate(() => { window.__T.sim(.1); });
   await pg.evaluate(instalar);
@@ -324,6 +328,26 @@ async function main() {
       log(await ev((T, E, d) => { const a = E.abrirAte(d.rooms[0]), b = E.abrirAte(d.rooms[1]); if (!a.ok || !b.ok) return { item: 'atalho ' + d.id, ok: false, a, b };
         const r = E.abrirPorta(d.id); E.volta(); return { item: 'atalho ' + d.id, precoDado: d.cost, ...r, ok: r.ok }; }, d));
     }
+  }
+  // 8) O3-D10 (--camp --so camp): interativos da campanha (notas, gerador, alçapão e o sino grátis do I.1): anda até cada um, o F
+  // escolhe o item certo e o uso dá o estado esperado no host e no cliente; o objetivo de cada um é ativado como no campForca
+  if (SO.includes('camp')) {
+    const L = await ev(T => T.ZD.zint.map((o, i) => ({ i, t: o.t, id: o.id, v: o.v, x: o.x, z: o.z, n: o.n })).filter(o => ['nota', 'gerador', 'alcapao', 'sino'].includes(o.t) && (o.t !== 'sino' || o.id)));
+    for (const o of L) log(await ev((T, E, o) => {
+      const h = E.h(), d = o.t === 'nota' ? 1 : 1.3, x = o.x + o.n[0] * d, z = o.z + o.n[1] * d, zona = E.zona(x, z), portas = E.abrirAte(zona);
+      if (!portas.ok) return { item: o.t + ' ' + o.id, ok: false, portas };
+      const ob = { gerador: 'I.2', alcapao: 'II.4', sino: 'I.1' }[o.t];
+      if (ob) { const O = T.CAMP.obj[ob] ||= { st: 'oculto', p: 0, h: 0, q: null, envT: 0, pend: false }; if (O.st !== 'ativo') { O.st = 'oculto'; T.campObjAtiva(ob); } }
+      const w = E.ir(x, z), mi = E.mirar([o.x, o.z], a => a?.k === 'zint' && a.id === o.i), act = E.act();
+      const res = { item: o.t + ' ' + o.id, zona, portas: portas.portas, andou: w, prompt: act?.txt, mirou: mi.ok ? true : mi.act };
+      if (o.t === 'alcapao') { let n = 0; while (T.Z.zint[o.i].st !== 'aberto' && n++ < 60) { T.srvZHold(h, { k: 'zint', id: o.i }); E.passo(.15); }
+        res.estado = T.Z.zint[o.i].st; res.ok = mi.ok && act.hold === 1 && res.estado === 'aberto' && T.ZC.zint[o.i].st === 'aberto'; }
+      else { const pago = mi.ok && act.ok !== false ? E.F() : 0, st = T.Z.zint[o.i].st; Object.assign(res, { pago, estado: st, cli: T.ZC.zint[o.i].st });
+        if (o.t === 'nota') { res.painel = T.ZLORE.i === o.i; res.ok = mi.ok && pago === 0 && res.painel; T.zintLoreFecha(false); }
+        else if (o.t === 'gerador') res.ok = mi.ok && pago === 0 && st === 'pegando' && res.cli === 'pegando';
+        else res.ok = mi.ok && pago === 0 && st === 'tocando'; }
+      E.volta(); return res;
+    }, o));
   }
   out.portasAbertas = await ev(T => [...T.ZC.doors]);
   if (SAIDA) fs.writeFileSync(SAIDA, JSON.stringify(out, null, 1));
