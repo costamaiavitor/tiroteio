@@ -27,6 +27,8 @@
 //  5. regiões (zoneAt) sem nenhum interativo, Caixa com 'n' que não aponta para dentro, portas cujos lados não batem com rooms;
 //  6. força × risco: custo de portas até o item, caminho a pé desde o nascimento e pontos de nascimento de zumbi por perto.
 // Interativos novos (O2-C04: ZINT_MAPA do jogo, barris e os próximos tipos) entram pelo __T.zintAud(), sem mexer aqui; tipo novo só ganha cor e legenda.
+// O2-C08: atalhos (porta com atalho: 1) ficam fora do custo de portas; erro se uma área, um item ou o interruptor de uma trava só
+// se alcança por um atalho (softlock), e o relatório mostra quanto cada atalho encurta.
 // Ganchos: usa os do O2-C01 em window.__T quando existem (zBuildWalk, footFreeR, ZPERKS...); sem eles, refaz as mesmas contas.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -79,7 +81,7 @@ function auditar(cfg) {
   const colDe = c => { if (!c) return -1; return COL.findIndex(b => b === c || igual(b, c)); };
   ZD.doors.forEach(d => {
     const o = Wd?.doors.get(d.id), nrm = d.rot != null ? [Math.sin(d.rot), Math.cos(d.rot)] : d.axis === 'z' ? [1, 0] : [0, 1];
-    add({ id: 'porta:' + d.id, tipo: 'porta', cat: 'porta', x: d.x, z: d.z, n: nrm, ux: d.x, uz: d.z, preco: d.cost, efeito: `${d.kind === 'debris' ? 'entulho' : d.kind === 'gate' ? 'portão' : 'porta'}: ${nomeZ(d.rooms[0])} ↔ ${nomeZ(d.rooms[1])}`, kind: d.kind, rooms: d.rooms,
+    add({ id: 'porta:' + d.id, tipo: 'porta', cat: 'porta', x: d.x, z: d.z, n: nrm, ux: d.x, uz: d.z, preco: d.cost, efeito: `${{ debris: 'entulho', gate: 'portão', cortafogo: 'porta corta-fogo', cerca: 'cerca', porteira: 'porteira' }[d.kind] || 'porta'}${d.atalho ? ' (atalho' + (d.trava ? ', trava ' + d.trava : '') + ')' : ''}: ${nomeZ(d.rooms[0])} ↔ ${nomeZ(d.rooms[1])}`, kind: d.kind, rooms: d.rooms, atalho: !!d.atalho, trava: d.trava || null,
       raio: 2.6, col: o ? colDe(o.col) : -1, fonte: 'M.z.doors' });
   });
   ZD.wall.forEach((wb, i) => {
@@ -97,7 +99,9 @@ function auditar(cfg) {
     if (t.post) { o.corpo = aabb(t.sx, t.sz, t.n, .5, .4, 2.3); o.col = colDe(o.corpo); uso(o, .2 + PR + .25); } else { o.parede = { y: 1.3 }; uso(o, .08 + PR + .3); }
     add(o); });
   // O2-C04: interativos novos (ZINT_MAPA do jogo): corpo = a caixa que ele põe no COL, ponto de uso na frente (n)
-  for (const q of (T.zintAud?.() || [])) { const o = { ...q, cat: 'item' }; o.col = colDe(o.corpo); uso(o, (q.usoDist ?? .3) + PR + .25); add(o); }
+  for (const q of (T.zintAud?.() || [])) { const o = { ...q, cat: 'item' }; o.col = colDe(o.corpo); uso(o, (q.usoDist ?? .3) + PR + .25);
+    if (o.tipo === 'interruptor') { o.parede = { y: 1.35 }; const zi = ZD.zint?.[+String(o.id).split(':')[1]]; o.idInt = zi?.id; o.preco = zi?.custo ?? o.preco; } // O2-C08: alavanca rente à parede, preço da instância
+    add(o); }
   const boxCur = Wd?.boxCol ? colDe(Wd.boxCol) : -1;
   ZD.boxes.forEach((L, i) => { const sw = Math.abs(L.n[0]) > 0, hw = sw ? .45 : .9, hd = sw ? .9 : .45;
     const o = { id: 'caixa:' + i, tipo: 'caixa', cat: 'item', x: L.x, z: L.z, n: L.n, nome: 'Caixa misteriosa' + (i === 0 ? ' (início)' : ''), preco: 950, efeito: 'arma sorteada (10 na Liquidação); muda de lugar depois do ursinho', raio: 2.3, fonte: 'M.z.boxes',
@@ -161,7 +165,7 @@ function auditar(cfg) {
   for (const [zz, m2] of vaza) if (m2 >= 4) ach('erro', 'vaza', `Sem abrir porta nenhuma o jogador chega a ${r2(m2)} m² de ${nomeZ(zz)} (área inicial é ${nomeZ(start)})`, []);
 
   // custo de portas até cada área (grafo de M.z.doors, como o zActive)
-  const custo = { [start]: 0 }, portasAte = { [start]: [] }; { let mud = true; while (mud) { mud = false; for (const d of ZD.doors) for (const [a, b] of [[d.rooms[0], d.rooms[1]], [d.rooms[1], d.rooms[0]]]) if (custo[a] != null && (custo[b] == null || custo[a] + d.cost < custo[b])) { custo[b] = custo[a] + d.cost; portasAte[b] = [...portasAte[a], d.id]; mud = true; } } }
+  const custo = { [start]: 0 }, portasAte = { [start]: [] }; { let mud = true; while (mud) { mud = false; for (const d of ZD.doors) if (!d.atalho) for (const [a, b] of [[d.rooms[0], d.rooms[1]], [d.rooms[1], d.rooms[0]]]) if (custo[a] != null && (custo[b] == null || custo[a] + d.cost < custo[b])) { custo[b] = custo[a] + d.cost; portasAte[b] = [...portasAte[a], d.id]; mud = true; } } }
 
   // ---------- 1. colisão e lugar para ficar ----------
   const dentroParede = (x, y, z) => perto(x - .05, x + .05, z - .05, z + .05).some(k => { const b = COL[k]; return x >= b.minX - .05 && x <= b.maxX + .05 && z >= b.minZ - .05 && z <= b.maxZ + .05 && y >= b.minY && y <= b.maxY; });
@@ -205,6 +209,22 @@ function auditar(cfg) {
     if (o.caminhoJ === Infinity || o.caminhoJ == null) { o.problemas.push('inalcancavel'); ach('erro', 'inalcancavel', `${o.id} (${o.nome}) não é alcançável a pé desde o nascimento, nem com todas as portas abertas`, [o.id]); }
     if (o.custoPortas == null) { o.problemas.push('sem_porta'); ach('erro', 'sem_porta', `${o.id} (${o.nome}) está em ${nomeZ(o.zonaUso)}, área que nenhuma porta abre (o zActive nunca a ativa)`, [o.id]); }
   }
+  // O2-C08: atalhos (portas com atalho: 1) só encurtam: o custo acima não passa por eles (o host só os abre com as duas áreas já
+  // ativas); as duas áreas precisam ter outro caminho, a trava precisa de um interruptor alcançável sem passar por ela (nem por
+  // outro atalho) e todo item precisa ser alcançável a pé com os atalhos fechados (nenhuma área depende de interativo novo)
+  { const atal = itens.filter(o => o.tipo === 'porta' && o.atalho);
+    for (const o of atal) {
+      for (const r of o.rooms) if (custo[r] == null) ach('erro', 'atalho_unico', `${o.id}: ${nomeZ(r)} só se alcança pelo atalho (precisa de outro caminho)`, [o.id]);
+      if (o.trava) { const it = itens.find(q => q.tipo === 'interruptor' && q.idInt === o.trava);
+        if (!it) ach('erro', 'trava_sem_interruptor', `${o.id}: trava '${o.trava}' sem interruptor no mapa`, [o.id]);
+        else if (custo[it.zonaUso] == null) ach('erro', 'trava_atras', `${o.id}: o interruptor ${it.id} (${nomeZ(it.zonaUso)}) não se alcança sem a porta que ele destrava`, [o.id, it.id]); }
+    }
+    if (atal.length) { const fechados = new Set([...doorCols].filter(k => !atal.some(o => o.col === k))), Jsem = pintar(.5, PR, bloqJ, fechados), Dsem = campo(Jsem, spawns);
+      for (const o of itens) { if (o.tipo === 'porta') continue; const d = dist(Jsem, Dsem, o.ux, o.uz); o.caminhoSemAtalho = r2(d);
+        if (d === Infinity && o.caminhoJ !== Infinity) ach('erro', 'so_pelo_atalho', `${o.id} (${o.nome}) só é alcançável a pé por um atalho`, [o.id]); }
+      for (const o of atal) { const a = dist(Jsem, Dsem, o.x + o.n[0] * 2.5, o.z + o.n[1] * 2.5), b = dist(Jsem, Dsem, o.x - o.n[0] * 2.5, o.z - o.n[1] * 2.5);
+        if (a === Infinity || b === Infinity) ach('erro', 'atalho_unico', `${o.id}: um dos lados só se alcança a pé pelo próprio atalho`, [o.id]);
+        else o.encurta = r2(Math.abs(a - b)); } } } // encurta: diferença de caminho dos dois lados com o atalho fechado (≈ o que ele poupa)
   // Caixa: lugar 0 na área inicial; 'n' para dentro de uma área (zTickObjects usa zoneAt(x+n, z+n) para escolher o lugar novo)
   ZD.boxes.forEach((L, i) => { const zz = zona(L.x + L.n[0], L.z + L.n[1]);
     if (i === 0 && zz !== start) ach('erro', 'caixa_inicio', `caixa:0 precisa estar na área inicial (${nomeZ(start)}); está em ${nomeZ(zz)}`, ['caixa:0']);
@@ -311,7 +331,7 @@ function auditar(cfg) {
     for (const e of extras) { if (e.tipo === 'janela') { g.fillStyle = '#4fd1ff'; g.fillRect(X(e.x) - 2, Y(e.z) - 2, 5, 5); }
       else if (e.tipo === 'zumbi_do_chao') { g.fillStyle = '#b06cff'; g.beginPath(); g.arc(X(e.x), Y(e.z), 2.5, 0, 7); g.fill(); }
       else { g.fillStyle = '#4cff6a'; g.beginPath(); g.arc(X(e.x), Y(e.z), 4, 0, 7); g.fill(); } }
-    const COR = { porta: '#ff9a2e', arma_parede: '#f2f2f2', letal: '#ffd84a', bowie: '#ffd84a', bebida: '#ff4f9a', pap: '#a77bff', energia: '#ffe14a', armadilha: '#5fd0ff', caixa: '#3fe0c0', barril: '#ff6a3d', terminal: '#9fe870', fogo: '#ffb020' };
+    const COR = { porta: '#ff9a2e', arma_parede: '#f2f2f2', letal: '#ffd84a', bowie: '#ffd84a', bebida: '#ff4f9a', pap: '#a77bff', energia: '#ffe14a', armadilha: '#5fd0ff', caixa: '#3fe0c0', barril: '#ff6a3d', terminal: '#9fe870', fogo: '#ffb020', interruptor: '#ffe680' };
     const rot = o => o.tipo === 'porta' ? `${o.id.slice(6)} ${o.preco}` : o.tipo === 'caixa' ? `?${o.id.slice(6)}` : o.tipo === 'bebida' ? o.nome : o.tipo === 'pap' ? 'PaP' : o.tipo === 'energia' ? 'ENERGIA' : o.tipo === 'armadilha' ? 'armadilha' : o.tipo === 'barril' ? 'barril' : `${o.nome} ${o.preco}`;
     for (const o of itens) { const c = COR[o.tipo] || '#fff', ruim = o.problemas?.some(p => p !== 'meio_sombreado' && p !== 'nasce_em_cima' && p !== 'apertado');
       if (o.tipo === 'porta') { const t = [-o.n[1], o.n[0]]; g.strokeStyle = c; g.lineWidth = 4; g.beginPath(); g.moveTo(X(o.x - t[0] * 2), Y(o.z - t[1] * 2)); g.lineTo(X(o.x + t[0] * 2), Y(o.z + t[1] * 2)); g.stroke(); txt(rot(o), X(o.x) + 4, Y(o.z) - 4, c, 10); continue; }
@@ -324,7 +344,7 @@ function auditar(cfg) {
     // legenda
     const lx = cw - LEG + 14; let ly = 50; g.fillStyle = '#1d2023'; g.fillRect(cw - LEG, 0, LEG, ch);
     txt(`${T.curMapId ?? ''} — planta dos interativos`, lx, 28, '#fff', 15);
-    const leg = [['porta', 'porta / portão / entulho (preço)'], ['arma_parede', 'arma de parede (preço)'], ['letal', 'granada, Semtex, Claymore, Bowie'], ['bebida', 'bebida'], ['pap', 'Pack-a-Punch'], ['energia', 'energia'], ['armadilha', 'armadilha (área do choque)'], ['caixa', 'lugar da Caixa (?n)'], ['barril', 'barril explosivo (O2-C04)'], ['terminal', 'terminal com lore (O2-C07)'], ['fogo', 'armadilha de fogo (O2-C06)']];
+    const leg = [['porta', 'porta / portão / entulho (preço)'], ['arma_parede', 'arma de parede (preço)'], ['letal', 'granada, Semtex, Claymore, Bowie'], ['bebida', 'bebida'], ['pap', 'Pack-a-Punch'], ['energia', 'energia'], ['armadilha', 'armadilha (área do choque)'], ['caixa', 'lugar da Caixa (?n)'], ['barril', 'barril explosivo (O2-C04)'], ['terminal', 'terminal com lore (O2-C07)'], ['fogo', 'armadilha de fogo (O2-C06)'], ['interruptor', 'interruptor (O2-C08)']];
     for (const [k, s] of leg) { g.fillStyle = COR[k]; g.beginPath(); g.arc(lx + 5, ly - 4, 5, 0, 7); g.fill(); txt(s, lx + 16, ly, '#ddd', 12); ly += 20; }
     for (const [cor, s] of [['#4fd1ff', 'janela (zumbi entra)'], ['#b06cff', 'zumbi sai do chão'], ['#4cff6a', 'nascimento do jogador'], ['#ff2a2a', 'problema (círculo) / perto demais (tracejado)']]) { g.fillStyle = cor; g.fillRect(lx, ly - 9, 10, 10); txt(s, lx + 16, ly, '#ddd', 12); ly += 20; }
     ly += 6; txt('fundo: área andável (cor por região;', lx, ly, '#aaa', 11); txt('mais clara = área inicial)', lx, ly + 14, '#aaa', 11); txt('preto = parede; marrom = dá para pular', lx, ly + 28, '#aaa', 11); txt('traço = para onde o item está virado', lx, ly + 42, '#aaa', 11);
@@ -364,6 +384,7 @@ function relatorio(mapa, r) {
   if (!QUIETO) {
     L.push('itens (id | zona | preço | caminho a pé m | portas até lá | força | problemas):');
     for (const o of it) if (o.tipo !== 'porta') L.push(`  ${o.id.padEnd(14)} ${String(o.nome).slice(0, 22).padEnd(22)} ${String(o.nomeZona).slice(0, 24).padEnd(24)} ${String(o.preco ?? '').padStart(5)}  ${fmt(o.caminhoJ).padStart(6)}  ${String(o.custoPortas ?? '—').padStart(5)}  f${o.forca ?? '-'}  ${(o.problemas || []).join(',')}`);
+    const atal = it.filter(o => o.tipo === 'porta' && o.atalho); if (atal.length) { L.push('atalhos (O2-C08; id | preço | trava | lados | quanto encurta a pé, m):'); for (const o of atal) L.push(`  ${o.id.padEnd(22)} ${String(o.preco).padStart(5)}  ${(o.trava || '—').padEnd(17)} ${o.rooms.join('/').padEnd(8)} ${fmt(o.encurta)}`); }
     L.push(`pares abaixo de ${CFG.perto} m (${r.pares.length}; ${r.pares.filter(p => p.d < CFG.min).length} abaixo de ${CFG.min} m):`);
     for (const p of r.pares) L.push(`  ${p.grav === 'erro' ? 'ERRO ' : '     '}${p.a} — ${p.b}: ${fmt(p.d)} m${p.visada ? '' : ' (parede no meio)'}`);
     L.push('bloqueio de passagem (campo de fluxo com × sem itens):');

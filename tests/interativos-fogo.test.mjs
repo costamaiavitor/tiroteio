@@ -135,6 +135,7 @@ test('elétricas novas (Sanatório): 4 armadilhas montadas; cada nova liga com o
     const r = await noJogo(J2.page, (T, PREP) => {
       if (T.Z.phase !== 'round') T.zStartRound(); T.sim(.2);
       const { p, poe, segura, zumbi } = (new Function('return ' + PREP)())(T); segura(); T.Z.power = true; T.ZC.power = true; p.dwEnd = 1e12;
+      (T.ZD.zint || []).forEach((o, k) => { if (o.t === 'interruptor') { p.money = 5000; poe(o.x + o.n[0], o.z + o.n[1]); T.srvZUse(p, { k: 'zint', id: k }); } }); // O2-C08: as novas dependem do interruptor da ala
       const res = [];
       for (let i = 1; i < T.ZD.traps.length; i++) { const t = T.ZD.traps[i]; p.money = 5000; poe(t.sx + t.n[0], t.sz + t.n[1]); T.srvZUse(p, { k: 'trap', id: i });
         const z = zumbi(t.x, t.z); T.sim(.3); res.push({ i, gasto: 5000 - p.money, st: T.Z.traps[i].st, morto: !T.Z.zs.has(z.id) }); T.Z.zs.clear(); }
