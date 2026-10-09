@@ -259,6 +259,10 @@ const CAMP_FALA_TXT = { // id -> { quem, txt } (docs/overhaul/lore.md §10.1)
   'dir-fase3': { quem: 'NÚMERO 1', txt: 'Ainda não acabou.' },
   'dir-coro': { quem: 'O CORO', txt: 'Ainda não acabou. Ainda não acabou.' },
   'dir-morte': { quem: 'NÚMERO 1', txt: 'Então... acabou...' },
+  // Legendas de estreia dos zumbis novos (campanha.md §6.2: a 1ª aparição de cada tipo na partida; O3-D06 e O3-D08)
+  'penitente-estreia': { quem: 'PENITENTE', txt: 'Não deixe chegar perto do balde: a cal cega. Mate de longe.' },
+  'soldado-estreia': { quem: 'SOLDADO', txt: 'O capacete segura o primeiro tiro na cabeça. Eles vêm em trio.' },
+  'afogado-estreia': { quem: 'AFOGADO DO VEIO', txt: 'Olhe as ondas na água preta: ele sai onde elas param. Granada na água.' },
   // Carniceiro (Fermino) — também no clássico, se o coordenador quiser
   'carn-entrada': { quem: 'O MAGAREFE', txt: 'Mais um para pesar.' },
 };
