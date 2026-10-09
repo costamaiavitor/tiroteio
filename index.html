@@ -22532,11 +22532,41 @@ function canvasTex(w, h, draw, leitura) { // leitura: o desenho usa getImageData
   const c = document.createElement('canvas'); c.width = w; c.height = h; draw(leitura ? ctxLeitura(c) : c.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.userData.tmp = true; return t;
 }
-function chalkTex(title, price) {
+// ===== O2-C05: silhueta de giz conforme o que a parede vende =====
+// Antes toda placa mostrava o fuzil (Granadas, Semtex, Claymore e Faca Bowie também). O tipo sai da tabela W (campo model; fuzil sem
+// automático nem rajada = semiautomático, desenhado como rifle de precisão). Traços em 256x128, faixa do meio (o nome fica em cima e o preço embaixo).
+// Cada traço: ['p', fecha, x0, y0, x1, y1, ...] linha; ['e', x, y, rx, ry, a0, a1] elipse (arco); ['f', x, y, r] ponto cheio.
+const GIZ_SIL = {
+  fuzil: [['p', 1, 30, 52, 200, 52, 200, 62, 120, 62, 112, 86, 96, 86, 100, 62, 60, 62, 52, 74, 30, 74], ['p', 0, 200, 56, 234, 56]],
+  smg: [['p', 1, 72, 52, 180, 52, 180, 64, 160, 64, 155, 84, 145, 84, 148, 64, 134, 64, 134, 94, 122, 94, 122, 64, 72, 64], ['p', 0, 180, 58, 206, 58], ['p', 0, 72, 55, 46, 55, 46, 68, 72, 62]],
+  escopeta: [['p', 1, 24, 60, 70, 52, 120, 52, 120, 62, 92, 62, 88, 78, 79, 78, 82, 62, 70, 62, 26, 76], ['p', 0, 120, 54, 236, 54], ['p', 0, 120, 60, 200, 60], ['p', 1, 140, 57, 178, 57, 178, 67, 140, 67]],
+  precisao: [['p', 1, 26, 56, 180, 56, 180, 64, 116, 64, 108, 86, 96, 86, 100, 64, 64, 64, 56, 78, 26, 76], ['p', 0, 180, 60, 238, 60], ['p', 1, 90, 40, 152, 40, 152, 48, 90, 48], ['p', 0, 106, 48, 106, 56], ['p', 0, 138, 48, 138, 56]],
+  metralhadora: [['p', 1, 22, 52, 58, 56, 58, 68, 22, 76], ['p', 1, 58, 50, 172, 50, 172, 66, 58, 66], ['p', 0, 172, 57, 236, 57], ['p', 1, 98, 66, 130, 66, 130, 86, 98, 86], ['p', 0, 140, 66, 135, 82, 146, 82, 150, 66], ['p', 0, 96, 50, 100, 42, 132, 42, 136, 50], ['p', 0, 206, 58, 194, 92], ['p', 0, 206, 58, 218, 92]],
+  pistola: [['p', 1, 82, 50, 178, 50, 178, 63, 82, 63], ['p', 1, 92, 63, 122, 63, 114, 96, 86, 96], ['p', 0, 122, 63, 127, 77, 142, 77, 142, 63], ['p', 0, 178, 56, 188, 56]],
+  granada: [['e', 128, 72, 17, 21, 0, 7], ['p', 1, 120, 44, 136, 44, 136, 51, 120, 51], ['p', 0, 136, 47, 149, 52, 146, 82], ['e', 111, 45, 6, 6, 0, 7], ['p', 0, 112, 64, 144, 64], ['p', 0, 112, 78, 144, 78], ['p', 0, 128, 52, 128, 92]],
+  semtex: [['e', 128, 64, 36, 13, 0, 7], ['p', 0, 92, 64, 92, 76], ['p', 0, 164, 64, 164, 76], ['e', 128, 76, 36, 13, 0, 3.1416], ['e', 128, 64, 18, 6, 0, 7], ['f', 128, 64, 4]],
+  claymore: [['p', 1, 82, 54, 128, 46, 174, 54, 174, 80, 128, 72, 82, 80], ['p', 0, 96, 80, 90, 91], ['p', 0, 106, 78, 109, 91], ['p', 0, 150, 78, 147, 91], ['p', 0, 160, 80, 166, 91], ['p', 1, 122, 48, 122, 41, 134, 41, 134, 48], ['p', 0, 98, 63, 128, 58, 158, 63]],
+  faca: [['p', 1, 104, 58, 186, 58, 204, 62, 224, 64, 200, 72, 104, 74], ['p', 1, 97, 50, 104, 50, 104, 82, 97, 82], ['p', 1, 44, 58, 97, 60, 97, 72, 44, 74, 36, 66], ['f', 60, 66, 2.5], ['f', 80, 66, 2.5], ['p', 0, 112, 63, 184, 63]],
+  tubo: [['p', 1, 34, 56, 216, 56, 216, 70, 34, 70], ['p', 1, 216, 53, 232, 51, 232, 75, 216, 73], ['p', 0, 110, 70, 106, 88, 116, 88, 120, 70], ['p', 0, 88, 56, 88, 46, 100, 46, 100, 56]],
+};
+const GIZ_MODELO = { ak: 'fuzil', m4: 'fuzil', bull: 'fuzil', smg: 'smg', mp40: 'smg', ppsh: 'smg', uzi: 'smg', p90: 'smg', shotgun: 'escopeta', dbarrel: 'escopeta', scout: 'precisao', awp: 'precisao', dmr: 'precisao', xbow: 'precisao', lmg: 'metralhadora', pistol: 'pistola', deagle: 'pistola', revolver: 'pistola', raygun: 'pistola', nade: 'granada', smoke: 'granada', monkey: 'granada', semtex: 'semtex', clay: 'claymore', knife: 'faca', karambit: 'faca', launcher: 'tubo', law: 'tubo' };
+const gizClasse = id => { const w = W[id] || {}, c = GIZ_MODELO[w.model] || 'fuzil'; return c === 'fuzil' && w.model && !w.auto && !w.burst && w.slot !== 'secondary' ? 'precisao' : c; };
+// a placa recebe só o nome (zBuildWorld): volta ao id pela própria tabela W; 'Granadas' e 'Faca Bowie' são os rótulos que o zBuildWorld põe no he e na bowie (faca)
+let GIZ_NOME = null;
+const gizTipo = title => { if (!GIZ_NOME) { GIZ_NOME = new Map([['Granadas', 'he'], ['Faca Bowie', 'knife']]); for (const [id, w] of Object.entries(W)) if (w?.name && !GIZ_NOME.has(w.name)) GIZ_NOME.set(w.name, id); } return gizClasse(GIZ_NOME.get(title)); };
+function gizSil(g, tipo) {
+  for (const [k, ...a] of GIZ_SIL[tipo] || GIZ_SIL.fuzil) {
+    g.beginPath();
+    if (k === 'p') { const [fecha, ...v] = a; g.moveTo(v[0], v[1]); for (let i = 2; i < v.length; i += 2) g.lineTo(v[i], v[i + 1]); if (fecha) g.closePath(); g.stroke(); }
+    else if (k === 'e') { g.ellipse(a[0], a[1], a[2], a[3], 0, a[4], Math.min(a[5], Math.PI * 2)); g.stroke(); }
+    else { g.arc(a[0], a[1], a[2], 0, Math.PI * 2); g.fillStyle = 'rgba(235,235,225,.85)'; g.fill(); }
+  }
+}
+// ===== fim O2-C05 =====
+function chalkTex(title, price, tipo = gizTipo(title)) {
   return canvasTex(256, 128, g => {
     g.strokeStyle = 'rgba(235,235,225,.85)'; g.lineWidth = 3; g.lineCap = 'round'; g.lineJoin = 'round';
-    g.beginPath(); g.moveTo(30, 52); g.lineTo(200, 52); g.lineTo(200, 62); g.lineTo(120, 62); g.lineTo(112, 86); g.lineTo(96, 86); g.lineTo(100, 62); g.lineTo(60, 62); g.lineTo(52, 74); g.lineTo(30, 74); g.closePath(); g.stroke();
-    g.beginPath(); g.moveTo(200, 56); g.lineTo(234, 56); g.stroke();
+    gizSil(g, tipo); // O2-C05: silhueta do tipo vendido
     g.fillStyle = 'rgba(240,240,230,.92)'; g.textAlign = 'center'; g.font = 'bold 28px Rajdhani, Arial'; g.fillText(title, 128, 32); g.font = 'bold 26px Rajdhani, Arial'; g.fillText(price, 128, 118);
   });
 }
@@ -22550,7 +22580,7 @@ function chalkTex(title, price) {
 let B06_RT = null; const b06Alvo = () => B06_RT || (B06_RT = new THREE.WebGLRenderTarget(1, 1));
 const B06_GIZ = new Map(); let B06_B01 = null; // B06_B01: instanciadas da junção (O1-B01) fora da cena até a área animar
 { const f = b01Fim; b01Fim = F => { B06_B01 = F; return f(F); }; }
-{ const giz = chalkTex; chalkTex = (t, p) => { const k = t + '|' + p; let x = B06_GIZ.get(k); if (!x) B06_GIZ.set(k, x = giz(t, p)); return x; }; }
+{ const giz = chalkTex; chalkTex = (t, p, s = gizTipo(t)) => { const k = t + '|' + p + '|' + s; let x = B06_GIZ.get(k); if (!x) B06_GIZ.set(k, x = giz(t, p, s)); return x; }; } // O2-C05: tipo na chave
 function b06Texturas(raizes) { // texturas presas a materiais (e fundo/ambiente) dentro das raízes
   const S = new Set(), mat = m => { if (m) for (const v of Object.values(m)) if (v?.isTexture) S.add(v); };
   for (const r of raizes) r?.traverse(o => { if (o.material) for (const m of [o.material].flat()) { mat(m); if (m.uniforms) for (const u of Object.values(m.uniforms)) if (u?.value?.isTexture) S.add(u.value); } });
