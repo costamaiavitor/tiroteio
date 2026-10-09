@@ -28069,6 +28069,106 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP
 // @@CAMP-CHEFE-1@@
 //
 // @@CAMP-ATO-1@@
+// ===== O3-D10: Atos I e II da campanha na Vila (docs/overhaul/campanha.md §4.3; textos em docs/overhaul/lore.md §8–§10) =====
+// O que tem aqui (dono: O3-D10). Só dados e código da campanha: no clássico nada disto roda (os interativos novos ficam { off: 1 },
+// as notas não ligam, o tick devolve na hora e o sino só muda com a campanha ligada e o I.1 ativo).
+// - CAMP_OBJ dos Atos I e II (as etapas I e II de CAMP_ATOS já apontam para eles):
+//   I.1  usar o sino da Igreja (a 1ª badalada sai grátis; abre A↔B)      I.2  defender o gerador da Pedreira (abre B↔F; liga a Energia)
+//   II.1 ler a lista do Hospital de campanha (abre I↔F e I↔K)            II.2 chegar à Estação, onde Nogueira espera (abre F↔G)
+//   II.3 escoltar Nogueira da Estação ao Forte Velho (rota por F e I)     II.4 segurar F no alçapão da casamata (Castelo)
+//   Portas da história: a cadeia de menor custo (auditoria.mjs) entre o lugar do objetivo anterior e o do seguinte; a rota da escolta
+//   só passa por portas já abertas (F↔G e I↔F). O fim do Ato II (rodada 9) leva à etapa C1 (arena Forte Velho; sem ela, ao Sanatório).
+// - Interativos da campanha na Vila (ZINT_MAPA.vila, com id): gerador, alçapão e as 5 notas. O sino ganha o id 'sino-igreja'.
+// - Nogueira: visual procedural (CAMP_NPC.cabo.monta: o boneco do PvP com a farda da 3ª Cia, sem os óculos, com o rádio de
+//   campanha nas costas, a antena e a pistola na mão; quadro: passo, pose da pistola e o nome por cima) e, no host, a posição dele
+//   parado na Estação (II.2) e no Forte (II.3 cumprido) para o cliente desenhar, mais a fala 'cabo-chegou' quando o alçapão começa
+//   a abrir ("eu seguro a porta").
+// - Agenda das rodadas 1–9: a do O3-D05 (CAMP_AGENDA) já é a do campanha.md §5.2 (3 Névoa, 6 Lançamento, 8 cães, 9 Apagão).
+const CAMP_VILA = {
+  sino: 'sino-igreja', // id dado ao sino do O2-C10 (ZINT_MAPA.vila) para o objetivo I.1
+  npcHz: 2, // posição do Nogueira parado (sem escolta) mandada ao cliente: 2 por segundo (o cliente esconde depois de 3 s sem nada)
+  estacao: [64.8, 42.5, -Math.PI / 2], // Nogueira esperando na Estação (x, z, yaw): ponta leste do prédio, ao lado do bilhete
+  forte: [-47, -50, Math.PI * .6], // e no Forte, segurando a porta do alçapão (o fim da rota)
+  sinoTxt: 'Tocar o sino (chama o rádio; atrai os zumbis)',
+};
+// rota da escolta (II.3): Estação (G) -> porta F↔G -> Pedreira (F), por dentro do anel -> porta I↔F -> Castelo (I) pela entrada leste.
+// Conferida com o tools do O3-D10 (rota.mjs): cada trecho com segClearR, a mais de 1 m de colisor e na grade dos zumbis; ~200 m (~80 s a 2,6 m/s)
+CAMP_VILA.rota = [[64.8, 42.5], [67.4, 14], [68, 0], [67.6, -14], [62.5, -28], [56, -42], [44, -54], [24, -65], [8, -68], [0, -68], [-8, -67], [-24, -57], [-33, -48.5], [-40, -48], [-47, -50]];
+Object.assign(CAMP_OBJ, {
+  'I.1': { tipo: 'usar', titulo: 'Tocar o sino da Igreja', abre: ['AB'], alvo: { zint: CAMP_VILA.sino, st: ['tocando'] }, gratis: 1,
+    radio: { ok: 'r1-sino', lembra: 'r1-inicio' }, depois: ['I.2'] },
+  'I.2': { tipo: 'defender', titulo: 'Ligar o gerador da Pedreira', abre: ['BF'], alvo: { zint: 'gerador-pedreira' }, dura: 45, hp: 1500, hpPorJog: .35, atrai: .4, atraiR: 12,
+    aoFeito: 'energia', radio: { ini: 'r1-energia', ok: 'r1-gerador-pegou', falha: 'r1-gerador-caiu' } },
+  'II.1': { tipo: 'ler', titulo: 'Achar a lista do Hospital de campanha', abre: ['IF', 'IK'], alvo: { zint: 'vila-hospital' }, radio: { ok: 'r2-lista', lembra: 'r2-inicio' }, depois: ['II.2'] },
+  'II.2': { tipo: 'chegar', titulo: 'Achar Nogueira na Estação', abre: ['FG'], zona: { x: 64.5, z: 41, r: 3 }, radio: { ok: 'r2-escolta', lembra: 'r2-lista' }, depois: ['II.3'] },
+  'II.3': { tipo: 'escoltar', titulo: 'Levar Nogueira ao Forte Velho', npc: 'cabo', rota: CAMP_VILA.rota, radio: { falha: 'r2-escolta-caiu', lembra: 'r2-escolta' }, depois: ['II.4'] },
+  'II.4': { tipo: 'usar', titulo: 'Abrir o alçapão da casamata', alvo: { zint: 'alcapao-casamata' }, radio: { ini: 'r2-forte', lembra: 'r2-forte' } },
+});
+Object.assign(CAMP_ATOS[0], { objs: ['I.1', 'I.2'], ini: ['I.1'] }); Object.assign(CAMP_ATOS[1], { objs: ['II.1', 'II.2', 'II.3', 'II.4'], ini: ['II.1'] });
+{ const s = ZINT_MAPA.vila.find(o => o.t === 'sino'); if (s && !s.id) s.id = CAMP_VILA.sino; }
+// sonda do O3-D10 (sonda.mjs: planta e foto de cima) e auditoria.mjs/conferencia.mjs com --camp sem erro. Notas: (x, z) na face da
+// parede (folha e bilhete) ou no chão; ato 0 = Ato I, 1 = Ato II (a nota da Pedreira entra com o marco I.3, no começo do Ato II)
+ZINT_MAPA.vila.push(
+  { t: 'gerador', id: 'gerador-pedreira', x: 47.6, z: -63.4, n: [0, 1] }, // F Pedreira: ao lado da Energia (oeste), de frente para o pátio
+  { t: 'alcapao', id: 'alcapao-casamata', x: -50, z: -52, n: [0, 1] }, // I Castelo: chão do pátio, longe do PaP, da mesa e do tripé
+  { t: 'nota', v: 'pregada', id: 'n-praca-cabo', x: -6.85, z: -7, n: [1, 0], ato: 0 }, // A Praça: poste do noroeste, virado para o chafariz
+  { t: 'nota', v: 'bilhete', id: 'n-pedreira-dinamite', x: 47, z: -59.85, n: [0, 1], ato: 1 }, // F Pedreira: poste ao lado do gerador
+  { t: 'nota', v: 'pregada', id: 'n-castelo-foto', x: -47, z: -57.4, n: [0, 1], ato: 1 }, // I Castelo: muralha norte, por dentro
+  { t: 'nota', v: 'chao', id: 'n-base-ordem', x: 101, z: -99.2, n: [0, 1], ato: 1 }, // c0 Base militar (fora da rota): diante do galpão do meio
+  { t: 'nota', v: 'bilhete', id: 'n-estacao-cabo', x: 63, z: 40, n: [1, 0], ato: 1 }, // G Estação: parede leste do prédio
+);
+// sino (O2-C10): na campanha, com o I.1 ativo, a primeira badalada sai grátis (o resto do sino é o de sempre)
+const campSinoGratis = i => { const id = campObjComZint(i, 'usar'); return !!id && !!CAMP_OBJ[id].gratis; };
+{ const F = ZINT_FN.sino, usar0 = F.usar, prompt0 = F.prompt;
+  F.usar = function (p, i, o, E, D, err, m) { if (CAMP.on && CAMP.modo === 'campanha' && E.st === 'pronto' && campSinoGratis(i)) return zintPoe(i, 'tocando', D.dura, p.id); return usar0.call(this, p, i, o, E, D, err, m); };
+  F.prompt = function (o, i, c, D) { if (c.st === 'pronto' && campCliOn() && CAMP.c.obj['I.1']?.st === 'ativo' && CAMP_OBJ['I.1']?.gratis && o.id === CAMP_VILA.sino) return { k: 'zint', id: i, cost: 0, txt: CAMP_VILA.sinoTxt }; return prompt0.call(this, o, i, c, D); };
+}
+// ---------- host: Nogueira parado (II.2 e depois da escolta) e a fala do alçapão ----------
+let campVilaNpcT = 0;
+function campVilaTick() {
+  if (CAMP.modo !== 'campanha' || curMapId !== 'vila' || CAMP.fim || CAMP.trans) return;
+  const O = CAMP.obj, o2 = O['II.2'], o3 = O['II.3'], o4 = O['II.4'];
+  const P = o2?.st === 'ativo' ? CAMP_VILA.estacao : o3?.st === 'feito' && o4 ? CAMP_VILA.forte : null;
+  if (P && !CAMP.npc && now >= campVilaNpcT) { campVilaNpcT = now + 1 / CAMP_VILA.npcHz; broadcastFast({ t: 'camp', k: 'npc', id: 'cabo', p: [P[0], r2(campChao(P[0], 0, P[1])), P[1], r2(P[2]), 1] }); }
+  if (o4?.st === 'ativo' && !o4.falou) { // "eu seguro a porta": a fala sai enquanto o alçapão abre (espera o intervalo de falas do personagem)
+    const i = o4.zi?.[0], E = i >= 0 ? Z.zint[i] : null, id = CAMP_NPC.cabo.falas.chegou;
+    if (E?.st === 'abrindo' && now >= (CAMP.falaT[id.split('-')[0]] || 0)) { o4.falou = true; campFala(id); } }
+}
+CAMP_GANCHOS.tick.push(campVilaTick);
+// ---------- cliente: o Cabo Nogueira (visual procedural) ----------
+const CAMP_CABO_VIS = { // cores (materiais do cache mc) e medidas do rádio de campanha, da antena e da pistola
+  radio: 0x3a4030, radioD: 0x23261e, mostrador: 0xb8a878, antena: 0x161616, pistola: 0x1c1d1f, cabo: 0x4a3626, nome: '#d8c890', rotulo: 'NOGUEIRA', calca: [0x3a4150, 0x454c34], // calça do PvP (azul) trocada pela da farda
+  passo: 1.7, passoAmp: .6, parado: .25, nomeY: 2.35, nomeD: 14,
+  tp: { cls: 'pistol', anc: new V3(0, -.05, .045), rh: new V3(0, -.05, .045), lh: null, mz: new V3(0, .03, -.19) }, // pistola na mão (TP_POSE.pistol)
+};
+Object.assign(CAMP_NPC.cabo, {
+  monta() {
+    const V = CAMP_CABO_VIS, g = playerModel(CAMP_NPC.cabo.skin), ud = g.userData;
+    { const [de, para] = V.calca; g.traverse(o => { if (o.isMesh && o.material === mc(de)) o.material = mc(para); }); } // calça verde-oliva da 3ª Cia
+    for (const o of ud.head.children) if (o.isMesh && Math.abs(o.position.z + .125) < .01 && Math.abs(o.position.y - .15) < .01) o.visible = false; // sem os óculos táticos (1958)
+    const rad = new THREE.Group(); rad.position.set(0, 1.2, .36); ud.inner.add(rad); // rádio de campanha nas costas (por cima da mochila)
+    bx(rad, .34, .42, .16, 0, 0, 0, mc(V.radio)); bx(rad, .36, .05, .17, 0, .19, 0, mc(V.radioD)); bx(rad, .12, .06, .02, -.06, .08, .085, mc(V.mostrador));
+    for (const x of [.06, .12]) { const k = zintCil(rad, .018, .02, 0, mc(V.radioD), 6, false); k.rotation.x = Math.PI / 2; k.position.set(x, .08, .09); } // botões
+    const ant = zintCil(rad, .007, 1.25, .8, mc(V.antena), 4, false); ant.position.set(.12, .8, -.02); ant.rotation.z = -.12; // antena (chicote)
+    bx(rad, .03, .03, .03, .195, 1.42, -.02, mc(V.antena));
+    const pis = new THREE.Group(); ud.gh.add(pis); // pistola: punho na origem (âncora), cano para -z
+    bx(pis, .035, .1, .06, 0, -.05, .045, mc(V.cabo)); bx(pis, .034, .045, .22, 0, .015, -.06, mc(V.pistola));
+    g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } }); // um boneco só, sem sombra nova (como os jogadores remotos)
+    const tag = nameSprite(V.rotulo, V.nome); tag.material.depthTest = false; tag.renderOrder = 9; tag.position.y = V.nomeY; g.add(tag);
+    Object.assign(ud, { tag, K: { aim: 0, run: 0, sw: 0 }, anim: 0, px: null, pz: 0, spd: 0 });
+    tpPose(g, V.tp, 0, ud.K);
+    return g;
+  },
+  quadro(n, dt) { // passo (pela velocidade interpolada), pistola baixa andando e em guarda parado, nome escalado pela distância
+    const g = n.model, ud = g.userData, V = CAMP_CABO_VIS; if (!ud.K) return;
+    const sp = ud.px === null ? 0 : Math.hypot(n.x - ud.px, n.z - ud.pz) / Math.max(dt, 1e-3); ud.px = n.x; ud.pz = n.z; ud.spd = lerp(ud.spd, Math.min(sp, 8), .2);
+    ud.anim += dt * ud.spd * V.passo; const la = Math.sin(ud.anim) * V.passoAmp * Math.min(1, ud.spd / 4); ud.legL.rotation.x = la; ud.legR.rotation.x = -la;
+    const f = 1 - Math.exp(-dt * 8); ud.K.aim = lerp(ud.K.aim, ud.spd < V.parado ? 1 : 0, f); tpPose(g, V.tp, 0, ud.K);
+    const k = Math.max(1, Math.hypot(camera.position.x - n.x, camera.position.z - n.z) / V.nomeD); ud.tag.scale.set(1.3 * k, .325 * k, 1);
+  },
+});
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_VILA, CAMP_CABO_VIS, campVilaTick, campSinoGratis, campChao, ZINT_MAPA, segClearR, zDoorOpen, zBuildWalk }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes e ferramentas
+// ===== FIM O3-D10 =====
 //
 // @@CAMP-CHEFE-2@@
 //
