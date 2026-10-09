@@ -22900,7 +22900,8 @@ function zBuildWorld(M) {
         h.add(bars); h.traverse(o => { if (o.isMesh) o.castShadow = true; });
       }
       bx(g, .5, .5, .03, 0, 1.5, .07, mc(0x8a6a2a)); // cadeado
-    } else if (d.kind === 'debris') {
+    } else if (ZINT_PORTA[d.kind]) zintPortaVis(g, d); // O2-C08: corta-fogo, cerca, porteira
+    else if (d.kind === 'debris') {
       for (let i = 0; i < 10; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(rand(.8, 2), rand(.2, .5), rand(.3, .7)), i % 3 ? woodM : stoneM); b.position.set(rand(-1.5, 1.5), rand(.2, 2.9), rand(-.2, .2)); b.rotation.set(rand(-.3, .3), rand(-.4, .4), rand(-.6, .6)); b.castShadow = true; g.add(b); }
     } else {
       bx(g, 3.9, 3.15, .25, 0, 1.575, 0, woodM).castShadow = true;
@@ -23059,12 +23060,12 @@ function zUpdateWorld(dt) {
   for (const o of Wd.doors.values()) if (o.open && !o.done) {
     const k = Math.min(1, (now - o.t0) / .9);
     if (o.d.kind === 'gate') o.halves.forEach((h, i) => h.position.x = (i ? 1 : -1) * (1 + k * 1.9)); // portão corre para os lados e fica aberto
-    else o.g.position.y = (o.d.kind === 'debris' ? -1 : 1) * k * 3.4;
+    else o.g.position.y = (o.d.kind === 'debris' || ZINT_PORTA[o.d.kind]?.desce ? -1 : 1) * k * 3.4; // O2-C08: cerca e porteira afundam
     if (k >= 1) { o.done = true; if (o.d.kind !== 'gate') o.g.visible = false; renderer.shadowMap.needsUpdate = true; }
   }
   for (const l of Wd.lights) {
     let f = 1; if (l.fire) f = .8 + Math.sin(now * 11 + l.ph) * .1 + Math.sin(now * 23) * .08; // fogo: sempre aceso, tremulando
-    else if (!ZC.power) { const n = Math.sin(now * 13 + l.ph) + Math.sin(now * 7.3 + l.ph * 2); f = n > 1.4 ? .12 : .5; }
+    else if (!ZC.power || (l.ala && !Wd.alas?.has(l.ala))) { const n = Math.sin(now * 13 + l.ph) + Math.sin(now * 7.3 + l.ph * 2); f = n > 1.4 ? .12 : .5; } // O2-C08: lâmpada da ala falha até o interruptor
     else if (l.fk) f = zLampFk(l, now); // 3A-8: vela, lampião, poste, fluorescente ou lâmpada que falha (pela área)
     if (l.sw) { zLampSwing(l, now); if (l.bulb.visible) l.bulb.position.set(l.x + l.ox, l.y + l.oy, l.z + l.oz); }
     l.f = f; if (l.bulb.visible) l.bulb.material.color.set(l.c).multiplyScalar((f > .4 ? 3 : .45) * (l.fk && ZC.power ? Math.min(1, f + .1) : 1)); // bulbo longe (escondido) não precisa
@@ -23609,7 +23610,7 @@ function zInteract(dt) {
   const px = me.pos.x, pz = me.pos.z, solo = zSolo(); let best = null, bd = 1e9;
   const cand = (dist, a) => { if (dist < bd) { bd = dist; best = a; } };
   const dd = (x, z) => Math.hypot(px - x, pz - z);
-  for (const d of ZD.doors) if (!ZC.doors.has(d.id)) { const dist = dd(d.x, d.z); if (dist < 2.6) cand(dist, { k: 'door', id: d.id, cost: d.cost, txt: `${d.kind === 'debris' ? 'Remover entulho' : d.kind === 'gate' ? 'Abrir portão' : 'Abrir porta'} [${d.cost}]` }); }
+  for (const d of ZD.doors) if (!ZC.doors.has(d.id)) { const dist = dd(d.x, d.z); if (dist < 2.6) { const tr = d.atalho && zintPortaTrava(d, false); cand(dist, tr ? { k: 'door', id: d.id, ok: false, txt: tr } : { k: 'door', id: d.id, cost: d.cost, txt: `${ZINT_PORTA[d.kind]?.verbo || (d.kind === 'debris' ? 'Remover entulho' : d.kind === 'gate' ? 'Abrir portão' : 'Abrir porta')} [${d.cost}]` }); } } // O2-C08: atalhos
   ZD.wall.forEach((wb, i) => {
     const dist = dd(wb.x, wb.z); if (dist > 2) return;
     let txt, cost, ok = true;
@@ -23652,6 +23653,7 @@ function zInteract(dt) {
     const dist = dd(t.sx, t.sz); if (dist > 2.2) return;
     const T = ZC.traps[i] || { st: 'idle' }; let txt, ok = true;
     if (!ZC.power) { txt = 'Armadilha elétrica — sem energia'; ok = false; }
+    else if (t.ala && !zintAlaCli(t.ala)) { txt = `Armadilha elétrica — ligue a ${ZINT_ALA[t.ala].nome}`; ok = false; } // O2-C08: interruptor da ala
     else if (T.st === 'on') { txt = 'Armadilha ligada'; ok = false; }
     else if (T.st === 'cool') { txt = `Armadilha recarregando · ${Math.max(0, Math.ceil(T.end - now))}s`; ok = false; }
     else txt = `Armadilha elétrica [${t.cost ?? ZTRAP.cost}]`; // O2-C06: custo opcional por armadilha
@@ -24395,6 +24397,7 @@ function srvZUse(p, m) {
   switch (m.k) {
     case 'door': {
       const d = ZD.doors.find(x => x.id === m.id); if (!d || Z.doors.has(d.id) || !near(d.x, d.z, 3.2)) return;
+      if (d.atalho) { const tr = zintPortaTrava(d, true); if (tr) return err(tr); } // O2-C08: atalho travado
       if (!zPay(p, d.cost)) return;
       Z.doors.add(d.id); broadcast({ t: 'zdoor', id: d.id }); zBuildWalk(); Z.ffT = 0; break;
     }
@@ -24457,7 +24460,8 @@ function srvZUse(p, m) {
     case 'zint': zintUsar(p, m); break; // O2-C04: interativos novos
     case 'trap': { // armadilha elétrica: perto da alavanca, com energia, pronta e com pontos
       const i = m.id, t = ZD.traps?.[i], T = Z.traps[i]; if (!Number.isInteger(i) || !t || !T || !near(t.sx, t.sz, 2.8)) return;
-      if (!Z.power) return err('Sem energia'); if (T.st !== 'idle') return err(T.st === 'on' ? 'Armadilha já ligada' : 'Armadilha recarregando');
+      if (!Z.power) return err('Sem energia'); if (t.ala && !zintAla(t.ala)) return err(`Ligue a ${ZINT_ALA[t.ala].nome} antes (interruptor da ala)`); // O2-C08
+      if (T.st !== 'idle') return err(T.st === 'on' ? 'Armadilha já ligada' : 'Armadilha recarregando');
       if (!zPay(p, t.cost ?? ZTRAP.cost)) return; // O2-C06: custo opcional por armadilha
       T.st = 'on'; T.t = now + ZTRAP.on; T.by = p.id; T.hurt = {};
       broadcast({ t: 'ztrap', i, st: 'on', t: ZTRAP.on }); break;
@@ -25016,6 +25020,185 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { ZINT
 //
 //
 // @@INTERATIVO-3@@
+// ===== O2-C08: interruptores e atalhos (docs/overhaul/interativos.md §1.4 e §1.6) =====
+// Interruptor (tipo 'interruptor'): alavanca na parede que destrava algo em outro lugar. Estados 'pronto' (desligado) e 'ligado'
+// (uso único por partida; o host confere distância, energia e pontos). No Sanatório precisa da Energia e liga uma ala inteira:
+// as lâmpadas da ala param de falhar (Wd.alas, gancho no zUpdateWorld), a porta corta-fogo dela destrava e a armadilha elétrica
+// dela (t.ala, marcado aqui nas de M.z.traps) só liga depois dele (srvZUse 'trap' e zInteract consultam zintAla / zintAlaCli). Na Vila é a tranca da porteira (sem energia, grátis).
+// Atalho: porta nova em M.z.doors ({ kind: 'cortafogo' | 'cerca' | 'porteira', atalho: 1, trava?: id do interruptor }) entre duas
+// áreas que já se ligam por outro caminho. Só encurta: o host só abre com as duas áreas já ativas (zActive) e, se tiver trava,
+// depois do interruptor; nada fica alcançável só por ele, e nenhum interruptor fica atrás da porta que destrava (sem softlock).
+// Rede: a porta é a de sempre (use k:'door' -> zdoor -> zBuildWalk; o campo dos zumbis é refeito e eles passam a usar o vão; quem
+// entra no meio recebe em z.d); a trava é o estado do interruptor (zint / zi). O vão é furado na parede antes do buildMap
+// (zintFura: a caixa da parede vira dois pedaços e a verga, nas regiões escritas à mão e nas do zGen, sem mexer na semente).
+ZINT.interruptor = { nome: 'Interruptor', custo: 0, usoR: 2.2, srvR: 2.8, forca: 2 }; // custo e energia por instância (custo, energia)
+ZINT.atalho = { vao: 4, verga: 3.2 }; // largura do vão (a das portas de hoje) e altura onde começa a verga
+const ZINT_ALA = { // alas do Sanatório: áreas cujas lâmpadas (e a armadilha da ala) dependem do interruptor
+  oeste: { nome: 'Ala Oeste', salas: ['G', 'H', 'N'] },
+  leste: { nome: 'Ala Leste', salas: ['K', 'L', 'M'] },
+  anel: { nome: 'Anel externo', salas: ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14'] },
+};
+const ZINT_PORTA = { // tipos de porta nova: verbo do F, som ao abrir e se afunda no chão (senão sobe, como a porta de madeira)
+  cortafogo: { verbo: 'Abrir a porta corta-fogo', som: 'door' },
+  cerca: { verbo: 'Derrubar a cerca', som: 'crack', desce: 1 },
+  porteira: { verbo: 'Abrir a porteira', som: 'crack', desce: 1 },
+};
+const ZINT_PORTAS = { // atalhos (id único 'atalho-*'; axis como nas portas: 'x' = parede ao longo de x); msg: texto da porta trancada
+  sanatorio: [
+    { id: 'atalho-DG', x: -27, z: 13.9, axis: 'z', cost: 750, rooms: ['D', 'G'], kind: 'cortafogo', atalho: 1, trava: 'ala-oeste', msg: 'Trancada: ligue a Ala Oeste (interruptor na Biblioteca)' },
+    { id: 'atalho-EK', x: 27, z: 17, axis: 'z', cost: 750, rooms: ['E', 'K'], kind: 'cortafogo', atalho: 1, trava: 'ala-leste', msg: 'Trancada: ligue a Ala Leste (interruptor no Jardim)' },
+    { id: 'atalho-r12r13', x: -24, z: 84, axis: 'z', cost: 1000, rooms: ['r12', 'r13'], kind: 'cortafogo', atalho: 1 }, // margem do brejo
+  ],
+  vila: [ // cercas dos quintais no muro do meio (lados retos, longe dos portões das diagonais): catavento B/F, C/G, E/H, D/I
+    { id: 'atalho-BF', x: 16, z: -50.5, axis: 'x', cost: 500, rooms: ['B', 'F'], kind: 'cerca', atalho: 1 },
+    { id: 'atalho-CG', x: 50.5, z: 18.5, axis: 'z', cost: 500, rooms: ['C', 'G'], kind: 'porteira', atalho: 1, trava: 'porteira-estacao', msg: 'Trancada: solte a tranca do lado da Estação (no muro, perto da porteira)' },
+    { id: 'atalho-EH', x: -16, z: 50.5, axis: 'x', cost: 500, rooms: ['E', 'H'], kind: 'cerca', atalho: 1 },
+    { id: 'atalho-DI', x: -50.5, z: -18.5, axis: 'z', cost: 750, rooms: ['D', 'I'], kind: 'cerca', atalho: 1 },
+  ],
+};
+ZINT_MAPA.sanatorio.push( // sonda do O2-C08 (face de parede alta, 2,5 m livres na frente, 3 m de portas, janelas, chão que solta zumbi e itens)
+  { t: 'interruptor', v: 'forca', id: 'ala-oeste', ala: 'oeste', custo: 500, energia: 1, x: -27.55, z: -31, n: [-1, 0] }, // N Biblioteca
+  { t: 'interruptor', v: 'forca', id: 'ala-leste', ala: 'leste', custo: 500, energia: 1, x: 35.75, z: 23.45, n: [0, -1] }, // K Jardim
+  { t: 'interruptor', v: 'forca', id: 'ala-anel', ala: 'anel', custo: 1000, energia: 1, x: -99.25, z: -11.57, n: [0, -1] }, // r5 Túneis de serviço
+);
+ZINT_MAPA.vila.push(
+  { t: 'interruptor', v: 'tranca', id: 'porteira-estacao', placa: 'PORTEIRA DA FAZENDA', x: 51.05, z: 8, n: [1, 0] }, // G Estação, no muro do lado de fora (destrava a porteira C/G)
+);
+function zintFura(boxes, d) { // vão da porta nova: a caixa da parede que passa por ele vira dois pedaços e a verga
+  const A = ZINT.atalho, V = A.vao / 2, ax = d.axis === 'x', a = ax ? d.x : d.z, c = ax ? d.z : d.x, out = [];
+  for (const b of boxes) {
+    const bc = ax ? b.z : b.x, bt = ax ? b.d : b.w, ba = ax ? b.x : b.z, bl = ax ? b.w : b.d, lo = ba - bl / 2, hi = ba + bl / 2;
+    if (b.mat === 'floor' || b.mat === 'inv' || bt > 1.6 || bl < 1.5 || b.h < .5 || b.y >= A.verga - .01 || Math.abs(bc - c) > bt / 2 || lo >= a + V || hi <= a - V) { out.push(b); continue; }
+    const peca = (p, q, y, h) => { if (q - p > .02 && h > .01) out.push(ax ? { ...b, x: (p + q) / 2, w: q - p, y, h } : { ...b, z: (p + q) / 2, d: q - p, y, h }); };
+    peca(lo, a - V, b.y, b.h); peca(a + V, hi, b.y, b.h);
+    if (b.y + b.h > A.verga + .05) peca(Math.max(lo, a - V), Math.min(hi, a + V), A.verga, b.y + b.h - A.verga); // verga
+  }
+  return out;
+}
+for (const [id, L] of Object.entries(ZINT_PORTAS)) { // as portas entram no mapa e os vãos são furados antes de cada buildMap
+  const M = MAPS[id]; if (!M?.z) continue; const f = M.boxes;
+  M.boxes = () => L.reduce(zintFura, f()); M.z.doors.push(...L);
+}
+{ const M = MAPS.sanatorio.z; for (const t of M.traps || []) for (const [k, A] of Object.entries(ZINT_ALA)) if (A.salas.includes(M.zoneAt(t.sx, t.sz))) t.ala = k; } // armadilha elétrica de uma ala (O2-C06: Refeitório, Estufa, Lavanderia) só liga depois do interruptor dela
+const zintIdx = id => (ZD.zint || []).findIndex(o => o.t === 'interruptor' && o.id === id);
+function zintAtivasCli() { const s = new Set([ZD.start || 'A']); for (const d of ZD.doors) if (ZC.doors.has(d.id)) { s.add(d.rooms[0]); s.add(d.rooms[1]); } return s; } // como o zActive, no cliente
+function zintPortaTrava(d, host) { // motivo de o atalho não abrir (null = pode): trava do interruptor e as duas áreas já ativas
+  if (d.trava) { const i = zintIdx(d.trava), E = i >= 0 ? (host ? Z.zint : ZC.zint)?.[i] : null; if (E?.st !== 'ligado') return d.msg || 'Trancada: ache o interruptor'; }
+  const at = host ? zActive() : zintAtivasCli(), falta = d.rooms.filter(r => !at.has(r));
+  return falta.length ? `Atalho: abra antes o caminho até ${falta.map(r => ZD.roomNames?.[r] || r).join(' e ')}` : null;
+}
+function zintAla(ala) { const L = ZD.zint || []; for (let i = 0; i < L.length; i++) if (L[i].t === 'interruptor' && L[i].ala === ala) return Z.zint?.[i]?.st === 'ligado'; return true; } // host: ala ligada (sem interruptor no mapa: sempre)
+function zintAlaCli(ala) { return !!ZC.world?.alas?.has(ala) || !(ZD.zint || []).some(o => o.t === 'interruptor' && o.ala === ala); } // cliente
+// ---------- visual (procedural) ----------
+const ZINT_PLACA = {};
+function zintPlacaTex(txt, cor, fundo) { // placa de texto (guardada entre as partidas)
+  const k = txt + cor + fundo; if (ZINT_PLACA[k]) return ZINT_PLACA[k];
+  const t = canvasTex(256, 64, g => { g.fillStyle = fundo; g.fillRect(0, 0, 256, 64); g.strokeStyle = cor; g.lineWidth = 3; g.strokeRect(4, 4, 248, 56); g.fillStyle = cor;
+    let fs = 30; g.font = `bold ${fs}px Rajdhani, Arial`; while (g.measureText(txt).width > 232 && fs > 14) g.font = `bold ${fs -= 2}px Rajdhani, Arial`; g.textAlign = 'center'; g.fillText(txt, 128, 42); });
+  t.userData.tmp = false; return (ZINT_PLACA[k] = t);
+}
+function zintPlaca(g, txt, cor, fundo, w, h, x, y, z, ry = 0) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: zintPlacaTex(txt, cor, fundo), toneMapped: false })); m.position.set(x, y, z); m.rotation.y = ry; g.add(m); return m; }
+const zintLuzM = c => { const m = new THREE.MeshBasicMaterial({ color: c, toneMapped: false }); return m; }; // lâmpada de estado (cor muda: material próprio)
+function zintPortaVis(g, d) { // zBuildWorld: aparência das portas novas (frente +z/-z, largura 4 m ao longo de x)
+  const Wd = ZC.world; Wd.portaTrava ||= new Map();
+  if (d.kind === 'cortafogo') { // duas folhas de aço vermelho, barra antipânico, visor aramado, faixa e placa dos dois lados
+    const aco = mc(0x7e2a1e), cinza = mc(0xa0a4a8), esc = mc(0x22252a);
+    bx(g, 3.9, 3.15, .18, 0, 1.575, 0, aco).castShadow = true; bx(g, .04, 3.1, .2, 0, 1.575, 0, esc);
+    for (const s of [-1, 1]) {
+      bx(g, 3.4, .07, .06, 0, 1.05, s * .13, cinza); for (const x of [-1.6, 1.6]) bx(g, .06, .12, .1, x, 1.05, s * .11, cinza);
+      for (const x of [-.95, .95]) bx(g, .42, .55, .02, x, 2.15, s * .095, mc(0x3a4650));
+      bx(g, 3.9, .14, .02, 0, .2, s * .095, mc(0xc8a020));
+      zintPlaca(g, 'CORTA-FOGO', '#ffe08a', '#5a1410', .9, .22, 0, 2.72, s * .1, s < 0 ? Math.PI : 0);
+    }
+    if (d.trava) { // lâmpada da trava em cima da porta (vermelha trancada, verde destravada)
+      const m = zintLuzM(0xff2a1a), l = bx(g, .16, .12, .26, 0, 3.02, 0, m); l.userData.dyn = true;
+      Wd.portaTrava.set(d.id, on => m.color.set(on ? 0x33ff66 : 0xff2a1a));
+    }
+    return;
+  }
+  const mad = mc(0x6a4a2c), esc = mc(0x4a321e), poste = mc(0x3e2a18);
+  for (const x of [-1.92, 1.92]) bx(g, .16, 2.5, .16, x, 1.25, 0, poste).castShadow = true;
+  if (d.kind === 'cerca') { // cerca de quintal: três travessas e ripas
+    for (const y of [.45, 1.25, 2.05]) bx(g, 3.7, .1, .06, 0, y, -.06, esc).castShadow = true;
+    for (let i = 0; i < 15; i++) bx(g, .14, 2.15 + (i % 2) * .12, .04, -1.68 + i * .24, 1.1 + (i % 2) * .06, .0, mad).castShadow = true;
+    return;
+  }
+  // porteira de fazenda: duas folhas com travessas e mão-francesa; corrente com cadeado enquanto a tranca está fechada
+  for (const s of [-1, 1]) {
+    for (const y of [.35, 1.05, 1.75]) bx(g, 1.8, .14, .07, s * .95, y, 0, mad).castShadow = true;
+    bx(g, .12, 1.6, .07, s * 1.78, 1.05, 0, mad); bx(g, .12, 1.6, .07, s * .12, 1.05, 0, mad);
+    const br = bx(g, .1, 2.15, .06, s * .95, 1.05, .05, esc); br.rotation.z = s * .9; br.castShadow = true;
+  }
+  if (d.trava) {
+    const cad = new THREE.Group(), ferro = new THREE.MeshLambertMaterial({ color: 0x2a2a2c });
+    for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { const e = bx(cad, .1, .05, .02, s * (.08 + k * .09), 1.05 + (k - 1) * .04, s * .06, ferro); e.rotation.z = s * .4; }
+    bx(cad, .16, .18, .07, 0, .93, .09, new THREE.MeshLambertMaterial({ color: 0x8a6a2a }));
+    cad.traverse(m => { if (m.isMesh) m.userData.dyn = true; }); g.add(cad);
+    Wd.portaTrava.set(d.id, on => { cad.visible = !on; renderer.shadowMap.needsUpdate = true; });
+  }
+}
+const ZINT_INT_COL = { forca: [.95, 1.75], tranca: [1, 1.8] }; // altura do colisor (de, até) rente à parede: 0,6 m de largura, 0,24 de fundo
+const ZINT_INT_MONTA = { // interruptor: frente +z, parede em z = 0; devolve { alav, luz }
+  forca(g, o) { // caixa de força cinza com conduíte até o teto, alavanca, lâmpada de estado e placa da ala
+    const cin = mc(0x5b6268), esc = mc(0x33373c);
+    bx(g, .56, .74, .16, 0, 1.35, .09, cin); bx(g, .5, .012, .006, 0, 1.35, .173, esc); bx(g, .22, .05, .02, -.12, 1.62, .175, mc(0xc8a020));
+    zintCil(g, .035, 3.05, 3.02, esc, 6).position.set(.42, 3.02, .04); bx(g, .16, .05, .05, .34, 1.55, .04, esc); // conduíte ao lado da placa bx(g, .7, .06, .1, 0, .96, .06, esc);
+    const alav = new THREE.Group(); alav.position.set(.36, 1.3, .1); bx(alav, .05, .34, .05, 0, .17, 0, mc(0x9a9a9a)); bx(alav, .1, .08, .1, 0, .34, 0, mcB(0xcc2222)); g.add(alav);
+    bx(g, .08, .08, .12, .36, 1.3, .06, esc);
+    const luz = bx(g, .1, .1, .04, -.14, 1.58, .19, zintLuzM(0xff2a1a)); luz.userData.dyn = true;
+    zintPlaca(g, (ZINT_ALA[o.ala]?.nome || 'ENERGIA').toUpperCase(), '#ffd25a', '#141618', .62, .16, 0, 1.92, .012);
+    return { alav, luz };
+  },
+  tranca(g, o) { // tábua com a tranca de ferro (ferrolho) e a placa da porteira
+    const mad = mc(0x5a3c22), ferro = mc(0x2f2f31);
+    bx(g, .6, .55, .06, 0, 1.3, .03, mad); for (const y of [1.12, 1.48]) bx(g, .62, .06, .07, 0, y, .04, mc(0x4a3018));
+    bx(g, .5, .06, .06, 0, 1.3, .1, ferro); for (const x of [-.2, .2]) bx(g, .07, .12, .05, x, 1.3, .1, ferro);
+    const alav = new THREE.Group(); alav.position.set(.12, 1.3, .14); bx(alav, .04, .22, .04, 0, .11, 0, ferro); bx(alav, .07, .06, .07, 0, .22, 0, mcB(0x8a2a1a)); g.add(alav);
+    zintPlaca(g, o.placa || 'PORTEIRA', '#2a1a0e', '#e2cf9a', .6, .15, 0, 1.72, .012);
+    return { alav, luz: null };
+  },
+};
+ZINT_FN.interruptor = {
+  est: ['pronto', 'ligado'],
+  efeito: (o, D) => `${o.ala ? `liga a ${ZINT_ALA[o.ala].nome} (luzes, armadilha e porta corta-fogo)` : 'solta a tranca da porteira'}; ${o.custo ?? D.custo} pontos${o.energia ? '; precisa de energia' : ''}; uma vez por partida`,
+  monta(o, i) {
+    const Wd = ZC.world; Wd.alas ||= new Set(); Wd.portaTrava ||= new Map();
+    const n = o.n || [0, 1], g = new THREE.Group(); g.position.set(o.x, 0, o.z); g.rotation.y = Math.atan2(n[0], n[1]);
+    const corpo = new THREE.Group(); g.add(corpo); const { alav, luz } = (ZINT_INT_MONTA[o.v] || ZINT_INT_MONTA.forca)(corpo, o);
+    alav.rotation.x = .7; corpo.traverse(m => { if (m.isMesh && !m.userData.dyn && !m.material.map) { m.castShadow = true; m.receiveShadow = true; } });
+    mergeParts(corpo);
+    world.add(g); cullAdd(g, o.x, o.z, 1.2);
+    const ex = Math.abs(n[0]) ? .12 : .3, ez = Math.abs(n[0]) ? .3 : .12, cx = o.x + n[0] * .07, cz = o.z + n[1] * .07, h = ZINT_INT_COL[o.v]?.[1] ?? 1.75; // caixa da parede até a face
+    const col = { minX: cx - ex, maxX: cx + ex, minY: ZINT_INT_COL[o.v]?.[0] ?? .95, maxY: h, minZ: cz - ez, maxZ: cz + ez }; COL.push(col);
+    return { g, alav, luz, col, h, raio: .2, i, tag: false };
+  },
+  estado(o, e, c, ant, sync) {
+    const on = c.st === 'ligado', Wd = ZC.world;
+    e.alav.rotation.x = on ? -.7 : .7; e.luz?.material.color.set(on ? 0x33ff66 : 0xff2a1a);
+    if (o.ala) { if (on) Wd.alas.add(o.ala); else Wd.alas.delete(o.ala); }
+    for (const d of ZD.doors) if (d.trava === o.id) Wd.portaTrava?.get(d.id)?.(on);
+    if (sync || !on || ant === 'ligado') return;
+    const p = new V3(o.x, 1.4, o.z); play('power', p); if (o.ala) { play('lightning', p); toast(`${ZINT_ALA[o.ala].nome} ligada: luzes, armadilha e porta corta-fogo`, 3); } else toast('Tranca solta: a porteira pode ser aberta', 3);
+  },
+  prompt(o, i, c, D) {
+    if (c.st === 'ligado') return null;
+    const custo = o.custo ?? D.custo, verbo = o.ala ? `Ligar a ${ZINT_ALA[o.ala].nome}` : 'Soltar a tranca da porteira';
+    if (o.energia && !ZC.power) return { k: 'zint', id: i, ok: false, txt: `${verbo} — sem energia` };
+    return { k: 'zint', id: i, cost: custo, txt: custo ? `${verbo} [${custo}]` : verbo };
+  },
+  quadro(o, e) { // uma vez: as lâmpadas das áreas da ala passam a depender do interruptor
+    if (e.tag) return; e.tag = true; const A = ZINT_ALA[o.ala]; if (!A || !ZD.zoneAt) return;
+    for (const l of ZC.world.lights) if (!l.fire && A.salas.includes(ZD.zoneAt(l.x, l.z))) l.ala = o.ala;
+  },
+  usar(p, i, o, E, D, err) { // host
+    if (E.st === 'ligado') return err('Já está ligado');
+    if (o.energia && !Z.power) return err('Sem energia: ligue o gerador antes');
+    const c = o.custo ?? D.custo; if (c && !zPay(p, c)) return;
+    zintPoe(i, 'ligado', 0, p.id);
+  },
+};
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { ZINT_ALA, ZINT_PORTA, ZINT_PORTAS, zintFura, zintPortaTrava, zintAla, zintAlaCli, zintAtivasCli, zSyncWorld, zFlow }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+// ===== FIM O2-C08 =====
 //
 //
 //
@@ -25186,7 +25369,7 @@ function onMsgInner(m) {
       for (const zc of ZC.zs.values()) if (zc.kind === 6 && !zc.dead && Math.hypot(zc.pos.x - m.x, zc.pos.z - m.z) < 1) zc.atkE = now; break; } // o cutelo desce junto com o estrondo
     case 'zscr': { const zc = ZC.zs.get(m.id); if (zc && !zc.dead) { const p = zc.pos.clone(); p.y += 1.9; play('scream', p); puff(p, 0xd8f0ff, 3, .5, 0); zc.spK = 1; zc.sp0 = now; p.y = zc.pos.y + .1; zShockRing(p, 0xbfe8ff, 9, .6); p.y += 1.8; zShockRing(p, 0xd8f0ff, 4, .4); } break; } // grito: cabeça para trás e onda de choque
     case 'zrend': if (me.alive && !me.downed) grantXP(25); ZC.phase = 'break'; play('zend'); centerMsg('Rodada ' + m.r + ' concluída', 'Próxima rodada em 10 segundos', 4); zFogDog(false); break;
-    case 'zdoor': if (zDoorOpen(m.id)) { const d = ZD.doors.find(x => x.id === m.id); play('door', d ? new V3(d.x, 1.5, d.z) : null); } break;
+    case 'zdoor': if (zDoorOpen(m.id)) { const d = ZD.doors.find(x => x.id === m.id); play(ZINT_PORTA[d?.kind]?.som || 'door', d ? new V3(d.x, 1.5, d.z) : null); } break; // O2-C08: som da cerca
     case 'zpower': zPowerOn(); play('power'); centerMsg('ENERGIA LIGADA', 'Bebidas e Pack-a-Punch funcionando', 3); break;
     case 'zperk':
       if (m.id === C.myId && typeof m.k === 'string' && Object.hasOwn(ZPERKS, m.k)) { if (!ZC.perks.includes(m.k)) ZC.perks.push(m.k); if (m.k === 'widow') ZC.widow = ZPK.widowN; play('perk'); centerMsg(ZPERKS[m.k].name, ZPERKS[m.k].desc, 2.5); }
