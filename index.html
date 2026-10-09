@@ -20956,7 +20956,7 @@ function updateNades(dt) {
     }
     if (boom) { fxGroup.remove(n.mesh); nades.splice(i, 1); n.type === 'he' || n.type === 'semtex' ? explodeHE(n) : n.type === 'monkey' ? explodeMonkey(n) : startSmoke(n); }
   }
-  if (NET.isHost && Z.on) Z.lure = lure;
+  if (NET.isHost && Z.on) Z.lure = lure || zintIsca(); // O2-C10: sem macaco no ar, a isca é o sino da igreja tocando (o macaco vence)
   for (let i = smokes.length - 1; i >= 0; i--) {
     const s = smokes[i], age = now - s.t0, k = age < 1 ? age : age > 13.5 ? Math.max(0, 1 - (age - 13.5) / 1.5) : 1;
     s.sprites.forEach(sp => { sp.material.opacity = .92 * k; sp.position.lerp(sp.userData.to, Math.min(1, dt * 2)); });
@@ -25301,6 +25301,318 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { zint
 //
 //
 // @@INTERATIVO-5@@
+// ===== O2-C10: máquina de munição, Wunderfizz, baú do armeiro / armário de evidências e sino da igreja (docs/overhaul/interativos.md §1.8–§1.10) =====
+// Valores de jogo só em ZINT.municao, ZINT.wunderfizz, ZINT.bau e ZINT.sino; posições nos ZINT_MAPA (push). O host valida tudo (zintUsar:
+// distância, estado, energia, pontos) e sorteia (Wunderfizz e baú: Math.random só no host; o cliente recebe o resultado no estado).
+// Preços (comparados com os de hoje):
+// - munição 2000 (4500 se alguma arma na mão ou guardada é Pack-a-Punch): enche pente e reserva de TODAS as armas (as da Caixa e do PaP
+//   só enchiam com a Munição Máxima). Na parede, a munição custa metade da arma (250–750) e a da arma melhorada 4500: abaixo de 2000 duas
+//   recargas de parede saíam mais caras que a máquina; com arma melhorada cobra o mesmo da parede (não vira atalho barato). 1 vez por rodada.
+// - Wunderfizz 2500: a média das 13 bebidas é 2577 (1500–4000); sorteada, sem escolher, sai em média pelo preço justo (ganha quem tira
+//   Mule Kick/Widow's/Dying Wish, perde quem tira Quick Revive/Deadshot). Não passa do ZMAXPERKS, não repete bebida, só as do mapa.
+// - baú 1000: a Caixa custa 950 com a lista inteira (armas maravilha) e o ursinho; o baú tem lista curta e fixa do mapa, sem ursinho e sem
+//   mudar de lugar, 1 vez por jogador por rodada (não dá para "fazer fila" de macacos). Fica entre a Caixa e a arma de parede mais cara (1500).
+// - sino 500 (8 s de isca, 90 s de recarga): o macaco da Caixa atrai por ~8 s e vem 3 por compra; o sino é um só, fixo na torre (o jogador
+//   precisa estar lá) e com recarga longa. O macaco vence: com um macaco no ar, a isca é a dele (gancho no fim do updateNades).
+// Força × risco: Wunderfizz (4) no Cemitério (r1, anel de fora), baús (4) no Quartel (b31) e na Biblioteca (N, 3ª leva de portas),
+// munição (3) na Base militar (c0, anel de fora); só o sino (3) fica no octógono de dentro (a Igreja), como o interativos.md §2 pede.
+// Rede: estados globais em Z.zint (zintPoe → todos; quem entra no meio recebe em zi). Estados pessoais (só quem usou, por sendTo, como o
+// 'lido' do terminal): 'usado' (munição) e 'meu' (baú) marcam a rodada em que a pessoa usou e de quem é a oferta; não ficam no estado global.
+// Desempenho: corpo parado numa malha só (mergeParts); o que muda (lâmpada, globo, garrafa, tampa, porta, arma, corda) fica fora da junção,
+// sem transparente novo; cada um é um grupo no cullAdd (O1-B03). Colisor no COL com a pegada do móvel (encostado na parede, frente livre).
+ZINT.municao = { nome: 'Máquina de munição', custo: 2000, custoPap: 4500, energia: 1, usoS: 1.2, usoR: 2.2, srvR: 2.8, forca: 3 };
+ZINT.wunderfizz = { nome: 'Wunderfizz', custo: 2500, giraS: 3, energia: 1, usoR: 2.3, srvR: 2.9, forca: 4 };
+ZINT.bau = { nome: 'Baú', custo: 1000, giraS: 3, ofertaS: 10, usoR: 2.3, srvR: 3, forca: 4,
+  listas: { // arma: peso (o host tira o que a pessoa já tem, como a Caixa; letal cheio e macaco já na mão também saem)
+    armeiro: { monkey: 30, semtex: 12, clay: 12, chinalake: 10, law: 8, crossbow: 8, stakeout: 6, ak74u: 6, mp40: 4, m14: 4 }, // Vila: explosivos e armas de parede, macaco pesado
+    evidencias: { python: 12, c96: 12, b23r: 10, fiveseven: 10, cz75: 8, kiparis: 8, pm63: 8, spectre: 6, crossbow: 6, monkey: 8 }, // Sanatório: armas de mão e especiais leves
+  } };
+ZINT.sino = { nome: 'Sino da igreja', custo: 500, dura: 8, recarga: 90, badalada: 2.7, iscaD: 1.5, usoR: 2.2, srvR: 2.8, forca: 3 };
+// aparência do baú por mapa (procedural) e o texto do F
+const ZINT_BAU_VIS = {
+  armeiro: { nome: 'Baú do armeiro', placa: 'ARMEIRO', w: 1.1, d: .62, h: .62 }, // baú de madeira com ferragens (Vila)
+  evidencias: { nome: 'Armário de evidências', placa: 'EVIDÊNCIAS', w: 1, d: .55, h: 1.9 }, // armário de aço (Sanatório)
+};
+ZINT_MAPA.vila.push( // sonda do O2-C10 (móvel rente à parede, frente livre, longe de portas, janelas, chão que solta zumbi, itens e interativos) e auditoria.mjs
+  { t: 'municao', x: 115.11, z: -105.75, n: [-1, 0] }, // c0 Base militar: paiol
+  { t: 'bau', v: 'armeiro', x: -211.75, z: -37.03, n: [0, -1] }, // b31 Quartel
+  { t: 'sino', x: 10.98, z: -38.5, n: [1, 0], sino: [9.2, 10.2, -38.5] }, // B Igreja: corda no pé da torre (face leste); sino: onde toca (o do campanário)
+);
+ZINT_MAPA.sanatorio.push(
+  { t: 'wunderfizz', x: -50.96, z: -64.88, n: [1, 0] }, // r1 Cemitério: encostada no obelisco entre as covas
+  { t: 'bau', v: 'evidencias', x: -39.25, z: -18.22, n: [0, -1] }, // N Biblioteca
+);
+SND.sino = o => { tn(o, 4, 110, 109, .2); tn(o, 4, 247, 246, .1); tn(o, 3.5, 341, 339, .07); nz(o, .18, 500, 150, .06); }; // badalada (o mesmo sintetizado do sino da Igreja na atmosfera)
+// ---------- apoio ----------
+function zintGrupo(o) { const g = new THREE.Group(); g.position.set(o.x, 0, o.z); g.rotation.y = Math.atan2(o.n[0], o.n[1]); return g; } // frente local +z = o.n
+function zintCaixaCol(o, w, d, h) { const sw = Math.abs(o.n[0]) > 0, hw = (sw ? d : w) / 2 + .02, hd = (sw ? w : d) / 2 + .02; const col = { minX: o.x - hw, maxX: o.x + hw, minY: 0, maxY: h, minZ: o.z - hd, maxZ: o.z + hd }; COL.push(col); return col; }
+function zintPlacaTxt(g, txt, w, h, x, y, z, fundo, cor, fonte, basica) { // placa de texto (canvas); fora da junção (tem textura)
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new (basica ? THREE.MeshBasicMaterial : THREE.MeshLambertMaterial)({ map: canvasTex(256, Math.round(256 * h / w), (c, W, H) => {
+    c.fillStyle = fundo; c.fillRect(0, 0, W, H); c.strokeStyle = cor; c.lineWidth = 4; c.strokeRect(5, 5, W - 10, H - 10);
+    c.fillStyle = cor; c.textAlign = 'center'; c.textBaseline = 'middle'; let px = +fonte.match(/(\d+)px/)[1]; c.font = fonte;
+    while (c.measureText(txt).width > W - 24 && px > 10) { px -= 2; c.font = fonte.replace(/\d+px/, px + 'px'); } // texto comprido: fonte menor
+    c.fillText(txt, W / 2, H / 2 + 2);
+  }) }));
+  m.userData.own = true; m.position.set(x, y, z); g.add(m); return m;
+}
+const zintLamp = (g, x, y, z, s = .09) => { const m = new THREE.MeshBasicMaterial({ color: 0x222222 }), b = bx(g, s, s, .04, x, y, z, m); b.userData.own = true; return m; }; // lâmpada de estado (material próprio: muda de cor)
+function zintCor(m, c) { if (m.userData.c !== c) { m.userData.c = c; m.color.setHex(c); } }
+const zintPos = (o, y = 1) => new V3(o.x, y, o.z);
+// ---------- Máquina de munição (Vila) ----------
+// F: cobra e enche o pente e a reserva de todas as armas de quem usou (mensagem 'ammo' que já existe, uma por arma). Precisa de energia;
+// 1 vez por jogador por rodada. Estados: pronto -> uso (s = usoS, luz e som para todos) -> pronto; 'usado' é pessoal (marca a rodada).
+const zintArmas = p => zSlots(p).map(k => p.inv[k]).filter(w => w && W[w] && !W[w].ls && W[w].zw);
+ZINT_FN.municao = {
+  est: ['pronto', 'uso', 'usado'],
+  efeito: (o, D) => `enche pente e reserva de todas as armas (${D.custo}; ${D.custoPap} com arma do Pack-a-Punch), 1 vez por jogador por rodada, com energia`,
+  monta(o, i) {
+    const g = zintGrupo(o), corpo = new THREE.Group(); g.add(corpo);
+    const ol = mc(0x4b5320), esc = mc(0x2a2e16), lat = mc(0x9a7a3a);
+    bx(corpo, 1, 1.82, .7, 0, .97, 0, ol); bx(corpo, 1.06, .06, .76, 0, 1.91, 0, esc); bx(corpo, 1.06, .1, .76, 0, .05, 0, esc); // armário, tampo e base
+    bx(corpo, .84, .5, .03, 0, .62, .355, esc); bx(corpo, .7, .04, .05, 0, .87, .37, esc); // portinhola de baixo e aba
+    for (const x of [-.27, 0, .27]) { bx(corpo, .22, .16, .2, x, .24, .3, mc(0x5a6030)); for (const k of [-.05, 0, .05]) zintCil(corpo, .012, .08, .37, lat, 6).position.set(x + k, .37, .3); } // latas de munição com balas por cima
+    for (const s of [-1, 1]) bx(corpo, .03, .3, .06, s * .515, 1.2, 0, esc); // alças dos lados
+    bx(corpo, .2, .06, .05, .3, 1.02, .37, lat); // fenda das moedas (latão)
+    corpo.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); mergeParts(corpo);
+    const din = new THREE.Group(); g.add(din);
+    zintPlacaTxt(din, 'MUNIÇÃO', .8, .3, 0, 1.45, .352, '#2a2e16', '#e8d9a0', 'bold 64px Rajdhani, Arial');
+    const lampM = zintLamp(din, -.3, 1.02, .37);
+    world.add(g); cullAdd(g, o.x, o.z, 1.3);
+    return { g, lampM, col: zintCaixaCol(o, 1, .7, 1.94), raio: .3 };
+  },
+  estado(o, e, c, ant, sync) {
+    if (c.st === 'usado') { c.st = ant; c.usei = ZC.round; return; } // pessoal: só quem usou
+    if (!sync && c.st === 'uso' && ant !== 'uso') play('buy', zintPos(o));
+  },
+  prompt(o, i, c, D) {
+    if (!ZC.power && D.energia) return { k: 'zint', id: i, ok: false, txt: `${D.nome} — sem energia` };
+    if (c.usei === ZC.round) return { k: 'zint', id: i, ok: false, txt: `${D.nome}: volta na próxima rodada` };
+    const ws = ['primary', 'secondary', 'third'].map(k => G.inv[k]).filter(w => w && W[w] && !W[w].ls && W[w].zw);
+    if (!ws.length) return { k: 'zint', id: i, ok: false, txt: `${D.nome}: sem arma para encher` };
+    if (ws.every(w => { const a = G.ammo[w]; return a && a.mag >= wMag(w) && a.res >= W[w].res; })) return { k: 'zint', id: i, ok: false, txt: 'Munição cheia' };
+    const cost = ws.some(w => W[w].pap) ? D.custoPap : D.custo;
+    return { k: 'zint', id: i, cost, txt: `Encher a munição de todas as armas [${cost}]` };
+  },
+  quadro(o, e, c) { zintCor(e.lampM, !ZC.power ? 0x222222 : c.st === 'uso' ? 0xffaa22 : c.usei === ZC.round ? 0xcc2222 : 0x22cc44); },
+  usar(p, i, o, E, D, err) {
+    if (D.energia && !Z.power) return err('Sem energia');
+    const R = E.rod ||= {}; if (R[p.id] === Z.round) return err('Você já usou nesta rodada');
+    const ws = zintArmas(p); if (!ws.length) return err('Sem arma para encher');
+    if (!zPay(p, ws.some(w => W[w].pap) ? D.custoPap : D.custo)) return;
+    R[p.id] = Z.round;
+    for (const w of ws) sendTo(p.id, { t: 'ammo', w });
+    sendTo(p.id, { t: 'zint', i, st: 'usado' }); zintPoe(i, 'uso', D.usoS, p.id);
+  },
+  tick(i, o, E) { if (E.st === 'uso' && now >= E.t) zintPoe(i, 'pronto', 0); },
+};
+// ---------- Wunderfizz (Sanatório) ----------
+// F: cobra e sorteia NO HOST uma bebida das do mapa que a pessoa não tem (como a Bebida Grátis), sem passar do ZMAXPERKS; entrega na hora
+// (zPerkGot + 'zperk', o mesmo caminho da máquina de bebida) e o globo gira giraS s com a cor da bebida sorteada ('gira:<bebida>'),
+// fechado para os outros. Precisa de energia. Uma só no mapa: não muda de lugar (o "muda depois de 3 usos" do projeto pede 2+ lugares).
+const zintWunderOpc = (perks, solo, qr) => Object.keys(ZPERKS).filter(k => !perks.includes(k) && ZD.perks.some(x => x.k === k) && !(k === 'qr' && solo && qr >= 3));
+ZINT_FN.wunderfizz = {
+  est: ['pronto', ...Object.keys(ZPERKS).map(k => 'gira:' + k)],
+  efeito: (o, D) => `bebida sorteada que a pessoa não tem (${D.custo}), respeita o limite de ${ZMAXPERKS}, com energia; gira ${D.giraS} s`,
+  monta(o, i) {
+    const g = zintGrupo(o), corpo = new THREE.Group(); g.add(corpo);
+    const roxo = mc(0x2a1f3a), lat = mc(0xb08a3a), esc = mc(0x18121f);
+    zintCil(corpo, .42, .92, .46, roxo, 18); zintCil(corpo, .45, .08, .04, esc, 18); for (const y of [.12, .9]) zintCil(corpo, .44, .05, y, lat, 18); // base com aros de latão
+    zintCil(corpo, .22, .16, 1.0, lat, 14); zintCil(corpo, .16, .1, 1.74, lat, 14); zintCil(corpo, .015, .3, 1.94, esc, 6); // pescoço, tampa e para-raios
+    for (const a of [0, 2.1, 4.2]) { const h = zintCil(corpo, .012, .7, 1.38, lat, 6); h.position.set(Math.cos(a) * .33, 1.38, Math.sin(a) * .33); } // hastes em volta do globo
+    corpo.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); mergeParts(corpo);
+    const din = new THREE.Group(); g.add(din);
+    const globoM = new THREE.MeshLambertMaterial({ color: 0x241834, emissive: 0x000000 }), globo = new THREE.Mesh(new THREE.SphereGeometry(.31, 20, 14), globoM);
+    globo.userData.own = true; globo.position.y = 1.38; din.add(globo);
+    const garM = new THREE.MeshBasicMaterial({ color: 0xffffff }), gar = new THREE.Group(); gar.position.y = 1.38; gar.visible = false; din.add(gar); // garrafa girando dentro do globo
+    for (const [r, h, y] of [[.07, .22, 0], [.03, .1, .16]]) { const m = zintCil(gar, r, h, y, garM, 10, false); m.userData.own = true; }
+    zintPlacaTxt(din, 'WUNDERFIZZ', .5, .14, 0, .62, .425, '#1a0f24', '#d8b0ff', 'bold 60px Rajdhani, Arial', true);
+    world.add(g); cullAdd(g, o.x, o.z, 1.4);
+    return { g, globoM, gar, garM, col: zintCaixaCol(o, .9, .9, 1.8), raio: .45 };
+  },
+  estado(o, e, c, ant, sync) {
+    const k = c.st.startsWith('gira:') ? c.st.slice(5) : null; e.gar.visible = !!k;
+    if (k) e.garM.color.setHex(ZPERKS[k].color);
+    if (!sync && k && !ant.startsWith('gira:')) play('kaching', zintPos(o, 1.4));
+  },
+  prompt(o, i, c, D) {
+    if (!ZC.power && D.energia) return { k: 'zint', id: i, ok: false, txt: 'Wunderfizz — sem energia' };
+    if (c.st !== 'pronto') return { k: 'zint', id: i, ok: false, txt: 'Wunderfizz girando' };
+    if (ZC.perks.length >= ZMAXPERKS) return { k: 'zint', id: i, ok: false, txt: `Limite de ${ZMAXPERKS} bebidas` };
+    if (!zintWunderOpc(ZC.perks, zSolo(), ZC.qrBuys).length) return { k: 'zint', id: i, ok: false, txt: 'Wunderfizz: nenhuma bebida nova' };
+    return { k: 'zint', id: i, cost: D.custo, txt: `Wunderfizz: bebida sorteada [${D.custo}]` };
+  },
+  quadro(o, e, c) {
+    const k = c.st.length > 5 && c.st.startsWith('gira:') ? c.st.slice(5) : null;
+    if (k) { e.gar.rotation.y += .25; e.gar.position.y = 1.38 + Math.sin(now * 9) * .04; e.globoM.emissive.setHex(ZPERKS[k].color); e.globoM.userData.c = -1; }
+    else if (e.globoM.userData.c !== (ZC.power ? 1 : 0)) { e.globoM.userData.c = ZC.power ? 1 : 0; e.globoM.emissive.setHex(ZC.power ? 0x5a2a90 : 0x000000); }
+  },
+  usar(p, i, o, E, D, err) {
+    if (E.st !== 'pronto') return err('A Wunderfizz está girando');
+    if (D.energia && !Z.power) return err('Sem energia');
+    if (p.perks.length >= ZMAXPERKS) return err(`Limite de ${ZMAXPERKS} bebidas`);
+    const solo = S.players.size === 1, opc = zintWunderOpc(p.perks, solo, Z.qrBuys); if (!opc.length) return err('Nenhuma bebida nova para sortear');
+    if (!zPay(p, D.custo)) return;
+    const k = opc[Math.floor(Math.random() * opc.length)]; // sorteio no host
+    zPerkGot(p, k); if (k === 'qr' && solo) Z.qrBuys++;
+    broadcast({ t: 'zperk', id: p.id, k }); zintPoe(i, 'gira:' + k, D.giraS, p.id);
+  },
+  tick(i, o, E) { if (now >= E.t) zintPoe(i, 'pronto', 0, null); },
+};
+// ---------- Baú do armeiro (Vila) / Armário de evidências (Sanatório): variante fixa da Caixa ----------
+// F: cobra e o host sorteia da lista do mapa (ZINT.bau.listas[v]) o que a pessoa ainda não tem; gira giraS s (Timeslip: metade, como a
+// Caixa) e oferece a arma por ofertaS s só a quem pagou (estado 'oferta:<arma>' para todos; o 'meu' pessoal diz a quem é). Pegar = F de
+// novo (zGive, a arma na mão é a trocada); se a pessoa comprou a mesma arma na parede no meio tempo, devolve os pontos (como a Caixa).
+// Sem ursinho e sem mudar de lugar; 1 vez por jogador por rodada. A arma girando usa modelos guardados (ZBAU_M, como o ZBOXM da Caixa).
+const zintBauLista = v => ZINT.bau.listas[v] || ZINT.bau.listas.armeiro;
+const zintBauTem = (p, w) => w === 'monkey' ? p.inv.monkey > 0 : w === 'semtex' || w === 'he' ? p.inv[w] >= 4 : w === 'clay' ? p.inv.clay >= 2
+  : zHas(p, w) || zHas(p, w + '_pap') || (Z.pap.user === p.id && Z.pap.st !== 'idle' && Z.pap.w === w + '_pap');
+function zintBauSorteia(p, v) { // host: peso da lista, sem o que a pessoa já tem
+  const pool = Object.entries(zintBauLista(v)).filter(([w]) => !zintBauTem(p, w)); if (!pool.length) return null;
+  let r = Math.random() * pool.reduce((s, x) => s + x[1], 0); for (const [w, k] of pool) { r -= k; if (r <= 0) return w; } return pool[0][0];
+}
+function zintBauDa(p, w, back) { // host: entrega (letais e macaco como na parede e na Caixa)
+  if (w === 'monkey') { p.inv.monkey = 3; p.monkeyHad = true; zSendInv(p, 'monkey'); }
+  else if (w === 'semtex' || w === 'he') { const o = w === 'he' ? 'semtex' : 'he'; p.inv[w] = 4; if (p.inv[o]) p.inv[o] = 0; p.lethal = w; zSendInv(p, w); }
+  else if (w === 'clay') { p.inv.clay = 2; p.clayHad = true; zSendInv(p, 'clay'); }
+  else if (zintBauTem(p, w)) { p.money += back; sendTo(p.id, { t: 'pts', n: back, m: p.money }); sendTo(p.id, { t: 'err', txt: 'Você já tem essa arma: pontos devolvidos' }); }
+  else zGive(p, w, p.w);
+}
+const ZBAU_LUZ = new THREE.MeshBasicMaterial({ color: 0xd8e0c8 }); // lâmpada do armário (compartilhada)
+const ZBAU_M = new Map(); // modelos do baú, construídos uma vez (separados do ZBOXM: um modelo só tem um pai)
+function zintBauMostra(e, w) {
+  if (e.cur === w) return; while (e.holder.children.length) e.holder.remove(e.holder.children[0]); e.cur = w; if (!w || !W[w]) return;
+  let m = ZBAU_M.get(w); if (!m) { m = gunModel(w); m.scale.setScalar(w === 'monkey' ? 2.6 : e.esc); m.rotation.y = Math.PI / 2; ZBAU_M.set(w, m); }
+  e.holder.add(m);
+}
+ZINT_FN.bau = {
+  est: ['pronto', 'gira', 'meu', ...[...new Set(Object.values(ZINT.bau.listas).flatMap(L => Object.keys(L)))].map(w => 'oferta:' + w)],
+  efeito: (o, D) => `${(ZINT_BAU_VIS[o.v] || ZINT_BAU_VIS.armeiro).nome}: sorteia de ${Object.keys(zintBauLista(o.v)).length} itens (${D.custo}), 1 vez por jogador por rodada, sem ursinho`,
+  monta(o, i) {
+    const V = ZINT_BAU_VIS[o.v] || ZINT_BAU_VIS.armeiro, g = zintGrupo(o), corpo = new THREE.Group(), din = new THREE.Group(); g.add(corpo, din);
+    const holder = new THREE.Group(); din.add(holder); holder.visible = false;
+    const e = { g, holder, cur: null, raio: .4, esc: 1.7, abre: 0, rol: 0 };
+    if (o.v === 'evidencias') { // armário de aço de duas portas: a da direita abre; a arma aparece lá dentro
+      const aco = mc(0x6f7a72), esc = mc(0x2a302c), fundo = mc(0x15181a), hw = V.w / 2, hd = V.d / 2;
+      bx(corpo, V.w, .04, V.d, 0, V.h - .02, 0, aco); bx(corpo, V.w, .1, V.d, 0, .05, 0, esc); bx(corpo, V.w, .03, V.d - .04, 0, .9, -.02, fundo); // tampo, rodapé e prateleira
+      bx(corpo, V.w - .04, V.h - .1, .03, 0, V.h / 2, -hd + .015, fundo); for (const s of [-1, 1]) bx(corpo, .03, V.h - .1, V.d, s * (hw - .015), V.h / 2, 0, aco); // fundo e lados
+      bx(corpo, hw - .01, V.h - .14, .03, -hw / 2, V.h / 2 + .02, hd - .015, aco); bx(corpo, .03, .16, .04, -.06, 1.05, hd + .01, esc); // porta da esquerda (fechada) e puxador
+      for (const y of [1.6, 1.68, 1.76]) bx(corpo, hw - .12, .015, .005, -hw / 2, y, hd + .003, esc); // venezianas
+      bx(corpo, V.w - .12, .03, .03, 0, V.h - .1, -.05, ZBAU_LUZ); // lâmpada fria lá dentro (a arma aparece no escuro; parada: entra na malha do corpo)
+      corpo.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); mergeParts(corpo);
+      const porta = new THREE.Group(); porta.position.set(hw - .01, 0, hd - .015); din.add(porta); // dobradiça na borda direita
+      bx(porta, hw - .01, V.h - .14, .03, -(hw - .01) / 2, V.h / 2 + .02, 0, aco).castShadow = true; bx(porta, .03, .16, .04, -(hw - .01) + .06, 1.05, .025, esc);
+      for (const y of [1.6, 1.68, 1.76]) bx(porta, hw - .12, .015, .005, -(hw - .01) / 2, y, .018, esc);
+      zintPlacaTxt(porta, V.placa, .4, .1, -(hw - .01) / 2, 1.38, .017, '#d8d2c0', '#7a1010', 'bold 52px Arial');
+      holder.position.set(0, 1.25, hd + .14); e.porta = porta; e.esc = 1.7; // a arma flutua na frente da porta aberta (como na Caixa): lá dentro fica no escuro
+    } else { // baú de madeira com ferragens: a tampa abre para trás e a arma sobe e gira em cima
+      const mad = mc(0x6b4a2c), fer = mc(0x2c2a28), hw = V.w / 2, hd = V.d / 2, hb = V.h - .1;
+      bx(corpo, V.w, hb, V.d, 0, hb / 2, 0, mad); for (const x of [-hw + .12, hw - .12]) bx(corpo, .06, hb + .01, V.d + .02, x, hb / 2, 0, fer); // caixa e cintas de ferro
+      bx(corpo, V.w + .02, .05, V.d + .02, 0, .04, 0, fer); bx(corpo, .1, .12, .03, 0, hb - .1, hd + .01, fer); // rodapé e fecho
+      for (const s of [-1, 1]) bx(corpo, .03, .06, .18, s * (hw + .015), hb * .6, 0, fer); // alças
+      corpo.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); mergeParts(corpo);
+      zintPlacaTxt(din, V.placa, .44, .12, 0, hb * .5, hd + .006, '#3a2614', '#e0c890', 'bold 56px Georgia, serif');
+      const tampa = new THREE.Group(); tampa.position.set(0, hb, -hd); din.add(tampa); // dobradiça atrás
+      bx(tampa, V.w, .1, V.d, 0, .05, hd, mad).castShadow = true; for (const x of [-hw + .12, hw - .12]) bx(tampa, .06, .11, V.d + .02, x, .05, hd, fer);
+      holder.position.set(0, .95, 0); e.tampa = tampa;
+    }
+    world.add(g); cullAdd(g, o.x, o.z, 1.3);
+    e.col = zintCaixaCol(o, V.w, V.d, V.h); return e;
+  },
+  estado(o, e, c, ant, sync) {
+    if (c.st === 'meu') { c.st = ant; c.meu = true; c.usei = ZC.round; return; } // pessoal: a oferta é minha
+    const w = c.st.startsWith('oferta:') ? c.st.slice(7) : null, aberto = c.st !== 'pronto';
+    if (!aberto || (c.st === 'gira' && ant === 'pronto')) c.meu = false;
+    e.holder.visible = aberto; if (!aberto) zintBauMostra(e, null); else if (w) zintBauMostra(e, w);
+    if (sync) e.abre = aberto ? 1 : 0;
+    if (!sync && c.st === 'gira' && ant !== 'gira') play('boxmusic', zintPos(o));
+    if (!sync && w && ant === 'gira') play('kaching', zintPos(o));
+  },
+  prompt(o, i, c, D) {
+    const nome = (ZINT_BAU_VIS[o.v] || ZINT_BAU_VIS.armeiro).nome;
+    if (c.st === 'gira') return { k: 'zint', id: i, ok: false, txt: `${nome}: sorteando...` };
+    if (c.st.startsWith('oferta:')) return c.meu ? { k: 'zint', id: i, txt: `Pegar ${zWName(c.st.slice(7))}` } : { k: 'zint', id: i, ok: false, txt: `${nome} em uso` };
+    if (c.usei === ZC.round) return { k: 'zint', id: i, ok: false, txt: `${nome}: volta na próxima rodada` };
+    return { k: 'zint', id: i, cost: D.custo, txt: `${nome} [${D.custo}]` };
+  },
+  quadro(o, e, c, dt) {
+    const alvo = c.st === 'pronto' ? 0 : 1; if (e.abre !== alvo) e.abre = alvo ? Math.min(1, e.abre + dt * 3) : Math.max(0, e.abre - dt * 3);
+    if (e.tampa) e.tampa.rotation.x = -1.25 * e.abre; else e.porta.rotation.y = 1.7 * e.abre;
+    if (c.st === 'gira') { // roleta só de enfeite (o sorteio é do host): troca a arma mostrada e sobe devagar
+      if (now >= e.rol) { const L = Object.keys(zintBauLista(o.v)); e.rol = now + .15; zintBauMostra(e, L[(Math.random() * L.length) | 0]); }
+      if (e.tampa) e.holder.position.y = .75 + .25 * Math.min(1, 1 - Math.max(0, c.end - now) / ZINT.bau.giraS);
+    }
+    if (e.tampa && c.st !== 'pronto') e.holder.rotation.y = Math.sin(now * 1.5) * .5;
+    if (e.porta && c.st !== 'pronto') e.holder.position.y = 1.25 + Math.sin(now * 2.5) * .02;
+  },
+  usar(p, i, o, E, D, err) {
+    if (E.st === 'gira') return err('O baú está sorteando');
+    if (E.st.startsWith('oferta:')) { // pegar
+      if (E.by !== p.id) return err('Essa oferta é de outro jogador');
+      const w = E.w; E.w = null; zintPoe(i, 'pronto', 0, null); zintBauDa(p, w, E.pago ?? D.custo); return;
+    }
+    const R = E.rod ||= {}; if (R[p.id] === Z.round) return err('Você já abriu nesta rodada');
+    const w = zintBauSorteia(p, o.v); if (!w) return err('Nada novo para você aqui');
+    if (!zPay(p, D.custo)) return;
+    R[p.id] = Z.round; E.w = w; E.pago = D.custo;
+    const s = D.giraS * (p.perks.includes('slip') ? ZPK.slip : 1); // Timeslip: metade do tempo, como na Caixa
+    zintPoe(i, 'gira', s, p.id); sendTo(p.id, { t: 'zint', i, st: 'meu', s: r2(s) });
+  },
+  tick(i, o, E, D) {
+    if (now < E.t) return;
+    if (E.st === 'gira') zintPoe(i, 'oferta:' + E.w, D.ofertaS); // E.by continua sendo quem pagou
+    else if (E.st.startsWith('oferta:')) { E.w = null; zintPoe(i, 'pronto', 0, null); } // ninguém pegou: perdeu (como a Caixa)
+  },
+};
+// ---------- Sino da igreja (Vila) ----------
+// F na corda: por dura s os zumbis vão até o pé da torre (Z.lure, o mesmo caminho do macaco; o macaco vence: a isca do sino só vale sem
+// macaco no ar) e não atacam, como com o macaco. Depois recarga s. Estados: pronto -> tocando (s = dura) -> recarga (s = recarga) -> pronto.
+// A isca é posta pelo gancho no fim do updateNades (Z.lure = macaco || zintIsca()), que roda depois do servidor a cada quadro.
+function zintIsca() { // host: ponto da isca do sino que está tocando (ou null)
+  const E = Z.zint, L = ZD.zint; if (!E?.length) return null;
+  for (let i = 0; i < E.length; i++) if (E[i].st === 'tocando' && L[i]?.t === 'sino') { const o = L[i], k = ZINT.sino.iscaD; return E[i].isca ||= [o.x + o.n[0] * k, o.z + o.n[1] * k]; }
+  return null;
+}
+ZINT_FN.sino = {
+  est: ['pronto', 'tocando', 'recarga'],
+  efeito: (o, D) => `atrai os zumbis ao pé da torre por ${D.dura} s (o macaco vence); recarga ${D.recarga} s`,
+  monta(o, i) {
+    const g = zintGrupo(o), corpo = new THREE.Group(); g.add(corpo);
+    const mad = mc(0x4a3420), fer = mc(0x2a2826);
+    bx(corpo, .3, 1.5, .06, 0, .9, -.04, mad); for (const y of [.5, 1.35]) bx(corpo, .34, .05, .1, 0, y, -.02, fer); // tábua presa na torre e ferragens
+    bx(corpo, .22, .04, .12, 0, 1.0, .04, fer); bx(corpo, .04, .1, .04, -.09, 1.06, .09, fer); bx(corpo, .04, .1, .04, .09, 1.06, .09, fer); // gancho onde a corda é amarrada
+    corpo.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); mergeParts(corpo);
+    const din = new THREE.Group(); g.add(din);
+    const corda = new THREE.Group(); din.add(corda); // a corda sobe até o vão do campanário (dinâmica: puxa enquanto toca)
+    const topo = 9.3, base = 1.05, cm = mc(0x9a8458);
+    zintCil(corda, .022, topo - base, (topo + base) / 2, cm, 6, false).position.z = .08;
+    for (const [y, c] of [[1.3, 0x8a1a1a], [1.45, 0xe0d8c0], [1.6, 0x1a3a8a]]) zintCil(corda, .05, .15, y, mc(c), 8).position.z = .08; // pegada listrada
+    zintPlacaTxt(din, 'SÓ EM CASO DE PERIGO', .56, .16, .48, 1.75, .005, '#2a1d14', '#e8dcc0', 'bold 30px Georgia, serif');
+    world.add(g); cullAdd(g, o.x, o.z, 1.2);
+    return { g, corda, col: zintCaixaCol(o, .34, .14, 1.6), raio: .25, bad: 0 };
+  },
+  estado(o, e, c, ant, sync) { if (!sync && c.st === 'tocando' && ant !== 'tocando') e.bad = 0; else if (c.st === 'tocando') e.bad = now + ZINT.sino.badalada; },
+  prompt(o, i, c, D) {
+    if (c.st === 'tocando') return { k: 'zint', id: i, ok: false, txt: 'O sino está tocando' };
+    if (c.st === 'recarga') return { k: 'zint', id: i, ok: false, txt: `Sino: a corda volta em ${Math.max(0, Math.ceil(c.end - now))}s` };
+    return { k: 'zint', id: i, cost: D.custo, txt: `Tocar o sino (atrai os zumbis) [${D.custo}]` };
+  },
+  quadro(o, e, c) {
+    if (c.st !== 'tocando') { if (e.corda.position.y) e.corda.position.y = 0; return; }
+    const D = ZINT.sino, f = ((D.dura - (c.end - now)) % D.badalada) / D.badalada; e.corda.position.y = -.35 * Math.sin(Math.PI * Math.min(1, f * 2)); // puxa e solta a cada badalada
+    if (now >= e.bad) { e.bad = now + D.badalada; play('sino', o.sino ? new V3(...o.sino) : zintPos(o, 9)); }
+  },
+  usar(p, i, o, E, D, err) {
+    if (E.st !== 'pronto') return err(E.st === 'tocando' ? 'O sino já está tocando' : 'A corda do sino está presa');
+    if (!zPay(p, D.custo)) return;
+    zintPoe(i, 'tocando', D.dura, p.id);
+  },
+  tick(i, o, E, D) {
+    if (now < E.t) return;
+    if (E.st === 'tocando') zintPoe(i, 'recarga', D.recarga); else if (E.st === 'recarga') zintPoe(i, 'pronto', 0, null);
+  },
+};
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { ZINT_BAU_VIS, ZBAU_M, zintIsca, zintBauSorteia, zintWunderOpc }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+// ===== FIM O2-C10 =====
 
 function srvZHold(p, m) {
   if (!p.alive || p.downed || S.phase === 'over') return;
