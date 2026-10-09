@@ -24602,7 +24602,7 @@ function zintPoe(i, st, dur, by) { const E = Z.zint[i]; E.st = st; E.t = now + (
 function zintUsar(p, m) { // srvZUse k:'zint'
   const i = m.id, o = Number.isInteger(i) ? ZD.zint?.[i] : null, E = o && Z.zint?.[i], D = o && ZINT[o.t]; if (!E || !D) return;
   if (Math.hypot(p.pos[0] - o.x, p.pos[2] - o.z) > D.srvR) return;
-  ZINT_FN[o.t].usar?.(p, i, o, E, D, t => sendTo(p.id, { t: 'err', txt: t }));
+  ZINT_FN[o.t].usar?.(p, i, o, E, D, t => sendTo(p.id, { t: 'err', txt: t }), m); // O2-E02: m (a arma na mão que o cliente diz, como no boxtake)
 }
 function zintTick() { const L = ZD.zint; for (let i = 0; i < Z.zint.length; i++) { const E = Z.zint[i]; if (E.st !== 'pronto') ZINT_FN[L[i].t].tick?.(i, L[i], E, ZINT[L[i].t]); } }
 function zintRodada() { const L = ZD.zint || []; for (let i = 0; i < (Z.zint?.length || 0); i++) ZINT_FN[L[i].t].rodada?.(i, L[i], Z.zint[i], ZINT[L[i].t]); }
@@ -25470,12 +25470,12 @@ function zintBauSorteia(p, v) { // host: peso da lista, sem o que a pessoa já t
   const pool = Object.entries(zintBauLista(v)).filter(([w]) => !zintBauTem(p, w)); if (!pool.length) return null;
   let r = Math.random() * pool.reduce((s, x) => s + x[1], 0); for (const [w, k] of pool) { r -= k; if (r <= 0) return w; } return pool[0][0];
 }
-function zintBauDa(p, w, back) { // host: entrega (letais e macaco como na parede e na Caixa)
+function zintBauDa(p, w, back, cur) { // host: entrega (letais e macaco como na parede e na Caixa); cur: arma na mão (sai com o inventário cheio)
   if (w === 'monkey') { p.inv.monkey = 3; p.monkeyHad = true; zSendInv(p, 'monkey'); }
   else if (w === 'semtex' || w === 'he') { const o = w === 'he' ? 'semtex' : 'he'; p.inv[w] = 4; if (p.inv[o]) p.inv[o] = 0; p.lethal = w; zSendInv(p, w); }
   else if (w === 'clay') { p.inv.clay = 2; p.clayHad = true; zSendInv(p, 'clay'); }
   else if (zintBauTem(p, w)) { p.money += back; sendTo(p.id, { t: 'pts', n: back, m: p.money }); sendTo(p.id, { t: 'err', txt: 'Você já tem essa arma: pontos devolvidos' }); }
-  else zGive(p, w, p.w);
+  else zGive(p, w, cur ?? p.w); // O2-E02: a arma que o cliente diz ter na mão (com a Máquina da Morte, a guardada), como no boxtake da Caixa
 }
 const ZBAU_LUZ = new THREE.MeshBasicMaterial({ color: 0xd8e0c8 }); // lâmpada do armário (compartilhada)
 const ZBAU_M = new Map(); // modelos do baú, construídos uma vez (separados do ZBOXM: um modelo só tem um pai)
@@ -25544,11 +25544,11 @@ ZINT_FN.bau = {
     if (e.tampa && c.st !== 'pronto') e.holder.rotation.y = Math.sin(now * 1.5) * .5;
     if (e.porta && c.st !== 'pronto') e.holder.position.y = 1.25 + Math.sin(now * 2.5) * .02;
   },
-  usar(p, i, o, E, D, err) {
+  usar(p, i, o, E, D, err, m) {
     if (E.st === 'gira') return err('O baú está sorteando');
     if (E.st.startsWith('oferta:')) { // pegar
       if (E.by !== p.id) return err('Essa oferta é de outro jogador');
-      const w = E.w; E.w = null; zintPoe(i, 'pronto', 0, null); zintBauDa(p, w, E.pago ?? D.custo); return;
+      const w = E.w; E.w = null; zintPoe(i, 'pronto', 0, null); zintBauDa(p, w, E.pago ?? D.custo, isW(m?.cur) ? m.cur : undefined); return;
     }
     const R = E.rod ||= {}; if (R[p.id] === Z.round) return err('Você já abriu nesta rodada');
     const w = zintBauSorteia(p, o.v); if (!w) return err('Nada novo para você aqui');
