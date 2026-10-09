@@ -30,7 +30,7 @@ test('barril: sala no Sanatório monta os barris (colisor no COL, estado pronto 
     if (T.Z.phase !== 'round') T.zStartRound(); T.sim(.2);
     const L = T.ZD.zint, E = T.ZC.world.zint, COL = T.COL();
     return { n: L.filter(o => o.t === 'barril').length, tipos: [...new Set(L.map(o => o.t))], srv: T.Z.zint.every(e => e.st === 'pronto'), cli: T.ZC.zint.every(c => c.st === 'pronto'),
-      col: E.every(e => COL.includes(e.col) && e.col.maxY === e.h), zi: T.zWorldState().zi.length, total: L.length };
+      col: E.every((e, i) => L[i].t !== 'barril' || (COL.includes(e.col) && e.col.maxY === e.h)), zi: T.zWorldState().zi.length, total: L.length }; // O2-C09: colisor conferido só nos barris (tipo achado por t; a barricada não tem colisor)
   });
   assert.ok(r.n >= 8, `só ${r.n} barris`); assert.ok(r.tipos.includes('barril'));
   assert.ok(r.srv && r.cli, 'estado inicial não é pronto'); assert.ok(r.col, 'colisor fora do COL'); assert.equal(r.zi, r.total);
