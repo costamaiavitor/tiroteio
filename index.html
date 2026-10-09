@@ -1895,6 +1895,37 @@ MAPS.vila = {
   })(),
 };
 
+// ===== O2-C02: redistribuição dos itens da Vila (regras de docs/overhaul/auditoria_itens.md §3) =====
+// Só lugar muda (preço e efeito, não). Bebidas fortes (2500+), Faca Bowie e Pack-a-Punch saem do octógono de dentro
+// (750-1000 pontos de porta) para o anel de fora (2250-2500) e os distritos (4250-4500); a terceira cópia de cada arma
+// de parede repetida vira letal (preço que a letal já tem), para nenhuma arma aparecer mais de 2 vezes.
+const C02 = {
+  perks: { // k: novo lugar (x, z, frente)
+    speed: { x: 8, z: -85.55, n: [0, 1] }, // F Pedreira, muro de fora
+    jug: { x: -8, z: 85.55, n: [0, -1] }, // H Acampamento, muro de fora
+    vult: { x: 52.55, z: 40, n: [-1, 0] }, // G Estação, oeste do prédio da estação
+    widow: { x: 108.85, z: -26, n: [1, 0] }, // L Fábrica, dentro do galpão
+    mule: { x: .85, z: -110, n: [1, 0] }, // J Mina, divisória com o Hospital
+    dying: { x: -110, z: -.85, n: [0, -1] }, // Q Serraria, divisória com a Floresta
+  },
+  pap: { x: -56.9, z: -44, n: [1, 0] }, // I Castelo, muralha oeste do pátio (perto do chão que solta zumbi do lado de fora)
+  wall: [ // [arma, x, z de antes] -> mudanças
+    ['bowie', 6, 24, { x: -37.1, z: -53, n: [1, 0] }], // E Lago -> I Castelo, muralha leste por fora
+    ['commando', 59.2, -125, { w: 'clay', cost: 1000 }], // J Mina (fica Base militar e Quartel)
+    ['hk21', 132.45, -40, { w: 'he', cost: 250 }], // L Fábrica (fica Pico e Estaleiro)
+    ['rpk', -104, -59.2, { w: 'semtex', cost: 500 }], // Q Serraria (fica Mina velha e Brejo negro)
+    ['spas', 104.65, 121.16, { w: 'clay', cost: 1000 }], // c1 Pântano (fica Acampamento e Porto)
+    ['galil', 229.57, -96.86, { w: 'he', cost: 250 }], // b10 Margem do rio (fica Estação e Floresta)
+    ['fal', 206.59, -8.06, { w: 'semtex', cost: 500 }], // b11 Ponte velha (fica Castelo e Farol)
+    ['mp40', -200.85, 109.96, { w: 'he', cost: 250 }], // b30 Bairro queimado (fica Igreja e Hospital)
+    ['ak74u', 105.14, 184.71, { w: 'semtex', cost: 500 }], // b20 Cais (fica Fazenda e Ferrovia)
+  ],
+};
+{ const Z = MAPS.vila.z;
+  for (const p of Z.perks) if (C02.perks[p.k]) Object.assign(p, C02.perks[p.k]);
+  Object.assign(Z.pap, C02.pap);
+  for (const [w, x, z, o] of C02.wall) { const e = Z.wall.find(q => q.w === w && Math.abs(q.x - x) < .05 && Math.abs(q.z - z) < .05); if (e) Object.assign(e, o); else console.warn('O2-C02: giz não achado', w, x, z); }
+}
 // ---------- Vila: cenário que não é caixa alinhada (diagonais, telhados, árvores, chão pintado) ----------
 let MAP_ANIM = []; // animações do cenário (moinho), rodam todo frame
 const VG = 180; // lado do chão pintado da Vila (m)
