@@ -23654,8 +23654,8 @@ function zInteract(dt) {
     if (!ZC.power) { txt = 'Armadilha elétrica — sem energia'; ok = false; }
     else if (T.st === 'on') { txt = 'Armadilha ligada'; ok = false; }
     else if (T.st === 'cool') { txt = `Armadilha recarregando · ${Math.max(0, Math.ceil(T.end - now))}s`; ok = false; }
-    else txt = `Armadilha elétrica [${ZTRAP.cost}]`;
-    cand(dist, { k: 'trap', id: i, txt, ok, cost: ZTRAP.cost });
+    else txt = `Armadilha elétrica [${t.cost ?? ZTRAP.cost}]`; // O2-C06: custo opcional por armadilha
+    cand(dist, { k: 'trap', id: i, txt, ok, cost: t.cost ?? ZTRAP.cost });
   });
   zintCands(cand, dd); // O2-C04
   ZD.windows.forEach((w, i) => { if (ZC.boards[i] >= 6) return; const dist = dd(w.ix, w.iz); if (dist < 2.2) cand(dist + .3, { k: 'repair', id: i, hold: 1, txt: 'Segure F — consertar a janela' }); });
@@ -24158,7 +24158,7 @@ function zChase(z, dt) {
     if (!Z.lure && tgt) { if (z.los || z.atkWind) zTryAttack(z, tgt, z.dog ? 1.5 : z.kind === 6 ? 2.3 : z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35); if (dist < (z.dog ? .9 : .85 + (z.rad - .3) * 2)) dX = dZ = 0; } // sem linha livre (grade no meio) não bate
     else if (Z.lure && dist < 1) dX = dZ = 0;
   }
-  const spd = (z.crawler ? .9 : z.speed * (z.buffT > now ? 1.3 : 1) * (z.kind === 6 && z.hp < z.maxHp * .5 ? 1.4 : 1) * (z.slowT > now ? .6 : 1) * (z.webT > now ? .2 : 1)) * (z.atkWind ? .35 : 1), k = Math.min(1, dt * 8); // grito: +30%; Carniceiro furioso abaixo da metade
+  const spd = (z.crawler ? .9 : z.speed * (z.buffT > now ? 1.3 : 1) * (z.kind === 6 && z.hp < z.maxHp * .5 ? 1.4 : 1) * (z.slowT > now ? .6 : 1) * (z.webT > now ? .2 : 1)) * (z.atkWind ? .35 : 1) * (z.fogoT > now ? ZINT.fogo.lento : 1), k = Math.min(1, dt * 8); // O2-C06: queimando anda mais devagar (armadilha de fogo); grito: +30%; Carniceiro furioso abaixo da metade
   b.vel.x += (dX * spd - b.vel.x) * k; b.vel.z += (dZ * spd - b.vel.z) * k;
   const face = (dX || dZ) ? Math.atan2(-dX, -dZ) : has ? Math.atan2(-(gx - P.x), -(gz - P.z)) : z.yaw;
   z.yaw += clamp(angDiff(z.yaw, face), -8 * dt, 8 * dt);
@@ -24458,7 +24458,7 @@ function srvZUse(p, m) {
     case 'trap': { // armadilha elétrica: perto da alavanca, com energia, pronta e com pontos
       const i = m.id, t = ZD.traps?.[i], T = Z.traps[i]; if (!Number.isInteger(i) || !t || !T || !near(t.sx, t.sz, 2.8)) return;
       if (!Z.power) return err('Sem energia'); if (T.st !== 'idle') return err(T.st === 'on' ? 'Armadilha já ligada' : 'Armadilha recarregando');
-      if (!zPay(p, ZTRAP.cost)) return;
+      if (!zPay(p, t.cost ?? ZTRAP.cost)) return; // O2-C06: custo opcional por armadilha
       T.st = 'on'; T.t = now + ZTRAP.on; T.by = p.id; T.hurt = {};
       broadcast({ t: 'ztrap', i, st: 'on', t: ZTRAP.on }); break;
     }
@@ -24701,6 +24701,124 @@ const D_RESTO = ZINT.barril.restoH; // altura dos restos (colisor e malha)
 // Marcas para os blocos dos próximos interativos (um bloco por agente, logo abaixo da marca @@INTERATIVO-n@@ que o coordenador der; ver docs/overhaul/interativos.md §3).
 // Cada bloco: ZINT.<tipo> = {...}; ZINT_FN.<tipo> = {...}; ZINT_MAPA.<mapa>.push(...). As marcas ficam afastadas para os diffs não se encostarem.
 // @@INTERATIVO-1@@
+// ===== O2-C06: armadilha de fogo (Vila) e armadilhas elétricas novas (Vila e Sanatório) =====
+// Projeto em docs/overhaul/interativos.md §1.2 e §1.3. Valores de jogo só aqui (ZINT.fogo e as entradas de M.z.traps).
+// Elétricas novas: o código de hoje (alavanca, área de choque, ZTRAP, mensagem ztrap); cada entrada pode ter cost próprio
+// (lido como t.cost ?? ZTRAP.cost no srvZUse e no zInteract). Precisam de energia, como a de sempre.
+MAPS.vila.z.traps.push(
+  { x: 141, z: -15.2, w: 5, d: 2.4, sx: 141.25, sz: -11.58, n: [0, -1] }, // L Fábrica: cerca elétrica na frente do galpão (alavanca na parede norte)
+);
+MAPS.sanatorio.z.traps.push(
+  { x: -39.25, z: 15.6, w: 4.4, d: 2.4, sx: -39.25, sz: 19.42, n: [0, -1] }, // G Refeitório: entre as mesas e a parede sul
+  { x: 50.25, z: 27.6, w: 4.4, d: 2, sx: 50.25, sz: 24.58, n: [0, 1] }, // L Estufa: na frente dos canteiros
+  { x: 75, z: -14, w: 2.4, d: 4, sx: 73.58, sz: -9.75, n: [1, 0] }, // r9 Lavanderia: na boca do corredor que vem do oeste
+);
+// Armadilha de fogo: F no tanque com registro (com pontos, sem energia) acende uma faixa de chão por dura segundos. Zumbi que
+// passa pega fogo: perde vida enquanto está na faixa e mais queima segundos depois (mata o comum em ~mataS s até a rodada
+// mataAte; depois demora mais), e anda a lento × a velocidade (gancho no zChase). O Carniceiro perde só dpsBoss da vida por
+// segundo. Jogador na faixa leva jogDps por segundo (PhD Flopper não protege: é fogo). Abate do fogo não dá pontos (como a
+// elétrica). Depois recarga segundos. Rede: estados pronto -> aceso (s = dura) -> recarga (s = recarga) -> pronto; o dano é só no host.
+ZINT.fogo = { nome: 'Armadilha de fogo', custo: 750, dura: 20, recarga: 60, mataS: 1, mataAte: 15, dpsBoss: .03, jogDps: 15, jogCada: .5, lento: .7, queima: 2,
+  usoR: 2.2, srvR: 2.8, forca: 3, chamas: 26, somCada: 1.1 };
+// aparência por lugar (procedural): o chão que pega fogo, o tanque e o cano furado da faixa
+const ZINT_FOGO = {
+  feno: { chao: ['#8a6a2a', '#c9a64e', '#e2c574'], palha: 1, alt: .03, tanque: 0x8a2a1e, cano: 0x3a3a3a }, // celeiro: feno espalhado na entrada
+  oleo: { chao: ['#0c0a08', '#1a1612', '#2a2520'], alt: .015, tanque: 0x3d4a2c, cano: 0x5a3a22 }, // acampamento: óleo derramado e cano furado
+  alambique: { chao: ['#2a1418', '#4a2228', '#5e3a2a'], alt: .015, tanque: 0x9a5a2a, cano: 0xb87333 }, // vinhedo: bagaço de uva e cano de cobre
+};
+// mancha irregular do chão (textura com recorte: alphaTest, não é transparente) — manchas sobrepostas e, no feno, fios de palha
+const ZFOGO_MANCHA = V => canvasTex(256, 256, g => {
+  for (let k = 0; k < 26; k++) { g.fillStyle = V.chao[k % 3]; g.beginPath(); g.ellipse(40 + Math.random() * 176, 40 + Math.random() * 176, 26 + Math.random() * 40, 20 + Math.random() * 34, Math.random() * 3, 0, 7); g.fill(); }
+  if (V.palha) { g.lineWidth = 2; for (let k = 0; k < 260; k++) { const x = 30 + Math.random() * 196, y = 30 + Math.random() * 196, a = Math.random() * 6.3; if (g.getImageData(x | 0, y | 0, 1, 1).data[3] < 128) continue; g.strokeStyle = V.chao[1 + (k % 2)]; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 14, y + Math.sin(a) * 14); g.stroke(); } }
+}, true);
+// a: [x, z, largura em x, fundo em z] da faixa (posta onde os zumbis passam; o tanque fica fora dela, do lado de quem usa)
+ZINT_MAPA.vila.push(
+  { t: 'fogo', v: 'feno', x: 29.45, z: 4.6, n: [-1, 0], a: [30.5, 0, 2.4, 5.6] }, // C Fazenda: entrada do celeiro (6 m), tanque na parede de fora
+  { t: 'fogo', v: 'oleo', x: -48.6, z: 56.27, n: [0, -1], a: [-50, 52.9, 5, 2.2] }, // H Acampamento: entre a carroça e a fogueira
+  { t: 'fogo', v: 'alambique', x: -72.75, z: 112.4, n: [-1, 0], a: [-69.8, 109.5, 3.2, 4.2] }, // c2 Vinhedo: corredor do alambique
+);
+ZINT_FN.fogo = {
+  est: ['pronto', 'aceso', 'recarga'],
+  efeito: (o, D) => `fogo em ${o.a[2]}×${o.a[3]} m por ${D.dura} s (comum morre em ~${D.mataS} s até a rodada ${D.mataAte}, queima mais ${D.queima} s, zumbi a ${Math.round(D.lento * 100)}%); recarga ${D.recarga} s; sem energia`,
+  monta(o, i) {
+    const V = ZINT_FOGO[o.v] || ZINT_FOGO.oleo, D = ZINT.fogo, [ax, az, aw, ad] = o.a, cx = ax - o.x, cz = az - o.z, ry = Math.atan2(o.n[0], o.n[1]);
+    const g = new THREE.Group(); g.position.set(o.x, 0, o.z);
+    const corpo = new THREE.Group(); g.add(corpo); // parado: vira uma malha só (mergeParts)
+    const tq = new THREE.Group(); tq.rotation.y = ry; corpo.add(tq); // tanque de pé, de frente para quem usa
+    bx(tq, .62, 1, .36, 0, .5, 0, mc(V.tanque)).castShadow = true;
+    bx(tq, .66, .06, .4, 0, 1.03, 0, mc(0x2a2420)); bx(tq, .66, .06, .4, 0, .03, 0, mc(0x2a2420)); // tampa e base
+    bx(tq, .08, .4, .08, -.2, 1.26, 0, mc(V.cano)); bx(tq, .5, .07, .07, 0, .1, .2, mc(V.cano)); // respiro e cano de saída
+    const roda = new THREE.Mesh(new THREE.TorusGeometry(.12, .025, 6, 14), mc(0xb02020)); roda.position.set(0, .72, .2); tq.add(roda); // registro (parado: entra na junção)
+    const cg = new THREE.Group(); cg.position.set(cx, 0, cz); corpo.add(cg); // faixa: chão que pega fogo (sem colisor: não bloqueia nada)
+    if (!V.palha) { const longo = aw >= ad, c = zintCil(cg, .04, (longo ? aw : ad) - .3, .04, mc(V.cano), 8, false); c.rotation[longo ? 'z' : 'x'] = Math.PI / 2; } // cano furado ao longo da faixa
+    mergeParts(corpo);
+    const chao = new THREE.Mesh(new THREE.PlaneGeometry(aw * 1.15, ad * 1.15).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: ZFOGO_MANCHA(V), alphaTest: .5 })); // mancha (fora da junção: tem textura)
+    chao.userData.own = true; chao.position.set(cx, V.alt, cz); chao.receiveShadow = true; g.add(chao);
+    const din = new THREE.Group(); din.rotation.y = ry; g.add(din); // o que muda: lâmpada de estado e placa (fora da junção)
+    const lampM = new THREE.MeshBasicMaterial({ color: 0x22cc44 }); bx(din, .1, .1, .05, .2, .92, .19, lampM).userData.own = true;
+    const placa = new THREE.Mesh(new THREE.PlaneGeometry(.56, .14), new THREE.MeshBasicMaterial({ map: ZFOGO_PLACA(), toneMapped: false })); placa.userData.own = true; placa.position.set(0, .45, .185); din.add(placa);
+    // fogo: 1 Points (as chamas sobem e somem), brilho no chão e halo; transparentes só enquanto aceso. Sem luz nova (o jogo tem limite).
+    const N = D.chamas, pos = new Float32Array(N * 3), cor = new Float32Array(N * 3), fase = new Float32Array(N);
+    for (let k = 0; k < N; k++) { pos[k * 3] = cx + (Math.random() - .5) * aw * .9; pos[k * 3 + 1] = Math.random() * 1.4; pos[k * 3 + 2] = cz + (Math.random() - .5) * ad * .9; fase[k] = Math.random(); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(cor, 3)); geo.computeBoundingSphere();
+    const add = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending };
+    const chamas = new THREE.Points(geo, new THREE.PointsMaterial({ map: SOFT, size: .8, vertexColors: true, ...add })); chamas.userData.own = true; chamas.visible = false; g.add(chamas);
+    const brilho = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: SOFT, color: 0xff6a1c, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, ...add }));
+    brilho.userData.own = true; brilho.position.set(cx, .07, cz); brilho.scale.set(aw * 1.7, 1, ad * 1.7); brilho.visible = false; g.add(brilho);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, color: 0xff7a2a, opacity: .5, ...add })); halo.userData.own = true; halo.position.set(cx, 1, cz); halo.scale.set(Math.max(aw, ad) * 1.25, 2.4, 1); halo.visible = false; g.add(halo);
+    world.add(g); cullAdd(g, (o.x + ax) / 2, (o.z + az) / 2, Math.hypot(ax - o.x, az - o.z) / 2 + Math.hypot(aw, ad) / 2 + .5);
+    const sw = Math.abs(o.n[0]) > 0, hw = (sw ? .36 : .62) / 2 + .02, hd = (sw ? .62 : .36) / 2 + .02; // colisor do tanque (a faixa não tem)
+    const col = { minX: o.x - hw, maxX: o.x + hw, minY: 0, maxY: 1.06, minZ: o.z - hd, maxZ: o.z + hd }; COL.push(col);
+    return { g, lampM, chamas, brilho, halo, pos, cor, fase, cx, cz, aw, ad, col, raio: .2, som: 0 };
+  },
+  estado(o, e, c, ant, sync) {
+    const on = c.st === 'aceso'; e.chamas.visible = e.brilho.visible = e.halo.visible = on;
+    e.lampM.color.set(on ? 0xff7a20 : c.st === 'recarga' ? 0xcc2222 : 0x22cc44);
+    if (!sync && on && ant !== 'aceso') { play('smoke', new V3(o.a[0], .5, o.a[1])); e.som = now + .5; }
+  },
+  prompt(o, i, c, D) {
+    if (c.st === 'aceso') return { k: 'zint', id: i, ok: false, txt: 'Armadilha de fogo acesa' };
+    if (c.st === 'recarga') return { k: 'zint', id: i, ok: false, txt: `Armadilha de fogo recarregando · ${Math.max(0, Math.ceil(c.end - now))}s` };
+    return { k: 'zint', id: i, cost: D.custo, txt: `Acender a armadilha de fogo [${D.custo}]` };
+  },
+  quadro(o, e, c, dt) {
+    if (c.st !== 'aceso') return;
+    const P = e.pos, K = e.cor, F = e.fase, n = F.length;
+    for (let k = 0; k < n; k++) { // a chama sobe 1,5 m e apaga (amarela embaixo, vermelha em cima); renasce noutro ponto da faixa
+      let f = F[k] + dt * (1.1 + (k % 4) * .2); if (f >= 1) { f -= 1; P[k * 3] = e.cx + (Math.random() - .5) * e.aw * .9; P[k * 3 + 2] = e.cz + (Math.random() - .5) * e.ad * .9; }
+      F[k] = f; P[k * 3 + 1] = .15 + f * 1.5; const a = f < .15 ? f / .15 : 1 - (f - .15) / .85;
+      K[k * 3] = a; K[k * 3 + 1] = a * (.62 - f * .4); K[k * 3 + 2] = a * .12 * (1 - f);
+    }
+    e.chamas.geometry.attributes.position.needsUpdate = true; e.chamas.geometry.attributes.color.needsUpdate = true;
+    const t = .75 + Math.random() * .25; e.brilho.material.opacity = .55 * t; e.halo.material.opacity = .28 * t;
+    if (now >= e.som) { e.som = now + ZINT.fogo.somCada; play('hiss', new V3(o.a[0], .4, o.a[1])); }
+  },
+  usar(p, i, o, E, D, err) {
+    if (E.st !== 'pronto') return err(E.st === 'aceso' ? 'A armadilha de fogo já está acesa' : 'Armadilha de fogo recarregando');
+    if (!zPay(p, D.custo)) return;
+    E.hurt = {}; E.ult = now; zintPoe(i, 'aceso', D.dura, p.id);
+  },
+  tick(i, o, E, D) { // host: queima quem está na faixa (e quem saiu dela há menos de queima s); acende, apaga e recarrega
+    const dt = Math.min(.25, Math.max(0, now - (E.ult ?? now))); E.ult = now;
+    if (E.st === 'aceso' && now >= E.t) { zintPoe(i, 'recarga', D.recarga); E.fim = now; }
+    else if (E.st === 'recarga' && now >= E.t) { zintPoe(i, 'pronto', 0, null); return; }
+    const aceso = E.st === 'aceso'; if (!aceso && now - (E.fim ?? -99) > D.queima) return; // apagada e ninguém mais queimando
+    const [ax, az, aw, ad] = o.a, x0 = ax - aw / 2, x1 = ax + aw / 2, z0 = az - ad / 2, z1 = az + ad / 2, r = Math.min(Z.round, D.mataAte), dps = zHp(r) * zHpK(r) / D.mataS;
+    for (const z of Z.zs.values()) {
+      const P = z.body.pos;
+      if (aceso && z.st !== 'rise' && P.x > x0 && P.x < x1 && P.z > z0 && P.z < z1 && P.y < 2) { z.fogoT = now + D.queima; z.fogoI = i; }
+      if (z.fogoI !== i || !(z.fogoT > now) || !dt) continue;
+      z.hp -= (z.kind === 6 ? z.maxHp * D.dpsBoss : dps) * dt; // Carniceiro: só uma fração por segundo
+      if (z.hp <= 0) zKill(z, null, 'body', 'fogo', false, true); // sem pontos, como a elétrica
+    }
+    if (aceso) for (const q of S.players.values()) {
+      if (!q.alive || q.downed || q.pos[0] < x0 || q.pos[0] > x1 || q.pos[2] < z0 || q.pos[2] > z1 || q.pos[1] > 2.4) continue;
+      const H = E.hurt ||= {}; if (now >= (H[q.id] || 0)) { H[q.id] = now + D.jogCada; zHurt(q, Math.round(D.jogDps * D.jogCada), null); } // PhD não protege
+    }
+  },
+};
+const ZFOGO_PLACA = () => canvasTex(256, 64, g => { g.fillStyle = '#0d0d0d'; g.fillRect(0, 0, 256, 64); g.fillStyle = '#ff8a30'; g.font = 'bold 34px Rajdhani, Arial'; g.textAlign = 'center'; g.fillText('PERIGO: FOGO', 128, 46); });
+// ===== FIM O2-C06 =====
 //
 //
 //
