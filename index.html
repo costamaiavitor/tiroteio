@@ -882,6 +882,135 @@ MAPS.forte = {
   })(),
 };
 // ===== FIM O3-D09 (mapa) =====
+// ===== O3-D11: arena Casa do Forno (MAPS.forno; docs/overhaul/campanha.md §8.2, lore.md: os quatro fornos, a esteira, as válvulas, Vicente) =====
+// Mapa pequeno e só da campanha (camp: 1: fora dos cartões do clássico e do PvP). Salão de 36 x 50 m com teto de 7 m: 4 fornos na
+// parede norte (forno 1 a oeste; portas de ferro que abrem no ataque "porta do forno"), esteira de 3 m do sul até a boca do forno 4,
+// carvoeira elevada a leste (1,2 m, degraus de carvão) com a calha de carvão no alto da parede (de onde vêm os Carvoeiros do apito),
+// poço de cinzas a oeste (zona lenta), grades de ventilação (as "janelas" dos zumbis) e a porta dos túneis de serviço ao sul (por onde
+// se chega; fechada). Pilares, válvulas, barris de gás, máquina de munição e a nota ficam no ZINT_MAPA.forno (bloco do O3-D11, abaixo
+// da @@CAMP-CHEFE-2@@). Desempenho: cenário fixo na junção (mergeStatic), só o que se mexe em grupo dyn (portas dos fornos, fogo,
+// calor e a lona da esteira), 6 lâmpadas do pool, teto que faz sombra (o sol não entra), sem atmosfera (atmos) e sem luz por ataque.
+const FORNO = { // tudo de tabela: metros, centro do salão na origem, -z = norte
+  hx: 18, hz: 25, T: 1, H: 7, fora: 8, // meia largura e meio comprimento do salão, paredes de 1 m, teto de 7 m; chão de fora (os zumbis nascem a 4–7 m das grades)
+  fornos: [-12, -6, 0, 6], fornoW: 4.2, fornoD: 2.6, fornoH: 5.4, chamine: 2.6, porta: { w: 2.4, h: 2.3, abre: 1.75 }, // forno 1..4 de oeste a leste; abre: ângulo da porta aberta
+  esteira: { x: 6, w: 3, z1: 22.5, v: 1.5, boca: 2.5, lona: 2 }, // da ponta sul (z1) até a boca do forno 4, 1,5 m/s para o norte; boca: os últimos 2,5 m; lona: m por repetição da textura
+  carvoeira: { x0: 13, x1: 18, z0: -21, z1: -7, h: 1.2, deg: 3, degD: .5 }, calha: { z: -14, y0: 6.3, y1: 1.5, w: 1.6 }, lacaio: { x: 11.2, z: -14 }, // lacaio: pé da calha (chão)
+  poco: [-18, -11, 1, 13], // poço de cinzas [x0, x1, z0, z1] (×0,6 no CAMP_FOG)
+  janelas: [[3, -6], [3, 12], [2, -10], [2, 12], [1, 10]], // grades: [lado (1 leste, 2 sul, 3 oeste), posição ao longo da parede]
+  entrada: { x: 0, w: 2.8, h: 3 }, // porta dos túneis de serviço (sul): só desenho
+  vigas: 6, tubos: [[-15, 6.2], [-3, 6.4], [10, 6.2]], // vigas do teto (passo em z) e tubos de vapor no teto (x, y) de ponta a ponta
+  lampadas: [[-12, -22.15, 2.9, 1], [-6, -22.15, 2.9, 1], [0, -22.15, 2.9, 1], [6, -22.15, 2.9, 1], [-6, 8, 6.1, 0], [10, 12, 6.1, 0]], // x, z, y, fogo: em cima de cada porta e 2 do teto (6 do pool)
+  luz: { fogo: [12, 13, 0xff6a24], teto: [13, 22, 0xffb060] }, // base, alcance e cor: boca dos fornos e lâmpadas do teto
+  cores: { teto: 0x1e1916, viga: 0x2a221c, ferro: 0x24221f, ferroE: 0x151413, cobre: 0x6a4428, tijolo: 0x4a2a20, brasa: 0xff6a1a, carvao: 0x121110, cinza: 0x4a4744, cinzaE: 0x34322f,
+    lona: 0x2b2826, trilho: 0x3a3c3e, madeira: 0x4a3626, calor: 0xff5a10 },
+  chama: { op: 1, alt: 2.1, pulso: [.82, .18, 17] }, calor: { op: [.15, .7], hz: [3, 9] }, // fogo da porta (ativo) e o brilho da porta escolhida (aviso)
+};
+function fornoJanelas() { // grades = janelas do zumbi (centro da parede, n para fora), com os pontos de fora/dentro como no Sanatório
+  const F = FORNO, mx = F.hx + F.T / 2, mz = F.hz + F.T / 2;
+  return F.janelas.map(([s, a]) => { const w = s === 0 ? { x: a, z: -mz, n: [0, -1] } : s === 2 ? { x: a, z: mz, n: [0, 1] } : s === 1 ? { x: mx, z: a, n: [1, 0] } : { x: -mx, z: a, n: [-1, 0] };
+    w.room = 'A'; w.ox = w.x + w.n[0] * .9; w.oz = w.z + w.n[1] * .9; w.ix = w.x - w.n[0] * 1.2; w.iz = w.z - w.n[1] * 1.2; w.tx = -w.n[1]; w.tz = w.n[0]; return w; });
+}
+const fornoFace = () => -FORNO.hz + FORNO.fornoD; // z da frente dos fornos (a porta e a boca)
+function fornoCaixas() { // colisores (B: desenhados e no COL)
+  const F = FORNO, mx = F.hx + F.T / 2, mz = F.hz + F.T / 2, Lx = F.hx + F.T, P = s => F.janelas.filter(q => q[0] === s).map(q => zWin(q[1])), C = F.carvoeira;
+  return [floor((F.hx + F.fora) * 2, (F.hz + F.fora) * 2),
+    ...zWall('x', -mz, -Lx, Lx, P(0), F.H, 'wall', F.T), ...zWall('x', mz, -Lx, Lx, P(2), F.H, 'wall', F.T),
+    ...zWall('z', -mx, -F.hz, F.hz, P(3), F.H, 'wall', F.T), ...zWall('z', mx, -F.hz, F.hz, P(1), F.H, 'wall', F.T),
+    ...F.fornos.map(x => B(x, -F.hz + F.fornoD / 2, F.fornoW, F.fornoD, F.fornoH, 'forno')), // os 4 fornos (alvenaria encostada na parede norte)
+    B((C.x0 + C.x1) / 2, (C.z0 + C.z1) / 2, C.x1 - C.x0, C.z1 - C.z0, C.h, 'coal'), // carvoeira elevada (1,2 m: o jogador sobe; a grade dos zumbis contorna)
+    ...stairs((C.x0 + C.x1) / 2, C.z1 + C.degD * (C.deg - .5), 0, -1, C.deg, C.h, C.degD, C.x1 - C.x0 - 1, 'coal'), // degraus de carvão na ponta sul
+  ];
+}
+function buildForno(M) { // cenário procedural (fixo: a junção do mergeStatic junta por material e bloco; o que se mexe fica em grupo dyn)
+  const F = FORNO, K = F.cores, G = new THREE.Group(); world.add(G);
+  const p = (w, h, d, x, y, z, c, ry = 0, rx = 0, rz = 0) => { const b = bx(G, w, h, d, x, y, z, typeof c === 'number' ? mc(c) : c); b.rotation.set(rx, ry, rz); return b; };
+  const cil = (r, h, x, y, z, c, rx = 0, rz = 0, seg = 10) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mc(c)); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); G.add(m); return m; };
+  const dinamico = () => { const g = new THREE.Group(); g.userData.dyn = 1; world.add(g); return g; };
+  const W2 = F.hx + F.T, D2 = F.hz + F.T, fz = fornoFace(), E = F.esteira, PT = F.porta;
+  // teto (faz sombra: o sol não entra no salão), vigas e os tubos de vapor que correm de ponta a ponta
+  { const t = p(W2 * 2, .3, D2 * 2, 0, F.H + .15, 0, K.teto); t.castShadow = true;
+    for (let z = -F.hz + F.vigas / 2; z < F.hz; z += F.vigas) p(W2 * 2, .45, .35, 0, F.H - .22, z, K.viga);
+    for (const [x, y] of F.tubos) { cil(.16, F.hz * 2, x, y, 0, K.ferro, Math.PI / 2); for (let z = -F.hz + 3; z < F.hz; z += 6) p(.08, F.H - y, .08, x, (F.H + y) / 2, z, K.ferroE); } }
+  // fornos: chaminé até o teto, arco em cima da porta, a boca acesa (atrás da porta), grelha, carvão no chão
+  for (let i = 0; i < F.fornos.length; i++) {
+    const x = F.fornos[i];
+    p(F.fornoW * .8, F.H - F.fornoH, F.fornoD * .7, x, (F.H + F.fornoH) / 2, -F.hz + F.fornoD * .35, K.tijolo); // chaminé
+    p(PT.w + .7, .5, .25, x, PT.h + .3, fz + .12, K.ferroE); for (const s of [-1, 1]) p(.35, PT.h + .1, .25, x + s * (PT.w / 2 + .17), PT.h / 2, fz + .12, K.ferroE); // moldura de ferro
+    p(PT.w, PT.h, .02, x, PT.h / 2, fz + .015, zGlow(K.brasa, 1.6)); // a boca acesa (a porta tapa; aberta, aparece)
+    for (let k = 0; k < 5; k++) p(PT.w - .1, .05, .03, x, .35 + k * .45, fz + .04, K.ferroE); // grelha
+    p(.9, .7, .1, x, F.fornoH - .7, fz + .06, K.cobre); // placa de cobre
+    for (let k = 0; k < 4; k++) p(.4 + (k % 2) * .2, .22, .4, x - 1.6 + k * .9, .11, fz + 1 + (k % 3) * .3, K.carvao, k * .7); // carvão caído
+  }
+  // portas dos fornos (grupo dyn: abrem no ataque, dobradiça a oeste) e o brilho da porta escolhida e o fogo (um de cada: um ataque por vez)
+  { const dyn = dinamico(); FORNO_V.portas = F.fornos.map(x => {
+      const h = new THREE.Group(); h.position.set(x - PT.w / 2, 0, fz + .14); dyn.add(h);
+      const fo = new THREE.Group(); h.add(fo); bx(fo, PT.w, PT.h, .1, PT.w / 2, PT.h / 2, 0, mc(K.ferro)); for (const y of [.5, PT.h - .5]) bx(fo, PT.w + .02, .12, .13, PT.w / 2, y, 0, mc(K.ferroE));
+      bx(fo, .16, .3, .16, PT.w - .3, PT.h / 2, .1, mc(K.cobre)); mergeParts(fo); return { h, a: 0 }; });
+    const cg = new THREE.PlaneGeometry(PT.w + .3, PT.h + .3); cg.translate(0, PT.h / 2, 0);
+    const calor = new THREE.Mesh(cg, new THREE.MeshBasicMaterial({ color: K.calor, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false }));
+    calor.userData.own = true; calor.userData.noShadow = true; calor.visible = false; calor.position.z = fz + .25; dyn.add(calor); FORNO_V.calor = calor;
+    // fogo da porta aberta: duas lâminas cruzadas, comprimento 1 (escala no z = comprimento do ataque), mais forte perto da porta
+    const pos = [], col = []; const v = (x, y, z, k) => { pos.push(x, y, z); col.push(k, k * .5, k * .12); };
+    const lam = (ax) => { for (let i = 0; i < 6; i++) { const z0 = i / 6, z1 = (i + 1) / 6, k0 = 1 - z0 * .85, k1 = 1 - z1 * .85, hw = PT.w / 2;
+      if (ax) { v(-hw, .05, z0, k0); v(hw, .05, z0, k0); v(hw, .05, z1, k1); v(-hw, .05, z0, k0); v(hw, .05, z1, k1); v(-hw, .05, z1, k1); }
+      else { v(0, 0, z0, k0); v(0, F.chama.alt * (1 - z0 * .5), z0, k0 * .6); v(0, F.chama.alt * (1 - z1 * .5), z1, k1 * .6); v(0, 0, z0, k0); v(0, F.chama.alt * (1 - z1 * .5), z1, k1 * .6); v(0, 0, z1, k1); } } };
+    lam(1); lam(0);
+    const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g2.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    const chama = new THREE.Mesh(g2, new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, transparent: true, opacity: F.chama.op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false }));
+    chama.userData.own = true; chama.userData.noShadow = true; chama.frustumCulled = false; chama.visible = false; dyn.add(chama); FORNO_V.chama = chama; }
+  // esteira: trilhos, roletes nas pontas, a boca do forno 4 e a lona (grupo dyn: a textura corre para o norte)
+  { const x0 = E.x - E.w / 2, x1 = E.x + E.w / 2, len = E.z1 - fz, zc = (E.z1 + fz) / 2;
+    for (const x of [x0 - .1, x1 + .1]) { p(.2, .45, len, x, .22, zc, K.trilho); for (let z = fz + 2; z < E.z1; z += 4) p(.14, .22, .14, x, .11, z, K.ferroE); }
+    cil(.22, E.w + .2, E.x, .24, E.z1 - .1, K.ferro, 0, Math.PI / 2, 12); // rolete da ponta sul
+    p(E.w, .08, 1, E.x, PT.h + .06, fz + .4, K.ferroE); // aba da boca do forno 4 (a lona entra por baixo da porta)
+    const tx = canvasTex(64, 256, g => { g.fillStyle = '#1c1a19'; g.fillRect(0, 0, 64, 256); g.fillStyle = '#3a3633'; for (let y = 0; y < 256; y += 32) g.fillRect(0, y, 64, 6); g.fillStyle = 'rgba(0,0,0,.35)'; for (let i = 0; i < 40; i++) g.fillRect(Math.random() * 64, Math.random() * 256, 3, 2); });
+    tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.repeat.set(1, len / E.lona);
+    const lona = new THREE.Mesh(new THREE.PlaneGeometry(E.w, len), new THREE.MeshLambertMaterial({ map: tx, color: K.lona }));
+    lona.rotation.x = -Math.PI / 2; lona.position.set(E.x, .03, zc); lona.receiveShadow = true; lona.userData.own = true;
+    const dyn = dinamico(); dyn.add(lona); FORNO_V.lona = lona; }
+  // carvoeira: monte de carvão, calha que desce do alto da parede leste e o pé da calha (de onde saem os Carvoeiros)
+  { const C = F.carvoeira, Ca = F.calha, top = C.h;
+    for (let i = 0; i < 14; i++) { const s = .35 + (i % 4) * .15; p(s, s * .6, s, C.x0 + .6 + (i * 1.37) % (C.x1 - C.x0 - 1.2), top + s * .3, C.z0 + 1 + (i * 3.1) % (C.z1 - C.z0 - 2), K.carvao, i * .9, 0, (i % 3) * .1); }
+    const dx = F.hx - (C.x0 + 1), dy = Ca.y0 - Ca.y1, comp = Math.hypot(dx, dy), ang = Math.atan2(dy, dx), cx = (F.hx + C.x0 + 1) / 2, cy = (Ca.y0 + Ca.y1) / 2;
+    p(comp, .08, Ca.w, cx, cy, Ca.z, K.ferro, 0, 0, ang); for (const s of [-1, 1]) p(comp, .4, .08, cx, cy + .2, Ca.z + s * Ca.w / 2, K.ferroE, 0, 0, ang); // calha com as abas
+    p(.4, 1.4, Ca.w + .8, F.hx - .2, Ca.y0 + .5, Ca.z, K.ferroE); // boca da calha na parede
+    p(1.8, .5, 1.6, F.lacaio.x + .3, .25, F.lacaio.z, K.carvao, .4); p(1, .3, 1, F.lacaio.x - .5, .15, F.lacaio.z + .9, K.carvao, 1.1); // carvão no pé da calha
+    for (let i = 0; i < 3; i++) p(.12, top + .9, .12, C.x0 + .06, (top + .9) / 2, C.z0 + 2 + i * 5, K.madeira); p(.08, .08, C.z1 - C.z0 - 2, C.x0 + .06, top + .85, (C.z0 + C.z1) / 2, K.madeira); } // guarda-corpo
+  // poço de cinzas (zona lenta): o chão cinza, montes baixos e a borda de pedra
+  { const [x0, x1, z0, z1] = F.poco; p(x1 - x0, .02, z1 - z0, (x0 + x1) / 2, .012, (z0 + z1) / 2, K.cinza);
+    for (let i = 0; i < 9; i++) p(1.2 + (i % 3) * .5, .25 + (i % 2) * .15, 1 + (i % 4) * .3, x0 + 1.2 + (i * 2.3) % (x1 - x0 - 2), .1, z0 + 1 + (i * 3.7) % (z1 - z0 - 2), K.cinzaE, i * .6);
+    p(.3, .15, z1 - z0, x1 + .15, .075, (z0 + z1) / 2, K.ferroE); for (const z of [z0, z1]) p(x1 - x0, .15, .3, (x0 + x1) / 2, .075, z + (z === z0 ? -.15 : .15), K.ferroE); }
+  // porta dos túneis de serviço (sul, fechada: é por onde se chegou) e as lâmpadas do teto (fio e cúpula)
+  { const En = F.entrada, z = F.hz - .07; p(En.w, En.h, .12, En.x, En.h / 2, z, K.ferro); p(En.w + .5, .3, .2, En.x, En.h + .15, z, K.ferroE); for (const y of [.6, En.h - .6]) p(En.w, .1, .16, En.x, y, z - .02, K.ferroE);
+    p(.14, .4, .14, En.x + En.w / 2 - .35, En.h / 2, z - .1, K.cobre); }
+  for (const [x, z, y, fogo] of F.lampadas) if (!fogo) { p(.03, F.H - y - .1, .03, x, (F.H + y) / 2, z, K.ferroE); const c = new THREE.Mesh(new THREE.ConeGeometry(.35, .25, 10, 1, true), mc(K.ferro)); c.position.set(x, y + .14, z); G.add(c); }
+  MAP_ANIM.push(fornoAnim);
+}
+const FORNO_V = { portas: null, calor: null, chama: null, lona: null }; // peças do cliente que o fornoAnim mexe (o resto do estado do cliente fica no bloco do Foguista)
+MAPS.forno = {
+  name: 'Casa do Forno', desc: 'arena da campanha: quatro fornos, a esteira, as válvulas de vapor e o foguista', zonly: 1, zombie: 1, camp: 1, w: (FORNO.hx + FORNO.fora) * 2, d: (FORNO.hz + FORNO.fora) * 2,
+  sky: 0x0a0605, skyTop: 0x030202, exposure: 1.45, fogC: 0x140b07, fog: [14, 62],
+  hemi: 1, hemiC: [0xc8906a, 0x2a1c14], sunI: .2, sunC: 0xff9a60, sun: [-12, 42, 16],
+  theme: { floor: ['concrete', 0x3e3631], wall: ['brick', 0x5a3426], forno: ['brick', 0x33201a], coal: ['rock', 0x1d1b1a], metal: ['metal', 0x3c3f42] },
+  boxes: fornoCaixas,
+  build: buildForno,
+  spawns: [[-3, 21], [1.5, 21], [-3, 23], [1.5, 23]],
+  z: (() => {
+    const F = FORNO, x = F.hx, z = F.hz;
+    const d = {
+      ff: { x0: -(x + F.fora), z0: -(z + F.fora), nx: (x + F.fora) * 2, nz: (z + F.fora) * 2 },
+      start: 'A', rooms: { A: [-x, x, -z, z] }, roomNames: { A: 'Casa do Forno' }, floors: { A: ['concrete', 0x4a4038] },
+      windows: fornoJanelas(), risers: [], doors: [], wall: [], perks: [], traps: [],
+      pap: { x: 0, z: z + F.fora - 2, n: [0, -1] }, power: { x: 4, z: z + F.fora - 2, n: [0, -1] }, // fora do salão e escondidos (fornoEsconde): a arena não tem PaP e a energia já vem ligada
+      boxes: [{ x: x - .55, z: 20, n: [-1, 0] }], // 1 lugar da Caixa (parede leste, perto da entrada)
+      lamps: F.lampadas.map(([lx, lz, ly, fogo]) => { const L = fogo ? F.luz.fogo : F.luz.teto; return { x: lx, z: lz, y: ly, base: L[0], dist: L[1], c: L[2], fire: !!fogo }; }),
+      spawns: [[-3, 21], [1.5, 21], [-3, 23], [1.5, 23]], // junto da porta dos túneis (sul)
+    };
+    d.zoneAt = (px, pz) => (Math.abs(px) <= x && Math.abs(pz) <= z ? 'A' : null);
+    return d;
+  })(),
+};
+// ===== FIM O3-D11 (mapa) =====
 
 function siteDeco(M) { // chão pintado e letra flutuando em cada bomb
   for (const [k, r] of Object.entries(M.sites)) {
@@ -29108,6 +29237,369 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP
 // ===== FIM O3-D10 =====
 //
 // @@CAMP-CHEFE-2@@
+// ===== O3-D11: O Foguista (Vicente, tipo 15) e a arena Casa do Forno (docs/overhaul/campanha.md §7.3, §8.2; lore.md: falas fog-*) =====
+// O que tem aqui (dono: O3-D11; o mapa é o MAPS.forno, logo abaixo da @@CAMP-MAPAS@@):
+// - ZKIND[15] (números do §7.3) e CAMP_CHEFE[15] pela base do O3-D07: 3 fases (100–60–25%). Ataques com aviso no chão: golpe de pá
+//   (setor de 100° e 3,2 m, empurra 4 m), porta do forno (a porta do forno com mais jogadores na frente brilha 1,5 s e solta um
+//   retângulo de fogo de 10 × 2,4 m por 2 s: 25/s no jogador, 200/s nos zumbis, menos no Carvoeiro; o pilar no caminho corta o fogo;
+//   só na arena), brasa lançada (disco de 3 m no alvo, chão em brasa 4 s a 15/s), apito (2 s subindo de tom; 4 Carvoeiros pela calha
+//   de carvão, na fase 3 mais 1 Pregador; teto 8; abre o fraco de qualquer lado na recuperação; pelo relógio: a cada 35/25/20 s) e, na
+//   fase 3, a explosão de pressão (disco de 7 m, aviso 3 s, 80; atrás de pilar não pega e o pilar perde 1/3; abre o fraco; a cada 15 s).
+//   Fase 2: "a pulseira queimou", a couraça racha, anda a 2,6 e deixa rastro de brasa (2 s onde pisa). Fase 3: o manômetro no vermelho.
+//   Ponto fraco: o tanque das costas (×3), sempre por trás (> 110°) e de qualquer lado na recuperação do apito e da explosão.
+// - Etapa C2 (rodada 20): CAMP_OBJ['C2.1'] (matar o tipo 15); energia ligada (campEnergia); 20 comuns pelas grades (CAMP_CURVA.C2 do
+//   O3-D02), sem os especiais do clássico; na morte a base (O3-D07) derruba lacaios e comuns e a etapa acaba (cenas c4-fim, c5-abertura
+//   quando a Galeria 7 existir; sem ela, o fim da campanha pelo motor do O3-D02).
+// - Interativos da arena (ZINT_MAPA.forno): 4 válvulas de vapor ('valvula', tipo novo: F grátis solta uma coluna de 2,5 m por 2 s;
+//   o Foguista dentro fica atordoado 3 s com o fraco aberto e o ataque no ar cancelado; zumbis dentro levam 50/s; recarga 20 s), 6
+//   pilares de tijolo (3000), 2 barris de gás (8% no chefe, O3-D07), a máquina de munição (O2-C10), a nota n-forno-pulseira (O3-D04)
+//   e a Caixa (M.z.boxes). Zonas (host): a esteira leva o Foguista atordoado para a boca do forno 4 (4%/s lá dentro) e a boca dá 20/s
+//   no jogador; o poço de cinzas deixa zumbis e o Foguista a ×0,6. Cliente: a esteira leva o jogador a 1,5 m/s e o poço o deixa a ×0,6
+//   (como o arame do O3-D09: o passo do quadro), porque a posição do jogador é dele.
+// - Cliente: modelo pelo registro do O3-D06 (CAMP_ZK[15] e CAMP_ZKF.modelo/anim[15]: macacão, avental de couro, luvas, boné, óculos,
+//   pá de carvão, o tanque nas costas com o manômetro (verde, âmbar, vermelho por fase, pisca no aviso da explosão), o apito com a
+//   corrente e as rachaduras acesas da fase 2); fornoAnim (MAP_ANIM da arena): portas dos fornos, brilho do aviso, fogo, a lona da
+//   esteira, a esteira e o poço no jogador; brasas no chão (disco da brasa lançada e rastro da fase 2) numa InstancedMesh na cena com os
+//   mesmos parâmetros de material do pool de avisos do O3-D07 (o programa já existe: nada compila na luta), montada junto com ele.
+//   O rastro é tirado da posição do chefe no próprio cliente (nada a mais na rede); o resto vem pelo aviso que já chega.
+// Nenhum gancho fora dos blocos além da marca @@CAMP-MAPAS@@. ZKIND: os tipos 7–14 que ainda não existem viram null (sem buraco: o
+// ZKIND.map(() => 0) do zMix soma só elementos presentes); o O3-D08/D09 trocam pelo tipo de verdade.
+for (let k = 7; k < 15; k++) if (!(k in ZKIND)) ZKIND[k] = null;
+Object.assign(ZKIND, { 15: { n: 'O Foguista', pts: 1000, xp: 50, sz: 1.7, rad: .55, chefe: 1, capGolpe: .06, capFraco: .1, capArmadilha: .02, capNuke: .05, capBarril: .08, fracoK: 3, fracoTras: 110 } });
+const CAMP_FOG = { // números do Foguista que não são de ataque (§7.3 e §8.2; o D15 ajusta)
+  k: 15, nasce: { x: 0, z: -17 }, // sobe do carvão na frente do forno 3
+  apito: { primeiro: 12, cada: [35, 25, 20] }, // o primeiro aos 12 s, depois a cada 35/25/20 s (fase 1/2/3)
+  pressao: { primeiro: 5, cada: 15 }, // fase 3: a primeira 5 s depois da troca, depois a cada 15 s
+  lac: { carvoeiro: 12, pregador: 13, n: 4, pregN: 1, max: 8 }, // apito: tipos (sem o O3-D08, comuns), quantos e o teto de vivos
+  rastro: { passo: .8, s: 2, r: .9, dps: 15, parcela: 5, dy: .4, max: 10 }, // fase 2: um ponto de brasa a cada 0,8 m andados, 2 s, raio 0,9 m, 15/s
+  esteira: { dy: .5, chefePct: .04, bocaDps: 20, parcela: 5 }, // esteira: altura máxima do pé; na boca do forno 4: 4%/s no Foguista e 20/s no jogador
+  poco: { lento: .6, dy: .4 }, // poço de cinzas: ×0,6 (zumbis, o Foguista e o jogador)
+  forno: { dpsZumbi: 200, imunes: [12], frente: 3.7, frenteZ: 13 }, // porta do forno: 200/s nos zumbis (menos o Carvoeiro); "na frente": |x - forno| ≤ 3,7 e até 13 m da boca
+  cli: { brasaN: 9, brasaK: .42, rastroK: 1.25, apaga: .6, flick: [9, 15], emb: 48, embCor: 0xff6a1a, embY: .04, porta: [6, 9], vapor: [.6, .25, 11] }, // brasas, portas (velocidade abre/fecha), vapor (escala)
+  cores: { pele: 0x6e5c50, roupa: 0x2f3b44, calca: 0x2b343b, olho: [0xff7a1a, 5], cabelo: 0x1a1510, couro: 0x4a2e1a, luva: 0x2a1c12, bone: 0x22262a, metal: 0x5c5f62, ferro: 0x24262a,
+    cobre: 0x8a5a2e, madeira: 0x5a3c22, aco: 0x7c8086, vidro: 0x1a1c1c, racha: 0xff5a10, mano: [0x40ff60, 0xffb020, 0xff2010], pulseira: 0x1a1412 },
+};
+const fgAng = (P, q) => Math.atan2(-(q.pos[0] - P.x), -(q.pos[2] - P.z));
+const fgLac = tipo => ZKIND[tipo] ? tipo : 0; // sem o O3-D08 (Carvoeiro 12, Pregador 13): comuns
+const fgLacOnde = () => CAMP_CH.campo || curMapId !== 'forno' ? 'perto' : FORNO.lacaio; // a calha só existe na arena (versão de campo: perto dos jogadores)
+CAMP_CHEFE[15] = {
+  nome: 'O Foguista', rodada: 20, base: 6, porJog: 4, vel: 2, dm: 1.6, aw: .7, ac: 1.5,
+  nasce: CAMP_FOG.nasce, entrada: 'fog-entrada', primeiroS: 3,
+  fases: [{ de: 1, vel: 2 }, { de: .6, vel: 2.6, fala: 'fog-fase2' }, { de: .25, vel: 2.6, fala: 'fog-fase3', baixa: 1 }],
+  ataques: [
+    { id: 'pa', fases: [1, 2, 3], peso: 4, cd: 2.5, aviso: .9, ativo: 0, rec: 1, forma: 'setor', dims: [3.2, 100], dano: 60, empurra: 4, som: 'fgpa', alcance: [0, 3.6] },
+    { id: 'forno', fases: [1, 2, 3], peso: 3, cd: 9, aviso: 1.5, ativo: 2, rec: 0, forma: 'linha', dims: [10, 2.4], dps: 25, vista: 0, campo: 0, fala: 'fog-forno', som: 'fgforno', alcance: [0, 60], pos: fgFornoPos, ok: fgFornoOk },
+    { id: 'brasa', fases: [1, 2, 3], peso: 3, cd: 5, aviso: 1, ativo: 4, rec: .6, forma: 'disco', dims: [3], onde: 'alvo', dps: 15, som: 'fgbrasa', alcance: [4, 24] },
+    { id: 'apito', fases: [1, 2, 3], peso: 0, aviso: 2, ativo: 0, rec: 1.5, forma: null, fraco: 1, fala: 'fog-apito', som: 'fgapito', ok: () => false, ativa: fgApito }, // fora do sorteio: o relógio (fgTick) chama
+    { id: 'pressao', fases: [3], peso: 0, aviso: 3, ativo: 0, rec: 2, forma: 'disco', dims: [7], dano: 80, cobre: 1, pilarFrac: 1 / 3, fraco: 1, vista: 0, som: 'fgpressao', ok: () => false, ativa: fgPressaoFx }, // idem
+  ],
+  fraco: { caixa: { f: -.26, r: .2, y0: 1.02, y1: 1.48 } }, // o tanque das costas (×sz)
+  ia: fgIA, tick: fgTick, fase: fgFase, inicio: fgInicio, morte: z => { campFala('fog-morte'); FGSRV.z = null; FGSRV.rastro.length = 0; },
+  cliFase: fgCliFase, cliQuadro: fgCliQuadro,
+};
+CAMP_OBJ['C2.1'] = { tipo: 'matar', titulo: 'Derrube o Foguista', chefe: 15 }; // etapa C2 (O3-D02): o chefe entra pelo relógio do O3-D07
+// ---------- host: estado do Foguista (um por vez) ----------
+const FGSRV = { z: null, apT: 0, prT: 1e12, rastro: [], rx: 0, rz: 0 };
+function fgInicio(z) { const P = z.body.pos; Object.assign(FGSRV, { z, apT: now + CAMP_FOG.apito.primeiro, prT: 1e12, rx: P.x, rz: P.z }); FGSRV.rastro.length = 0; }
+const fgEsteira = (x, z) => { const E = FORNO.esteira; return Math.abs(x - E.x) <= E.w / 2 && z >= fornoFace() && z <= E.z1; };
+const fgBoca = (x, z) => { const E = FORNO.esteira; return Math.abs(x - E.x) <= E.w / 2 && z >= fornoFace() && z <= fornoFace() + E.boca; };
+const fgPoco = (x, z) => { const P = FORNO.poco; return x >= P[0] && x <= P[1] && z >= P[2] && z <= P[3]; };
+const fgImune = o => CAMP_FOG.forno.imunes.includes(o.kind) || !!(typeof CAMP_ZK === 'object' && CAMP_ZK[o.kind]?.imuneFogo); // Carvoeiro (O3-D08: CAMP_ZK[12].imuneFogo)
+const fgDif = () => zDf().dmg / CAMP_CHEFE_BASE.danoDif; // dano das zonas do chefe escala como os ataques (Normal = o número da tabela)
+function fgNaFrente(i, q) { const F = CAMP_FOG.forno, x = FORNO.fornos[i], fz = fornoFace(); return Math.abs(q.pos[0] - x) <= F.frente && q.pos[2] >= fz && q.pos[2] <= fz + F.frenteZ; }
+function fgFornoOk() { if (curMapId !== 'forno' || CAMP_CH.campo) return false; for (const q of S.players.values()) if (q.alive && !q.downed) for (let i = 0; i < FORNO.fornos.length; i++) if (fgNaFrente(i, q)) return true; return false; }
+function fgFornoPos(z, tg) { // o forno com mais jogadores na frente (empate: o mais perto do alvo); o fogo sai da porta para o sul
+  let best = 0, bn = -1, bd = 1e9;
+  for (let i = 0; i < FORNO.fornos.length; i++) { let n = 0; for (const q of S.players.values()) if (q.alive && !q.downed && fgNaFrente(i, q)) n++; const d = Math.abs(tg.pos[0] - FORNO.fornos[i]); if (n > bn || (n === bn && d < bd)) { bn = n; bd = d; best = i; } }
+  return [[FORNO.fornos[best], 0, fornoFace(), Math.PI]];
+}
+function fgApito(z, A, CH) { // fim do aviso do apito: o Pregador (fase 3) primeiro, depois os Carvoeiros, no teto de vivos (+2 por jogador a partir do 2º)
+  const L = CAMP_FOG.lac, onde = fgLacOnde();
+  if (CH.fase >= 2) campChefeLacaios({ tipo: fgLac(L.pregador), n: L.pregN, max: L.max, onde });
+  campChefeLacaios({ tipo: fgLac(L.carvoeiro), n: L.n, max: L.max, onde });
+  broadcast({ t: 'camp', k: 'fg', e: 'calha' });
+}
+function fgPressaoFx() { broadcast({ t: 'camp', k: 'fg', e: 'pressao' }); } // o estouro (som e fumaça no cliente; o dano é da base)
+function fgFase(z, n) { FGSRV.apT = Math.min(FGSRV.apT, now + CAMP_FOG.apito.cada[n]); if (n === 2) FGSRV.prT = now + CAMP_FOG.pressao.primeiro; }
+function fgIA(z, dt, tgt, CH) { // true = cuidou (a esteira leva o atordoado para a boca do forno 4); false = a base (avisa/ataca/atordoado) e a perseguição
+  if (FGSRV.z !== z) fgInicio(z);
+  const P = z.body.pos;
+  if (curMapId === 'forno' && z.atord > now && P.y < CAMP_FOG.esteira.dy && fgEsteira(P.x, P.z)) {
+    P.z = Math.max(fornoFace() + z.rad, P.z - FORNO.esteira.v * dt); z.body.vel.set(0, 0, 0); z.body.onGround = true; z.atkWind = 0;
+    z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z; z.stuck = 0; return true;
+  }
+  return false;
+}
+function fgDanoZona(q, campo, dps, parc, dt) { const v = (q[campo] || 0) + dps * dt; if (v >= parc) { q[campo] = v - parc; zHurt(q, parc, { x: q.pos[0], z: q.pos[2] }); } else q[campo] = v; }
+function fgTick(z, dt, CH) { // relógio do apito e da explosão, rastro de brasa, fogo da porta nos zumbis, boca do forno no Foguista
+  if (FGSRV.z !== z) fgInicio(z);
+  const P = z.body.pos, F = CAMP_FOG, k = fgDif();
+  // rastro de brasa (fase 2 em diante): um ponto a cada passo andado no chão; jogador em cima leva 15/s
+  const L = FGSRV.rastro; for (let i = L.length - 1; i >= 0; i--) if (now >= L[i].fim) L.splice(i, 1);
+  if (CH.fase >= 1 && P.y < F.rastro.dy && hyp(P.x - FGSRV.rx, P.z - FGSRV.rz) >= F.rastro.passo) { L.push({ x: P.x, z: P.z, fim: now + F.rastro.s }); if (L.length > F.rastro.max) L.shift(); FGSRV.rx = P.x; FGSRV.rz = P.z; }
+  else if (CH.fase < 1) { FGSRV.rx = P.x; FGSRV.rz = P.z; }
+  if (L.length) for (const q of S.players.values()) {
+    if (!q.alive || q.downed || q.pos[1] > F.rastro.dy) { q.fgRa = 0; continue; }
+    let den = false; for (const c of L) if (hyp(q.pos[0] - c.x, q.pos[2] - c.z) <= F.rastro.r) { den = true; break; }
+    if (den) fgDanoZona(q, 'fgRa', F.rastro.dps * k, F.rastro.parcela, dt); else q.fgRa = 0;
+  }
+  // porta do forno no ativo: os zumbis no retângulo (menos o chefe e os imunes) queimam a 200/s, sem pontos
+  const A = CH.atk;
+  if (A && A.a.id === 'forno' && A.ini && now < A.fb) { // A.ini: a base já cortou a linha no pilar (o relógio do chefe roda antes do ataque)
+    const s = A.sh[0], len = A.len[0], fx = -Math.sin(s[3]), fz = -Math.cos(s[3]);
+    for (const o of Z.zs.values()) {
+      if (o === z || o.st !== 'in' || ZKIND[o.kind]?.chefe || fgImune(o)) continue;
+      const dx = o.body.pos.x - s[0], dz = o.body.pos.z - s[2], al = dx * fx + dz * fz;
+      if (al < -o.rad || al > len + o.rad || Math.abs(dx * fz - dz * fx) > A.d2 / 2 + o.rad) continue;
+      o.hp -= F.forno.dpsZumbi * dt; if (o.hp <= 0) zKill(o, null, 'body', 'forno', false, false);
+    }
+  }
+  // boca do forno 4 (a esteira o trouxe atordoado): 4%/s enquanto estiver lá (nunca na troca de fase)
+  if (curMapId === 'forno' && z.st === 'in' && P.y < F.esteira.dy && fgBoca(P.x, P.z) && !(CH.inv > now)) {
+    z.hp -= z.maxHp * F.esteira.chefePct * dt; if (z.hp <= 0) { zKill(z, null, 'body', 'forno', false, false); return; }
+  }
+  // explosão de pressão (fase 3) e apito, pelo relógio: só entre ataques, fora da troca de fase e sem estar atordoado
+  if (CH.atk || now < CH.inv || z.atord > now) return;
+  const tg = campChefeAlvo(z) || [...S.players.values()].find(q => q.alive && !q.downed); if (!tg) return;
+  if (CH.fase >= 2 && now >= FGSRV.prT) { const a = CH.def.ataques.find(x => x.id === 'pressao'); if (a) { campChefeAtaca(z, a, tg); FGSRV.prT = now + F.pressao.cada; } return; }
+  if (now >= FGSRV.apT) { const a = CH.def.ataques.find(x => x.id === 'apito'); if (a) { campChefeAtaca(z, a, tg); FGSRV.apT = now + F.apito.cada[CH.fase]; } }
+}
+// ---------- host: zonas da arena (rodada da arena; jogador e zumbi) ----------
+function fgArenaTick(dt) {
+  if (!CAMP.on || curMapId !== 'forno' || !Z.on) return;
+  const F = CAMP_FOG, k = fgDif();
+  for (const q of S.players.values()) { // boca do forno 4: 20/s no jogador (a esteira do cliente o leva até lá)
+    if (q.alive && !q.downed && q.pos[1] < F.esteira.dy && fgBoca(q.pos[0], q.pos[2])) fgDanoZona(q, 'fgBo', F.esteira.bocaDps * k, F.esteira.parcela, dt); else q.fgBo = 0;
+  }
+  for (const z of Z.zs.values()) { // poço de cinzas: ×0,6 (multiplica e divide de volta, como a nuvem de cal do O3-D06)
+    const P = z.body.pos, den = z.st === 'in' && P.y <= F.poco.dy && fgPoco(P.x, P.z);
+    if (den && !z.fgPo) { z.fgPo = 1; z.cv = (z.cv || 1) * F.poco.lento; } else if (!den && z.fgPo) { z.fgPo = 0; z.cv = (z.cv || 1) / F.poco.lento; }
+  }
+}
+CAMP_GANCHOS.tick.push(fgArenaTick);
+CAMP_GANCHOS.rodada.push(() => { // rodada 20 (§8.2): os 20 comuns da curva (os especiais do clássico ficam fora; os lacaios são do Foguista)
+  if (CAMP.modo === 'campanha' && CAMP_ATOS[CAMP.et]?.mapa === 'forno' && Z.mix) { Z.mix = ZKIND.map(() => 0); Z.mixN = 0; }
+});
+CAMP_GANCHOS.inicio.push(e => { // etapa da arena: energia ligada (máquina de munição; a arena não tem chave de energia)
+  if (CAMP_ATOS[e]?.mapa === 'forno' && curMapId === 'forno') campEnergia();
+  FGSRV.z = null; FGSRV.rastro.length = 0;
+});
+// menu: a regra "arena nunca vira mapa do clássico/PvP" é a do O3-D09 (campForm0 com MAPS[..].camp): vale para o forno sem nada aqui.
+// ---------- interativo novo: válvula de vapor ('valvula'; §4.2) ----------
+ZINT.valvula = { nome: 'Válvula de vapor', custo: 0, usoR: 2.2, srvR: 2.8, vaporS: 2, recarga: 20, r: 2.5, atordoa: 3, dpsZumbi: 50, forca: 2 }; // F solta a coluna de vapor do teto
+function fornoEsconde() { const W_ = ZC.world; if (curMapId !== 'forno' || !W_) return; for (const o of [W_.pap?.g, W_.power?.g]) if (o) o.visible = false; } // a arena não tem PaP nem chave de energia (estão fora do salão)
+const FG_VAP = { geo: null, mat: null }; // coluna de vapor (uma geometria e um material para as 4 válvulas; aditivo, só aceso no vapor)
+function fgVapGeo() {
+  if (FG_VAP.geo) return FG_VAP;
+  const h = FORNO.H - .7, g = new THREE.CylinderGeometry(1, .7, h, 16, 4, true), P = g.attributes.position, cor = new Float32Array(P.count * 3);
+  for (let i = 0; i < P.count; i++) { const t = (P.getY(i) + h / 2) / h, k = .25 + .75 * t * t; cor[i * 3] = cor[i * 3 + 1] = cor[i * 3 + 2] = k; } // mais forte em cima (o bocal)
+  g.setAttribute('color', new THREE.BufferAttribute(cor, 3)); g.translate(0, h / 2, 0); g.userData.keep = true;
+  FG_VAP.geo = g; FG_VAP.mat = new THREE.MeshBasicMaterial({ color: 0xd8e2e8, vertexColors: true, transparent: true, opacity: .32, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false });
+  return FG_VAP;
+}
+const fgValvC = o => [o.x + o.n[0] * o.d, o.z + o.n[1] * o.d]; // centro da coluna (o bocal no teto, a o.d metros do cano, para a frente)
+ZINT_FN.valvula = {
+  est: ['pronto', 'vapor', 'recarga'],
+  efeito: (o, D) => `campanha: F solta uma coluna de vapor de ${D.r} m por ${D.vaporS} s (o Foguista dentro: atordoado ${D.atordoa} s e fraco aberto; zumbis ${D.dpsZumbi}/s); recarga de ${D.recarga} s`,
+  monta(o, i) {
+    fornoEsconde();
+    if (!campZintOn()) return CAMP_STUB();
+    const C_ = CAMP_FOG.cores, D = ZINT.valvula, H = FORNO.H, g = zintGrupo(o), corpo = new THREE.Group(); g.add(corpo); // frente local +z = o.n (para a coluna)
+    zintCil(corpo, .13, H, H / 2, mc(C_.ferro), 10); zintCil(corpo, .2, .14, .9, mc(C_.cobre), 10); // cano e a luva do registro
+    const hz = zintCil(corpo, .11, o.d, H - .45, mc(C_.ferro), 10); hz.rotation.x = Math.PI / 2; hz.position.z = o.d / 2; // cano no teto até o bocal
+    const bc = zintCil(corpo, .45, .35, H - .75, mc(C_.metal), 12); bc.position.z = o.d; campPeca(corpo, .3, .1, .3, 0, H - .45, o.d, mc(C_.ferro)); // bocal
+    campPeca(corpo, .5, .35, .08, 0, 1.75, .05, mc(0x2a2522)); mergeParts(corpo); // placa (atrás da roda)
+    const roda = new THREE.Group(); roda.position.set(0, 1.3, .22); g.add(roda); // roda do registro (gira no vapor)
+    const aro = new THREE.Mesh(new THREE.TorusGeometry(.26, .035, 6, 18), mc(0xa02818)); roda.add(aro); for (let a = 0; a < 3; a++) bx(roda, .5, .04, .04, 0, 0, 0, mc(0xa02818)).rotation.z = a * Math.PI / 3; bx(roda, .1, .1, .12, 0, 0, -.06, mc(C_.ferro));
+    mergeParts(roda);
+    const V = fgVapGeo(), vap = new THREE.Mesh(V.geo, V.mat); vap.position.set(0, 0, o.d); vap.scale.set(D.r, 1, D.r); vap.visible = false; vap.frustumCulled = false; vap.userData.noShadow = true; vap.castShadow = vap.receiveShadow = false; g.add(vap);
+    world.add(g); const [cx, cz] = fgValvC(o); cullAdd(g, (o.x + cx) / 2, (o.z + cz) / 2, o.d / 2 + D.r + .5);
+    return { g, corpo, roda, vap, col: zintCaixaCol(o, .4, .4, H), raio: .3 };
+  },
+  estado(o, e, c, ant, sync) {
+    if (e.off) return; e.vap.visible = c.st === 'vapor';
+    if (sync || ant === c.st || c.st !== 'vapor') return;
+    const [cx, cz] = fgValvC(o), p = new V3(cx, 1, cz); play('hiss', p); play('fgvapor', p);
+    for (let k = 0; k < 4; k++) puff(new V3(cx + rand(-1.2, 1.2), rand(.2, 1.6), cz + rand(-1.2, 1.2)), 0xdfe6ea, 2.4, 1.2, .9);
+  },
+  prompt(o, i, c, D) {
+    if (!campCliOn()) return null;
+    if (c.st === 'vapor') return { k: 'zint', id: i, ok: false, txt: `${D.nome}: soltando vapor` };
+    if (c.st === 'recarga') return { k: 'zint', id: i, ok: false, txt: `${D.nome}: recarregando (${Math.max(1, Math.ceil(c.end - now))} s)` };
+    return { k: 'zint', id: i, txt: 'Soltar o vapor (atordoa o Foguista)' };
+  },
+  quadro(o, e, c, dt) {
+    if (e.off || c.st !== 'vapor') return; const K = CAMP_FOG.cli.vapor, D = ZINT.valvula;
+    e.roda.rotation.z -= dt * 7; const s = D.r * (1 + K[1] * Math.sin(now * K[2])) * (c.end - now < .4 ? Math.max(.05, (c.end - now) / .4) : 1); e.vap.scale.set(s, 1 + K[1] * .3 * Math.sin(now * K[2] * 1.3), s);
+  },
+  usar(p, i, o, E, D, err) {
+    if (!CAMP.on) return; if (E.st !== 'pronto') return err(E.st === 'vapor' ? 'A válvula está soltando vapor' : 'A válvula está recarregando');
+    E.atord = false; E.tk = now; zintPoe(i, 'vapor', D.vaporS, p.id);
+  },
+  tick(i, o, E, D) { // host: no vapor, o Foguista dentro fica atordoado (uma vez por coluna) e os zumbis queimam; depois recarrega
+    if (E.st === 'recarga') { if (now >= E.t) zintPoe(i, 'pronto', 0, null); return; }
+    if (E.st !== 'vapor') return;
+    const dt = Math.min(.25, Math.max(0, now - (E.tk ?? now))); E.tk = now;
+    const [cx, cz] = fgValvC(o), CH = CAMP_CH;
+    for (const z of Z.zs.values()) {
+      if (z.st !== 'in' || z.body.pos.y > FORNO.H - 1) continue; const d = hyp(z.body.pos.x - cx, z.body.pos.z - cz);
+      if (ZKIND[z.kind]?.chefe) {
+        if (E.atord || z !== CH.z || d > D.r + (z.rad || .5)) continue;
+        E.atord = true; z.atord = Math.max(z.atord || 0, now + D.atordoa); z.fracoAte = Math.max(z.fracoAte || 0, z.atord); z.atkWind = 0;
+        if (CH.atk) { CH.atk = null; broadcast({ t: 'camp', k: 'telx' }); } // o ataque no ar cai
+        CH.prox = Math.max(CH.prox, z.atord + rand(...CAMP_CHEFE_BASE.pausa)); campChefeEnvia();
+        continue;
+      }
+      if (d > D.r + (z.rad || .3)) continue;
+      z.hp -= D.dpsZumbi * dt; if (z.hp <= 0) zKill(z, null, 'body', 'vapor', false, false);
+    }
+    if (now >= E.t) zintPoe(i, 'recarga', D.recarga, null);
+  },
+};
+ZINT_MAPA.forno = [ // posições de mão (salão aberto; auditoria.mjs --mapas forno): cobertura no meio do salão e na frente dos fornos
+  { t: 'pilar', id: 'forno-pilar-1', v: 'tijolo', x: -6, z: -15, n: [0, 1] }, { t: 'pilar', id: 'forno-pilar-2', v: 'tijolo', x: -12, z: -4, n: [0, 1] }, // o 1 corta o fogo do forno 2
+  { t: 'pilar', id: 'forno-pilar-3', v: 'tijolo', x: 1, z: -7, n: [0, 1] }, { t: 'pilar', id: 'forno-pilar-4', v: 'tijolo', x: -4, z: 6, n: [0, 1] },
+  { t: 'pilar', id: 'forno-pilar-5', v: 'tijolo', x: 11.5, z: 2, n: [0, 1] }, { t: 'pilar', id: 'forno-pilar-6', v: 'tijolo', x: -1, z: 15, n: [0, 1] },
+  { t: 'valvula', id: 'forno-valvula-1', x: 9.2, z: -17.5, n: [-1, 0], d: 3.2 }, // coluna em cima da esteira, perto da boca do forno 4
+  { t: 'valvula', id: 'forno-valvula-2', x: -15.5, z: -10, n: [1, 0], d: 3.2 },
+  { t: 'valvula', id: 'forno-valvula-3', x: -9, z: 15.2, n: [0, -1], d: 3.2 },
+  { t: 'valvula', id: 'forno-valvula-4', x: 15.2, z: 12, n: [-1, 0], d: 3.2 },
+  { t: 'barril', v: 'gas', x: -17.45, z: -17, n: [1, 0] }, { t: 'barril', v: 'gas', x: 17.45, z: 0, n: [-1, 0] }, // gás nas paredes oeste e leste
+  { t: 'municao', x: -17.55, z: 20, n: [1, 0] }, // parede oeste, perto da entrada
+  { t: 'nota', v: 'pregada', id: 'n-forno-pulseira', x: FORNO.fornos[2] + FORNO.fornoW / 2, z: -FORNO.hz + 1.2, n: [1, 0], ato: 3 }, // na lateral do forno 3
+];
+// ---------- sons (sintetizados) ----------
+SND.fgapito = o => { tn(o, 1.05, 480, 820, .07, 'sine'); tn(o, 1.05, 720, 1230, .04, 'square'); tn(o, 1, 820, 1500, .08, 'sine', 1); tn(o, 1, 1230, 2250, .045, 'square', 1); nz(o, 2, 2600, 3400, .04, 'bandpass', 2); }; // o apito sobe de tom (2 s)
+SND.fgpa = o => { nz(o, .45, 500, 2200, .3, 'bandpass', 1.2); tn(o, .3, 140, 70, .2, 'triangle', .05); }; // a pá sobe raspando
+SND.fgforno = o => { nz(o, 1.5, 180, 900, .4, 'lowpass', 1); nz(o, 1.4, 1400, 500, .16, 'bandpass', 1, .15); tn(o, 1.2, 55, 90, .25, 'sawtooth', .2); }; // o forno ruge
+SND.fgbrasa = o => { nz(o, .35, 1800, 900, .22, 'bandpass', 2); for (let i = 0; i < 5; i++) nz(o, .05, 3200, 1500, .16, 'bandpass', 1.5, .3 + i * .09); }; // pá no carvão e estalos
+SND.fgpressao = o => { nz(o, 1.5, 700, 2600, .1, 'highpass', .7); nz(o, 1.5, 1400, 4200, .17, 'highpass', .7, 1.5); tn(o, 3, 60, 110, .12, 'sawtooth'); }; // pressão subindo (3 s)
+SND.fgvapor = o => { nz(o, 1.8, 5200, 2600, .22, 'highpass', .6); nz(o, 1.2, 900, 400, .12, 'lowpass', 1, .2); }; // jato de vapor
+// ---------- cliente: modelo pelo registro do O3-D06 (sem ele, o corpo comum) ----------
+function fgModelo(g, ud) { // macacão, avental de couro, luvas, boné e óculos, pá de carvão, o tanque com o manômetro e o apito nas costas
+  const C_ = CAMP_FOG.cores, T = ud.torso, H = ud.head, cou = mc(C_.couro), luv = mc(C_.luva), met = mc(C_.metal), fe = mc(C_.ferro), cob = mc(C_.cobre);
+  zcy(H, .13, .125, .06, 0, .25, .005, mc(C_.bone)); zbx(H, .2, .02, .1, 0, .225, -.13, mc(C_.bone)); // boné de foguista com a pala
+  for (const sx of [-1, 1]) zcy(H, .035, .035, .03, .05 * sx, .21, -.12, mc(C_.vidro)).rotation.x = Math.PI / 2; zbx(H, .24, .02, .02, 0, .21, -.1, cou); // óculos de proteção na testa
+  zbx(T, .44, .74, .02, 0, .1, -.172, cou); zbx(T, .03, .3, .015, .1, .55, -.16, cou); zbx(T, .03, .3, .015, -.1, .55, -.16, cou); // avental e as tiras
+  for (const sx of [-1, 1]) zbx(T, .035, .62, .012, .12 * sx, .3, .17, cou); zbx(T, .36, .05, .3, 0, .08, 0, cou); // alças do tanque e o cinto
+  for (const Hd of [ud.handL, ud.handR]) { zsp(Hd, .065, .08, .07, 0, -.05, 0, luv); zcy(Hd, .06, .07, .1, 0, .04, 0, luv); } // luvas
+  zcy(ud.foreL, .055, .055, .035, 0, -.24, 0, mc(C_.pulseira)); // a pulseira queimada no pulso
+  const pa = zbone(ud.handR, 0, -.06, -.02); ud.pa = pa; // pá de carvão (cabo ao longo do -y da mão)
+  zcy(pa, .022, .022, 1.05, 0, -.3, 0, mc(C_.madeira)); zbx(pa, .1, .1, .03, 0, .23, 0, mc(C_.madeira)); zbx(pa, .3, .34, .025, 0, -.95, -.04, mc(C_.aco)); zbx(pa, .3, .03, .1, 0, -1.11, -.01, mc(C_.aco));
+  const tq = zbone(T, 0, .36, .25); ud.tanque = tq; // tanque nas costas (o ponto fraco): cilindro, cintas, o apito em cima e a corrente
+  zcy(tq, .19, .19, .6, 0, 0, 0, met); for (const y of [-.2, .2]) zcy(tq, .2, .2, .04, 0, y, 0, fe); zsp(tq, .19, .08, .19, 0, .3, 0, met); zsp(tq, .19, .08, .19, 0, -.3, 0, met);
+  zcy(tq, .03, .03, .2, 0, .42, 0, cob); zcy(tq, .06, .045, .14, 0, .58, 0, cob); // o apito
+  for (let i = 0; i < 6; i++) zbx(tq, .015, .07, .015, -.04 - i * .03, .42 - i * .06, -.12 + i * .015, fe); // a corrente até o ombro
+  zcy(tq, .1, .1, .04, 0, .12, .2, fe).rotation.x = Math.PI / 2; // aro do manômetro (virado para trás)
+  ud.mano = C_.mano.map(c => { const b = zbone(tq, 0, .12, .225); zcy(b, .085, .085, .01, 0, 0, 0, zGlow(c, 2.2)).rotation.x = Math.PI / 2; return b; }); // mostrador verde, âmbar, vermelho (um por fase)
+  const ag = zbone(tq, 0, .12, .232); ud.agulha = ag; zbx(ag, .012, .07, .006, 0, .03, 0, mc(0x0a0a0a)); // agulha
+  const rc = zGlow(C_.racha, 2.5); ud.racha = [zbone(T, 0, 0, 0), zbone(ud.armL, 0, 0, 0), zbone(ud.armR, 0, 0, 0)]; // rachaduras acesas (fase 2 em diante)
+  for (const [x, y, a] of [[-.08, .45, .6], [.1, .3, -.5], [-.12, .15, .2], [.05, .55, 1.1]]) zbx(ud.racha[0], .028, .18, .014, x, y, -.18, rc).rotation.z = a;
+  for (const [x, y, a] of [[.08, .4, -.7], [-.1, .25, .4]]) zbx(ud.racha[0], .028, .18, .014, x, y, .17, rc).rotation.z = a;
+  for (const A of [ud.racha[1], ud.racha[2]]) { zbx(A, .024, .15, .014, .05, -.12, -.05, rc).rotation.z = .4; zbx(A, .024, .11, .014, -.04, -.22, .04, rc).rotation.z = -.5; }
+  for (const b of ud.racha) zHide(b, 1);
+}
+const FG_POSE = { // braços (armR, foreR, armL, foreL, abre R, abre L) e o tronco: pá em posição, erguida, golpe, pegar e jogar brasa, puxar o apito, pressão, apontar o forno
+  porte: [.5, .9, .7, 1.1, -.15, .35, 0], ergue: [2.6, .3, 2.4, .4, -.1, .1, -.15], golpe: [.2, .2, .35, .3, -.1, .15, .45], cava: [-.3, .4, .2, .6, -.2, .3, .35], joga: [1.9, .1, 1.7, .2, -.1, .2, -.1],
+  apito: [.5, .9, 3, .2, -.15, .15, 0], pressao: [.6, .3, .6, .3, -1.1, 1.1, .25], forno: [1.5, 0, .7, 1.1, -.2, .35, 0] };
+function fgTelAtivo() { const L = CAMP.c?.tel; if (!L) return null; for (let i = L.length - 1; i >= 0; i--) { const t = L[i]; if (now < t.t0 + t.s + Math.max(t.at, .35)) return t; } return null; }
+function fgAnim(zc, ud, dt) { // a pose dos braços é do Foguista (sobrescreve a do comum, suavizada aqui)
+  if (zc.f & (8 | 32 | 64)) return;
+  const ch = CAMP.c?.ch, tel = ch?.k === CAMP_FOG.k && ch.z === zc.id ? fgTelAtivo() : null, ta = tel ? tel.t0 + tel.s : 0, av = tel && now < ta;
+  let P = FG_POSE.porte, rap = 10;
+  if (tel?.a === 'pa') { P = av ? FG_POSE.ergue : FG_POSE.golpe; rap = av ? 8 : 22; }
+  else if (tel?.a === 'brasa') { P = av ? FG_POSE.cava : FG_POSE.joga; rap = av ? 8 : 20; }
+  else if (tel?.a === 'apito' && av) P = FG_POSE.apito; else if (tel?.a === 'pressao' && av) P = FG_POSE.pressao; else if (tel?.a === 'forno' && av) P = FG_POSE.forno;
+  const k = 1 - Math.exp(-dt * rap), v = zc.fgP ||= FG_POSE.porte.slice();
+  for (let i = 0; i < v.length; i++) v[i] += (P[i] - v[i]) * k;
+  const tr = av && (tel.a === 'pressao' || tel.a === 'apito') ? Math.sin(now * 47) * .05 : 0; // treme no aviso do apito e da pressão
+  ud.armR.rotation.set(v[0], 0, v[4]); ud.foreR.rotation.set(v[1], 0, 0); ud.handR.rotation.set(0, 0, 0); ud.handL.rotation.set(0, 0, 0); ud.armL.rotation.set(v[2] + tr, 0, v[5]); ud.foreL.rotation.set(v[3], 0, 0); ud.torso.rotation.x += v[6] + tr;
+}
+if (typeof CAMP_ZK === 'object' && typeof CAMP_ZKF === 'object' && CAMP_ZKF?.modelo) { // registro do O3-D06 (gancho no zLook/zBuildModel/zAnimHuman)
+  CAMP_ZK[15] = { cores: CAMP_FOG.cores, cabelo: 0, geme: 'brute', gemeS: [6, 12], sc: 0, vel: [2, 2] }; // sc/vel: o status do O3-D06 lê (a base do O3-D07 põe a velocidade da fase depois)
+  CAMP_ZKF.modelo[15] = fgModelo; CAMP_ZKF.anim[15] = fgAnim;
+}
+// ---------- cliente: fase, manômetro, mensagens ----------
+function fgCliFase(zc, f) {
+  if (!zc) return; const p = zc.pos.clone(); p.y += 2;
+  if (f === 2) { play('crack', p); play('fgbrasa', p); for (let k = 0; k < 4; k++) puff(p.clone().add(new V3(rand(-.6, .6), rand(-.8, .4), rand(-.6, .6))), 0xff6a1a, 1, .6, .8); } // a couraça racha
+  if (f === 3) { play('hiss', p); play('power', p); puff(p, 0xe8eef2, 2, 1, 1); } // o ponteiro no vermelho
+}
+function fgCliQuadro(zc, dt, ch) { // manômetro (verde, âmbar, vermelho; pisca no aviso da explosão), rachaduras da fase 2, agulha
+  const ud = zc.model?.userData; if (!ud?.mano) return;
+  const f = ch?.f || 1, tel = fgTelAtivo(), pisca = tel?.a === 'pressao' && now < tel.t0 + tel.s && Math.sin(now * 25) < 0;
+  for (let i = 0; i < 3; i++) zHide(ud.mano[i], i !== f - 1 || pisca);
+  for (const b of ud.racha) zHide(b, f < 2);
+  ud.agulha.rotation.z = -1.2 + (f - 1) * 1.1 + (f === 3 ? Math.sin(now * 13) * .15 : 0);
+}
+CAMP_GANCHOS.msg.fg = m => { // { e: 'calha' | 'pressao' }: carvão caindo da calha (lacaios) e o estouro da pressão
+  if (m.e === 'calha') { if (curMapId !== 'forno') return; const L = FORNO.lacaio, p = new V3(L.x + 1.5, 4.5, L.z); play('slam', p); play('fgbrasa', p); for (let k = 0; k < 6; k++) puff(new V3(L.x + rand(-.6, 2.4), rand(.3, 5), L.z + rand(-.8, .8)), 0x1c1a19, 2, 1.6, .5); }
+  else if (m.e === 'pressao') { const ch = CAMP.c?.ch, zc = ch && ZC.zs.get(ch.z); if (!zc) return; const p = zc.pos.clone(); p.y += 1.5; play('boom', p); play('hiss', p);
+    for (let k = 0; k < 10; k++) puff(p.clone().add(new V3(rand(-3.5, 3.5), rand(-1, 1.5), rand(-3.5, 3.5))), 0xdfe6ea, 3, 1.4, 1.2); const d = camera.position.distanceTo(p); if (d < 14) me.shake = Math.max(me.shake, (1 - d / 14) * .5); }
+};
+// ---------- cliente: brasas no chão (brasa lançada e rastro da fase 2): uma InstancedMesh na cena, com os parâmetros do pool de avisos ----------
+const FG_FX = { emb: null, m4: new THREE.Matrix4(), q: new THREE.Quaternion(), v: new V3(), e: new V3(), cor: new THREE.Color(), rastro: [], rx: 0, rz: 0, rz0: null };
+function fgEmbMonta() {
+  if (FG_FX.emb) return FG_FX.emb;
+  const n = 10, pos = [], col = []; for (let i = 0; i < n; i++) { const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2; pos.push(0, 0, 0, Math.cos(a1), 0, Math.sin(a1), Math.cos(a0), 0, Math.sin(a0)); col.push(1, 1, 1, 0, 0, 0, 0, 0, 0); } // disco que some na borda (aditivo)
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.userData.keep = true;
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); // = pool do O3-D07
+  const M = new THREE.InstancedMesh(g, mat, CAMP_FOG.cli.emb); M.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  for (let i = 0; i < CAMP_FOG.cli.emb; i++) M.setColorAt(i, FG_FX.cor.set(CAMP_FOG.cli.embCor));
+  M.count = 0; M.visible = false; M.frustumCulled = false; M.renderOrder = 2; M.castShadow = M.receiveShadow = false; M.userData.noShadow = true; M.name = 'fgBrasas'; scene.add(M); FG_FX.emb = M;
+  try { M.count = 1; M.visible = true; renderer.setRenderTarget(CFG.gfx === 'alto' ? composer.readBuffer : null); try { renderer.compile(M, camera); } finally { renderer.setRenderTarget(null); M.count = 0; M.visible = false; } } catch (e) { }
+  return M;
+}
+function fgEmb(i, x, y, z, r) { const F = FG_FX; F.v.set(x, y + CAMP_FOG.cli.embY, z); F.e.set(r, 1, r); F.emb.setMatrixAt(i, F.m4.compose(F.v, F.q, F.e)); }
+function fgHud() { // CAMP_GANCHOS.hud (cada quadro do cliente na campanha): brasas da brasa lançada e do rastro do chefe
+  if (FORNO_V.portas && curMapId !== 'forno') { FORNO_V.portas = FORNO_V.calor = FORNO_V.chama = FORNO_V.lona = null; } // a arena saiu: solta as peças
+  const M = FG_FX.emb || (CAMP_AV ? fgEmbMonta() : null); if (!M) return; // junto com o pool de avisos (primeira tela da campanha)
+  const K = CAMP_FOG.cli, R = CAMP_FOG.rastro, c = CAMP.c, ch = c?.ch, L = FG_FX.rastro, max = K.emb; let n = 0;
+  // rastro: a posição do chefe no próprio cliente, a cada passo andado (fase 2 em diante)
+  for (let i = L.length - 1; i >= 0; i--) if (now >= L[i][3]) L.splice(i, 1);
+  const zc = ch?.k === CAMP_FOG.k ? ZC.zs.get(ch.z) : null;
+  if (zc && !zc.dead && ch.f >= 2 && zc.pos.y < R.dy) { if (hyp(zc.pos.x - FG_FX.rx, zc.pos.z - FG_FX.rz) >= R.passo) { L.push([zc.pos.x, zc.pos.y, zc.pos.z, now + R.s]); if (L.length > R.max) L.shift(); FG_FX.rx = zc.pos.x; FG_FX.rz = zc.pos.z; } }
+  else if (zc) { FG_FX.rx = zc.pos.x; FG_FX.rz = zc.pos.z; }
+  for (const p of L) { if (n >= max) break; const fade = clamp((p[3] - now) / K.apaga, 0, 1); fgEmb(n++, p[0], p[1], p[2], R.r * K.rastroK * fade * (.85 + .15 * Math.sin(now * K.flick[0] + p[0]))); }
+  // brasa lançada: o disco do aviso vira chão em brasa no ativo
+  if (c?.tel) for (const t of c.tel) {
+    if (t.a !== 'brasa' || !t.p[0]) continue; const ta = t.t0 + t.s; if (now < ta || now >= ta + t.at) continue;
+    const s = t.p[0], fade = clamp((ta + t.at - now) / K.apaga, 0, 1);
+    for (let j = 0; j < K.brasaN && n < max; j++) { const a = j * 2.39996, d = j ? t.d1 * (.25 + .6 * ((j * .618) % 1)) : 0; fgEmb(n++, s[0] + Math.cos(a) * d, s[1], s[2] + Math.sin(a) * d, t.d1 * K.brasaK * fade * (.8 + .2 * Math.sin(now * K.flick[1] + j))); }
+  }
+  if (n !== M.count || n) { M.count = n; M.visible = n > 0; if (n) M.instanceMatrix.needsUpdate = true; }
+}
+CAMP_GANCHOS.hud.push(fgHud);
+// ---------- cliente: a arena (MAP_ANIM) ----------
+const FGCLI = { ax: 0, az: 0, aOk: false, forno: -1, fogoT: 0 };
+function fgTel(a) { const L = CAMP.c?.tel; if (!L) return null; for (let i = L.length - 1; i >= 0; i--) { const t = L[i]; if (t.a === a && now < t.t0 + t.s + t.at) return t; } return null; }
+function fgCliCorta(x, z0, len) { // comprimento do fogo até o primeiro pilar de pé na linha da porta (cliente: estado do ZINT e o colisor montado)
+  const L = ZD?.zint, E = ZC.world?.zint; if (!L || !E) return len;
+  for (let i = 0; i < L.length; i++) { if (L[i].t !== 'pilar' || ZC.zint?.[i]?.st === 'caido') continue; const c = E[i]?.col; if (c && x >= c.minX && x <= c.maxX && c.minZ >= z0) len = Math.min(len, c.minZ - z0); }
+  return Math.max(.3, len);
+}
+function fornoAnim(dt) { // portas dos fornos, brilho do aviso e o fogo, a lona da esteira, a esteira e o poço no jogador
+  const V = FORNO_V, F = FORNO, K = CAMP_FOG.cli, camp = campCliOn() && ZC.on && !!CAMP.c;
+  if (camp && ZC.powT !== -1e9) ZC.powT = -1e9; // a energia da arena já vem ligada: sem o marcador do Pack-a-Punch (não há PaP aqui)
+  if (V.lona?.material.map) { const o = V.lona.material.map.offset; o.y = (((o.y - F.esteira.v * dt / F.esteira.lona) % 1) + 1) % 1; } // corre para o norte (o +v da textura, que o plano deitado põe no -z)
+  const tel = camp ? fgTel('forno') : null, ta = tel ? tel.t0 + tel.s : 0;
+  let fi = -1; if (tel?.p[0]) { let bd = 1e9; F.fornos.forEach((x, i) => { const d = Math.abs(x - tel.p[0][0]); if (d < bd) { bd = d; fi = i; } }); }
+  if (V.portas) V.portas.forEach((P, i) => { const alvo = i === fi && now >= ta ? F.porta.abre : 0, k = 1 - Math.exp(-dt * (alvo ? K.porta[0] : K.porta[1])); P.a += (alvo - P.a) * k; P.h.rotation.y = -P.a; });
+  if (V.calor) { const on = fi >= 0 && now < ta; V.calor.visible = on; if (on) { const u = clamp((now - tel.t0) / Math.max(.01, tel.s), 0, 1), C = F.calor; V.calor.position.x = F.fornos[fi]; V.calor.material.opacity = C.op[0] + (C.op[1] - C.op[0]) * u * (.5 + .5 * Math.sin((now - tel.t0) * (C.hz[0] + (C.hz[1] - C.hz[0]) * u) * Math.PI * 2)); } }
+  if (V.chama) { const on = fi >= 0 && now >= ta; V.chama.visible = on;
+    if (on) { const C = F.chama, j = C.pulso[0] + C.pulso[1] * Math.sin(now * C.pulso[2]); V.chama.position.set(F.fornos[fi], 0, fornoFace() + .2); V.chama.scale.set(j, j * (.9 + .2 * Math.sin(now * 23)), fgCliCorta(F.fornos[fi], fornoFace(), tel.d1));
+      if (FGCLI.forno !== tel.t0) { FGCLI.forno = tel.t0; const p = new V3(F.fornos[fi], 1.2, fornoFace() + 2); play('fgforno', p); play('boom', p); } } }
+  // jogador: a esteira leva (1,5 m/s para a boca do forno 4) e o poço de cinzas atrasa (×0,6: desfaz parte do passo do quadro)
+  if (!camp || !me.alive || me.downed) { FGCLI.aOk = false; return; }
+  if (me.pos.y < CAMP_FOG.esteira.dy && fgEsteira(me.pos.x, me.pos.z)) { const nz = Math.max(fornoFace() + .35, me.pos.z - F.esteira.v * dt); if (!blockedAt(me.pos.x, me.pos.y + .01, nz, me.h)) me.pos.z = nz; }
+  if (me.pos.y < CAMP_FOG.poco.dy && fgPoco(me.pos.x, me.pos.z)) {
+    if (FGCLI.aOk) { const k = 1 - CAMP_FOG.poco.lento, nx = me.pos.x - (me.pos.x - FGCLI.ax) * k, nz = me.pos.z - (me.pos.z - FGCLI.az) * k; if (!blockedAt(nx, me.pos.y + .01, nz, me.h)) { me.pos.x = nx; me.pos.z = nz; } }
+    FGCLI.aOk = true; FGCLI.ax = me.pos.x; FGCLI.az = me.pos.z; me.sprinting = false;
+  } else FGCLI.aOk = false;
+}
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { matchForm, campForm0, CAMP_FOG, FGSRV, FGCLI, FG_FX, FORNO, FORNO_V, fgTick, fgIA, fgFase, fgEsteira, fgBoca, fgPoco, fgArenaTick, fgFornoPos, fgFornoOk, fgNaFrente, fgHud, fgImune, fgCliCorta, fgDif, fornoAnim, fornoEsconde, fgModelo, fgValvC, fornoFace,
+  fornoEstado: () => ({ mapa: curMapId, anim: MAP_ANIM.includes(fornoAnim), chama: FORNO_V.chama ? !!scene.getObjectById(FORNO_V.chama.id) : null, portas: FORNO_V.portas?.map(P => +P.a.toFixed(2)) ?? null, pap: ZC.world?.pap?.g.visible ?? null, power: ZC.world?.power?.g.visible ?? null, emb: FG_FX.emb?.count ?? null }) }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); }
+// ===== FIM O3-D11 =====
 //
 // @@CAMP-ATO-2@@
 //
