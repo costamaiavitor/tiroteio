@@ -29816,6 +29816,100 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { matc
 // ===== FIM O3-D11 =====
 //
 // @@CAMP-ATO-2@@
+// ===== O3-D12: Atos III e IV da campanha no Sanatório (docs/overhaul/campanha.md §4.3; textos em docs/overhaul/lore.md §8–§10) =====
+// O que tem aqui (dono: O3-D12). Só dados e código da campanha: no clássico nada disto roda (o registro e a chave ficam { off: 1 },
+// as notas não ligam, as portas do Laboratório não trancam, o tick devolve na hora).
+// - CAMP_OBJ dos Atos III e IV (as etapas III e IV de CAMP_ATOS já apontam para eles):
+//   III.1 ler o livro de admissões (terminal da Recepção)               III.2 coletar a chave da Enfermeira-chefe (elite do O3-D08) e
+//   III.3 ler o relatório 31 no Laboratório (abre B↔D; solta o apito)          levá-la à porta B↔D (abre A↔B)
+//   III.4 segurar o Laboratório 75 s (zona = sala D)                     IV.1 ligar a Energia nas Caldeiras (abre D↔I, H↔I, H↔P)
+//   IV.2 ligar as três alas (interruptores do O2-C08, pagos: 500/500/1000; abre a cadeia até N, K e r5; rádio a cada uma)
+//   IV.3 fechar o registro da Torre d'água (segurar F somando 12 s; quem segura chama os zumbis; abre K↔M)
+//   Portas da história: a cadeia de menor custo (grafo das portas, como o zActive) entre o lugar do objetivo anterior e o do seguinte.
+//   O fim do Ato IV (rodada 19, cena c4-forno) leva à etapa C2 (arena Casa do Forno); o do Ato III segue no mesmo mapa (rodada 16).
+// - Laboratório trancado no Ato III: as três portas da sala D (B↔D, F↔D, D↔I) usam a trava das portas do O2-C08 (atalho + trava +
+//   msg, por acessores só nessas três portas do MAPS.sanatorio) enquanto o III.2 não foi cumprido, no host e no cliente. Assim o F
+//   mostra "Trancada" (sem preço) e o host recusa. A chave abre a B↔D: o portador chega à porta (destino do III.2) e o III.3 a abre
+//   de graça. Depois disso F↔D e D↔I voltam a ser portas pagas comuns. Decisão: não usei a trava 'camp:' do CAMP_TRAVAS (O3-D02),
+//   porque o cliente confere o preço da porta antes de mandar o F (sem 1000 pontos o portador nem conseguia entregar) e o texto
+//   mostrava "Abrir porta [1000]" numa porta trancada.
+// - O apito (III.3): ler o relatório solta o evento Estouro (O3-D05) até o fim da rodada; se a leitura cai no intervalo ou numa rodada
+//   com outro evento, ele entra na próxima rodada que puder ter evento (até o Estouro da agenda, na 15).
+// - A chave que cai fora do campo dos zumbis (a elite morta na janela, por fora da parede) vai para a célula andável mais perto, numa
+//   área já aberta (sem softlock).
+// - Interativos da campanha no Sanatório (ZINT_MAPA.sanatorio, com id): registro da Torre, chave (escondida até cair) e as 4 notas.
+// - Agenda das rodadas 11–19: a do O3-D05 (CAMP_AGENDA) já é a do campanha.md §5.2 e §6.4 (13 Silêncio + Carniceiro, 14 cães,
+//   15 Estouro, 17 Inchados, 18 Carniceiro, 19 Relógio): nada mudou aqui.
+const CAMP_SAN = {
+  chave: 'chave-lab', // item do III.2 (ZINT 'chave'): a Enfermeira-chefe solta ao morrer
+  labPortas: ['BD', 'FD', 'DI'], // portas da sala D (Laboratório): trancadas no Ato III até a chave chegar
+  labTrava: 'camp-chave-lab', // id da trava (não é interruptor: o zintPortaTrava devolve a msg)
+  labMsg: 'Trancada: a chave do Laboratório está com a Enfermeira-chefe',
+  entrega: { x: -7.6, z: 16, r: 2.4 }, // destino do III.2: diante da porta B↔D, do lado da Enfermaria
+  lab: { x: -18, z: 16, r: 8 }, // zona do III.4: a sala D (x −27..−9, z 8..24)
+  energia: { x: -52, z: 62.5, r: 2 }, // a alavanca da Energia (P Caldeiras): só para a seta do IV.1
+  registro: 'registro-torre', alas: ['ala-oeste', 'ala-leste', 'ala-anel'],
+  apito: 'estouro', // evento solto pelo relatório 31 (III.3)
+  busca: [8, .5, 16], // chave fora do campo: raio máximo (m), passo do raio (m) e direções por anel
+};
+Object.assign(CAMP_OBJ, {
+  'III.1': { tipo: 'ler', titulo: 'Ler o livro de admissões da Recepção', alvo: { zint: 'san-recepcao' }, radio: { ok: 'r3-livro', lembra: 'r3-inicio' }, depois: ['III.2'] },
+  'III.2': { tipo: 'coletar', titulo: 'Tomar a chave da Enfermeira-chefe e levar ao Laboratório', abre: ['AB'], item: CAMP_SAN.chave, origem: 'elite', destino: CAMP_SAN.entrega,
+    radio: { ini: 'r3-chave', lembra: 'r3-chave' }, depois: ['III.3'] },
+  'III.3': { tipo: 'ler', titulo: 'Ler o relatório 31 no Laboratório', abre: ['BD'], alvo: { zint: 'san-laboratorio' }, radio: { ok: 'r3-laboratorio', lembra: 'r3-chave' }, depois: ['III.4'] },
+  'III.4': { tipo: 'segurar', titulo: 'Segurar o Laboratório', zona: CAMP_SAN.lab, dura: 75, radio: { lembra: 'r3-laboratorio' } },
+  'IV.1': { tipo: 'usar', titulo: 'Ligar a Energia nas Caldeiras', abre: ['DI', 'HI', 'HP'], alvo: { energia: 1 }, zona: CAMP_SAN.energia, radio: { lembra: 'r4-inicio' }, depois: ['IV.2'] },
+  'IV.2': { tipo: 'usar', titulo: 'Ligar as três alas', abre: ['GH', 'GN', 'AC', 'CK', 'Nr5'], alvo: { zint: CAMP_SAN.alas, st: ['ligado'], n: 3 }, radio: { lembra: 'r4-alas' }, depois: ['IV.3'] },
+  'IV.3': { tipo: 'usar', titulo: 'Fechar o registro da Torre d\'água', abre: ['KM'], alvo: { zint: CAMP_SAN.registro }, radio: { ok: 'r4-registro', lembra: 'r4-inicio' } },
+});
+Object.assign(CAMP_ATOS[3], { objs: ['III.1', 'III.2', 'III.3', 'III.4'], ini: ['III.1'] }); Object.assign(CAMP_ATOS[4], { objs: ['IV.1', 'IV.2', 'IV.3'], ini: ['IV.1'] });
+// sonda do O3-D12 (planta de cima) e auditoria.mjs/conferencia.mjs com --camp sem erro. Notas: (x, z) na face da parede (folha) ou no
+// chão; ato 2 = Ato III, 3 = Ato IV. A chave fica no meio do Laboratório até cair (a posição anda com o item: campItemSolta).
+ZINT_MAPA.sanatorio.push(
+  { t: 'registro', id: CAMP_SAN.registro, x: 41, z: -17.3, n: [0, 1] }, // M Torre d'água: encostado na perna sudoeste da torre, de frente para o portão K↔M
+  { t: 'chave', id: CAMP_SAN.chave, x: -18, z: 16, n: [0, 1] }, // escondida até a Enfermeira-chefe morrer
+  { t: 'nota', v: 'chao', id: 'n-enfermaria-dose', x: -2.9, z: 12.2, n: [1, 0], ato: 2 }, // B Enfermaria: no chão, ao lado do leito do noroeste
+  { t: 'nota', v: 'pregada', id: 'n-estabulo-fermino', x: 73.5, z: 81.25, n: [1, 0], ato: 2 }, // r11 Estábulo: parede oeste, no fundo da baia 4
+  { t: 'nota', v: 'chao', id: 'n-biblioteca-sono', x: -50, z: -21.5, n: [1, 0], ato: 2 }, // N Biblioteca: corredor entre as estantes, perto da mesa
+  { t: 'nota', v: 'pregada', id: 'n-torre-registro', x: 49, z: -17.65, n: [0, 1], ato: 3 }, // M Torre d'água: perna sudeste da torre, de frente para o registro
+);
+// ---------- trava do Laboratório (Ato III): acessores nas três portas da sala D ----------
+function campSanTrancado() { // o Laboratório está trancado: Ato III da campanha com o III.2 ainda não cumprido (host ou o que o cliente sabe)
+  if (NET.isHost) { const O = CAMP.modo === 'campanha' ? CAMP.obj['III.2'] : null; return !!O && O.st !== 'feito'; }
+  const o = campCliOn() ? CAMP.c?.obj['III.2'] : null; return !!o && o.st !== 'feito' && CAMP_ATOS[CAMP.c.et]?.id === 'III';
+}
+for (const d of MAPS.sanatorio.z.doors) if (CAMP_SAN.labPortas.includes(d.id)) {
+  const o = { atalho: d.atalho, trava: d.trava, msg: d.msg }; // o que a porta tinha (nada, hoje): volta quando destranca
+  for (const k in o) Object.defineProperty(d, k, { configurable: true, enumerable: k in d, get: () => campSanTrancado() ? (k === 'atalho' ? 1 : k === 'trava' ? CAMP_SAN.labTrava : CAMP_SAN.labMsg) : o[k] });
+}
+// ---------- host: Energia, alas, apito e a chave fora do campo ----------
+function campSanTick() {
+  if (CAMP.modo !== 'campanha' || curMapId !== 'sanatorio' || CAMP.fim || CAMP.trans) return;
+  const O = CAMP.obj, o1 = O['IV.1'], o2 = O['IV.2'], o3 = O['III.3'];
+  if (o1?.st === 'ativo' && Z.power) campObjFeito('IV.1'); // a alavanca da Energia (M.z.power) não é ZINT: o tick confere
+  if (o2 && o2.ok) { const n = o2.ok.size; if (n > (o2.alas | 0)) { o2.alas = n; campRadio('r4-alas'); } } // uma linha a cada ala ligada (mesmo duas no mesmo tick)
+  if (o3?.st === 'feito' && !o3.apito) { o3.apito = 1; o3.apitoPend = !campSanApito(); } // o relatório 31 solta o apito
+  const it = CAMP.itens[CAMP_SAN.chave];
+  if (it?.st === 'chao' && (it.vx !== it.x || it.vz !== it.z)) campSanChaveAlcance(it);
+}
+function campSanApito() { // Estouro nesta rodada (true) ou fica pendente para a próxima rodada que puder ter evento
+  const E = CAMP_EVS; if (Z.phase !== 'round' || E.id || !campEvPode(Z.round) || CAMP.obj['III.4']?.st === 'feito') return false;
+  return campEvLiga(CAMP_SAN.apito);
+}
+function campSanChaveAlcance(it) { // a chave no chão precisa estar no campo dos zumbis e numa área aberta; senão vai para a célula boa mais perto
+  const act = zActive(), bom = (x, z) => { const c = ffCell(x, z); return c >= 0 && !!FF.walk[c] && act.has(zRoomAt(x, z)); }, [R, dr, n] = CAMP_SAN.busca;
+  let x = it.x, z = it.z;
+  if (!bom(x, z)) { let ach = false; for (let r = dr; r <= R && !ach; r += dr) for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r; if (bom(px, pz)) { x = px; z = pz; ach = true; break; } }
+    if (ach) campItemSolta(CAMP_SAN.chave, x, z); }
+  it.vx = it.x; it.vz = it.z; // conferida (não procura de novo até a chave mudar de lugar)
+}
+CAMP_GANCHOS.tick.push(campSanTick);
+CAMP_GANCHOS.rodada.push(r => { // o apito que ficou pendente (a agenda do O3-D05 já rodou: só entra se a rodada ficou sem evento)
+  const o3 = CAMP.obj['III.3']; if (!o3?.apitoPend) return;
+  if (CAMP_EVS.id === CAMP_SAN.apito || CAMP.obj['III.4']?.st === 'feito') o3.apitoPend = false; else if (campSanApito()) o3.apitoPend = false;
+});
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_SAN, campSanTick, campSanTrancado, campSanApito, campSanChaveAlcance, campItemTick, campObjFeito, campRadio, ZINT_MAPA }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes e ferramentas
+// ===== FIM O3-D12 =====
 //
 // @@CAMP-CHEFE-3@@
 // ===== O3-D13: O Diretor (Dr. Aurélio, Número 1, tipo 16) e a arena Galeria 7 (docs/overhaul/campanha.md §7.4, §8.3; lore.md: falas dir-*) =====
