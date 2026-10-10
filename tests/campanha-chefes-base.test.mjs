@@ -31,7 +31,7 @@ const DEF = T => {
   return TK;
 };
 const PREP = `(T => {
-  const p = T.S.players.get('h'), CH = T.CAMP_CH, TK = T.ZKIND.findIndex(k => k.n === 'Chefe de teste');
+  const p = T.S.players.get('h'), CH = T.CAMP_CH, TK = T.ZKIND.findIndex(k => k?.n === 'Chefe de teste'); // O3-D09: tipos ainda vazios do ZKIND são null
   const poe = (q, x, z, y = 0) => { q.pos = [x, y, z]; if (q === p) { T.me.pos.set(x, y, z); T.me.vel.set(0, 0, 0); } };
   const quieto = () => { const z = CH.z; if (z) { z.speed = 0; z.atkT = 1e12; } CH.prox = 1e12; CH.lacT = 1e12; T.Z.spawnT = 1e12; T.Z.toSpawn = Math.max(T.Z.toSpawn, 5); for (const o of [...T.Z.zs.values()]) if (o !== z) T.Z.zs.delete(o.id); };
   const agora = () => window.__simNow;

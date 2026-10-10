@@ -43,14 +43,14 @@ test('tabela: ZKIND 7–9 e CAMP_ZK com os números do §6.2, água da Vila em c
   const r = await noJogo(J.page, T => {
     const K = T.ZKIND, Z = T.CAMP_ZK, A = T.CAMP_AGUA.vila;
     const andavel = A.filter(([x, z]) => { const c = T.ffCell(x, z); return c >= 0 && T.FF.walk[c]; }).length;
-    return { k: [7, 8, 9].map(i => [K[i].n, K[i].hp, K[i].pts, K[i].xp, K[i].sz, K[i].rad, !!K[i].chefe]), len: K.length,
+    return { k: [7, 8, 9].map(i => [K[i].n, K[i].hp, K[i].pts, K[i].xp, K[i].sz, K[i].rad, !!K[i].chefe]), len: K.length, buraco: [...K.keys()].filter(i => !(i in K)).length,
       pen: [Z[7].vel, Z[7].cal.alcance, Z[7].cal.aviso, Z[7].cal.cone, Z[7].cal.abre, Z[7].cal.dano, Z[7].cal.olhoS, Z[7].nuvem.r, Z[7].nuvem.s, Z[7].nuvem.lento],
       sol: [Z[8].vel, Z[8].trio], afo: [Z[9].vel, Z[9].sub.vel, Z[9].sub.y, Z[9].sub.aviso, Z[9].sub.avisoR, Z[9].sub.dano, Z[9].sub.lento, Z[9].sub.lentoS],
       mix: [T.CAMP_MIX[7].estreia, T.CAMP_MIX[8].estreia, T.CAMP_MIX[9].estreia], agua: A.length, andavel,
       fala: ['penitente-estreia', 'soldado-estreia', 'afogado-estreia'].every(id => T.CAMP_FALA_TXT[id]?.txt) };
   });
   assert.deepEqual(r.k, [['Penitente', 1.2, 50, 3, 1, .3, false], ['Soldado', 1.5, 60, 4, 1.02, .3, false], ['Afogado do Veio', .9, 50, 3, .95, .3, false]]);
-  assert.equal(r.len, 10, 'ZKIND vai até o 9 (o D07/D08 acrescentam os seguintes)');
+  assert.ok(r.len >= 10, 'ZKIND vai pelo menos até o 9 (D08: 10–13; D09/D11/D13: chefes 14–16)'); assert.equal(r.buraco, 0, 'sem buraco no ZKIND (O3-D09: os tipos que faltam são null)');
   assert.deepEqual(r.pen, [[3.4, 3.8], 4, .6, 3.5, 50, 10, 2.5, 2.5, 4, .5]);
   assert.deepEqual(r.sol, [[3.6, 4.3], 3]);
   assert.deepEqual(r.afo, [[1.3, 1.8], 4.5, -1, .8, 4.5, 25, .5, 1.5]);

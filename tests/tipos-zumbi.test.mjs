@@ -100,7 +100,7 @@ test('ganchos da campanha: sem CAMP.on devolvem na hora; com CAMP.on chamam o qu
     // tipo com 5 bits: ida e volta de 0 a 31, sem tocar nos bits 0-6 e 10 (vault)
     o.ida = []; for (let k = 0; k < 32; k++) { const f = T.zfTipo(k) | 1024 | 127; o.ida.push(T.zTipoDeF(f) === k && (f & 1024) === 1024 && (f & 127) === 127 && (k > 7 || T.zfTipo(k) === k << 7)); }
     o.carn = ['chefe', 'capGolpe', 'capArmadilha', 'capNuke', 'alc', 'furia'].map(c => ZKIND[6][c]);
-    o.chefes = ZKIND.map((K, i) => K.chefe ? i : -1).filter(i => i >= 0);
+    o.chefes = ZKIND.map((K, i) => K?.chefe ? i : -1).filter(i => i >= 0 && i < 7); // O3-D09: os chefes da campanha (14+) e os tipos ainda vazios (null) ficam fora
     // clássico: devolvem na hora, sem chamar nada registrado
     let chamou = 0; const reg = () => { chamou++; };
     CAMP_G.tipo.push(k => (reg(), 3)); CAMP_G.dano.push((z, d) => (reg(), d * 2)); CAMP_G.nasce.push((z, c) => (reg(), c.length = 0)); CAMP_G.status.push(z => { reg(); z.cv = 2; }); CAMP_G.morte.push(reg); CAMP_G.zhit.push(() => (reg(), false));
