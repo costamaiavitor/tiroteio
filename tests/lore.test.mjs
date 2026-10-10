@@ -2,7 +2,8 @@
 // iguais aos da lore.md e dentro do limite; nenhum id repetido; todo id citado no campanha.md existe; o tipo ZINT 'nota' (só com a
 // campanha) abre e fecha como o terminal; os sons sintetizados (rádio, apito, coro, papel) saem com som e sem NaN.
 // As notas de verdade são posicionadas pelos agentes dos atos (D10/D12/D14): aqui entram 3 notas de TESTE, empurradas no
-// ZINT_MAPA.sanatorio antes de criar a sala (fora dos dados do mapa) e tiradas no fim.
+// ZINT_MAPA.sanatorio antes de criar a sala (fora dos dados do mapa) e tiradas no fim. O3-D12: as notas de teste têm teste: 1 (as de
+// verdade do Sanatório usam os mesmos ids): o teste conta e tira só as dele.
 // Rodar: pnpm test (todos) ou node --test tests/lore.test.mjs
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -77,12 +78,12 @@ test('lore: todo id de texto citado no campanha.md existe na tabela certa (termi
 // notas de teste na Recepção do Sanatório (perto do nascimento): pregada e bilhete na parede oeste (à esquerda do terminal) (face em x = -8,495, a mesma
 // do terminal da Recepção), papel no chão no meio da sala
 const NOTAS = [
-  { t: 'nota', v: 'pregada', id: 'n-enfermaria-dose', x: -8.495, z: 6.75, n: [1, 0] },
-  { t: 'nota', v: 'bilhete', id: 'n-biblioteca-sono', x: -8.495, z: 8.6, n: [1, 0] },
-  { t: 'nota', v: 'chao', id: 'n-torre-registro', x: -5.5, z: 4.25, n: [1, 0], ato: 3 },
+  { t: 'nota', v: 'pregada', id: 'n-enfermaria-dose', x: -8.495, z: 6.75, n: [1, 0], teste: 1 },
+  { t: 'nota', v: 'bilhete', id: 'n-biblioteca-sono', x: -8.495, z: 8.6, n: [1, 0], teste: 1 },
+  { t: 'nota', v: 'chao', id: 'n-torre-registro', x: -5.5, z: 4.25, n: [1, 0], ato: 3, teste: 1 },
 ];
 const PREP = `(T => {
-  const p = T.S.players.get('h'), L = T.ZD.zint, nota = L.map((o, i) => i).filter(i => L[i].t === 'nota');
+  const p = T.S.players.get('h'), L = T.ZD.zint, nota = L.map((o, i) => i).filter(i => L[i].t === 'nota' && L[i].teste);
   const poe = (q, x, z) => { q.pos = [x, 0, z]; if (q.id === 'h') T.me.pos.set(x, 0, z); };
   const frente = (i, d = 1.2) => [L[i].x + L[i].n[0] * d, L[i].z + L[i].n[1] * d];
   T.Z.toSpawn = 50; T.Z.spawnT = 1e12; T.Z.zs.clear();
@@ -100,7 +101,7 @@ test('nota: sem a campanha não existe (sem peças, sem prompt, F no host não a
     poe(p, ...frente(nota[0])); T.zInteract(0); const prompt = T.ZC.act?.k === 'zint' && nota.includes(T.ZC.act.id);
     T.srvZUse(p, { k: 'zint', id: nota[0] });
     return { n: nota.length, ligada: T.zintNotaLigada(L[nota[0]]), pecas: nota.map(i => !!E[i]?.g), col: nota.map(i => E[i]?.col ?? null), prompt, aberto: T.ZLORE.i,
-      lidos: T.Z.zint[nota[0]].lidos?.size || 0, ganho: p.money - m0, zi: T.zWorldState().zi.length === L.length, aud: T.zintAud().filter(a => a.tipo === 'nota').map(a => a.corpo ?? null) };
+      lidos: T.Z.zint[nota[0]].lidos?.size || 0, ganho: p.money - m0, zi: T.zWorldState().zi.length === L.length, aud: T.zintAud().filter(a => a.tipo === 'nota').map(a => a.corpo ?? null).slice(-nota.length) };
   }, PREP);
   assert.equal(r.n, 3); assert.equal(r.ligada, false);
   assert.deepEqual(r.pecas, [false, false, false], 'peças montadas no clássico'); assert.deepEqual(r.col, [null, null, null]);
@@ -189,6 +190,6 @@ test('lore: terminal com o texto novo; sons do rádio, apito, coro e papel com s
     T.zintLoreFecha(false); p.pos = [L[i].x + 1.2, 0, L[i].z]; T.me.pos.set(L[i].x + 1.2, 0, L[i].z); T.srvZUse(p, { k: 'zint', id: i });
     return { txt: document.querySelector('#zlore .zlx').textContent, titulo: document.getElementById('zloreT').textContent }; });
   assert.equal(t.titulo, 'Livro de admissões, última linha'); assert.match(t.txt, /^Família 413\./);
-  await noJogo(J.page, (T, N) => { T.zintLoreFecha(false); const L = T.ZINT_MAPA.sanatorio; for (const n of N) { const k = L.findIndex(o => o.id === n.id && o.t === 'nota'); if (k >= 0) L.splice(k, 1); } T.ZNOTA.forca = false; }, NOTAS);
+  await noJogo(J.page, (T, N) => { T.zintLoreFecha(false); const L = T.ZINT_MAPA.sanatorio; for (const n of N) { const k = L.findIndex(o => o.id === n.id && o.t === 'nota' && o.teste); if (k >= 0) L.splice(k, 1); } T.ZNOTA.forca = false; }, NOTAS);
   assert.deepEqual(J.erros, []);
 });

@@ -150,8 +150,9 @@ async function main() {
   await pg.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: 'domcontentloaded', timeout: 180000 });
   await pg.waitForFunction(() => window.__T && window.__T.MAPS, null, { timeout: 240000 });
   await pg.evaluate(([mapa, camp]) => { const T = window.__T; T.CFG.gfx = 'baixo'; try { T.applyQuality(); } catch { }
-    if (camp) T.campLibera?.(1, 1); // O3-D10: Ato II liberado no Normal (a partida começa no Ato I do mesmo jeito)
-    T.startHost({ map: mapa, zmap: mapa, mode: 'zombies', rounds: 8, frags: 20, bots: 0, diff: 1, zdiff: 1, ...(camp ? { zmode: 'campanha', ato: 0 } : {}) });
+    const ato = mapa === 'sanatorio' ? 2 : 0; // O3-D12: no Sanatório a campanha começa no Ato III (o mapa do Ato I é a Vila)
+    if (camp) T.campLibera?.(Math.max(1, ato), 1); // O3-D10: Ato II liberado no Normal (a partida começa no Ato I do mesmo jeito)
+    T.startHost({ map: mapa, zmap: mapa, mode: 'zombies', rounds: 8, frags: 20, bots: 0, diff: 1, zdiff: 1, ...(camp ? { zmode: 'campanha', ato } : {}) });
     if (camp && T.ZNOTA) T.ZNOTA.forca = true; }, [MAPA, CAMPF]);
   await pg.waitForFunction(() => !document.getElementById('warmMsg') && window.__T.ZC.world && window.__T.S.players.get('h')?.alive, null, { timeout: 600000, polling: 250 });
   await pg.evaluate(() => { window.__T.sim(.1); });
@@ -329,19 +330,19 @@ async function main() {
         const r = E.abrirPorta(d.id); E.volta(); return { item: 'atalho ' + d.id, precoDado: d.cost, ...r, ok: r.ok }; }, d));
     }
   }
-  // 8) O3-D10 (--camp --so camp): interativos da campanha (notas, gerador, alçapão e o sino grátis do I.1): anda até cada um, o F
+  // 8) O3-D10 (--camp --so camp): interativos da campanha (notas, gerador, alçapão, registro (O3-D12) e o sino grátis do I.1): anda até cada um, o F
   // escolhe o item certo e o uso dá o estado esperado no host e no cliente; o objetivo de cada um é ativado como no campForca
   if (SO.includes('camp')) {
-    const L = await ev(T => T.ZD.zint.map((o, i) => ({ i, t: o.t, id: o.id, v: o.v, x: o.x, z: o.z, n: o.n })).filter(o => ['nota', 'gerador', 'alcapao', 'sino'].includes(o.t) && (o.t !== 'sino' || o.id)));
+    const L = await ev(T => T.ZD.zint.map((o, i) => ({ i, t: o.t, id: o.id, v: o.v, x: o.x, z: o.z, n: o.n })).filter(o => ['nota', 'gerador', 'alcapao', 'registro', 'sino'].includes(o.t) && (o.t !== 'sino' || o.id)));
     for (const o of L) log(await ev((T, E, o) => {
       const h = E.h(), d = o.t === 'nota' ? 1 : 1.3, x = o.x + o.n[0] * d, z = o.z + o.n[1] * d, zona = E.zona(x, z), portas = E.abrirAte(zona);
       if (!portas.ok) return { item: o.t + ' ' + o.id, ok: false, portas };
-      const ob = { gerador: 'I.2', alcapao: 'II.4', sino: 'I.1' }[o.t];
+      const ob = { gerador: 'I.2', alcapao: 'II.4', registro: 'IV.3', sino: 'I.1' }[o.t];
       if (ob) { const O = T.CAMP.obj[ob] ||= { st: 'oculto', p: 0, h: 0, q: null, envT: 0, pend: false }; if (O.st !== 'ativo') { O.st = 'oculto'; T.campObjAtiva(ob); } }
       const w = E.ir(x, z), mi = E.mirar([o.x, o.z], a => a?.k === 'zint' && a.id === o.i), act = E.act();
       const res = { item: o.t + ' ' + o.id, zona, portas: portas.portas, andou: w, prompt: act?.txt, mirou: mi.ok ? true : mi.act };
-      if (o.t === 'alcapao') { let n = 0; while (T.Z.zint[o.i].st !== 'aberto' && n++ < 60) { T.srvZHold(h, { k: 'zint', id: o.i }); E.passo(.15); }
-        res.estado = T.Z.zint[o.i].st; res.ok = mi.ok && act.hold === 1 && res.estado === 'aberto' && T.ZC.zint[o.i].st === 'aberto'; }
+      if (o.t === 'alcapao' || o.t === 'registro') { const fim = o.t === 'alcapao' ? 'aberto' : 'fechado'; let n = 0; while (T.Z.zint[o.i].st !== fim && n++ < 120) { T.srvZHold(h, { k: 'zint', id: o.i }); E.passo(.15); }
+        res.estado = T.Z.zint[o.i].st; res.ok = mi.ok && act.hold === 1 && res.estado === fim && T.ZC.zint[o.i].st === fim; }
       else { const pago = mi.ok && act.ok !== false ? E.F() : 0, st = T.Z.zint[o.i].st; Object.assign(res, { pago, estado: st, cli: T.ZC.zint[o.i].st });
         if (o.t === 'nota') { res.painel = T.ZLORE.i === o.i; res.ok = mi.ok && pago === 0 && res.painel; T.zintLoreFecha(false); }
         else if (o.t === 'gerador') res.ok = mi.ok && pago === 0 && st === 'pegando' && res.cli === 'pegando';

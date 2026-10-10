@@ -225,7 +225,7 @@ test('4 trocas de mapa seguidas: bagagem (pontos, PaP, bebidas), caído levanta 
     T.CAMP_ATOS[4].mapa = 'vila'; T.CAMP_ATOS[5].mapa = 'sanatorio'; T.CAMP_ATOS[6].mapa = 'vila';
     T.CAMP_ATOS.push({ id: 'X', ato: 4, nome: 'Teste', mapa: 'sanatorio', rod0: 26, rodMin: 26, rodMax: 26, objs: [], ini: [] });
     T.CAMP_KIT.X = { pts: 111, armas: ['m1911'], bebidas: [] };
-    T.CAMP_ATOS[3].objs = []; T.CAMP_ATOS[3].ini = []; T.CAMP_ATOS[5].objs = []; T.CAMP_ATOS[5].ini = []; // O3-D11: a etapa C2 (no Sanatório aqui) sem o chefe: a troca é o que se mede
+    T.CAMP_ATOS[3].objs = []; T.CAMP_ATOS[3].ini = []; T.CAMP_ATOS[4].objs = []; T.CAMP_ATOS[4].ini = []; T.CAMP_ATOS[5].objs = []; T.CAMP_ATOS[5].ini = []; // O3-D11: a etapa C2 (no Sanatório aqui) sem o chefe; O3-D12: a etapa IV (na Vila aqui) sem os objetivos do Sanatório (as portas da história abririam portas da Vila): a troca é o que se mede
     T.S.st = { ...T.S.st, zmode: 'campanha', ato: 2 }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1);
     window.__trocas = []; window.__base = {};
     return T.CAMP.et;
