@@ -81,6 +81,7 @@ test('rodadas 22 e 23 abrem as galerias; rodada 25: 12 fixos, objetivo do chefe,
   const r = await rodar((T, arg, H) => {
     const { p, CH } = H; p.dwEnd = 1e12; const o = {}, fim = () => { for (const z of [...T.Z.zs.values()]) T.zKill(z, null, 'body', 'nuke', false, true); T.Z.toSpawn = 0; T.sim(.5); T.sim(T.Z.phaseEnd - window.__simNow + .2); };
     fim(); o.r22 = [T.Z.round, [...T.Z.doors].sort().join()]; fim(); o.r23 = [T.Z.round, [...T.Z.doors].sort().join()];
+    T.campForca('V.1'); T.campForca('V.2'); T.sim(.1); // O3-D14: o Diretor só vem depois das cargas e da Névoa (V.1, V.2)
     T.Z.round = 24; fim(); o.round = T.Z.round; o.ts = T.Z.toSpawn + [...T.Z.zs.values()].filter(z => !z.lac && !T.ZKIND[z.kind]?.chefe).length; o.mixN = T.Z.mixN;
     o.obj = T.campEstado().obj['F.1']?.st;
     o.tipos = [T.gal7Tipo(11), T.gal7Tipo(12), T.gal7Tipo(10), T.gal7Tipo(13), T.gal7Tipo(9), T.gal7Tipo(0)]; o.rest = Object.keys(T.CAMP_ZKS.rest).map(Number).filter(k => ![9, 10, 13].includes(k));
@@ -219,19 +220,19 @@ test('quem entra no meio: espectador, recebe o chefe na fase 3, o aviso no ar (u
   assert.deepEqual(r.cli, [16, 3]); assert.equal(r.tels, 1, 'o mesmo aviso uma vez só'); assert.ok(r.mare);
 });
 
-test('morte: lacaios e comuns caem, o objetivo do chefe fecha, o evento do chefe final (CAMP_GANCHOS.chefe com o 16) e o fim da etapa', { timeout: 120000 }, async () => {
+test('morte: lacaios e comuns caem, o objetivo do chefe fecha, o evento do chefe final (CAMP_GANCHOS.chefe com o 16) e a fuga (O3-D14)', { timeout: 120000 }, async () => {
   const r = await rodar((T, arg, H) => {
     const { p, CH, quieto, limpa, chao, poe } = H; quieto(); limpa(); chao(0, 8); const z = CH.z; poe(p, 0, 14); p.dwEnd = 1e12;
     const visto = []; T.CAMP_GANCHOS.chefe.push((k, zz, q) => visto.push([k, zz === z, q === p]));
     T.campChefeLacaios({ tipo: 0, n: 2, max: 9 }); { T.Z.toSpawn++; T.zSpawnOne(); } T.Z.toSpawn = 3; T.campChefeAtaca(z, CH.def.ataques.find(a => a.id === 'mare'), p); T.sim(2.1);
     z.hp = 10; CH.inv = 0; T.zHit(p, z.id, 100, 'body', 'm1911', false);
     const o = { zs: T.Z.zs.size, ts: T.Z.toSpawn, obj: T.campEstado().obj['F.1']?.st, ch: T.CAMP_CH.z, visto, sz: T.ZKIND[16].sz, mare: T.DRSRV.mareAte };
-    T.sim(.3); o.cliMare = T.DRCLI.mareAte > window.__simNow; o.ph = T.Z.phase; o.fim = T.CAMP.fim ? T.CAMP.fim.prox : T.CAMP.over ? 'concluida' : null; o.salvo = T.campSalvo().dif[1];
+    T.sim(.3); o.cliMare = T.DRCLI.mareAte > window.__simNow; o.ph = T.Z.phase; o.fim = T.CAMP.fim ? T.CAMP.fim.prox : T.CAMP.over ? 'concluida' : null; o.fuga = T.campVEstado().fase; o.salvo = T.campSalvo().dif[1];
     T.CAMP_GANCHOS.chefe.pop(); return o;
   });
-  assert.equal(r.zs, 0); assert.equal(r.ts, 0); assert.equal(r.obj, 'feito'); assert.equal(r.ch, null);
+  assert.equal(r.zs, 0); assert.equal(r.ts, 6, 'a fuga repõe (O3-D14)'); assert.equal(r.obj, 'feito'); assert.equal(r.ch, null);
   assert.deepEqual(r.visto, [[16, true, true]], 'CAMP_GANCHOS.chefe com o tipo 16'); assert.equal(r.sz, 1.3); assert.equal(r.mare, 0); assert.equal(r.cliMare, false);
-  assert.notEqual(r.ph, 'round'); assert.ok(r.fim === -1 || r.fim === 'concluida', 'a etapa V termina (o resto é do O3-D14): ' + r.fim); assert.ok(r.salvo.fim, 'campanha concluída no salvo');
+  assert.equal(r.ph, 'round', 'a rodada segue na fuga'); assert.equal(r.fim, null); assert.equal(r.fuga, 'cena', 'cena c5-fuga (O3-D14)'); assert.ok(!r.salvo.fim, 'a conclusão só vem depois da gaiola');
   assert.deepEqual(J.erros, []);
 });
 
