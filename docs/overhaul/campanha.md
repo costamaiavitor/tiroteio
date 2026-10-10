@@ -648,6 +648,8 @@ O `ZSPEC.boss` e o `cada` não valem na campanha. Fala `carn-entrada` quando nas
 - tempo do chefe com o kit do ato: Vigia 3–5 min, Foguista 4–6 min, Diretor 6–9 min (1 jogador, Normal);
 - morte do time em menos de 50% das tentativas no Normal com o kit do checkpoint.
 
+Medidas, números ajustados e o que fica para o playtest: `docs/overhaul/balanceamento.md` (O3-D15).
+
 ## 11. Persistência e checkpoints
 
 **Chave no navegador** `tiroteio.campanha` (JSON, lido e gravado pelos `load`/`save` de hoje):

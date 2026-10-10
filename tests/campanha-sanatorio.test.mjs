@@ -90,7 +90,7 @@ test('Ato III: livro, Enfermeira-chefe, chave no chão, entrega abre o Laborató
     return { e0: [e0.et, e0.obj['III.1']?.st, Object.keys(e0.obj)], notas0, kit, round0, hud, trava, i1, elite, cai, pega, solta, fora, pega2, i2, fd, i3, fora4, meio, intervalo, parado, ev, i4, cedo, r15, fim, cena,
       e1: [e1.et, e1.obj['IV.1']?.st, T.Z.round], portas1: ['DI', 'HI', 'HP'].map(d => T.Z.doors.has(d)), notas1: arg.NOTAS.map(nota), salvo: T.campSalvo().dif[1].ato, ouvidos: ouvidos(), trancado1: T.campSanTrancado() };
   }, { NOTAS });
-  assert.deepEqual(r.e0, [3, 'ativo', ['III.1', 'III.2', 'III.3', 'III.4']]); assert.deepEqual(r.kit, [3500, 'python', 'm14']);
+  assert.deepEqual(r.e0, [3, 'ativo', ['III.1', 'III.2', 'III.3', 'III.4']]); assert.deepEqual(r.kit, [4000, 'python', 'm14']); // O3-D15: kit do Ato III com 4000
   assert.deepEqual(r.notas0, [true, true, true, false], 'notas do Ato III aparecem; a da Torre (Ato IV) não');
   assert.equal(r.round0, 11); assert.ok(r.hud.includes('Ler o livro de admissões'), 'HUD com o objetivo: ' + r.hud);
   assert.deepEqual(r.trava.slice(0, 3), [false, false, 5000], 'Laboratório trancado: o host não abre nem cobra');

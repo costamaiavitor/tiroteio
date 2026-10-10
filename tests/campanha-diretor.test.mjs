@@ -86,7 +86,7 @@ test('rodadas 22 e 23 abrem as galerias; rodada 25: 12 fixos, objetivo do chefe,
     o.obj = T.campEstado().obj['F.1']?.st;
     o.tipos = [T.gal7Tipo(11), T.gal7Tipo(12), T.gal7Tipo(10), T.gal7Tipo(13), T.gal7Tipo(9), T.gal7Tipo(0)]; o.rest = Object.keys(T.CAMP_ZKS.rest).map(Number).filter(k => ![9, 10, 13].includes(k));
     T.sim(1); const z = CH.z; T.sim(2.5);
-    o.ch = T.campChefeEstado(); o.hp = [z?.maxHp, Math.round(T.zHp(25) * T.zHpK(25) * 12)]; o.pos = z && [z.body.pos.x, +z.body.pos.y.toFixed(2), z.body.pos.z]; o.modo = T.DRSRV.modo;
+    o.ch = T.campChefeEstado(); o.hp = [z?.maxHp, Math.round(T.zHp(25) * T.zHpK(25) * (T.CAMP_CHEFE[16].base + T.CAMP_CHEFE[16].porJog))]; o.pos = z && [z.body.pos.x, +z.body.pos.y.toFixed(2), z.body.pos.z]; o.modo = T.DRSRV.modo;
     o.tag = CH.tag; o.bar = document.getElementById('zboss').firstChild.nodeValue; o.sz = [T.ZKIND[16].sz, z.rad];
     o.tq = T.drIdx('g7-tanque').map(i => T.Z.zint[i].hpMax); o.jn = T.drIdx('g7-juncao').map(i => T.Z.zint[i].hpMax); o.esp = [Math.round(z.maxHp * .06), Math.round(z.maxHp * .04)];
     o.cli = T.CAMP.c.ch?.k;
@@ -95,7 +95,7 @@ test('rodadas 22 e 23 abrem as galerias; rodada 25: 12 fixos, objetivo do chefe,
   assert.deepEqual(r.r22, [22, 'g7-norte,g7-oeste']); assert.deepEqual(r.r23, [23, 'g7-leste,g7-norte,g7-oeste']);
   assert.equal(r.round, 25); assert.equal(r.ts, 12, '12 fixos (Normal) ' + JSON.stringify(r)); assert.equal(r.mixN, 0, 'sem especiais do clássico');
   assert.deepEqual(r.tipos, [0, 0, 10, 13, 9, 0], 'rodada 25: só Enfermeiro, Pregador e Afogado'); assert.deepEqual(r.rest, []);
-  assert.equal(r.obj, 'ativo'); assert.equal(r.ch.k, 16); assert.equal(r.hp[0], r.hp[1], 'vida = zHp(25)·(7 + 5·1)'); assert.ok(Math.abs(r.hp[0] - 52392) < 20);
+  assert.equal(r.obj, 'ativo'); assert.equal(r.ch.k, 16); assert.equal(r.hp[0], r.hp[1], 'vida = zHp(25)·(12 + 8,5·1)'); assert.ok(Math.abs(r.hp[0] - 52392 / 12 * 20.5) < 40); // O3-D15: vida ×1,7
   assert.deepEqual(r.pos, [0, .9, -2], 'em cima do púlpito'); assert.equal(r.modo, 'pulpito'); assert.deepEqual(r.sz, [1.3, .4]);
   assert.equal(r.tag, 'protegido'); assert.equal(r.bar, 'O DIRETOR · FASE 1 · PROTEGIDO'); assert.equal(r.cli, 16);
   assert.deepEqual(r.tq, Array(4).fill(r.esp[0]), 'tanques com 6% da vida'); assert.deepEqual(r.jn, Array(3).fill(r.esp[1]), 'junções com 4%');
@@ -166,7 +166,7 @@ test('ataques das fases 2 e 3: maré (plataforma seca), onda (45 + empurrão), a
     chao(2, 0); poe(p, 14, 10); T.DRSRV.nadaT = agora(); T.sim(1 / 30); o.nada = T.DRSRV.modo; for (let k = 0; k < 100 && T.DRSRV.modo !== 'chao'; k++) T.sim(.05); o.nadou = [T.DRSRV.modo, +Math.hypot(z.body.pos.x - 11, z.body.pos.z - 6).toFixed(2)]; T.DRSRV.nadaT = 1e12;
     return o;
   });
-  assert.deepEqual(r.tm, [2, null]); assert.equal(r.mAntes, 0); assert.ok(r.subindo, 'a água sobe no aviso'); assert.equal(r.mare, 10, 'maré 10/s ' + JSON.stringify(r)); assert.ok(r.cliMare);
+  assert.ok(Math.abs(r.tm[0] - 2) <= 1 / 30 && r.tm[1] === null, 'maré: aviso de 2 s ' + r.tm); // O3-D15: o cp pode reenviar o aviso no ar 1 tick depois (s 1,98; pendência do aviso duplicado no host, D07) assert.equal(r.mAntes, 0); assert.ok(r.subindo, 'a água sobe no aviso'); assert.equal(r.mare, 10, 'maré 10/s ' + JSON.stringify(r)); assert.ok(r.cliMare);
   assert.equal(r.seco, 0, 'plataforma seca'); assert.ok(Array.isArray(r.cp) && r.cp[0] > 0, 'maré no cp'); assert.deepEqual(r.acabou, [false, false]); assert.equal(r.desce, false);
   assert.deepEqual(r.to, [1.2, 'linha', 16, 3]); assert.equal(r.oAntes, 0); assert.equal(r.onda, 45); assert.ok(r.emp, 'empurrão');
   assert.deepEqual(r.ta, [.8, 'disco']); assert.equal(r.aAntes, 0); assert.deepEqual(r.preso, [true, true, true]); assert.deepEqual(r.solto, [0, false, true, true], 'o tiro no cano soltou');
@@ -194,7 +194,7 @@ test('junção rompida atordoa 5 s com o fraco aberto; ponto fraco ×3 só abert
     z.hp = z.maxHp * .34; T.Z.zs.set(99999, { id: 99999, drCoro: 1 }); T.drCoro(z); T.Z.zs.delete(99999); o.teto = +(z.hp / z.maxHp).toFixed(3);
     return o;
   });
-  const cap = 52380 * .06, capF = 52380 * .1;
+  const cap = 52380 / 12 * 20.5 * .06, capF = 52380 / 12 * 20.5 * .1; // O3-D15: vida do Diretor ×1,7 (base 12, porJog 8,5)
   assert.ok(Math.abs(r.fechado - Math.min(r.w * 1.1, cap)) < 2, `fechado: corpo (${r.fechado})`); assert.ok(Math.abs(r.aberto - Math.min(r.w * 3 * 1.1, capF)) < 2, `aberto: ×3 (${r.aberto})`);
   assert.ok(Math.abs(r.tras - r.fechado) < 2, 'por trás não abre (o fraco é o cano no peito)');
   assert.deepEqual(r.rompe, ['rompida', 5, true, null, true], 'rompida: atordoado 5 s, fraco, ataque cancelado');

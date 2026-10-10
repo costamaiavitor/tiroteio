@@ -64,7 +64,7 @@ test('Sanatório -> Forno: bagagem, rodada 20 com 20 comuns pelas grades, energi
     o.bag = [p.money, p.inv.secondary, p.perks.join(), p.maxHp, p.alive];
     o.est = T.fornoEstado(); o.zint = T.ZD.zint.map(x => x.t).join(); o.wins = T.ZD.windows.length;
     T.sim(4); const z = T.CAMP_CH.z;
-    o.ch = T.campChefeEstado(); o.hp = z?.maxHp; o.pos = window.__fgNasce; o.esp = Math.round(T.zHp(20) * 10); o.obj = T.campEstado().obj['C2.1']?.st;
+    o.ch = T.campChefeEstado(); o.hp = z?.maxHp; o.pos = window.__fgNasce; o.esp = Math.round(T.zHp(20) * (T.CAMP_CHEFE[15].base + T.CAMP_CHEFE[15].porJog)); /* O3-D15: a vida vem da tabela */ o.obj = T.campEstado().obj['C2.1']?.st;
     o.grades = [...T.Z.zs.values()].filter(x => x !== z).every(x => x.win >= 0); o.cli = T.CAMP.c.ch?.k; o.bar = document.getElementById('zboss').firstChild.nodeValue;
     o.modelo = !!T.ZC.zs.get(z.id)?.model.userData.tanque;
     return o;
@@ -75,7 +75,7 @@ test('Sanatório -> Forno: bagagem, rodada 20 com 20 comuns pelas grades, energi
   assert.equal(r.power, true); assert.equal(r.cpower, true); assert.equal(r.est.pap, false, 'PaP escondido'); assert.equal(r.est.power, false, 'chave de energia escondida'); assert.equal(r.est.anim, true);
   assert.deepEqual(r.bag, [4321, 'galil_pap', 'jug', 250, true], 'bagagem levada');
   assert.equal(r.zint, 'pilar,pilar,pilar,pilar,pilar,pilar,valvula,valvula,valvula,valvula,barril,barril,municao,nota'); assert.equal(r.wins, 5);
-  assert.equal(r.ch.k, 15); assert.equal(r.hp, r.esp, 'vida = zHp(20)·(6 + 4·1)'); assert.equal(r.obj, 'ativo'); assert.ok(r.pos && Math.hypot(r.pos[0], r.pos[1] + 17) <= 1.5, 'sobe na frente do forno 3 ' + r.pos); assert.ok(r.grades, 'comuns pelas grades');
+  assert.equal(r.ch.k, 15); assert.equal(r.hp, r.esp, 'vida = zHp(20)·(base + porJog·1)'); assert.equal(r.obj, 'ativo'); assert.ok(r.pos && Math.hypot(r.pos[0], r.pos[1] + 17) <= 1.5, 'sobe na frente do forno 3 ' + r.pos); assert.ok(r.grades, 'comuns pelas grades');
   assert.equal(r.cli, 15); assert.equal(r.bar, 'O FOGUISTA · FASE 1'); assert.ok(r.modelo, 'modelo do Foguista (tanque nas costas)');
   assert.deepEqual(J.erros, []);
 });

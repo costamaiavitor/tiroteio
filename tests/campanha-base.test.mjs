@@ -101,7 +101,7 @@ test('campanha: começa no Ato III com o kit, cena e objetivos de teste; quem en
   });
   assert.equal(r.on, true); assert.equal(r.et, 3); assert.equal(r.ph0, 'pre'); assert.equal(r.round0, 10); assert.ok(r.cena, 'cena de abertura');
   assert.equal(r.round, 11, 'a etapa III começa na rodada 11'); assert.equal(r.ph, 'round');
-  assert.equal(r.inv.primary, 'python'); assert.equal(r.inv.secondary, 'm14'); assert.deepEqual(r.perks, ['jug']); assert.equal(r.mh, 250); assert.equal(r.money, 3500);
+  assert.equal(r.inv.primary, 'python'); assert.equal(r.inv.secondary, 'm14'); assert.deepEqual(r.perks, ['jug']); assert.equal(r.mh, 250); assert.equal(r.money, 4000); // O3-D15: kit do Ato III com 4000
   assert.ok(r.zi.length === 6 && r.zi.every(z => z[1]), 'interativos da campanha montados');
   assert.deepEqual(r.ativos, ['T.mat']); assert.ok(r.nextDog > 1e8, 'cães do clássico desligados');
   assert.ok(r.cp && r.cp.et === 3 && r.cp.ob.some(o => o[0] === 'T.mat' && o[1] === 'ativo'), 'quem entra recebe o cp');
