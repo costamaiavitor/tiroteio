@@ -30271,6 +30271,252 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP
 // ===== FIM O3-D13 =====
 //
 // @@CAMP-ATO-3@@
+// ===== O3-D14: Ato V, o final e o modo infinito (docs/overhaul/campanha.md §4.3, §9, §11; textos em docs/overhaul/lore.md §9–§10.3) =====
+// O que tem aqui (dono: O3-D14). Nada disto roda no clássico: o host só entra pelos CAMP_GANCHOS (que o clássico nunca chama), o
+// cliente confere o modo (campCliOn / zmode 'infinito') e as mensagens novas ({ k: 'fuga' | 'final' | 'creditos' }) só vêm do host.
+// - Ato V (etapa 'V', Galeria 7, rodadas 21–24): V.1 plantar as 3 cargas (g7-carga-1..3 do O3-D13, segurar F 4 s; as galerias abrem
+//   uma por rodada pelo próprio D13); V.2 sobreviver à rodada da Névoa (a primeira rodada a partir da 24 que começa com o V.2 ativo:
+//   a agenda já põe a Névoa na 24; numa rodada depois, sem evento, a Névoa entra aqui). O Diretor vem na rodada seguinte à do V.2,
+//   nunca antes da 25: o GAL7_RODADAS.chefe do D13 fica em Infinity até o V.2 fechar (assim o chefe não chega com as cargas por plantar).
+// - F.1 (do D13, matar o 16) e F.2 (fugir pela gaiola g7-gaiola: 75 s, embarque de 10 s). Quando o Diretor morre (CAMP_GANCHOS.chefe,
+//   síncrono: a rodada não chega a terminar): F.2 ativo, cena c5-fuga de 4 s, o pilar da 1ª carga estoura (GAL7.gal.G1.pilar), a
+//   gaiola desce; no fim da cena, o Estouro sem fim (campEvLiga('estouro', { fuga: 1 }) do O3-D05: reposição contínua).
+//   Quem está na gaiola quando o embarque acaba escapa (CAMP.fugiram); quem fica fora não estraga o final do time.
+// - Final: os zumbis caem sem pontos, salva { ato: 4, fim: 1 } (campanha concluída na dificuldade e nas mais fáceis = Infinito
+//   liberado), cenas c5-final (+ c5-final-completo se a sala leu os 22 documentos na campanha inteira: campDocsSala do O3-D02) e
+//   c5-pos; depois os créditos (CAMP_GANCHOS.concluida): tela de rolagem que cada um pode pular; o host volta todos ao lobby no fim
+//   (ou antes, com um segundo Enter depois de pular), e o formulário mostra "Campanha concluída (X) · Infinito liberado".
+// - Infinito (zmode 'infinito'): estreias dos tipos novos pela CAMP_MIX[k].estreia (a mesma curva da campanha, sorteio do O3-D06 e
+//   O3-D08); eventos do O3-D05 (CAMP_INF.ev); chefes de campo (CAMP_INF.chefe): Vigia na 20, Foguista na 30, Diretor na 40 e depois
+//   um a cada 10 rodadas em rodízio, +25% de vida a cada volta, na versão de campo (campChefeNasce do O3-D07 com { campo: 1 }),
+//   nascendo perto de um jogador; a rodada não termina antes de ele morrer (é um zumbi vivo). Recorde: maior rodada por mapa e
+//   dificuldade, no salvo 'tiroteio.campanha' (inf) de cada jogador, mostrado no cartão do mapa. A legenda do rádio e das falas
+//   (estreias, eventos, chefes) aparece também no infinito (painel próprio; o do D02 só existe na campanha).
+// Ganchos: nenhum fora do bloco. O formulário ganha o recorde e o aviso de conclusão envolvendo o campFormRender do O3-D02 aqui mesmo.
+const CAMP_V = { // Ato V e final (o D15 ajusta os números)
+  cargas: ['g7-carga-1', 'g7-carga-2', 'g7-carga-3'], gaiola: 'g7-gaiola',
+  v2De: 24, v2Ev: 'nevoa', // V.2: a primeira rodada a partir da 24 que começa com o V.2 ativo; o evento dela
+  chefeMin: 25, // o Diretor vem na rodada seguinte à do V.2, nunca antes desta
+  fuga: { cenaS: 4, tempo: 75, embarque: 10, ev: 'estouro' }, // cena c5-fuga antes de a fuga começar; tempo e embarque do F.2
+  creditosS: 34, credFixoS: 5, // créditos: duração; os últimos segundos parados no fim ("Família 413")
+  gaiolaY: 9, gaiolaDesceS: 4, // a gaiola fica no alto do poço (acima do teto) e desce na cena da fuga
+  cenas: { fuga: 'c5-fuga', final: 'c5-final', completo: 'c5-final-completo', pos: 'c5-pos' },
+  radio: { cargas: 'r5-cargas', fuga: 'r5-fuga' },
+  txt: { cargas: 'Plantar as 3 cargas nos pilares da boca', nevoa: 'Sobreviver à Névoa do Veio', fuga: 'Fugir pela gaiola da mina',
+    concluida: 'CAMPANHA CONCLUÍDA', infLib: 'Infinito liberado', pular: 'Enter ou clique: pular', lobby: 'Volta ao lobby em', agora: 'Enter: voltar agora',
+    infCartao: 'O VALE AINDA CHAMA. Sobreviva o quanto puder, com tudo o que a campanha acordou.', recorde: 'Recorde: rodada', semRecorde: 'Sem recorde' },
+};
+const CAMP_CREDITOS = [ // créditos (lore.md §10.3: a lista de nomes do jogo; o último é "Família 413"). [estilo, texto]: t título, s sub, h grupo, n nome, e espaço, f fim
+  ['t', 'TIROTEIO · MODO ZUMBI'], ['s', 'São Lázaro do Vale, 1958'], ['e', ''],
+  ['h', 'A vila'], ['n', 'Padre Anselmo'], ['n', 'Benedito'], ['n', 'Seu Morais'], ['n', 'Tião'], ['n', 'Seu Quirino'], ['n', 'Antônio e Joãozinho'], ['n', 'Os Penitentes da Cal'], ['e', ''],
+  ['h', '3ª Companhia, 14º BC'], ['n', 'Cabo Ademar Nogueira, que não bebeu da água'], ['n', 'Tenente Brandão, o Vigia'], ['n', 'A Patrulha Lobo'], ['n', 'O capelão'], ['e', ''],
+  ['h', 'Sanatório Santa Inês'], ['n', 'Dr. Aurélio Vasconcellos, Número 1'], ['n', 'Vicente, o foguista'], ['n', 'Fermino, o magarefe'], ['n', 'As Irmãs de Santa Inês'], ['e', ''],
+  ['h', 'A mina'], ['n', 'O dono da chapa 17'], ['e', ''],
+  ['h', 'As famílias da lista'], ['n', '101 · 102 · 104 · 171-3 · 214 · 215 · 216'], ['n', 'e as outras, até a 412'], ['e', ''], ['e', ''],
+  ['f', 'Família 413'],
+];
+// infinito (§9): o D05 pôs CAMP_INF.ev; aqui os chefes de campo e as estreias (as mesmas da campanha: a CAMP_MIX é a fonte)
+Object.assign(CAMP_INF, {
+  chefe: { de: CAMP_INF.ev.chefeDe, cada: CAMP_INF.ev.chefeCada, ordem: [14, 15, 16], voltaK: .25, atrasoS: 5, tentaS: 1, sub: 'chefe de campo' }, // rodadas iguais às que o D05 deixa sem evento
+  estreia: Object.fromEntries(Object.entries(CAMP_MIX).map(([k, M]) => [k, M.estreia])), // só leitura (o sorteio do D06/D08 lê a CAMP_MIX)
+  mapas: ['vila', 'sanatorio'], // recorde por mapa (os do salvo, campSalvoSane)
+  radioCss: 'position:absolute;left:50%;top:118px;transform:translateX(-50%);width:640px;max-width:92vw;text-align:center;font-size:18px;color:#eee;background:rgba(0,0,0,.55);padding:6px 12px;border-radius:4px;opacity:0;transition:opacity .25s;text-shadow:0 1px 2px #000;pointer-events:none',
+});
+// ---------- objetivos do Ato V e do final ----------
+Object.assign(CAMP_OBJ, {
+  'V.1': { tipo: 'usar', titulo: CAMP_V.txt.cargas, alvo: { zint: CAMP_V.cargas, n: CAMP_V.cargas.length }, radio: { lembra: CAMP_V.radio.cargas }, depois: ['V.2'] },
+  'V.2': { tipo: 'sobreviver', titulo: CAMP_V.txt.nevoa }, // tipo próprio: o motor do D02 não mexe; quem fecha é o fimRodada daqui
+  'F.2': { tipo: 'fugir', titulo: CAMP_V.txt.fuga, alvo: { zint: CAMP_V.gaiola }, tempo: CAMP_V.fuga.tempo, embarque: CAMP_V.fuga.embarque, radio: { ini: CAMP_V.radio.fuga, lembra: CAMP_V.radio.fuga } },
+});
+CAMP_OBJ['F.1'] = { ...CAMP_OBJ['F.1'], tipo: 'matar', chefe: 16 }; // o do D13 (a fuga entra pela morte do Diretor, depois da cena)
+Object.assign(CAMP_ATOS.find(a => a.id === 'V'), { objs: ['V.1', 'V.2', 'F.1', 'F.2'], ini: ['V.1'] }); // a etapa V (índice 6)
+// ---------- host: Ato V, fuga e final ----------
+const CAMP_VS = { v2: 0, n0: 0, fase: null, t: 0, fim: 0, completo: false, docs: 0, cargasR: false }; // fase: null | 'cena' (c5-fuga) | 'fuga' | 'final' | 'cred'
+function campVLimpa() { Object.assign(CAMP_VS, { v2: 0, n0: 0, fase: null, t: 0, fim: 0, completo: false, docs: 0, cargasR: false }); }
+const campVOn = () => CAMP.on && CAMP.modo === 'campanha' && CAMP_ATOS[CAMP.et]?.id === 'V';
+const campVGal = () => typeof GAL7_RODADAS !== 'undefined' ? GAL7_RODADAS : null;
+CAMP_GANCHOS.inicio.push(e => { // etapa nova: Ato V do zero; o Diretor espera o V.2
+  campVLimpa(); const G = campVGal(); if (G) G.chefe = CAMP_ATOS[e]?.id === 'V' ? Infinity : CAMP_V.chefeMin;
+});
+CAMP_GANCHOS.rodada.push(r => { // depois da agenda (D05) e do Diretor (D13)
+  if (!campVOn()) return;
+  if (!CAMP_VS.cargasR && CAMP.obj['V.1']?.st === 'ativo') { CAMP_VS.cargasR = true; campRadio(CAMP_V.radio.cargas); } // depois do r5-inicio
+  const O = CAMP.obj['V.2'];
+  if (O?.st === 'ativo' && !CAMP_VS.v2 && r >= CAMP_V.v2De && !Z.dogRound) {
+    CAMP_VS.v2 = r; CAMP_VS.n0 = Math.max(1, Z.toSpawn);
+    if (!CAMP_EVS.id && campEvPode(r)) campEvLiga(CAMP_V.v2Ev);
+  }
+});
+CAMP_GANCHOS.fimRodada.push(r => { if (campVOn() && CAMP.obj['V.2']?.st === 'ativo' && CAMP_VS.v2 === r) campObjFeito('V.2'); });
+CAMP_GANCHOS.chefe.push(k => { if (k === CAMP_DIRETOR.k && campVOn() && !CAMP_VS.fase) campVFuga(); }); // síncrono: antes de o zTick ver a rodada vazia
+CAMP_GANCHOS.tick.push(campVTick);
+CAMP_GANCHOS.tick.push(() => { if (CAMP_EVS.fuga && !(campVOn() && CAMP_VS.fase === 'fuga')) campEvDesliga(); }); // a fuga só vale na fuga (partida nova, lobby, infinito: nada sobra)
+function campVTick() {
+  if (!campVOn()) return;
+  const O = CAMP.obj, G = campVGal(), v2 = O['V.2'];
+  if (v2?.st === 'ativo' && CAMP_VS.v2 === Z.round && Z.phase === 'round') { // progresso da rodada da Névoa
+    let n = Z.toSpawn; for (const z of Z.zs.values()) if (!z.lac && !ZKIND[z.kind]?.chefe) n++;
+    const p = clamp(1 - n / CAMP_VS.n0, 0, 1); if (p !== v2.p) { v2.p = p; campObjEnvia('V.2'); }
+  }
+  if (G && G.chefe === Infinity && v2?.st === 'feito') G.chefe = Math.max(CAMP_V.chefeMin, Z.round + 1); // o Diretor na rodada seguinte
+  if (!CAMP_VS.fase && O['F.1']?.st === 'feito') campVFuga(); // F.1 forçado (testes, atalho)
+  if (CAMP_VS.fase === 'cena' && now >= CAMP_VS.t) {
+    CAMP_VS.fase = 'fuga';
+    if (Z.phase === 'round') { campEvLiga(CAMP_V.fuga.ev, { fuga: 1 }); Z.spawnT = Math.min(Z.spawnT, now); }
+  }
+  if (CAMP_VS.fase === 'fuga' && Z.phase === 'round' && !CAMP_EVS.id) campEvLiga(CAMP_V.fuga.ev, { fuga: 1 }); // a fuga começou num intervalo (atalho)
+  if (CAMP_VS.fase === 'fuga' && O['F.2']?.st === 'feito') campVFinal();
+}
+function campVFuga() { // o Diretor caiu: cena c5-fuga, o pilar da 1ª carga estoura, a gaiola desce; a rodada segue (a fuga repõe zumbis)
+  const F = CAMP_V.fuga, P = GAL7.gal.G1.pilar;
+  CAMP_VS.fase = 'cena'; CAMP_VS.t = now + F.cenaS;
+  if (Z.phase === 'round') { Z.toSpawn = Math.max(Z.toSpawn, CAMP_EV.estouro.fuga.repoe); Z.reQ = []; Z.spawnT = now + F.cenaS; }
+  broadcast({ t: 'camp', k: 'fuga', e: 'ini', s: F.cenaS, x: P[0], z: P[1] });
+  const O = CAMP.obj['F.2']; if (O && O.st !== 'ativo' && O.st !== 'feito') { O.st = 'oculto'; campObjAtiva('F.2'); } // o objetivo já no HUD (a gaiola desce na cena; o Estouro começa depois dela)
+}
+function campVDocs() { // documentos lidos pela sala na campanha inteira (só os ids da lore: 10 terminais + 12 notas)
+  const L = campDocsSala(), D = campDocs(), ok = id => Object.hasOwn(ZINT_TERM_TXT, id) || Object.hasOwn(CAMP_NOTA_TXT, id);
+  return { n: L.filter(ok).length, tot: D.total };
+}
+function campVFinal() { // a gaiola subiu: zumbis caem sem pontos, salvo da conclusão e as cenas do final (o campConcluida vem depois delas)
+  CAMP_VS.fase = 'final'; campEvDesliga();
+  for (const z of [...Z.zs.values()]) zKill(z, null, 'body', 'nuke', false, true);
+  Z.toSpawn = 0; Z.reQ = [];
+  const D = campVDocs(), completo = D.n >= D.tot, C_ = CAMP_V.cenas, dif = S.st.zdiff | 0; CAMP_VS.completo = completo; CAMP_VS.docs = D.n;
+  const cenas = [C_.final, completo && C_.completo, C_.pos].filter(Boolean), d = campCenaDur(cenas);
+  broadcast({ t: 'camp', k: 'salva', ato: CAMP_ATOS[CAMP.et].ato, dif, fim: 1 });
+  broadcast({ t: 'camp', k: 'final', c: completo ? 1 : 0, n: D.n, tot: D.tot });
+  for (const a of CAMP.alvos) a.alive = false; CAMP.alvos = [];
+  CAMP.fim = { prox: -1, t: now + d, troca: false }; Z.phaseEnd = now + 3600;
+  broadcast({ t: 'camp', k: 'cena', ids: cenas, s: r2(d), troca: 0 });
+}
+CAMP_GANCHOS.concluida.push(() => { // créditos (no lugar do "Volta ao lobby" do D02); no fim, o campInicio leva ao lobby
+  const s = CAMP_V.creditosS, dif = S.st.zdiff | 0;
+  CAMP_VS.fase = 'cred'; CAMP_VS.fim = now + s;
+  broadcast({ t: 'camp', k: 'creditos', s, dif });
+  S.phase = 'over'; S.phaseEnd = now + s; Z.phase = 'over'; CAMP.over = true; CAMP.overSt = S.st; CAMP.repetir = false; srvState();
+  return true;
+});
+function campVLobbyJa() { if (NET.isHost && CAMP_VS.fase === 'cred' && S.phase === 'over' && CAMP.over) { S.phaseEnd = now; return true; } return false; } // host: depois de pular, Enter de novo
+CAMP_GANCHOS.cp.push(cp => { // quem entra no meio: a fase do final (gaiola embaixo, créditos)
+  if (!campVOn() || !CAMP_VS.fase) return;
+  const fim = CAMP_VS.fase === 'cena' ? CAMP_VS.t : CAMP_VS.fase === 'cred' ? CAMP_VS.fim : now;
+  cp.fg = [CAMP_VS.fase, r2(Math.max(0, fim - now))];
+});
+// ---------- host: infinito (chefes de campo) ----------
+const CAMP_INFS = { vistoR: 0, pend: null, n: 0 };
+function campInfChefeDe(r) { // a rodada tem chefe de campo? { k, volta, vidaK } (Vigia 20, Foguista 30, Diretor 40, depois em rodízio)
+  const C_ = CAMP_INF.chefe; if (!(r >= C_.de) || (r - C_.de) % C_.cada) return null;
+  const L = C_.ordem.filter(k => CAMP_CHEFE[k] && ZKIND[k]); if (!L.length) return null;
+  const i = (r - C_.de) / C_.cada, volta = Math.floor(i / L.length);
+  return { k: L[i % L.length], volta, vidaK: 1 + C_.voltaK * volta };
+}
+function campInfTick() {
+  if (CAMP.modo !== 'infinito') return;
+  const I = CAMP_INFS, C_ = CAMP_INF.chefe, r = Z.round;
+  if (r < I.vistoR) Object.assign(I, { vistoR: 0, pend: null, n: 0 }); // partida nova
+  if (Z.phase === 'round' && r !== I.vistoR) { I.vistoR = r; const c = campInfChefeDe(r); if (c) I.pend = { ...c, r, t: now + C_.atrasoS }; }
+  if (!I.pend || Z.phase !== 'round' || now < I.pend.t || CAMP_CH.z) return;
+  const z = campChefeNasce(I.pend.k, { campo: 1, vidaK: I.pend.vidaK, rodada: r });
+  if (!z) { I.pend.t = now + C_.tentaS; return; } // sem lugar (ou rodada de cães): tenta de novo, e a pendência passa para a próxima rodada
+  I.n++; broadcast({ t: 'msg', txt: String(CAMP_CHEFE[I.pend.k].nome || ZKIND[I.pend.k].n).toUpperCase(), sub: `Rodada ${r} · ${C_.sub}`, dur: 4 }); I.pend = null;
+}
+CAMP_GANCHOS.tick.push(campInfTick);
+// ---------- cliente ----------
+const CAMP_VC = { fuga: 0, mundo: null, cred: null, el: null, aviso: null, docs: null, rec: -1, recK: '', radio: null };
+const campInfCli = () => C.st?.mode === 'zombies' && C.st.zmode === 'infinito';
+Object.assign(CAMP_GANCHOS.msg, {
+  fuga: m => { // a cena da fuga (4 s), o pilar estoura, a gaiola começa a descer
+    if (!campCliOn() || m.e !== 'ini' || !finN(m.s)) return; const s = clamp(m.s, 0, 30);
+    CAMP_VC.fuga = -1; CAMP_VC.mundo = ZC.world; // o relógio começa no quadro seguinte (o 'now' da mensagem pode ser o do servidor)
+    campCena([CAMP_V.cenas.fuga], false); const ce = CAMP.c.cena; if (ce?.L.length) for (const c of ce.L) c[1] = s / ce.L.length;
+    if (finN(m.x) && finN(m.z) && Math.abs(m.x) < 1e4 && Math.abs(m.z) < 1e4) boomFx(new V3(m.x, 1.5, m.z));
+  },
+  final: m => { // a sala leu tudo: o final completo fica no salvo de cada um
+    if (!campCliOn()) return; CAMP_VC.docs = [finN(m.n) ? m.n | 0 : 0, finN(m.tot) ? m.tot | 0 : 0];
+    if (m.c === 1) { const s = campSalvo(); s.finalCompleto = true; save('campanha', s); }
+  },
+  creditos: m => { if (!campCliOn() || !finN(m.s)) return; const s = clamp(m.s, 0, 120), dif = clamp(m.dif | 0, 0, ZDIFF.length - 1); CAMP.c.cena = null; CAMP_VC.cred = { t0: -1, fim: Infinity, s, pulou: false }; CAMP_VC.aviso = { dif }; },
+});
+CAMP_GANCHOS.sync.push(cp => { // quem entra no meio: gaiola já embaixo; créditos com o tempo que falta (a foto do mundo chega a todos, sempre: só para quem ainda não viu)
+  const f = Array.isArray(cp.fg) ? cp.fg : null; if (!f || typeof f[0] !== 'string') return;
+  if ((f[0] === 'cena' || f[0] === 'fuga' || f[0] === 'final') && !CAMP_VC.fuga) { CAMP_VC.fuga = -2; CAMP_VC.mundo = ZC.world; } // -2: já embaixo (o quadro seguinte acerta o relógio)
+  if (f[0] === 'cred' && finN(f[1]) && !CAMP_VC.cred) { const s = clamp(f[1], 0, 120); CAMP_VC.cred = { t0: -1, fim: Infinity, s: CAMP_V.creditosS, ja: CAMP_V.creditosS - s, pulou: false }; }
+});
+CAMP_GANCHOS.hud.push(campVHud);
+function campVHud(dt) {
+  if (campInfCli()) return campInfHud();
+  if (!campCliOn()) return;
+  if (curMapId === 'galeria7' && ZC.world) { // a gaiola: no alto até a fuga, desce na cena (o 'subiu' do D02 sobe sozinho)
+    if (CAMP_VC.mundo !== ZC.world) { CAMP_VC.mundo = ZC.world; CAMP_VC.fuga = 0; }
+    if (CAMP_VC.fuga < 0) CAMP_VC.fuga = CAMP_VC.fuga === -2 ? now - CAMP_V.gaiolaDesceS : now;
+    const i = campZintIdx(CAMP_V.gaiola), e = ZC.world.zint?.[i], c = ZC.zint?.[i];
+    if (e?.g && !e.off && c && c.st !== 'subiu') { const k = CAMP_VC.fuga ? clamp((now - CAMP_VC.fuga) / CAMP_V.gaiolaDesceS, 0, 1) : 0, y = CAMP_V.gaiolaY * (1 - k); if (e.g.position.y !== y) e.g.position.y = y; }
+  }
+  campCredQuadro();
+}
+// créditos: tela de rolagem por cima de tudo (dentro do #zhud: some com o HUD ao voltar ao lobby); pular = esconder a sua
+const CAMP_CRED_CSS = `#campCred{position:fixed;inset:0;z-index:15;background:#000;overflow:hidden;pointer-events:auto;display:none;font-family:Georgia,serif;color:#e8e2d4}
+#campCred .rol{position:absolute;left:0;right:0;top:0;text-align:center;will-change:transform}
+#campCred .rol div{margin:0 auto;max-width:760px;padding:0 24px}
+#campCred .t{font-size:34px;letter-spacing:3px}#campCred .s{font-size:18px;color:#aaa;margin-top:6px}#campCred .h{font-size:14px;letter-spacing:3px;color:#ff8a6a;text-transform:uppercase;margin-top:26px}
+#campCred .n{font-size:22px;margin-top:8px}#campCred .e{height:40px}#campCred .f{font-size:38px;letter-spacing:4px;color:#fff}
+#campCred .fim{position:absolute;left:0;right:0;top:42%;text-align:center;display:none}#campCred .fim b{display:block;font-size:30px;letter-spacing:3px}#campCred .fim span{font-size:18px;color:#bbb}
+#campCred small{position:absolute;bottom:4vh;right:4vw;color:#888;font-size:14px;font-family:sans-serif}
+@media (max-width:600px){#campCred .t{font-size:24px}#campCred .n{font-size:17px}#campCred .f{font-size:28px}}`;
+function campCredEl() {
+  let E = CAMP_VC.el; if (E?.root.isConnected) return E;
+  if (!document.getElementById('campCredCss')) { const s = document.createElement('style'); s.id = 'campCredCss'; s.textContent = CAMP_CRED_CSS; document.head.appendChild(s); }
+  const root = document.createElement('div'); root.id = 'campCred';
+  root.innerHTML = `<div class="rol">${CAMP_CREDITOS.map(([c, t]) => `<div class="${c}">${esc(t)}</div>`).join('')}</div><div class="fim"><b></b><span></span></div><small></small>`;
+  ($('#zhud') || document.body).appendChild(root); root.onclick = () => campCredPula();
+  return (CAMP_VC.el = E = { root, rol: root.querySelector('.rol'), fim: root.querySelector('.fim'), small: root.querySelector('small'), k: '' });
+}
+function campCredPula() { const c = CAMP_VC.cred; if (!c || now >= c.fim) return false; if (!c.pulou) { c.pulou = true; return true; } return campVLobbyJa(); }
+addEventListener('keydown', e => { if (!CAMP_VC.cred || now >= CAMP_VC.cred.fim || !campCliOn()) return; if (e.code === 'Enter' || e.code === 'Space') campCredPula(); });
+function campCredQuadro() {
+  const c = CAMP_VC.cred; if (c && c.t0 < 0) { c.t0 = now - (c.ja || 0); c.fim = c.t0 + c.s; }
+  if (!c) { if (CAMP_VC.el?.root.style.display === 'block') CAMP_VC.el.root.style.display = 'none'; return; }
+  if (now >= c.fim + 1) { CAMP_VC.cred = null; return; }
+  const E = campCredEl(); if (E.root.style.display !== 'block') E.root.style.display = 'block';
+  const resta = Math.max(0, Math.ceil(c.fim - now)), V = CAMP_V.txt, dif = ZDIFF[CAMP_VC.aviso?.dif ?? 1]?.name || '';
+  const sm = `${c.pulou ? '' : V.pular + ' · '}${V.lobby} ${resta}s${c.pulou && NET.isHost ? ' · ' + V.agora : ''}`;
+  if (E.k !== sm) { E.k = sm; E.small.textContent = sm; }
+  if (c.pulou) { if (E.rol.style.display !== 'none') { E.rol.style.display = 'none'; E.fim.style.display = 'block'; E.fim.querySelector('b').textContent = V.concluida; E.fim.querySelector('span').textContent = `${dif} · ${V.infLib}`; } return; }
+  const ult = E.rol.lastElementChild, H = innerHeight, fimY = H / 2 - (ult ? ult.offsetTop + ult.offsetHeight / 2 : 0);
+  const k = clamp((now - c.t0) / Math.max(1, c.s - CAMP_V.credFixoS), 0, 1), y = H + (fimY - H) * k;
+  E.rol.style.transform = `translateY(${y.toFixed(1)}px)`;
+}
+// infinito: legenda do rádio e das falas (a fila é a do D02) e o recorde
+function campInfHud() {
+  const st = C.st, m = curMapId, d = st.zdiff | 0, r = ZC.round | 0;
+  if (CAMP_INF.mapas.includes(m) && r > 0 && ZC.on) { // recorde: a maior rodada a que chegou neste mapa e dificuldade
+    const key = m + ':' + d; if (CAMP_VC.recK !== key) { CAMP_VC.recK = key; CAMP_VC.rec = campSalvo().inf[m]?.[d] ?? 0; }
+    if (r > CAMP_VC.rec) { CAMP_VC.rec = r; const s = campSalvo(); s.inf[m][d] = r; save('campanha', s); }
+  }
+  const c = CAMP.c; let el = CAMP_VC.radio;
+  if (!el?.isConnected) { el = CAMP_VC.radio = document.createElement('div'); el.id = 'campInfRadio'; el.style.cssText = CAMP_INF.radioCss; ($('#zhud') || document.body).appendChild(el); }
+  if (c.radio && now >= c.radio.fim) c.radio = null;
+  if (!c.radio && c.radioQ.length) { const [k, id] = c.radioQ.shift(), t = campTxt(k, id), txt = String(t?.txt ?? id), quem = String(t?.quem ?? (k === 'radio' ? 'RÁDIO' : ''));
+    const [mn, mx, pl] = CAMP.radioS; c.radio = { fim: now + clamp(mn + txt.length * pl, mn, mx) };
+    el.innerHTML = `<b style="color:${k === 'fala' ? '#ffb070' : '#9fd0ff'};letter-spacing:1px">${k === 'radio' && quem !== 'RÁDIO' ? 'RÁDIO · ' : ''}${esc(quem)}:</b> ${esc(txt)}`; if (k === 'radio' && SND.radio) play('radio'); }
+  const op = c.radio ? '1' : '0'; if (el.style.opacity !== op) el.style.opacity = op;
+}
+// formulário (O3-D02): o recorde no cartão do mapa, o texto do Infinito e o aviso de campanha concluída
+function campInfForm(el, st) {
+  if (st.mode !== 'zombies') return;
+  const zm = el.querySelector('[data-zm]')?.parentElement, V = CAMP_V.txt;
+  if (zm && CAMP_VC.aviso) { const d = document.createElement('div'); d.className = 'zdesc'; d.innerHTML = `<b>${esc(V.concluida.charAt(0) + V.concluida.slice(1).toLowerCase())} (${esc(ZDIFF[CAMP_VC.aviso.dif]?.name || '')})</b> · ${esc(V.infLib)}`; zm.after(d); }
+  if (st.zmode !== 'infinito') return;
+  if (zm) { const d = document.createElement('div'); d.className = 'zdesc'; d.textContent = V.infCartao; (zm.nextElementSibling?.classList.contains('zdesc') ? zm.nextElementSibling : zm).after(d); }
+  const inf = campSalvo().inf, dz = clamp(st.zdiff | 0, 0, ZDIFF.length - 1);
+  for (const b of el.querySelectorAll('[data-map]')) { const m = b.dataset.map; if (!CAMP_INF.mapas.includes(m)) continue; const r = inf[m]?.[dz], s = document.createElement('small'); s.className = 'rec'; s.textContent = r ? `${V.recorde} ${r}` : V.semRecorde; b.appendChild(s); }
+}
+{ const f0 = campFormRender; campFormRender = function (el, st) { f0(el, st); campInfForm(el, st); }; } // envolve o do O3-D02 (o matchForm chama pelo nome)
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_V, CAMP_VS, CAMP_VC, CAMP_INFS, CAMP_CREDITOS, campVFuga, campVFinal, campVDocs, campVTick, campInfChefeDe, campInfTick, campInfForm, campCredPula, campVLobbyJa, zintPoe, campFala, campRadio, campInfLiberado, campChefeLimpa,
+  campVEstado: () => ({ fase: CAMP_VS.fase, v2: CAMP_VS.v2, chefeR: campVGal()?.chefe ?? null, completo: CAMP_VS.completo, docs: CAMP_VS.docs, ev: CAMP_EVS.id, fuga: CAMP_EVS.fuga, cred: !!CAMP_VC.cred, credVis: CAMP_VC.el?.root.style.display === 'block', pulou: !!CAMP_VC.cred?.pulou,
+    gaiolaY: (() => { const i = campZintIdx(CAMP_V.gaiola), e = ZC.world?.zint?.[i]; return e?.g ? +e.g.position.y.toFixed(2) : null; })(), radioInf: CAMP_VC.radio?.isConnected ? [CAMP_VC.radio.style.opacity, CAMP_VC.radio.textContent] : null }) }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+// ===== FIM O3-D14 =====
 //
 // ===== FIM O3: campanha =====
 
