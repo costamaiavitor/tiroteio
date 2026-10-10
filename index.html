@@ -1011,6 +1011,220 @@ MAPS.forno = {
   })(),
 };
 // ===== FIM O3-D11 (mapa) =====
+// ===== O3-D13: arena Galeria 7 (MAPS.galeria7; docs/overhaul/campanha.md §8.3, lore.md: o Veio, o púlpito do Diretor, a gaiola da mina) =====
+// Mapa pequeno e só da campanha (camp: 1: fora dos cartões do clássico e do PvP). Caverna de ~100 x 90 m: salão central (A, 48 x 42 m,
+// teto de 10 m) com o lago do Veio (água rasa, andável), o púlpito no meio (ilha de pedra de 0,9 m), 4 poços fundos (de onde vêm os
+// lacaios e por onde o Diretor nada), 5 plataformas de rocha e andaime de 1,2 m (secas na maré; degraus de 0,4 m), as placas de ferro
+// da Corrente e o cano-mestre nas paredes; 3 galerias de fora (G1 oeste, G2 norte, G3 leste: uma por rodada, 21 a 23, pelas portas da
+// história), cada uma com o pilar da boca onde vai a carga; o poço da gaiola ao sul (a fuga) e a boca do cano por onde se chega (sudeste).
+// Tanques, junções, cargas, gaiola, nota, munição e Caixa ficam no ZINT_MAPA.galeria7 (bloco do O3-D13, abaixo da @@CAMP-CHEFE-3@@).
+// Desempenho: cenário fixo na junção (mergeStatic), pedras e estalactites instanciadas (1 chamada cada), água numa malha só (shader de
+// água do 3A-13, sfxAgua: mesmo programa da Vila), luzes de carbureto numa malha de pontos, 6 lâmpadas do pool, sem atmosfera e sem luz
+// por inimigo. Nada acima de 1,21 m é degrau para o jogador (ZTOP): as plataformas têm 1,2 m e dois degraus.
+const GAL7 = { // tudo de tabela: metros, -z = norte, centro do salão na origem
+  T: 1.5, // espessura das paredes de rocha
+  sala: { x: 24, z0: -22, z1: 20, h: 10, teto: 9.8 }, // salão central A: x de -24 a 24
+  gal: { // galerias de fora: retângulo interno [x0, x1, z0, z1], altura da parede e do teto, porta no muro do salão, janelas, pilar da boca
+    G1: { r: [-46, -25.5, -6, 6], h: 6, teto: 5.8, nome: 'Galeria oeste', porta: 'g7-oeste', pilar: [-38, 0], carga: [-37, 0, 1, 0] },
+    G2: { r: [-6, 6, -44, -23.5], h: 6, teto: 5.8, nome: 'Galeria norte', porta: 'g7-norte', pilar: [0, -36], carga: [0, -35, 0, 1] },
+    G3: { r: [25.5, 46, -6, 6], h: 6, teto: 5.8, nome: 'Galeria leste', porta: 'g7-leste', pilar: [38, 0], carga: [37, 0, -1, 0] },
+  },
+  pilarW: 2, // pilar da boca (2 x 2 m, do chão ao teto)
+  poco: { r: [-5, 5, 21.5, 31], h: 7, teto: 6.8, vao: 3.5 }, // poço da gaiola (sul), vão de 7 m no muro do salão
+  gaiola: [0, 27], // centro da gaiola (ZINT 'gaiola' do O3-D02)
+  fora: { x: 56, z0: -54, z1: 46 }, // chão de fora (os zumbis nascem a 4–7 m das janelas, nos túneis laterais) e grade dos zumbis
+  lago: { x: 0, z: -2, r: 9.5, seg: 40, y: .035 }, // lago do Veio (raso: andável)
+  pulpito: { x: 0, z: -2, w: 3.4, h: .9 }, // ilha de pedra do púlpito (o Diretor fica em cima na fase 1)
+  pocos: [[-11, -10], [11, -10], [-11, 6], [11, 6]], pocoW: 2.4, pocoR: 1.55, // poços fundos (colisor de água, como os da Vila) e a borda
+  plats: [ // plataformas [x, z, w, d, lado dos degraus (dx, dz), andaime]
+    [-17, -14, 4, 3, 1, 0, 0], [17, -14, 4, 3, -1, 0, 0], [-17, 9, 4, 4, 1, 0, 0], [17, 10, 3, 4, -1, 0, 1], [0, 13, 4, 2.4, 0, -1, 1]],
+  platH: 1.2, degD: .6, degW: 1.6, // altura (≤ ZTOP), fundo e largura de cada degrau
+  placas: [[-6.5, -12], [6.5, -12], [-8, 5.5], [8, 5.5], [-15, -3], [15, -3]], placaW: 2.4, // placas de ferro da Corrente (a fase 1 escolhe 4)
+  janelas: [ // [sala, x, z, nx, nz] (centro do muro, normal para fora)
+    ['A', -15, -22.75, 0, -1], ['A', 15, -22.75, 0, -1], ['A', -24.75, -14, -1, 0], ['A', -24.75, 12, -1, 0], ['A', 24.75, -14, 1, 0], ['A', 24.75, 12, 1, 0], ['A', -14, 20.75, 0, 1],
+    ['G1', -36, -6.75, 0, -1], ['G1', -42, 6.75, 0, 1], ['G2', -6.75, -34, -1, 0], ['G2', 6.75, -38, 1, 0], ['G3', 36, -6.75, 0, -1], ['G3', 42, 6.75, 0, 1]],
+  risers: [[-12, -17, 'A'], [12, -17, 'A'], [-20, 2, 'A'], [20, 3, 'A'], [-10, 15, 'A'], [-33, -3, 'G1'], [-43, 3, 'G1'], [-3, -31, 'G2'], [3, -41, 'G2'], [33, 3, 'G3'], [43, -3, 'G3']],
+  agua: [[-9.4, -7.9, 'A'], [9.4, -7.9, 'A'], [-9.4, 4.1, 'A'], [9.4, 4.1, 'A'], [-5, -9, 'A'], [5, -9, 'A'], [-7, -1, 'A'], [7, -1, 'A'], [-4, 5, 'A'], [4, 5, 'A']], // CAMP_AGUA.galeria7 (Afogados, Névoa)
+  spawns: [[12.5, 15.5], [15, 15.5], [12.5, 17.5], [15, 17.5]], // boca do cano (sudeste): onde se chega
+  boca: { x: 14, z: 20.9, r: 1.25 }, // a boca do cano-mestre no muro sul (colisor e desenho)
+  cano: { y: 4.2, r: .32 }, // o cano-mestre corre pelas paredes do salão e desce até cada junção
+  lampadas: [[-23.4, -15, 3.6], [23.4, -15, 3.6], [-12, 19.4, 3.4], [-36, -5.4, 3.2], [5.4, -34, 3.2], [36, 5.4, 3.2]], // x, z, y (6 do pool)
+  carbureto: [[-23.6, 0, 2.6], [23.6, 3, 2.6], [-6, -21.6, 2.6], [6, 19.6, 2.6], [-46, 3, 2.4], [-30, -5.6, 2.4], [-3, -44, 2.4], [5.6, -26, 2.4], [46, -3, 2.4], [30, 5.6, 2.4], [-4.6, 30.6, 2.4], [4.6, 22, 2.4]],
+  carbCor: 0xffa040, carbTam: 1.6,
+  pedras: { n: 90, semente: 7, esc: [.45, 1.1] }, estalac: { n: 70, semente: 13, comp: [.6, 2.2] }, // pedras nas paredes, estalactites no teto
+  cores: { rocha: 0x3b3833, rochaE: 0x26241f, teto: 0x1d1c19, madeira: 0x4e3a28, madeiraE: 0x2e2218, ferro: 0x2a2c2e, ferrugem: 0x5a3a24, cano: 0x3c3a36, canoE: 0x24221f,
+    agua: 0x04070a, aguaE: 0x05110d, veio: 0x0e4a3a, oleo: 0x0a1a14, placa: 0x3d4248, placaE: 0x1e2226, pedra: 0x4a463e, livro: 0x2a1610, papel: 0xcfc6ae, vela: 0xffd9a0, trilho: 0x55585c },
+};
+const GAL7_V = { agua: null, mare: null, aguaM: null, placas: null, carb: null, ser: null }; // peças do cliente que o gal7Anim mexe (o resto fica no bloco do Diretor)
+function gal7Janelas() { // janelas dos zumbis (túneis laterais), com os pontos de fora/dentro como no Sanatório
+  return GAL7.janelas.map(([room, x, z, nx, nz]) => { const w = { room, x, z, n: [nx, nz] }; w.ox = x + nx * .9; w.oz = z + nz * .9; w.ix = x - nx * 1.2; w.iz = z - nz * 1.2; w.tx = -nz; w.tz = nx; return w; });
+}
+function gal7Buracos(sala, eixo, c) { // janelas e portas num muro: lista de vãos no eixo do muro
+  const out = [];
+  for (const [r, x, z] of GAL7.janelas) if (r === sala && (eixo === 'x' ? Math.abs(z - c) < .01 : Math.abs(x - c) < .01)) out.push(zWin(eixo === 'x' ? x : z));
+  return out;
+}
+function gal7Caixas() { // colisores (B: desenhados e no COL; 'col': só no COL; 'inv': água, segura gente e deixa a bala passar)
+  const G = GAL7, T = G.T, S = G.sala, h = T / 2, o = [floor(G.fora.x * 2, G.fora.z1 - G.fora.z0), ...border(G.fora.x * 2, G.fora.z1 - G.fora.z0, 10, 'rock').map(b => ({ ...b, z: b.z + (G.fora.z0 + G.fora.z1) / 2 }))];
+  o[0].z = (G.fora.z0 + G.fora.z1) / 2;
+  const L = S.x + T, P = G.poco;
+  // salão: muros com as portas das galerias, as janelas e o vão do poço da gaiola
+  o.push(...zWall('x', S.z0 - h, -L, L, [zGap(-2, 2), ...gal7Buracos('A', 'x', S.z0 - h)], S.h, 'rock', T));
+  o.push(...zWall('x', S.z1 + h, -L, L, [zGap(-P.vao, P.vao), ...gal7Buracos('A', 'x', S.z1 + h)], S.h, 'rock', T));
+  o.push(...zWall('z', -S.x - h, S.z0, S.z1, [zGap(-2, 2), ...gal7Buracos('A', 'z', -S.x - h)], S.h, 'rock', T));
+  o.push(...zWall('z', S.x + h, S.z0, S.z1, [zGap(-2, 2), ...gal7Buracos('A', 'z', S.x + h)], S.h, 'rock', T));
+  // galerias: G1 e G3 (leste-oeste), G2 (norte-sul)
+  for (const k of ['G1', 'G3']) { const r = G.gal[k].r, H = G.gal[k].h, s = k === 'G1' ? -1 : 1, ext = s < 0 ? r[0] - T : r[1] + T, dentro = s < 0 ? r[1] : r[0];
+    o.push(...zWall('x', r[2] - h, Math.min(ext, dentro), Math.max(ext, dentro), gal7Buracos(k, 'x', r[2] - h), H, 'rock', T));
+    o.push(...zWall('x', r[3] + h, Math.min(ext, dentro), Math.max(ext, dentro), gal7Buracos(k, 'x', r[3] + h), H, 'rock', T));
+    o.push(...zWall('z', s < 0 ? r[0] - h : r[1] + h, r[2], r[3], [], H, 'rock', T)); }
+  { const r = G.gal.G2.r, H = G.gal.G2.h;
+    o.push(...zWall('z', r[0] - h, r[2] - T, r[3], gal7Buracos('G2', 'z', r[0] - h), H, 'rock', T));
+    o.push(...zWall('z', r[1] + h, r[2] - T, r[3], gal7Buracos('G2', 'z', r[1] + h), H, 'rock', T));
+    o.push(...zWall('x', r[2] - h, r[0], r[1], [], H, 'rock', T)); }
+  // poço da gaiola
+  o.push(...zWall('z', P.r[0] - h, P.r[2], P.r[3] + T, [], P.h, 'rock', T), ...zWall('z', P.r[1] + h, P.r[2], P.r[3] + T, [], P.h, 'rock', T), ...zWall('x', P.r[3] + h, P.r[0], P.r[1], [], P.h, 'rock', T));
+  // pilares da boca (um por galeria: a carga vai na face voltada para a porta)
+  for (const k in G.gal) { const [x, z] = G.gal[k].pilar; o.push(B(x, z, G.pilarW, G.pilarW, G.gal[k].h, 'rock')); }
+  // púlpito, poços (água funda: parede para o jogador, buraco para os zumbis), plataformas com degraus, boca do cano
+  { const Q = G.pulpito; o.push(B(Q.x, Q.z, Q.w, Q.w, Q.h, 'stone')); }
+  for (const [x, z] of G.pocos) o.push(B(x, z, G.pocoW, G.pocoW, 1.2, 'inv'));
+  for (const [x, z, w, d, dx, dz, and] of G.plats) {
+    o.push(B(x, z, w, d, G.platH, and ? 'col' : 'rock'));
+    for (let k = 0; k < 2; k++) { const off = (dx ? w : d) / 2 + G.degD * (k + .5), hh = G.platH * (2 - k) / 3, ww = Math.min(G.degW, dx ? d : w);
+      o.push(dx ? B(x + dx * off, z, G.degD, ww, hh, and ? 'wood' : 'rock') : B(x, z + dz * off, ww, G.degD, hh, and ? 'wood' : 'rock')); }
+  }
+  { const b = G.boca; o.push(B(b.x, b.z, b.r * 2 + .4, 1.4, b.r * 2 + .3, 'col')); }
+  return o;
+}
+function buildGal7(M) { // cenário procedural (fixo: a junção do mergeStatic junta por material e bloco)
+  const G = GAL7, K = G.cores, Gr = new THREE.Group(); world.add(Gr);
+  const p = (w, h, d, x, y, z, c, ry = 0, rx = 0, rz = 0) => { const b = bx(Gr, w, h, d, x, y, z, mc(c)); b.rotation.set(rx, ry, rz); return b; };
+  const cil = (r1, r2, h, x, y, z, c, rx = 0, ry = 0, rz = 0, seg = 10) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, seg), mc(c)); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = m.receiveShadow = true; Gr.add(m); return m; };
+  const S = G.sala, T = G.T;
+  // tetos de rocha (a luz do céu não entra: só as lâmpadas, o carbureto e o brilho do Veio)
+  p(S.x * 2 + T * 2, .4, S.z1 - S.z0 + T * 2, 0, S.teto + .2, (S.z0 + S.z1) / 2, K.teto);
+  for (const k in G.gal) { const r = G.gal[k].r; p(r[1] - r[0] + T * 2, .4, r[3] - r[2] + T * 2, (r[0] + r[1]) / 2, G.gal[k].teto + .2, (r[2] + r[3]) / 2, K.teto); }
+  { const r = G.poco.r; p(r[1] - r[0] + T * 2, .4, r[3] - r[2] + T * 2, 0, G.poco.teto + .2, (r[2] + r[3]) / 2, K.teto); }
+  // escoramento das galerias (quadros de madeira a cada 4 m) e trilhos da vagoneta
+  for (const k in G.gal) {
+    const g = G.gal[k], r = g.r, lx = k !== 'G2', a0 = lx ? r[0] : r[2], a1 = lx ? r[1] : r[3], c = lx ? (r[2] + r[3]) / 2 : (r[0] + r[1]) / 2, hw = lx ? (r[3] - r[2]) / 2 : (r[1] - r[0]) / 2;
+    for (let a = a0 + 2; a < a1 - 1; a += 4) { if (Math.abs(a - (lx ? g.pilar[0] : g.pilar[1])) < 1.6) continue;
+      for (const s of [-1, 1]) lx ? p(.3, g.teto, .3, a, g.teto / 2, c + s * (hw - .2), K.madeira) : p(.3, g.teto, .3, c + s * (hw - .2), g.teto / 2, a, K.madeira);
+      lx ? p(.32, .32, hw * 2, a, g.teto - .2, c, K.madeiraE) : p(hw * 2, .32, .32, c, g.teto - .2, a, K.madeiraE); }
+    for (const s of [-.55, .55]) lx ? p(a1 - a0, .08, .07, (a0 + a1) / 2, .06, c + s + 2.2, K.trilho) : p(.07, .08, a1 - a0, c + s + 2.2, .06, (a0 + a1) / 2, K.trilho);
+    for (let a = a0 + .4; a < a1; a += .9) lx ? p(.2, .06, 1.6, a, .03, c + 2.2, K.madeiraE) : p(1.6, .06, .2, c + 2.2, .03, a, K.madeiraE);
+    { const [x, z] = g.pilar; for (const s of [-1, 1]) { lx ? p(.25, .25, G.pilarW + .5, x + s * (G.pilarW / 2 + .13), g.teto - .4, z, K.madeiraE) : p(G.pilarW + .5, .25, .25, x, g.teto - .4, z + s * (G.pilarW / 2 + .13), K.madeiraE); } } // cinta de madeira no pilar
+    { const [x, z] = g.pilar, ex = lx ? (k === 'G1' ? r[0] + 2 : r[1] - 2) : c, ez = lx ? c : r[2] + 2; for (let i = 0; i < 6; i++) p(.6 + (i % 3) * .3, .4 + (i % 2) * .3, .5 + (i % 2) * .4, ex + Math.sin(i * 2.1) * 1.6, .2 + (i % 2) * .2, ez + Math.cos(i * 1.7) * 1.6, K.pedra, i, .2 * i, .1); void x; void z; } // entulho no fundo
+  }
+  // púlpito: ilha de pedra, estrado, a estante com o livro de chamada aberto e duas velas
+  { const Q = G.pulpito, y = Q.h; p(Q.w + .4, .25, Q.w + .4, Q.x, .1, Q.z, K.rochaE);
+    p(2.2, .12, 1.6, Q.x, y + .06, Q.z + .4, K.madeiraE); p(.9, 1.05, .5, Q.x, y + .55, Q.z - .5, K.madeira); p(1.05, .06, .62, Q.x, y + 1.1, Q.z - .5, K.madeiraE, 0, -.3);
+    p(.5, .04, .36, Q.x, y + 1.16, Q.z - .5, K.livro, 0, -.3); p(.46, .01, .32, Q.x, y + 1.185, Q.z - .5, K.papel, 0, -.3);
+    for (const s of [-1, 1]) { p(.06, .22, .06, Q.x + s * .62, y + 1.24, Q.z - .5, K.papel); bx(Gr, .03, .05, .03, Q.x + s * .62, y + 1.38, Q.z - .5, zGlow(K.vela, 2)); } }
+  // poços: borda de pedra (8 blocos) e a polia de onde descem as cordas
+  for (const [x, z] of G.pocos) { for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; p(1.15, .45, .4, x + Math.cos(a) * G.pocoR, .22, z + Math.sin(a) * G.pocoR, K.pedra, -a + Math.PI / 2); } }
+  // placas de ferro da Corrente (rentes ao chão)
+  for (const [x, z] of G.placas) { p(G.placaW, .04, G.placaW, x, .02, z, K.placa); for (const s of [-1, 1]) p(G.placaW + .1, .05, .12, x, .025, z + s * G.placaW / 2, K.placaE); }
+  // plataformas: rocha (as caixas desenham) e andaime (pranchas, pés e guarda-corpo)
+  for (const [x, z, w, d, dx, dz, and] of G.plats) {
+    if (!and) { p(w + .2, .15, d + .2, x, G.platH + .02, z, K.rochaE); continue; }
+    p(w, .1, d, x, G.platH - .05, z, K.madeira); for (let i = 0; i < Math.floor(w / .4); i++) p(.04, .11, d, x - w / 2 + .4 * (i + .5), G.platH - .04, z, K.madeiraE);
+    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) p(.14, G.platH, .14, x + a * (w / 2 - .1), G.platH / 2, z + b * (d / 2 - .1), K.madeiraE);
+    for (const [a, b] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) { if (a === dx && b === dz) continue; a ? p(.06, .06, d, x + a * (w / 2 - .05), G.platH + .9, z, K.madeira) : p(w, .06, .06, x, G.platH + .9, z + b * (d / 2 - .05), K.madeira); }
+  }
+  // cano-mestre: corre no alto das paredes do salão, desce até cada junção e sai pela boca do cano (sudeste), por onde se chega
+  { const C = G.cano, y = C.y, x0 = -S.x + C.r + .05, x1 = S.x - C.r - .05, z0 = S.z0 + C.r + .05, z1 = S.z1 - C.r - .05;
+    cil(C.r, C.r, x1 - x0, 0, y, z0, K.cano, 0, 0, Math.PI / 2); cil(C.r, C.r, z1 - z0, x0, y, (z0 + z1) / 2, K.cano, Math.PI / 2); cil(C.r, C.r, z1 - z0, x1, y, (z0 + z1) / 2, K.cano, Math.PI / 2);
+    cil(C.r, C.r, x1 - G.boca.x, (G.boca.x + x1) / 2, y, z1, K.cano, 0, 0, Math.PI / 2);
+    for (let a = -S.x + 3; a < S.x; a += 6) { p(.2, .9, .2, a, y + .45 + C.r, z0 - .05, K.ferro); } // abraçadeiras
+    for (const [x, z, nx, nz] of GAL7_JUNCOES) cil(C.r * .8, C.r * .8, y - .9 - .3, x + nx * .35, (y + .9 + .3) / 2, z + nz * .35, K.cano); // descida até a junção
+    const b = G.boca; cil(b.r, b.r, 1.6, b.x, b.r + .1, b.z, K.cano, Math.PI / 2); cil(b.r + .12, b.r + .12, .3, b.x, b.r + .1, b.z - .75, K.canoE, Math.PI / 2, 0, 0, 14); // a boca do cano
+    p(b.r * 2.2, .06, 1.8, b.x, .03, b.z - 1.4, K.oleo); } // a água preta que escorre da boca
+  // poço da gaiola: castelete (pés, travessa e a roda da polia) e trilho de guia
+  { const [gx, gz] = G.gaiola, H = G.poco.teto; for (const s of [-1, 1]) { p(.3, H, .3, gx + s * 2.6, H / 2, gz - 2.6, K.madeiraE); p(.3, H, .3, gx + s * 2.6, H / 2, gz + 2.6, K.madeiraE); }
+    p(5.6, .35, .35, gx, H - .5, gz - 2.6, K.madeira); p(5.6, .35, .35, gx, H - .5, gz + 2.6, K.madeira); p(.35, .35, 5.6, gx, H - .5, gz, K.madeira);
+    const roda = new THREE.Mesh(new THREE.TorusGeometry(.8, .08, 6, 18), mc(K.ferro)); roda.position.set(gx, H - 1.2, gz); roda.rotation.y = Math.PI / 2; roda.castShadow = true; Gr.add(roda);
+    for (const s of [-1, 1]) p(.04, H - 1.2, .04, gx + s * .5, (H - 1.2) / 2 + .6, gz, K.ferro); } // cabos
+  // suportes das lâmpadas
+  for (const [x, z, y] of G.lampadas) p(.08, .08, .5, x, y + .2, z, K.ferro);
+  // pedras encostadas nas paredes e estalactites (instanciadas: 1 chamada cada)
+  { const R = mkRand(G.pedras.semente), ps = [], muros = gal7Faces(), o3 = new THREE.Object3D();
+    for (let i = 0; i < G.pedras.n; i++) { const f = muros[Math.floor(R() * muros.length)], t = R(), x = f[0] + (f[2] - f[0]) * t, z = f[1] + (f[3] - f[1]) * t; if (gal7Vao(x, z)) continue; const s = G.pedras.esc[0] + R() * (G.pedras.esc[1] - G.pedras.esc[0]); const hz = f[1] === f[3], zo = M.z.zoneAt, dn = hz ? (zo(x, z + .6) ? -1 : 1) : (zo(x + .6, z) ? -1 : 1), e = .45 * s; ps.push([x + (hz ? 0 : dn * e), R() * .4 * s, z + (hz ? dn * e : 0), s, R() * 6]); } // metade enterrada na parede
+    const im = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(.7, 0), mc(K.rochaE), ps.length);
+    ps.forEach(([x, y, z, s, r], i) => { o3.position.set(x, y, z); o3.rotation.set(r, r * 1.7, r * .6); o3.scale.set(s, s * .8, s); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); });
+    im.castShadow = im.receiveShadow = true; im.computeBoundingSphere(); world.add(im);
+    const R2 = mkRand(G.estalac.semente), es = [], tetos = [[-S.x, S.x, S.z0, S.z1, S.teto], ...Object.values(G.gal).map(g => [...g.r, g.teto])];
+    for (let i = 0; i < G.estalac.n; i++) { const t = tetos[i % tetos.length], x = t[0] + 1 + R2() * (t[1] - t[0] - 2), z = t[2] + 1 + R2() * (t[3] - t[2] - 2), c = G.estalac.comp[0] + R2() * (G.estalac.comp[1] - G.estalac.comp[0]); es.push([x, t[4] - c / 2, z, c]); }
+    const ei = new THREE.InstancedMesh(new THREE.ConeGeometry(.28, 1, 6).rotateX(Math.PI), mc(K.rocha), es.length);
+    es.forEach(([x, y, z, c], i) => { o3.position.set(x, y, z); o3.rotation.set(0, i, 0); o3.scale.set(.7 + (i % 4) * .2, c, .7 + (i % 3) * .2); o3.updateMatrix(); ei.setMatrixAt(i, o3.matrix); });
+    ei.castShadow = true; ei.computeBoundingSphere(); world.add(ei); }
+  // água do Veio: o lago e os poços numa malha só (shader de água do 3A-13), e o lençol da maré (só aparece na maré)
+  { const L = G.lago, gs = [], c0 = new THREE.CircleGeometry(L.r, L.seg).rotateX(-Math.PI / 2); c0.translate(L.x, L.y, L.z); gs.push(c0);
+    for (const [x, z] of G.pocos) { const c = new THREE.CircleGeometry(G.pocoR - .15, 16).rotateX(-Math.PI / 2); c.translate(x, .55, z); gs.push(c); }
+    const orig = new THREE.MeshPhongMaterial({ color: K.agua, specular: 0x5a7a70, shininess: 90, emissive: K.aguaE });
+    SFX.fx2o.clear(); SFX.o2fx.clear(); SFX.alvos.length = SFX.novos.length = SFX.espelhos.length = 0; SFX.on = true; SFX.resp = SFX.pano = null; // arena sem atmosfera: o 3A-13 não zerou
+    const fx = sfxAgua(orig, { amp: .22, esc: .6, vel: .55, refl: .3, oleo: K.oleo, pulso: K.veio }); SFX.fx2o.set(fx, orig); SFX.o2fx.set(orig, fx);
+    const dyn = new THREE.Group(); dyn.userData.dyn = 1; world.add(dyn);
+    const agua = new THREE.Mesh(mergeGeos(gs), fx); agua.receiveShadow = true; agua.userData.own = true; dyn.add(agua); GAL7_V.agua = agua; GAL7_V.aguaM = orig;
+    const mare = new THREE.Mesh(new THREE.PlaneGeometry(S.x * 2, S.z1 - S.z0).rotateX(-Math.PI / 2), fx); mare.position.set(0, .02, (S.z0 + S.z1) / 2); mare.visible = false; mare.userData.own = true; dyn.add(mare); GAL7_V.mare = mare;
+    if (CFG.gfx === 'baixo') sfxTick(0); // no Baixo a água volta ao Phong já na montagem (SFX.on ainda é true: o sfxTick troca)
+    MAP_ANIM.push(sfxTick); }
+  // brilho azul das placas no aviso da Corrente (instanciado, escondido sem aviso) e as luzes de carbureto (pontos aditivos: 1 chamada)
+  { const n = G.placas.length, im = new THREE.InstancedMesh(new THREE.PlaneGeometry(G.placaW * .9, G.placaW * .9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x3a8cff, transparent: true, opacity: .55, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }), n);
+    const o3 = new THREE.Object3D(); G.placas.forEach(([x, z], i) => { o3.position.set(x, .06, z); o3.updateMatrix(); im.setMatrixAt(i, o3.matrix); });
+    im.count = n; im.userData.on = -1; im.frustumCulled = false; im.userData.own = true; im.userData.noShadow = true; im.renderOrder = 2; const dyn = new THREE.Group(); dyn.userData.dyn = 1; dyn.add(im); world.add(dyn); GAL7_V.placas = im; }
+  { const pos = new Float32Array(G.carbureto.length * 3); G.carbureto.forEach(([x, z, y], i) => { pos.set([x, y, z], i * 3); p(.12, .25, .12, x, y - .2, z, K.ferrugem); });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: G.carbCor, size: G.carbTam, map: SOFT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, fog: false }));
+    pts.userData.own = true; pts.frustumCulled = false; const dyn = new THREE.Group(); dyn.userData.dyn = 1; dyn.add(pts); world.add(dyn); GAL7_V.carb = pts; }
+  { const n = 6, ge = new THREE.CylinderGeometry(.035, .02, .55, 6).rotateX(Math.PI / 2), im = new THREE.InstancedMesh(ge, zGlow(0x9affd0, 2), n), m4 = new THREE.Matrix4().makeTranslation(0, -50, 0); // seringas da Dose (pool; o gal7Anim mexe)
+    for (let i = 0; i < n; i++) im.setMatrixAt(i, m4); im.frustumCulled = false; im.userData.noShadow = true; im.userData.n = 0; const dyn = new THREE.Group(); dyn.userData.dyn = 1; dyn.add(im); world.add(dyn); GAL7_V.ser = im; }
+  MAP_ANIM.push(gal7Anim);
+}
+const GAL7_JUNCOES = [[-24, -8, 1, 0], [10, -22, 0, 1], [24, 9, -1, 0]]; // face da parede e normal (para dentro) de cada junção do cano-mestre
+function gal7Faces() { // faces internas das paredes [x0, z0, x1, z1, altura] (pedras encostadas)
+  const G = GAL7, S = G.sala, L = [[-S.x, S.z0, S.x, S.z0, S.h], [-S.x, S.z1, S.x, S.z1, S.h], [-S.x, S.z0, -S.x, S.z1, S.h], [S.x, S.z0, S.x, S.z1, S.h]];
+  for (const k in G.gal) { const r = G.gal[k].r, h = G.gal[k].h; L.push([r[0], r[2], r[1], r[2], h], [r[0], r[3], r[1], r[3], h]); if (k !== 'G2') L.push(k === 'G1' ? [r[0], r[2], r[0], r[3], h] : [r[1], r[2], r[1], r[3], h]); else L.push([r[0], r[2], r[1], r[2], h], [r[0], r[2], r[0], r[3], h], [r[1], r[2], r[1], r[3], h]); }
+  return L;
+}
+function gal7Vao(x, z) { // perto de janela, porta, junção, Caixa, máquina ou boca do cano: sem pedra
+  for (const [, wx, wz] of GAL7.janelas) if (Math.abs(wx - x) < 2.6 && Math.abs(wz - z) < 2.6) return true;
+  for (const [px, pz] of [[-24, 0], [24, 0], [0, -22], [0, 20], [-25.5, 0], [25.5, 0], [0, -23.5]]) if (Math.abs(px - x) < 3.2 && Math.abs(pz - z) < 3.2) return true;
+  for (const [jx, jz] of GAL7_JUNCOES) if (Math.hypot(jx - x, jz - z) < 2.2) return true;
+  for (const [ix, iz] of [[-24, 5], [24, -6], [GAL7.boca.x, 20], [-24, 12], [24, 12]]) if (Math.hypot(ix - x, iz - z) < 2.4) return true;
+  return false;
+}
+MAPS.galeria7 = {
+  name: 'Galeria 7', desc: 'arena da campanha: a boca da Galeria 7, o lago do Veio, o púlpito do Diretor e a gaiola da mina', zonly: 1, zombie: 1, camp: 1, w: GAL7.fora.x * 2, d: GAL7.fora.z1 - GAL7.fora.z0,
+  sky: 0x020303, skyTop: 0x010202, exposure: 1.35, fogC: 0x070a09, fog: [6, 50],
+  hemi: .62, hemiC: [0x6a8278, 0x1a1714], sunI: .12, sunC: 0x8fb0a0, sun: [12, 40, 8],
+  theme: { floor: ['rock', 0x2e2b26], wall: ['rock', 0x3b3833], rock: ['rock', 0x3b3833], stone: ['rock', 0x4a463e], wood: ['wood', 0x4e3a28], metal: ['metal', 0x45484c] },
+  boxes: gal7Caixas,
+  build: buildGal7,
+  spawns: GAL7.spawns,
+  z: (() => {
+    const G = GAL7, S = G.sala, P = G.poco.r, g = G.gal;
+    const d = {
+      ff: { x0: -G.fora.x, z0: G.fora.z0, nx: G.fora.x * 2, nz: G.fora.z1 - G.fora.z0 },
+      start: 'A', rooms: { A: [-S.x, S.x, S.z0, S.z1], G1: g.G1.r.slice(), G2: g.G2.r.slice(), G3: g.G3.r.slice() },
+      roomNames: { A: 'Salão do Veio', G1: g.G1.nome, G2: g.G2.nome, G3: g.G3.nome },
+      floors: { A: ['rock', 0x2a2722], G1: ['dirt', 0x2e2a22], G2: ['dirt', 0x2e2a22], G3: ['dirt', 0x2e2a22] },
+      windows: gal7Janelas(), risers: G.risers.map(r => r.slice()), wall: [], perks: [], traps: [],
+      doors: [{ id: g.G1.porta, x: -S.x - G.T / 2, z: 0, axis: 'z', cost: 1500, rooms: ['A', 'G1'], kind: 'debris' },
+        { id: g.G2.porta, x: 0, z: S.z0 - G.T / 2, axis: 'x', cost: 1500, rooms: ['A', 'G2'], kind: 'debris' },
+        { id: g.G3.porta, x: S.x + G.T / 2, z: 0, axis: 'z', cost: 1500, rooms: ['A', 'G3'], kind: 'debris' }],
+      pap: { x: 50, z: 40, n: [0, -1] }, power: { x: 46, z: 40, n: [0, -1] }, // fora da caverna e escondidos (gal7Esconde): a arena não tem PaP e a energia já vem ligada
+      boxes: [{ x: -S.x + .55, z: 5, n: [1, 0] }], // 1 lugar da Caixa (parede oeste do salão)
+      lamps: G.lampadas.map(([x, z, y]) => ({ x, z, y, base: 14, dist: 22, c: 0xffb060 })),
+      spawns: G.spawns.map(s => s.slice()),
+    };
+    d.zoneAt = (x, z) => { for (const k of ['A', 'G1', 'G2', 'G3']) { const r = d.rooms[k]; if (x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3]) return k; }
+      return x >= P[0] && x <= P[1] && z >= S.z1 && z <= P[3] ? 'A' : null; }; // o poço da gaiola é do salão (vão aberto)
+    return d;
+  })(),
+};
+// ===== FIM O3-D13 (mapa) =====
 
 function siteDeco(M) { // chão pintado e letra flutuando em cada bomb
   for (const [k, r] of Object.entries(M.sites)) {
@@ -29604,6 +29818,363 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { matc
 // @@CAMP-ATO-2@@
 //
 // @@CAMP-CHEFE-3@@
+// ===== O3-D13: O Diretor (Dr. Aurélio, Número 1, tipo 16) e a arena Galeria 7 (docs/overhaul/campanha.md §7.4, §8.3; lore.md: falas dir-*) =====
+// O que tem aqui (dono: O3-D13; o mapa é o MAPS.galeria7, logo abaixo da @@CAMP-MAPAS@@, depois do Forno):
+// - ZKIND[16] e CAMP_CHEFE[16] pela base do O3-D07. Vida zHp(25)·(7 + 5·np) (sozinho 52 392 no Normal), dividida 30/35/35 pelas fases;
+//   tamanho por fase (1,3 na fase 1; 2,2 nas fases 2 e 3): o host troca ZKIND[16].sz/rad (visada do 'zhit', caixas) e o cliente escala
+//   a raiz e as caixas pela fase que já chega no { k: 'chefe' } (quem entra no meio recebe a fase pelo cp: nada novo na rede).
+//   Fase 1 "O Diretor": no púlpito (cinemático, como o Vigia na torre), protegido pelos 4 tanques do Veio ('pilar' variante tanque,
+//   vida = 6% da dele): com ≥ 1 tanque de pé leva ×0,2 e a barra mostra PROTEGIDO; os 4 caídos (ou a vida em 70%) passam à fase 2.
+//   Ataques: Dose (3 seringas em leque de 30°, 18 m, projétil a 16 m/s que o pilar segura; 20 + 1 dose do Enfermeiro: campZk2Dose),
+//   Chamada (2 Enfermeiros + 4 comuns pelos poços; teto 8 lacaios + 2 por jogador), Corrente (4 discos de 3 m nas placas de ferro
+//   mais perto dos jogadores; as placas acendem em azul; 35). Fase 2 "Número 1": mergulha no lago e volta grande por um poço; nada entre
+//   os poços (a cada 14 s, do lago ou da borda de um poço até o poço mais perto do alvo); Maré (aviso 2 s, 8 s: abaixo de 0,5 m no
+//   salão 10/s e ×0,6; as 5 plataformas e o púlpito ficam secos), Onda (16 × 3 m, 45 + empurrão de 5 m), Abraço (o alvo a ≤ 3 m: preso
+//   1,5 s a 25/s, o fraco abre já no abraço e quem acerta o cano no peito solta na hora; depois 1,5 s de fraco aberto), Afogados
+//   (lacaios da água a cada 18 s, teto 4). Fase 3 "Ainda não acabou": apagão local (só o carbureto e o Veio), 2 Pregadores (lacaios do
+//   coro), Coro (com ≥ 1 deles vivo cura 3% da vida, sem passar de 35%), avisos ×0,8 (nunca abaixo de 0,6 s, pela base), as junções
+//   voltam inteiras. Junções do cano-mestre (3, 'juncao', vida = 4% da dele): rompida = atordoado 5 s com o fraco ×3 aberto.
+//   Tanques e junções só levam dano com o chefe vivo (vida enorme na tabela; o início do chefe põe a vida de verdade).
+// - Arena (rodadas 21–25, só na campanha): as galerias abrem uma por rodada (21 oeste, 22 norte, 23 leste: portas da história, de
+//   graça); até 20 vivos (Normal, ×max da dificuldade/24); rodada 25: 12 comuns fixos (só Enfermeiro, Afogado e Pregador como tipos
+//   novos), o objetivo do chefe (CAMP_OBJ['F.1'], 'matar' o 16) ativa e o Diretor sobe da água no púlpito. A energia vem ligada.
+// - Pontos de entrada para o O3-D14 (Ato V, cargas, fuga, créditos): CAMP_OBJ['V.1'/'V.2'/'F.2'] são dele (o 'F.1' daqui é o mínimo para
+//   o chefe entrar sem o D14 e pode ser trocado); as cargas já estão no mapa ('g7-carga-1..3', tipo 'carga' do O3-D02, nas faces dos
+//   pilares da boca de cada galeria), a gaiola ('g7-gaiola', zona da fuga) e o pilar da 1ª carga (GAL7.gal.G1.pilar); a morte do Diretor
+//   chega pelo CAMP_GANCHOS.chefe (tipo 16, zumbi, quem matou) da base e o fim da etapa pelo CAMP_GANCHOS.concluida. GAL7_RODADAS diz
+//   que porta abre em que rodada e qual objetivo ativa na rodada do chefe.
+// - Cliente: modelo pelo registro do O3-D06 (CAMP_ZK[16], CAMP_ZKF.modelo/anim[16]): fase 1 de jaleco, colete, óculos redondos e a
+//   pulseira sem número acesa; fases 2 e 3 a crosta cinzenta escorrendo preto e o cano entrando no peito (o ponto fraco, aceso quando
+//   aberto). gal7Anim (MAP_ANIM da arena): maré (o lençol de água sobe no aviso e fica os 8 s), placas da Corrente, seringas no ar,
+//   lentidão na maré e preso no abraço (desfaz o passo, como o arame do Forte), apagão da fase 3, carbureto. Mensagens { t:'camp', k:'dr' }.
+// - Correção pequena na base (O3-D07), relatada pelo O3-D11: o mesmo aviso chegando duas vezes (cp de quem entra no meio + a mensagem
+//   do ar) era desenhado duas vezes; o msg.tel agora ignora a cópia (mesmo ataque, mesmas posições, mesmo fim).
+// Nenhum gancho fora dos blocos além da marca @@CAMP-MAPAS@@.
+for (let k = 7; k < 16; k++) if (!(k in ZKIND)) ZKIND[k] = null; // sem buraco (o zMix soma todos)
+ZKIND[16] = { n: 'O Diretor', pts: 2000, xp: 100, sz: 1.3, rad: .4, chefe: 1, capGolpe: .06, capFraco: .1, capArmadilha: .02, capNuke: .05, capBarril: .08, fracoK: 3 };
+const CAMP_DIRETOR = { // números do Diretor que não são de ataque (§7.4; o D15 ajusta)
+  k: 16, nasce: { x: GAL7.pulpito.x, z: GAL7.pulpito.z }, // sobe da água no púlpito
+  sz: [1.3, 2.2, 2.2], rad: [.4, .7, .7], // tamanho e raio por fase
+  protecao: .2, tanqueVida: .06, juncaoVida: .04, semDano: 1e9, // fase 1 com tanque de pé: ×0,2; vida de cada tanque e junção (fração da vida dele)
+  rompe: 5, // junção rompida: atordoado (s), fraco aberto
+  mergulho: { desce: 3.5, fundo: -2.6, sobe: 2.4, borda: 2.3 }, // m/s para descer e subir, fundo, distância do centro do poço onde ele sai
+  nada: { cada: [14, 11], primeiro: 10, perto: 3.5, folga: .5, tenta: 1 }, // fases 2 e 3: a cada 14/11 s, do lago ou a 3,5 m de um poço
+  dose: { v: 16, raio: .55, dano: 20, falaP: .35, chao: 1.5 }, // projétil (m/s), raio, dano; chance da fala (o limitador da fala é por personagem)
+  mare: { y: .5, dps: 10, passo: 5, lento: .6, s: 8, zona: 'A', visY: .42 }, // abaixo de y no salão: 10/s (parcelas de 5) e ×0,6; dura s
+  coro: { cura: .03, teto: .35 }, // cura 3% (sem passar do começo da fase 3)
+  chamada: { enf: 2, comuns: 4, max: 8 }, afogados: { n: 2, max: [0, 4, 4], cada: [0, 18, 22] }, pregadores: 2,
+  cli: { pulseira: 0xd8f0ff, veio: 0x3fe0b0, fracoK: [2, 6], placa: 0x3a8cff, mareCor: 'rgba(20,60,45,.35)', apagaoLuz: .35, bulbo: .08, carbPulso: [.8, .2, 9], cresceS: 1.6,
+    txtMare: 'A MARÉ DO VEIO SOBE: suba numa plataforma', txtPreso: 'O DIRETOR TE SEGURA: atirem no cano do peito' },
+  cores: { pele: 0x9a968c, roupa: 0xd9d5c9, calca: 0x2a2a2e, olho: [0x9ff0d8, 3], cabelo: 0x8a8880, jaleco: 0xe2ded2, colete: 0x3a3630, gravata: 0x1c1a1a, aro: 0x2a2620,
+    crosta: 0x55524c, crostaE: 0x2c2a27, escorre: 0x050707, cano: 0x6a4a34, canoE: 0x2c2620 },
+};
+const GAL7_RODADAS = { abre: { 21: ['g7-oeste'], 22: ['g7-norte'], 23: ['g7-leste'] }, chefe: 25, fixos: 12, tipos25: [9, 10, 13], vivos: 20, vivosRef: 24, objChefe: 'F.1' };
+const DR_LAC = { n: 2, cada: 0, get max() { return CAMP_DIRETOR.afogados.max; }, get tipo() { return !CAMP_CH.campo && curMapId === 'galeria7' && ZKIND[9] ? 9 : 0; }, get onde() { return drAguaOnde(); } }; // Afogados (fases 2 e 3)
+CAMP_CH_EF.drDose = q => { if (typeof campZk2Dose === 'function') campZk2Dose(q); else sendTo(q.id, { t: 'camp', k: 'zk', e: 'agarra', s: 4, v: .85 }); }; // a dose do Enfermeiro (O3-D08)
+CAMP_CHEFE[16] = {
+  nome: 'O Diretor', rodada: 25, base: 7, porJog: 5, vel: 1.8, dm: 1.6, aw: .8, ac: 1.5,
+  nasce: CAMP_DIRETOR.nasce, entrada: 'dir-entrada', primeiroS: 3,
+  fases: [{ de: 1, vel: 1.8, danoK: drProtecao }, { de: .7, vel: 2.4, fala: 'dir-fase2', lacCada: CAMP_DIRETOR.afogados.cada[1] }, { de: .35, vel: 2.8, fala: 'dir-fase3', avisoK: .8, lacCada: CAMP_DIRETOR.afogados.cada[2], baixa: 1 }],
+  ataques: [
+    { id: 'dose', fases: [1, 3], peso: 4, cd: 4.5, aviso: .6, ativo: 18 / 16, rec: .8, forma: 'linha', dims: [18, .6], n: 3, leque: 30, vista: 0, proj: 1, som: 'drseringa', alcance: [0, 24], pos: drDosePos, inicio: drDoseInicio },
+    { id: 'chamada', fases: [1, 3], peso: 2, cd: 22, aviso: 1.8, ativo: 0, rec: .5, forma: null, fala: 'dir-chamada', som: 'drsino', ok: drChamadaOk, ativa: drChamada },
+    { id: 'corrente', fases: [1], peso: 3, cd: 9, aviso: 1.5, ativo: .5, rec: .6, forma: 'disco', dims: [3], dano: 35, vista: 0, campo: 0, som: 'zap', pos: drCorrentePos, ok: () => curMapId === 'galeria7' },
+    { id: 'mare', fases: [2, 3], peso: 2, cd: 24, aviso: 2, ativo: 0, rec: .5, forma: null, vista: 0, campo: 0, som: 'drmare', ok: drMareOk, ativa: drMare },
+    { id: 'onda', fases: [2, 3], peso: 3, cd: 6, aviso: 1.2, ativo: 0, rec: 1, forma: 'linha', dims: [16, 3], dano: 45, empurra: 5, alcance: [0, 13], som: 'dragua', pos: drLinhaPos },
+    { id: 'abraco', fases: [2, 3], peso: 4, cd: 7, aviso: .8, ativo: 1.5, rec: 1.5, forma: 'disco', dims: [1.3], onde: 'alvo', dps: 25, fraco: 1, alcance: [0, 3], som: 'snarl', ativa: drAbraco },
+    { id: 'coro', fases: [3], peso: 3, cd: 14, aviso: 2, ativo: 0, rec: .5, forma: null, fala: 'dir-coro', som: 'drcoro', ok: drCoroOk, ativa: drCoro },
+  ],
+  lacaios: DR_LAC,
+  fraco: { caixa: { f: .2, r: .2, y0: 1.02, y1: 1.42 } }, // o cano entrando no peito (×sz)
+  ia: drIA, tick: drTick, fase: drFase, inicio: drInicio, objeto: drObjeto, morte: drMorte,
+  cliFase: drCliFase, cliQuadro: drCliQuadro,
+};
+CAMP_OBJ['F.1'] = { tipo: 'matar', titulo: 'Derrube o Diretor', chefe: 16 }; // rodada 25 (o O3-D14 pode trocar; GAL7_RODADAS.objChefe ativa)
+// ---------- host: estado do Diretor (um por vez) ----------
+const DRSRV = { z: null, modo: 'pulpito', rota: [], ri: 0, nadaT: 0, mareAte: 0, mareAcc: new Map(), presos: [] };
+const drArena = () => curMapId === 'galeria7' && !CAMP_CH.campo;
+function drIdx(pref) { const L = ZD?.zint || [], o = []; for (let i = 0; i < L.length; i++) if (typeof L[i].id === 'string' && L[i].id.startsWith(pref)) o.push(i); return o; }
+function drTanques() { if (!drArena()) return 0; let n = 0; for (const i of drIdx('g7-tanque')) if (Z.zint?.[i] && Z.zint[i].st !== 'caido') n++; return n; }
+function drProtecao() { return drTanques() > 0 ? CAMP_DIRETOR.protecao : 1; } // danoK da fase 1
+function drTamanho(n) { const D = CAMP_DIRETOR, K = ZKIND[16]; K.sz = D.sz[n] ?? D.sz[0]; K.rad = D.rad[n] ?? D.rad[0]; if (DRSRV.z) DRSRV.z.rad = K.rad; }
+function drVidas(z) { // tanques (6%) e junções (4%) com a vida de verdade (antes do chefe, nada as gasta)
+  if (curMapId !== 'galeria7') return; const D = CAMP_DIRETOR;
+  for (const i of drIdx('g7-tanque')) campPilarRestaura(i, Math.max(1, Math.round(z.maxHp * D.tanqueVida)));
+  for (const i of drIdx('g7-juncao')) campPilarRestaura(i, Math.max(1, Math.round(z.maxHp * D.juncaoVida)));
+}
+function drInicio(z, CH) {
+  Object.assign(DRSRV, { z, modo: drArena() ? 'pulpito' : 'chao', rota: [], ri: 0, nadaT: now + CAMP_DIRETOR.nada.primeiro, mareAte: 0, presos: [] }); DRSRV.mareAcc.clear();
+  drTamanho(0); drVidas(z);
+  CH.tag = drProtecao() < 1 ? 'protegido' : null;
+}
+function drBorda(w, x, z) { const dx = x - w[0], dz = z - w[1], d = hyp(dx, dz) || 1, b = CAMP_DIRETOR.mergulho.borda; return [w[0] + dx / d * b, w[1] + dz / d * b]; } // ponto da borda do poço voltado para (x, z)
+function drPocoPara(tg) { // poço mais perto do alvo: sai na borda voltada para o lago
+  let best = null, bd = 1e9; const L = GAL7.lago;
+  for (const w of GAL7.pocos) { const d = tg ? hyp(w[0] - tg.pos[0], w[1] - tg.pos[2]) : Math.random(); if (d < bd) { bd = d; best = w; } }
+  return drBorda(best, L.x, L.z);
+}
+function drMergulha(z, tg) { // desce onde está, atravessa por baixo e sobe na borda do poço mais perto do alvo
+  const P = z.body.pos, M = CAMP_DIRETOR.mergulho, s = drPocoPara(tg);
+  DRSRV.modo = 'mergulho'; DRSRV.ri = 0; DRSRV.rota = [[P.x, M.fundo, P.z, M.desce], [s[0], M.fundo, s[1], 1e4], [s[0], 0, s[1], M.sobe]];
+  broadcast({ t: 'camp', k: 'dr', e: 'agua', x: r2(P.x), z: r2(P.z) });
+}
+function drAnda(z, dt) { // segue a rota (cinemático, como o Vigia na escada); true enquanto anda
+  const P = z.body.pos, w = DRSRV.rota[DRSRV.ri]; if (!w) return false;
+  const dx = w[0] - P.x, dy = w[1] - P.y, dz = w[2] - P.z, d = Math.hypot(dx, dy, dz), s = w[3] * dt;
+  if (Math.abs(dx) + Math.abs(dz) > .05 && w[3] < 1e3) z.yaw = Math.atan2(-dx, -dz);
+  if (d <= s) { P.set(w[0], w[1], w[2]); DRSRV.ri++; if (DRSRV.ri === DRSRV.rota.length - 1) broadcast({ t: 'camp', k: 'dr', e: 'agua', x: r2(w[0]), z: r2(w[2]) }); } else { P.x += dx / d * s; P.y += dy / d * s; P.z += dz / d * s; }
+  z.body.vel.set(0, 0, 0); z.body.onGround = true; z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z; z.stuck = 0;
+  return DRSRV.ri < DRSRV.rota.length;
+}
+function drIA(z, dt, tgt, CH) { // true = cuidou (púlpito ou mergulho); false = a base (aviso, ataque, atordoado) e a perseguição
+  if (DRSRV.z !== z) drInicio(z, CH);
+  if (DRSRV.modo === 'pulpito') { // fase 1: em cima do púlpito, só gira para o alvo
+    const Q = GAL7.pulpito, P = z.body.pos; P.set(Q.x, Q.h, Q.z); z.body.vel.set(0, 0, 0); z.body.onGround = true; z.chkT = now + 6; z.stuck = 0; z.atkWind = 0;
+    const q = campChefeAlvo(z); if (q && !(z.atord > now)) z.yaw = Math.atan2(-(q.pos[0] - P.x), -(q.pos[2] - P.z));
+    return true;
+  }
+  if (DRSRV.modo === 'mergulho') { CH.prox = Math.max(CH.prox, now + .3); z.atkWind = 0; if (!drAnda(z, dt)) { DRSRV.modo = 'chao'; z.body.pos.y = 0; } return true; }
+  return false;
+}
+function drPodeMergulhar(P) { const N = CAMP_DIRETOR.nada, L = GAL7.lago; if (hyp(P.x - L.x, P.z - L.z) < L.r - N.folga) return true; for (const w of GAL7.pocos) if (hyp(P.x - w[0], P.z - w[1]) < N.perto) return true; return false; }
+function drTick(z, dt, CH) {
+  if (DRSRV.z !== z) drInicio(z, CH);
+  const D = CAMP_DIRETOR, P = z.body.pos, A = CH.atk;
+  if (CH.fase === 0) { const t = drProtecao() < 1 ? 'protegido' : null; if (CH.tag !== t) { CH.tag = t; campChefeEnvia(); } } // PROTEGIDO na barra
+  if (CH.fase >= 1 && drArena() && DRSRV.modo === 'chao' && !A && now >= DRSRV.nadaT && now >= CH.inv && !(z.atord > now) && z.st === 'in') { // nada entre os poços
+    if (drPodeMergulhar(P)) { drMergulha(z, campChefeAlvo(z)); DRSRV.nadaT = now + D.nada.cada[Math.min(CH.fase - 1, 1)]; } else DRSRV.nadaT = now + D.nada.tenta;
+  }
+  if (A && A.a.proj && now >= A.fa && now < A.fb + .05) drDoseVoo(z, A); // seringas no ar
+  if (A && A.a.id === 'abraco' && now >= A.fb && DRSRV.presos.length) drSolta(); // acabou de segurar
+  drMareTick(dt);
+}
+// ---------- host: ataques ----------
+const drAng = (P, q) => Math.atan2(-(q.pos[0] - P.x), -(q.pos[2] - P.z));
+function drLinhaPos(z, tg) { const P = z.body.pos; return [[P.x, Math.min(P.y, tg.pos[1]), P.z, drAng(P, tg)]]; } // aviso no chão (do púlpito também)
+function drDosePos(z, tg) { const P = z.body.pos, a = drAng(P, tg), n = this?.n ?? 3, lq = (this?.leque ?? 30) * Math.PI / 180, o = []; for (let i = 0; i < n; i++) o.push([P.x, 0, P.z, a + (n > 1 ? (i / (n - 1) - .5) * lq : 0)]); return o; }
+function drDoseInicio(z, A) { A.drHit = new Set(); if (Math.random() < CAMP_DIRETOR.dose.falaP) campFala('dir-dose'); }
+function drDoseVoo(z, A) { // cada seringa anda a 16 m/s pela linha (para no pilar); quem ela pega leva 20 e 1 dose (uma vez por ataque)
+  const D = CAMP_DIRETOR.dose, B = CAMP_CHEFE_BASE, t = Math.max(0, now - A.fa), k = zDf().dmg / B.danoDif; A.drHit ||= new Set();
+  for (let si = 0; si < A.sh.length; si++) {
+    const s = A.sh[si], d = t * D.v; if (d > A.len[si] + D.raio) continue; const fx = -Math.sin(s[3]), fz = -Math.cos(s[3]), x = s[0] + fx * d, zz = s[2] + fz * d;
+    for (const q of S.players.values()) {
+      if (!q.alive || q.downed || A.drHit.has(q.id) || q.pos[1] - s[1] > D.chao) continue;
+      if (hyp(q.pos[0] - x, q.pos[2] - zz) > D.raio + B.corpo) continue;
+      A.drHit.add(q.id); zHurt(q, Math.round(D.dano * k), { x: s[0], z: s[2] }); CAMP_CH_EF.drDose(q, z, A, CAMP_CH);
+    }
+  }
+}
+function drCorrentePos(z, tg) { // as 4 placas mais perto dos jogadores
+  const vivos = campVivos(), L = GAL7.placas.map(([x, zz]) => { let m = 1e9; for (const q of vivos) m = Math.min(m, hyp(q.pos[0] - x, q.pos[2] - zz)); return [m, x, zz]; });
+  L.sort((a, b) => a[0] - b[0]); return L.slice(0, 4).map(([, x, zz]) => [x, 0, zz, 0]);
+}
+function drPocoOnde(i) { if (!drArena()) return 'perto'; const w = GAL7.pocos[i % GAL7.pocos.length], b = drBorda(w, GAL7.lago.x, GAL7.lago.z); return { x: b[0], z: b[1] }; } // borda de um poço (lacaios)
+function drAguaOnde() { if (!drArena()) return 'perto'; const a = GAL7.agua[Math.floor(Math.random() * GAL7.agua.length)]; return { x: a[0], z: a[1] }; }
+function drLacMax() { return CAMP_DIRETOR.chamada.max + CAMP_CHEFE_BASE.lacPorJog * (campChefeNp() - 1); }
+function drChamadaOk() { return campChefeLacVivos() < drLacMax(); }
+function drChamada(z) { // 2 Enfermeiros e 4 comuns pelos poços (fora do toSpawn, marcados lacaio)
+  const C = CAMP_DIRETOR.chamada, tipos = [...Array(C.enf).fill(ZKIND[10] ? 10 : 0), ...Array(C.comuns).fill(0)]; let i = Math.floor(Math.random() * 4), vivos = campChefeLacVivos();
+  for (const k of tipos) { if (vivos >= drLacMax()) break; const o = campZNasce(k, drPocoOnde(i++)); if (!o) continue; o.lac = 1; vivos++; }
+}
+function drMareOk() { return curMapId === 'galeria7' && !(DRSRV.mareAte > now); }
+function drMare() { const s = CAMP_DIRETOR.mare.s; DRSRV.mareAte = now + s; DRSRV.mareAcc.clear(); broadcast({ t: 'camp', k: 'dr', e: 'mare', s }); }
+function drMareTick(dt) { // abaixo de 0,5 m no salão: 10/s (parcelas de 5); plataformas e púlpito secos
+  if (!(DRSRV.mareAte > now)) return; const M = CAMP_DIRETOR.mare;
+  for (const q of S.players.values()) {
+    if (!q.alive || q.downed || q.pos[1] >= M.y || zRoomAt(q.pos[0], q.pos[2]) !== M.zona) { DRSRV.mareAcc.delete(q.id); continue; }
+    let a = (DRSRV.mareAcc.get(q.id) || 0) + M.dps * dt; if (a >= M.passo) { a -= M.passo; zHurt(q, M.passo, { x: q.pos[0], z: q.pos[2] }); } DRSRV.mareAcc.set(q.id, a);
+  }
+}
+function drAbraco(z, A) { // segura quem está no disco; o fraco já abre (outro jogador acertando o cano solta)
+  const s = A.sh[0]; DRSRV.presos = [];
+  for (const q of S.players.values()) if (q.alive && !q.downed && campChefeDentro(A, s, q, s[3], A.len[0])) { DRSRV.presos.push(q.id); sendTo(q.id, { t: 'camp', k: 'dr', e: 'preso', s: r2(Math.max(0, A.fb - now)) }); }
+  z.fracoAte = Math.max(z.fracoAte || 0, A.fb); campChefeEnvia();
+}
+function drSolta() { for (const id of DRSRV.presos) sendTo(id, { t: 'camp', k: 'dr', e: 'solta' }); DRSRV.presos = []; }
+function drDanoFraco(z, dmg, zone, w, p) { // tiro no cano durante o abraço (de quem não está preso) solta na hora
+  const CH = CAMP_CH, A = CH.atk; if (z !== CH.z || CH.k !== CAMP_DIRETOR.k || zone !== 'fraco' || !A || A.a.id !== 'abraco' || now < A.fa || now >= A.fb || !p || DRSRV.presos.includes(p.id)) return dmg;
+  A.fb = now; A.fc = now + (A.a.rec ?? 0); z.fracoAte = Math.max(z.fracoAte || 0, A.fc); drSolta(); campChefeEnvia();
+  return dmg;
+}
+CAMP_G.dano.push(drDanoFraco);
+function drPregadores() { let n = 0; for (const o of Z.zs.values()) if (o.drCoro) n++; return n; }
+function drCoroOk() { return drPregadores() > 0; }
+function drCoro(z) { const C = CAMP_DIRETOR.coro; if (!drPregadores()) return; z.hp = Math.min(Math.max(z.hp, z.maxHp * C.teto), z.hp + z.maxHp * C.cura); }
+// ---------- host: fases, tanques, junções, morte ----------
+function drFase(z, n, CH) { // n: 0, 1, 2 (fase 1, 2, 3)
+  drTamanho(n); CH.tag = null;
+  if (n === 1 && DRSRV.modo === 'pulpito') drMergulha(z, campChefeAlvo(z)); // cai na água e volta grande por um poço
+  if (n >= 1) DRSRV.nadaT = Math.max(DRSRV.nadaT, now + CAMP_DIRETOR.nada.cada[Math.min(n - 1, 1)]);
+  if (n === 2) { // as junções voltam inteiras; 2 Pregadores (o coro)
+    drVidasJuncoes(z);
+    for (let i = 0; i < CAMP_DIRETOR.pregadores; i++) { const o = campZNasce(ZKIND[13] ? 13 : 0, drPocoOnde(i * 2 + 1)); if (o) { o.lac = 1; o.drCoro = 1; } }
+  }
+}
+function drVidasJuncoes(z) { if (curMapId !== 'galeria7') return; for (const i of drIdx('g7-juncao')) campPilarRestaura(i, Math.max(1, Math.round(z.maxHp * CAMP_DIRETOR.juncaoVida))); }
+function drObjeto(o, i, st, CH) { // tanque caído (os 4: fase 2) e junção rompida (atordoado, fraco aberto)
+  const z = CH.z; if (!z) return;
+  if (o.v === 'tanque' && st === 'caido') { if (CH.fase === 0 && drTanques() === 0) campChefeFase(1); else campChefeEnvia(); return; }
+  if (o.t === 'juncao' && st === 'rompida') {
+    z.atord = now + CAMP_DIRETOR.rompe; z.fracoAte = Math.max(z.fracoAte || 0, z.atord); z.atkWind = 0;
+    if (CH.atk) { if (CH.atk.a.id === 'abraco') drSolta(); CH.atk = null; broadcast({ t: 'camp', k: 'telx' }); }
+    CH.prox = Math.max(CH.prox, z.atord + rand(...CAMP_CHEFE_BASE.pausa));
+    broadcast({ t: 'camp', k: 'dr', e: 'rompe', x: r2(o.x), z: r2(o.z), id: z.id }); campChefeEnvia();
+  }
+}
+function drMorte(z) { // cai na água ("Então... acabou..."); a base derruba lacaios e comuns e dispara o campEvento/CAMP_GANCHOS.chefe
+  campFala('dir-morte'); drSolta(); if (DRSRV.mareAte > now) broadcast({ t: 'camp', k: 'dr', e: 'mare', s: 0 }); DRSRV.mareAte = 0;
+  const P = z.body.pos; broadcast({ t: 'camp', k: 'dr', e: 'morte', x: r2(P.x), z: r2(P.z) });
+  DRSRV.z = null; DRSRV.modo = 'pulpito'; drTamanho(0);
+}
+CAMP_GANCHOS.cp.push(cp => { if (DRSRV.mareAte > now) cp.dr = [r2(DRSRV.mareAte - now)]; }); // quem entra no meio: a maré em curso
+// ---------- host: a arena nas rodadas 21–25 (só na campanha) ----------
+function gal7Campanha() { return CAMP.on && CAMP.modo === 'campanha' && curMapId === 'galeria7' && CAMP_ATOS[CAMP.et]?.mapa === 'galeria7'; }
+CAMP_GANCHOS.inicio.push(e => { // etapa da arena: energia ligada; nada do Diretor anterior
+  if (CAMP_ATOS[e]?.mapa === 'galeria7' && curMapId === 'galeria7') campEnergia();
+  Object.assign(DRSRV, { z: null, modo: 'pulpito', mareAte: 0, presos: [] }); drTamanho(0);
+});
+CAMP_GANCHOS.rodada.push(r => { // galerias uma por rodada; rodada do chefe: 12 fixos e o objetivo do chefe
+  if (!gal7Campanha()) return; const R = GAL7_RODADAS;
+  for (const k in R.abre) if (+k <= r) for (const id of R.abre[k]) campAbreHistoria(id, false);
+  if (r === R.chefe && !Z.dogRound) {
+    Z.toSpawn = Math.max(1, Math.round(R.fixos * zDf().cnt)); if (Z.mix) { Z.mix = ZKIND.map(() => 0); Z.mixN = 0; }
+    const O = CAMP.obj[R.objChefe]; if (O && O.st === 'oculto') campObjAtiva(R.objChefe);
+  }
+});
+function gal7Tipo(k) { // rodada do chefe: só Enfermeiro, Afogado e Pregador como tipos novos (cotas do O3-D06/D08 podadas)
+  if (!gal7Campanha() || Z.round !== GAL7_RODADAS.chefe || Z.dogRound) return k;
+  const T = GAL7_RODADAS.tipos25, R = CAMP_ZKS?.rest; if (R) for (const kk in R) if (!T.includes(+kk)) delete R[kk];
+  return k > 6 && !ZKIND[k]?.chefe && !T.includes(k) && !Z.reQ.length ? 0 : k;
+}
+function gal7Nasce(z, cands) { // até 20 vivos (Normal; ×max da dificuldade/24); chefe e lacaios nascem pelo campZNasce (não passam aqui)
+  if (curMapId !== 'galeria7' || CAMP.modo !== 'campanha') return; const R = GAL7_RODADAS, cap = Math.round(R.vivos * zDf().max / R.vivosRef); let n = 0;
+  for (const o of Z.zs.values()) if (!o.lac && !ZKIND[o.kind]?.chefe) n++;
+  if (n >= cap) cands.length = 0;
+}
+CAMP_G.tipo.push(gal7Tipo); CAMP_G.nasce.unshift(gal7Nasce);
+if (typeof campEvUltimos === 'function') campEvUltimos(); // o evento (O3-D05) continua por cima
+CAMP_AGUA.galeria7 = GAL7.agua.map(a => a.slice()); // pontos de água (Afogados e Névoa)
+// ---------- interativos da arena ----------
+ZINT_MAPA.galeria7 = [ // posições de mão (auditoria.mjs --mapas galeria7 --camp): tanques em volta do púlpito, junções nas paredes, cargas nos pilares da boca
+  ...[[-4.2, -6.2], [4.2, -6.2], [-4.2, 2.2], [4.2, 2.2]].map(([x, z], i) => ({ t: 'pilar', id: 'g7-tanque-' + (i + 1), v: 'tanque', x, z, n: [0, 1], hp: CAMP_DIRETOR.semDano })),
+  ...GAL7_JUNCOES.map(([x, z, nx, nz], i) => ({ t: 'juncao', id: 'g7-juncao-' + (i + 1), x, z, n: [nx, nz], hp: CAMP_DIRETOR.semDano })),
+  ...['G1', 'G2', 'G3'].map((k, i) => { const c = GAL7.gal[k].carga; return { t: 'carga', id: 'g7-carga-' + (i + 1), x: c[0], z: c[1], n: [c[2], c[3]] }; }),
+  { t: 'gaiola', id: 'g7-gaiola', x: GAL7.gaiola[0], z: GAL7.gaiola[1], n: [0, -1] },
+  { t: 'municao', x: GAL7.sala.x - .45, z: -6, n: [-1, 0] }, // parede leste do salão
+  { t: 'nota', v: 'chao', id: 'n-galeria-diretor', x: 0, z: 2.4, n: [0, 1], ato: 4 }, // ao pé do púlpito
+];
+// ---------- sons (sintetizados) ----------
+SND.drseringa = o => { tn(o, .12, 3200, 2600, .05, 'sine'); tn(o, .1, 4100, 3800, .03, 'triangle', .05); nz(o, .15, 5000, 2500, .04, 'highpass', 1, .02); }; // brilho das seringas
+SND.drsino = o => { for (let k = 0; k < 3; k++) { tn(o, .6, 1180, 1170, .07, 'triangle', k * .35); tn(o, .5, 2360, 2340, .025, 'sine', k * .35); } }; // sineta da chamada
+SND.drmare = o => { nz(o, 2, 120, 380, .3, 'lowpass', 1.5); tn(o, 2, 48, 92, .18, 'sawtooth'); nz(o, 1.4, 700, 300, .08, 'bandpass', 3, .6); }; // a água subindo
+SND.dragua = o => { nz(o, .5, 900, 180, .32, 'lowpass', 1.2); nz(o, .35, 2600, 800, .1, 'bandpass', 2, .05); }; // espirro de água preta
+SND.drcoro = o => { for (const [f, d] of [[196, 0], [233, .05], [294, .1]]) campSomTom(o, f, f * .99, 1.4, .05, 'sawtooth', .25, d, ['bandpass', 700, 3]); }; // "ainda não acabou"
+SND.drgeme = o => { vox(o, rand(60, 75), .85, 1.1, .25); nz(o, .8, 300, 120, .12, 'lowpass', 2, .2); };
+// ---------- cliente: modelo pelo registro do O3-D06 ----------
+function drModelo(g, ud, C0) { // fase 1: jaleco, colete, óculos e a pulseira; fases 2 e 3: crosta cinzenta, escorrido preto e o cano no peito
+  const C_ = CAMP_DIRETOR.cores, T = ud.torso, H = ud.head, ja = mc(C_.jaleco), co = mc(C_.colete), aro = mc(C_.aro);
+  const f1 = [zbone(T, 0, 0, 0), zbone(H, 0, 0, 0), zbone(ud.inner, 0, 0, 0)]; ud.drF1 = f1;
+  zbx(f1[0], .17, .3, .02, 0, .38, -.163, co); zbx(f1[0], .035, .22, .012, 0, .42, -.176, mc(C_.gravata)); // colete e gravata
+  for (const sx of [-1, 1]) { zbx(f1[0], .07, .3, .016, .1 * sx, .4, -.168, ja).rotation.z = -.25 * sx; zbx(f1[2], .2, .52, .05, .1 * sx, .66, -.13, ja); zbx(f1[2], .2, .52, .05, .1 * sx, .66, .13, ja); } // lapelas e abas do jaleco
+  for (const sx of [-1, 1]) { const a = zcy(f1[1], .048, .048, .012, .065 * sx, .17, -.152, aro); a.rotation.x = Math.PI / 2; } zbx(f1[1], .04, .01, .01, 0, .175, -.158, aro); // óculos redondos
+  zcy(ud.foreL, .048, .048, .05, 0, -.2, 0, zGlow(CAMP_DIRETOR.cli.pulseira, 3)); // a pulseira sem número
+  const f2 = [zbone(T, 0, 0, 0), zbone(H, 0, 0, 0), zbone(ud.armL, 0, 0, 0), zbone(ud.armR, 0, 0, 0), zbone(ud.inner, 0, 0, 0), zbone(ud.foreL, 0, 0, 0), zbone(ud.foreR, 0, 0, 0)]; ud.drF2 = f2;
+  const cr = mc(C_.crosta), crE = mc(C_.crostaE), es = mc(C_.escorre);
+  zbx(f2[0], .44, .5, .32, 0, .3, 0, cr); zbx(f2[0], .3, .14, .34, .04, .5, -.005, crE); zbx(f2[1], .27, .16, .26, 0, .2, .01, cr); zbx(f2[4], .38, .3, .3, 0, .85, 0, crE); // crosta
+  for (const A of [f2[2], f2[3]]) { zcy(A, .085, .075, .34, 0, -.16, 0, cr); zbx(A, .03, .22, .02, .03, -.2, -.07, es); } for (const A of [f2[5], f2[6]]) { zcy(A, .07, .06, .3, 0, -.14, 0, crE); zbx(A, .025, .18, .02, -.02, -.18, -.06, es); }
+  for (const [x, y, h] of [[-.12, .3, .32], [.05, .24, .26], [.14, .36, .2], [-.03, .12, .18]]) zbx(f2[0], .025, h, .015, x, y, -.172, es); for (const x of [-.07, .06]) zbx(f2[1], .02, .12, .015, x, .1, -.14, es); // escorrido preto
+  const cano = zcy(f2[0], .085, .085, .9, 0, .11, -.53, mc(C_.cano)); cano.rotation.x = .93; zcy(f2[0], .12, .12, .07, 0, .38, -.19, mc(C_.canoE)).rotation.x = Math.PI / 2; zcy(f2[0], .095, .095, .075, 0, .38, -.19, zGlow(CAMP_DIRETOR.cli.veio, .5)).rotation.x = Math.PI / 2; // o cano-mestre entra no peito (junção acesa de leve)
+  const fr = zbone(T, 0, .38, -.215); ud.drFr = fr; zcy(fr, .13, .13, .03, 0, 0, 0, zGlow(CAMP_DIRETOR.cli.veio, 3)).rotation.x = Math.PI / 2; // o ponto fraco (aceso quando aberto)
+  for (const b of f2) zHide(b, 1); zHide(fr, 1);
+}
+const DR_POSE = { // braços (armR, foreR, armL, foreL, abre R, abre L) e o tronco
+  pulpito: [.55, .95, .55, .95, -.08, .08, .12], dose: [2.5, .25, .45, .7, -.25, .2, -.05], chamada: [1.3, .15, 1.3, .15, -1.05, 1.05, -.12],
+  abraco: [1.5, .35, 1.5, .35, -.45, .45, .25], onda: [2.1, .2, 2.1, .2, -.3, .3, -.2], coro: [2.7, .1, 2.7, .1, -.45, .45, -.3], mare: [1.1, .2, 1.1, .2, -.8, .8, -.25] };
+function drTelAtivo() { const L = CAMP.c?.tel; if (!L) return null; for (let i = L.length - 1; i >= 0; i--) { const t = L[i]; if (now < t.t0 + t.s + Math.max(t.at, .3)) return t; } return null; }
+function drAnim(zc, ud, dt) { // fase: troca as peças; pose do ataque (sobrescreve a do comum, suavizada)
+  const ch = CAMP.c?.ch, f = ch?.k === CAMP_DIRETOR.k ? ch.f : 1;
+  if (zc.drF !== f) { zc.drF = f; for (const b of ud.drF1 || []) zHide(b, f >= 2); for (const b of ud.drF2 || []) zHide(b, f < 2); }
+  if (ud.drFr) { const ab = ch && (ch.fr > now || ch.at > now); zHide(ud.drFr, !(f >= 2 && ab)); if (f >= 2 && ab) ud.drFr.scale.setScalar(1 + .25 * Math.sin(now * 12)); }
+  if (zc.f & (8 | 32 | 64)) return;
+  const tel = drTelAtivo(), nome = tel && DR_POSE[tel.a] ? tel.a : f === 1 && zc.pos.y > .5 ? 'pulpito' : null; if (!nome) { zc.drP = null; return; }
+  const P = DR_POSE[nome], k = 1 - Math.exp(-dt * 9), v = zc.drP ||= P.slice();
+  for (let i = 0; i < v.length; i++) v[i] += (P[i] - v[i]) * k;
+  ud.armR.rotation.set(v[0], 0, v[4]); ud.foreR.rotation.set(v[1], 0, 0); ud.armL.rotation.set(v[2], 0, v[5]); ud.foreL.rotation.set(v[3], 0, 0); ud.torso.rotation.x += v[6];
+}
+if (typeof CAMP_ZK === 'object' && typeof CAMP_ZKF === 'object' && CAMP_ZKF?.modelo) { // registro do O3-D06 (gancho no zLook/zBuildModel/zAnimHuman)
+  CAMP_ZK[16] = { cores: CAMP_DIRETOR.cores, cabelo: 0, geme: 'drgeme', gemeS: [8, 14], sc: 0, vel: [1.8, 1.8] };
+  CAMP_ZKF.modelo[16] = drModelo; CAMP_ZKF.anim[16] = drAnim;
+}
+// ---------- cliente: fase, mensagens e a arena ----------
+const DRCLI = { mundo: null, mareAte: 0, mareK: 0, mareTel: -1, presoAte: 0, pOk: false, px: 0, pz: 0, mOk: false, mx: 0, mz: 0, ap: false, hemiB: NaN, hemiW: NaN, fillB: NaN, fillW: NaN, tela: null };
+function drCliMundo() { if (DRCLI.mundo !== ZC.world) Object.assign(DRCLI, { mundo: ZC.world, mareAte: 0, mareK: 0, mareTel: -1, presoAte: 0, pOk: false, mOk: false }); }
+function drCliFase(zc, f) { // a fase chega do host; o tamanho cresce no drCliQuadro (quem entra no meio também)
+  ZKIND[16].sz = CAMP_DIRETOR.sz[f - 1] ?? CAMP_DIRETOR.sz[0];
+  if (!zc) return; const p = zc.pos.clone(); p.y += 1;
+  if (f === 2) { play('dragua', p); puff(p, 0x050807, 2.6, 1.2, .6); }
+  if (f === 3) { play('lightning', p); play('drcoro', p); }
+}
+function drCliQuadro(zc, dt, ch) { // escala da raiz pela fase (crescendo em cresceS) e as caixas (zc.sz)
+  const alvo = CAMP_DIRETOR.sz[(ch?.f || 1) - 1] ?? CAMP_DIRETOR.sz[0]; if (Math.abs(zc.sz - alvo) < 1e-3) return;
+  const v = Math.abs(CAMP_DIRETOR.sz[1] - CAMP_DIRETOR.sz[0]) / CAMP_DIRETOR.cli.cresceS * dt; zc.sz = zc.sz < alvo ? Math.min(alvo, zc.sz + v) : Math.max(alvo, zc.sz - v); zc.model.scale.setScalar(zc.sz);
+}
+const drXZ = m => finN(m.x) && finN(m.z) && Math.abs(m.x) < 1e4 && Math.abs(m.z) < 1e4;
+CAMP_GANCHOS.msg.dr = m => { // { e: 'preso' | 'solta' | 'mare' | 'agua' | 'rompe' | 'morte' }
+  if (typeof m.e !== 'string') return; drCliMundo(); const C_ = CAMP_DIRETOR.cli;
+  if (m.e === 'preso') { if (!finN(m.s)) return; DRCLI.presoAte = now + clamp(m.s, 0, 5); DRCLI.pOk = false; toast(C_.txtPreso, 2); play('snarl'); }
+  else if (m.e === 'solta') DRCLI.presoAte = 0;
+  else if (m.e === 'mare') { if (!finN(m.s)) return; DRCLI.mareAte = m.s > 0 ? now + clamp(m.s, 0, 30) : 0; }
+  else if (m.e === 'agua' || m.e === 'morte') { if (!drXZ(m)) return; const p = new V3(m.x, .3, m.z); play('dragua', p); puff(p, 0x050807, m.e === 'morte' ? 3.2 : 2, 1, .5); }
+  else if (m.e === 'rompe') { if (!drXZ(m)) return; const p = new V3(m.x, .9, m.z); play('crack', p); puff(p, 0x050807, 1.6, .9, .4); puff(p, 0x2a5a4a, 1, .6, .8); }
+};
+CAMP_GANCHOS.sync.push(cp => { if (Array.isArray(cp?.dr) && finN(cp.dr[0])) { drCliMundo(); DRCLI.mareAte = now + clamp(cp.dr[0], 0, 30); } }); // quem entra no meio
+{ const tel0 = CAMP_GANCHOS.msg.tel; CAMP_GANCHOS.msg.tel = m => { // correção (O3-D07, visto pelo O3-D11): o mesmo aviso (cp + mensagem do ar) uma vez só
+  const L = CAMP.c?.tel; if (L?.length && m && typeof m.a === 'string' && finN(m.s)) { const fim = now + m.s, k = JSON.stringify(Array.isArray(m.p) ? m.p : []); if (L.some(t => t.a === m.a && Math.abs(t.t0 + t.s - fim) < .15 && JSON.stringify(t.p) === k)) return; }
+  return tel0(m); }; }
+function drTela() { let el = DRCLI.tela; if (!el?.isConnected) { el = DRCLI.tela = document.createElement('div'); el.id = 'drMare'; el.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;background:radial-gradient(ellipse at center, transparent 45%, ${CAMP_DIRETOR.cli.mareCor})`; document.body.appendChild(el); } return el; }
+const _drM = new THREE.Matrix4(), _drO = new THREE.Object3D();
+function gal7Anim(dt) { // MAP_ANIM da arena (cliente): PaP escondido, carbureto, maré, placas, seringas, lentidão e preso, apagão da fase 3
+  const V = GAL7_V, D = CAMP_DIRETOR, C_ = D.cli, camp = campCliOn() && ZC.on, ch = camp ? CAMP.c.ch : null, dr = ch?.k === D.k ? ch : null;
+  if (curMapId === 'galeria7' && ZC.world) { for (const o of [ZC.world.pap?.g, ZC.world.power?.g]) if (o && o.visible) o.visible = false; if (ZC.powT !== -1e9) ZC.powT = -1e9; } // sem PaP nem chave de energia
+  drCliMundo();
+  if (V.carb) { const P = C_.carbPulso; V.carb.material.opacity = P[0] + P[1] * Math.sin(now * P[2]) * Math.sin(now * 3.7); }
+  // avisos no ar: a maré sobe no aviso; as placas da Corrente acendem; as seringas voam
+  let mare = DRCLI.mareAte > now ? 1 : 0, on = 0; const L = camp ? CAMP.c.tel : null, pl = V.placas;
+  if (L) for (const t of L) {
+    const ta = t.t0 + t.s;
+    if (t.a === 'mare' && now < ta) { mare = Math.max(mare, clamp((now - t.t0) / Math.max(.01, t.s), 0, 1)); if (DRCLI.mareTel !== t.t0) { DRCLI.mareTel = t.t0; toast(C_.txtMare, 3); } }
+    if (t.a === 'corrente' && pl) for (const s of t.p) GAL7.placas.forEach(([x, z], i) => { if (Math.abs(s[0] - x) < .5 && Math.abs(s[2] - z) < .5) on |= 1 << i; });
+  }
+  if (pl && (on || pl.userData.on)) { const pulso = .75 + .25 * Math.sin(now * 18); pl.userData.on = on; // só com aviso no ar (ou no quadro em que acaba)
+    GAL7.placas.forEach(([x, z], i) => { const s = on & (1 << i) ? pulso : 1e-4; _drO.position.set(x, .06, z); _drO.scale.set(s, 1, s); _drO.rotation.set(0, 0, 0); _drO.updateMatrix(); pl.setMatrixAt(i, _drO.matrix); });
+    pl.visible = on > 0; pl.instanceMatrix.needsUpdate = true; } else if (pl && pl.visible) pl.visible = false;
+  gal7Seringas(L);
+  DRCLI.mareK += (mare - DRCLI.mareK) * Math.min(1, dt * (mare > DRCLI.mareK ? 6 : 2.5));
+  if (V.mare) { V.mare.visible = DRCLI.mareK > .01; V.mare.position.y = .02 + (D.mare.visY - .02) * DRCLI.mareK; }
+  const naAgua = camp && me.alive && !me.downed && DRCLI.mareAte > now && me.pos.y < D.mare.y && zRoomAt(me.pos.x, me.pos.z) === D.mare.zona;
+  if (naAgua) { if (DRCLI.mOk) { const k = 1 - D.mare.lento, nx = me.pos.x - (me.pos.x - DRCLI.mx) * k, nz = me.pos.z - (me.pos.z - DRCLI.mz) * k; if (!blockedAt(nx, me.pos.y + .01, nz, me.h)) { me.pos.x = nx; me.pos.z = nz; } } DRCLI.mOk = true; DRCLI.mx = me.pos.x; DRCLI.mz = me.pos.z; me.sprinting = false; }
+  else DRCLI.mOk = false;
+  if (camp && DRCLI.presoAte > now && me.alive && !me.downed) { if (DRCLI.pOk) { me.pos.x = DRCLI.px; me.pos.z = DRCLI.pz; } else { DRCLI.pOk = true; DRCLI.px = me.pos.x; DRCLI.pz = me.pos.z; } me.sprinting = false; }
+  else DRCLI.pOk = false;
+  if (DRCLI.tela || naAgua) drTela().style.opacity = naAgua ? (.7 + .3 * Math.sin(now * 5)).toFixed(2) : '0';
+  const apaga = !!(dr && dr.f >= 3); // apagão local: só o carbureto e o Veio
+  if (apaga) { const W_ = ZC.world; if (W_) { for (const P of W_.pool) P.L.intensity = 0; for (const l of W_.lights) if (l.bulb.visible) l.bulb.material.color.multiplyScalar(C_.bulbo); }
+    if (hemi.intensity !== DRCLI.hemiW) DRCLI.hemiB = hemi.intensity; DRCLI.hemiW = hemi.intensity = DRCLI.hemiB * C_.apagaoLuz;
+    if (VIS.fill.parent) { if (VIS.fill.intensity !== DRCLI.fillW) DRCLI.fillB = VIS.fill.intensity; DRCLI.fillW = VIS.fill.intensity = DRCLI.fillB * C_.apagaoLuz; } DRCLI.ap = true; }
+  else if (DRCLI.ap) { DRCLI.ap = false; if (hemi.intensity === DRCLI.hemiW) hemi.intensity = DRCLI.hemiB; if (VIS.fill.intensity === DRCLI.fillW) VIS.fill.intensity = DRCLI.fillB; DRCLI.hemiW = DRCLI.fillW = NaN; }
+}
+function gal7Seringas(L) { // as seringas da Dose no ar (instanciadas: 1 chamada; o host confere o acerto)
+  const m = GAL7_V.ser; if (!m) return; let n = 0; const v = CAMP_DIRETOR.dose.v;
+  if (L) for (const t of L) { if (t.a !== 'dose' || !t.f) continue; const ta = t.t0 + t.s; if (now < ta) continue; const d = (now - ta) * v; if (d > t.d1) continue;
+    for (const s of t.p) { if (n >= m.count) break; const fx = -Math.sin(s[3]), fz = -Math.cos(s[3]); _drO.position.set(s[0] + fx * d, 1.25, s[2] + fz * d); _drO.rotation.set(0, s[3], 0); _drO.scale.set(1, 1, 1); _drO.updateMatrix(); m.setMatrixAt(n++, _drO.matrix); } }
+  if (!n && !m.userData.n) { if (m.visible) m.visible = false; return; }
+  for (let i = n; i < m.count; i++) { _drM.makeScale(1e-4, 1e-4, 1e-4); m.setMatrixAt(i, _drM); }
+  m.visible = n > 0; if (n || m.userData.n) m.instanceMatrix.needsUpdate = true; m.userData.n = n;
+}
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_DIRETOR, GAL7, GAL7_V, GAL7_RODADAS, GAL7_JUNCOES, DRSRV, DRCLI, DR_POSE, drTanques, drProtecao, drDanoFraco, drCoro, drSolta, drIA, drTick, drFase, drMergulha, drMareTick, drCorrentePos, drPregadores, drIdx,
+  gal7Anim, gal7Tipo, gal7Nasce, gal7Campanha, gal7Caixas, drModelo, CAMP_ZKS, CAMP_G, campPilarRestaura, srvZUse: typeof srvZUse === 'function' ? srvZUse : undefined,
+  gal7Estado: () => ({ mapa: curMapId, anim: MAP_ANIM.includes(gal7Anim), agua: GAL7_V.agua ? !!scene.getObjectById(GAL7_V.agua.id) : null, mare: GAL7_V.mare?.visible ?? null, mareY: GAL7_V.mare ? +GAL7_V.mare.position.y.toFixed(3) : null, pap: ZC.world?.pap?.g.visible ?? null, hemi: hemi.intensity, sz: ZKIND[16].sz }) }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); }
+// ===== FIM O3-D13 =====
 //
 // @@CAMP-ATO-3@@
 //
