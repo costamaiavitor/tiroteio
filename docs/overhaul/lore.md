@@ -263,6 +263,10 @@ const CAMP_FALA_TXT = { // id -> { quem, txt } (docs/overhaul/lore.md §10.1)
   'penitente-estreia': { quem: 'PENITENTE', txt: 'Não deixe chegar perto do balde: a cal cega. Mate de longe.' },
   'soldado-estreia': { quem: 'SOLDADO', txt: 'O capacete segura o primeiro tiro na cabeça. Eles vêm em trio.' },
   'afogado-estreia': { quem: 'AFOGADO DO VEIO', txt: 'Olhe as ondas na água preta: ele sai onde elas param. Granada na água.' },
+  'enfermeiro-estreia': { quem: 'ENFERMEIRO', txt: 'Ele joga a seringa de longe: saia da linha ou dê um passo para o lado. Três doses e a vista escurece.' },
+  'contido-estreia': { quem: 'CONTIDO', txt: 'Não tem mãos, só o peso. Quando ele tremer, saia da frente: na parede ele fica tonto.' },
+  'carvoeiro-estreia': { quem: 'CARVOEIRO', txt: 'A crosta de carvão segura bala, fogo e explosão. Mire na cabeça e não pise na brasa.' },
+  'pregador-estreia': { quem: 'PREGADOR DO VEIO', txt: 'Ele canta e os mortos levantam. Mate primeiro; um tiro na cabeça corta o canto.' },
   // Carniceiro (Fermino) — também no clássico, se o coordenador quiser
   'carn-entrada': { quem: 'O MAGAREFE', txt: 'Mais um para pesar.' },
 };

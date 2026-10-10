@@ -15,7 +15,8 @@ const PREP = `(T => {
   const p = T.S.players.get('h');
   const poe = (q, x, z) => { q.pos = [x, 0, z]; if (q === p) T.me.pos.set(x, 0, z); };
   const limpa = () => { for (const z of [...T.Z.zs.values()]) T.Z.zs.delete(z.id); T.Z.spawnT = 1e12; };
-  const zumbi = (x, z, k) => { const id = T.Z.nextId, mx = T.Z.mix.slice(), mn = T.Z.mixN; T.Z.mixN = 0; T.Z.toSpawn++; T.zSpawnOne(); T.Z.mix = mx; T.Z.mixN = mn; const zz = T.Z.zs.get(id); if (!zz) return null; zz.st = 'in'; zz.body.pos.set(x, 0, z); zz.speed = 0; zz.sc = 0; zz.chkT = 1e12; if (k !== undefined) zz.kind = k; return zz; };
+  // O3-D08: sem as cotas dos tipos novos (a rodada 11 é a estreia do Enfermeiro): o zumbi de teste é sempre o tipo pedido
+  const zumbi = (x, z, k) => { if (T.CAMP_ZKS) { T.CAMP_ZKS.r = T.Z.round; T.CAMP_ZKS.rest = {}; T.CAMP_ZKS.trio = 0; } if (T.CAMP_ZK2S) T.CAMP_ZK2S.garR = T.Z.round; const id = T.Z.nextId, mx = T.Z.mix.slice(), mn = T.Z.mixN; T.Z.mixN = 0; T.Z.toSpawn++; T.zSpawnOne(); T.Z.mix = mx; T.Z.mixN = mn; const zz = T.Z.zs.get(id); if (!zz) return null; zz.st = 'in'; zz.body.pos.set(x, 0, z); zz.speed = 0; zz.sc = 0; zz.chkT = 1e12; if (k !== undefined) zz.kind = k; return zz; };
   const rodada = () => { limpa(); T.Z.toSpawn = 40; T.Z.mix = T.ZKIND.map(() => 0); T.Z.mix[1] = 2; T.Z.mix[2] = 3; T.Z.mix[3] = 4; T.Z.mixN = 9; T.Z.spawnDelay = 1; T.Z.reQ = []; };
   const ev = () => T.CAMP_EVS.id;
   const abre = () => { T.Z.doors = new Set(T.ZD.doors.map(d => d.id)); T.zBuildWalk(); T.Z.ffT = 0; };
