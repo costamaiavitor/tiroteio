@@ -26213,16 +26213,16 @@ const CAMP_KIT = {
   I: { pts: null, armas: ['m1911'], bebidas: [] },
   II: { pts: 2000, armas: ['m1911', 'mp40'], bebidas: ['jug'], energia: 1, portasDe: ['I'] },
   C1: { pts: 3500, armas: ['m1911', 'mp40'], bebidas: ['jug'] },
-  III: { pts: 3500, armas: ['python', 'm14'], bebidas: ['jug'] },
+  III: { pts: 4000, armas: ['python', 'm14'], bebidas: ['jug'] }, // O3-D15: 4000 = o estado esperado do §10
   IV: { pts: 5000, armas: ['python', 'galil'], bebidas: ['jug', 'speed'], portasDe: ['III'] },
-  C2: { pts: 6500, armas: ['python', 'galil'], bebidas: ['jug', 'speed'] },
+  C2: { pts: 6500, armas: ['python_pap', 'galil_pap'], bebidas: ['jug', 'speed', 'qr'] }, // O3-D15: 2 armas com PaP e 3 bebidas (o estado esperado do §10)
   V: { pts: 7000, armas: ['python', 'stg44_pap'], bebidas: ['jug', 'speed', 'qr'] },
 };
 // Curva (§10) por etapa: vidaK (aplicada pelo campStatus do D03/D06), qtdK (aplicada aqui no toSpawn), maxK (vivos), fixos (rodada de chefe)
 const CAMP_CURVA = {
   I: { vidaK: .9, qtdK: .9, maxK: 1 }, II: { vidaK: 1, qtdK: 1, maxK: 1 }, C1: { vidaK: 1, qtdK: 1, maxK: 1, fixos: 16 },
-  III: { vidaK: 1, qtdK: .95, maxK: 1 }, IV: { vidaK: 1.05, qtdK: 1, maxK: 1 }, C2: { vidaK: 1.05, qtdK: 1, maxK: 1, fixos: 20 },
-  V: { vidaK: 1.1, qtdK: .8, maxK: 1 },
+  III: { vidaK: 1, qtdK: .9, maxK: 1 }, IV: { vidaK: 1.05, qtdK: 1, maxK: 1 }, C2: { vidaK: 1.05, qtdK: 1, maxK: 1, fixos: 20 },
+  V: { vidaK: 1.05, qtdK: .8, maxK: 1 },
 };
 // Mistura dos tipos novos (§6.2; consumida pelo D06/D08): fração da rodada [do começo, do fim do ato], teto de vivos, estreia
 const CAMP_MIX = {
@@ -29497,7 +29497,7 @@ const fgAng = (P, q) => Math.atan2(-(q.pos[0] - P.x), -(q.pos[2] - P.z));
 const fgLac = tipo => ZKIND[tipo] ? tipo : 0; // sem o O3-D08 (Carvoeiro 12, Pregador 13): comuns
 const fgLacOnde = () => CAMP_CH.campo || curMapId !== 'forno' ? 'perto' : FORNO.lacaio; // a calha só existe na arena (versão de campo: perto dos jogadores)
 CAMP_CHEFE[15] = {
-  nome: 'O Foguista', rodada: 20, base: 6, porJog: 4, vel: 2, dm: 1.6, aw: .7, ac: 1.5,
+  nome: 'O Foguista', rodada: 20, base: 9, porJog: 6, vel: 2, dm: 1.6, aw: .7, ac: 1.5, // O3-D15: vida ×1,5 (era base 6 e porJog 4: com o kit de 2 armas com PaP a luta caía para ~3 min; meta 4–6)
   nasce: CAMP_FOG.nasce, entrada: 'fog-entrada', primeiroS: 3,
   fases: [{ de: 1, vel: 2 }, { de: .6, vel: 2.6, fala: 'fog-fase2' }, { de: .25, vel: 2.6, fala: 'fog-fase3', baixa: 1 }],
   ataques: [
@@ -29966,7 +29966,7 @@ const GAL7_RODADAS = { abre: { 21: ['g7-oeste'], 22: ['g7-norte'], 23: ['g7-lest
 const DR_LAC = { n: 2, cada: 0, get max() { return CAMP_DIRETOR.afogados.max; }, get tipo() { return !CAMP_CH.campo && curMapId === 'galeria7' && ZKIND[9] ? 9 : 0; }, get onde() { return drAguaOnde(); } }; // Afogados (fases 2 e 3)
 CAMP_CH_EF.drDose = q => { if (typeof campZk2Dose === 'function') campZk2Dose(q); else sendTo(q.id, { t: 'camp', k: 'zk', e: 'agarra', s: 4, v: .85 }); }; // a dose do Enfermeiro (O3-D08)
 CAMP_CHEFE[16] = {
-  nome: 'O Diretor', rodada: 25, base: 7, porJog: 5, vel: 1.8, dm: 1.6, aw: .8, ac: 1.5,
+  nome: 'O Diretor', rodada: 25, base: 12, porJog: 8.5, vel: 1.8, dm: 1.6, aw: .8, ac: 1.5, // O3-D15: vida ×1,7 (era base 7 e porJog 5: derrubando os tanques a luta durava ~2,5 min; meta 6–9)
   nasce: CAMP_DIRETOR.nasce, entrada: 'dir-entrada', primeiroS: 3,
   fases: [{ de: 1, vel: 1.8, danoK: drProtecao }, { de: .7, vel: 2.4, fala: 'dir-fase2', lacCada: CAMP_DIRETOR.afogados.cada[1] }, { de: .35, vel: 2.8, fala: 'dir-fase3', avisoK: .8, lacCada: CAMP_DIRETOR.afogados.cada[2], baixa: 1 }],
   ataques: [
