@@ -237,8 +237,8 @@ test('cada evento desliga e limpa: host sem regra (tipo, dano, zhit, vida, nasci
     for (const id of Object.keys(T.CAMP_EV)) {
       rodada(); T.campEvLiga(id); T.sim(.3); const ligado = [ev(), T.CAMP_EVC.vis];
       T.campEvDesliga(); limpa(); T.Z.spawnDelay = 1; T.sim(.3);
+      if (T.CAMP_ZKS) { T.CAMP_ZKS.rest = {}; T.CAMP_ZKS.r = T.Z.round; T.CAMP_ZKS.trio = 0; } // O3-D06: sem as cotas dos tipos novos (só a regra do evento); antes de nascer, senão o infinito pode sortear um tipo novo
       const z = zumbi(2, -3), base = Math.round(Math.round(T.zHp(T.Z.round) * T.zHpK(T.Z.round)) * (T.CAMP.modo === 'campanha' && T.CAMP_CURVA?.[T.CAMP_ATOS?.[T.CAMP.et]?.id]?.vidaK || 1)) /* O3-D06: com a curva do ato (vidaK) */, v = T.campEvVis();
-      if (T.CAMP_ZKS) { T.CAMP_ZKS.rest = {}; T.CAMP_ZKS.r = T.Z.round; T.CAMP_ZKS.trio = 0; } // O3-D06: sem as cotas dos tipos novos (só a regra do evento)
       let n2 = 0; for (let k = 0; k < 50; k++) if (T.campTipo(0) !== 0) n2++;
       out[id] = { ligado, ev: ev(), cli: T.CAMP_EVC.id, vis: v.vis, man: v.man, tipo: n2, dano: T.campDano(z, 77, 'body', 'he', p, true), zhit: T.campZhitOk(p, { w: 'm1911' }, z), hp: z.hp === base, cv: z.cv ?? 1, fog: T.ZC.fogDog };
       limpa();
