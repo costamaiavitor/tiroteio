@@ -42,11 +42,13 @@ test('Etapa 8: peças no chão (por dificuldade); energia e PaP só funcionam de
     const D = T.ZD, p = T.S.players.get('h'), B = T.ZBAL.construcao, L = D.zint.map((o, i) => ({ o, i })).filter(x => x.o.t === 'peca');
     const out = { n: L.length, esperado: (B.pecas[1]) * 2, custo: T.zCustoAreas(D) };
     out.areasOk = L.every(x => { const r = T.zRoomAt(x.o.x, x.o.z); return out.custo[r] !== undefined && out.custo[r] <= B.custoMax[1]; });
-    p.money = 1e6; p.pos[0] = D.power.x + D.power.n[0] * 1.2; p.pos[2] = D.power.z + D.power.n[1] * 1.2;
+    // zv2-RF: põe o host e o cliente local no mesmo lugar (só p.pos voltava para me.pos no próximo pacote do cliente local e o 'power' falhava às vezes, longe da máquina)
+    const poe = (x, z) => { p.pos[0] = x; p.pos[2] = z; T.me.pos.set(x, p.pos[1], z); T.me.vel.set(0, 0, 0); };
+    p.money = 1e6; poe(D.power.x + D.power.n[0] * 1.2, D.power.z + D.power.n[1] * 1.2);
     T.srvZUse(p, { k: 'power' }); T.sim(.1); out.ligouSemMontar = !!T.Z.power;
-    for (const { o, i } of L) { p.pos[0] = o.x; p.pos[2] = o.z + .5; T.srvZUse(p, { k: 'zint', id: i }); T.sim(.05); }
+    for (const { o, i } of L) { poe(o.x, o.z + .5); T.srvZUse(p, { k: 'zint', id: i }); T.sim(.05); }
     out.pegas = [T.zPecasPegas('power'), T.zPecasPegas('pap')];
-    p.pos[0] = D.power.x + D.power.n[0] * 1.2; p.pos[2] = D.power.z + D.power.n[1] * 1.2;
+    poe(D.power.x + D.power.n[0] * 1.2, D.power.z + D.power.n[1] * 1.2);
     T.srvZUse(p, { k: 'zbuild', maq: 'power' }); T.sim(.1); out.montada = !!T.Z.built.power;
     T.srvZUse(p, { k: 'power' }); T.sim(.1); out.ligou = !!T.Z.power;
     return out;
