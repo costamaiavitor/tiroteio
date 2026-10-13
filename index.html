@@ -17967,7 +17967,7 @@ const SG = { rib: .008, pente: [.04, .027, .012], olyPente: [.02, .004], olyRib:
 // ---------- submetralhadoras (a2): empunhadura vertical na frente (MP5K, Thompson, PM63) ----------
 // ud.lgrip = eixo da empunhadura (topo e base, no espaço da arma); a mão de apoio fecha em volta dele (ver vmSetWeapon).
 // VGRIP.at: altura da mão no eixo (0 base, 1 topo); pal: para onde a palma empurra (da palma para a empunhadura), no espaço da arma
-const VGRIP = { at: .55, pal: [.9, 0, -.45], dx: -.004 };
+const VGRIP = { at: .55, pal: [.3, 0, -1], dx: -.004 }; // decisão do dono (13/10): palma mais para trás; com [.9, 0, -.45] o antebraço subia pelo meio e a manga clara aparecia embaixo da tela
 function vGrip(ud, x, yt, zt, yb, zb) {
   const top = new V3(x, yt, zt), bot = new V3(x, yb, zb); ud.lgrip = { top, bot };
   ud.lh = bot.clone().lerp(top, VGRIP.at); ud.lh.x += VGRIP.dx;
@@ -32606,7 +32606,7 @@ if (DEBUG) window.__T = { get NOW() { return now; }, showPause, MARKS, startFire
 // ===== O2-C01: ganchos de teste para a auditoria de itens (tools/itens/auditoria.mjs); só leitura e as funções do próprio jogo, nada de gameplay =====
 if (DEBUG) Object.assign(window.__T, { zBuildWalk, footFreeR, segClearR, zRoomAt, zActive, zDoorOpen, zBoxPlace, zHigh, colQuery, ffCell, ZPERKS, ZTRAP, ZMAXPERKS, ZWEAP, PR, STEP, ZVAULT, ZTOP });
 // ===== FIM O2-C01 =====
-if (DEBUG) Object.assign(window.__T, { scene, ZBAL, zFalsaCamufla, armaInspect, zSorteiaLugares, zRng, papProx, PAP_IDS, zConstruida, zPecasPegas, srvZBuild, zTamanho, zForaJanela, zCustoAreas, srvZUse, get ZDIFF() { return ZDIFF; } }); // zumbi-v2: cena, balanceamento e funções novas para os testes
+if (DEBUG) Object.assign(window.__T, { scene, ZBAL, zFalsaCamufla, armaInspect, VGRIP, VMC, zSorteiaLugares, zRng, papProx, PAP_IDS, zConstruida, zPecasPegas, srvZBuild, zTamanho, zForaJanela, zCustoAreas, srvZUse, get ZDIFF() { return ZDIFF; } }); // zumbi-v2: cena, balanceamento e funções novas para os testes
 // ===== O2-C04: ganchos de teste dos interativos (tests/interativos-zumbi.test.mjs e tools/itens/auditoria.mjs) =====
 if (DEBUG) Object.assign(window.__T, { ZINT, ZINT_MAPA, ZINT_BARRIL, ZINT_FN, zintUsar, zintTiro, zintExplosao, zintBarrilBoom, zintEstado, zintAud, zintSync, zintMsg, zExplode, zWorldState });
 // ===== FIM O2-C04 =====
