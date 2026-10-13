@@ -697,7 +697,7 @@ for (const [id, w] of Object.entries(ZWEAP)) {
     splash: w.papSplash ?? (w.splash && { r: w.splash.r * 1.2, dmg: w.splash.dmg * 2, self: w.splash.self }), tracer: w.papTracer ?? w.tracer ?? 0xb070ff,
     chain: w.papChain ?? w.chain, frost: w.papFrost ?? w.frost };
   for (let n = 2; n <= 3; n++) { const B = W[id + '_pap'], L = ZBAL.pap.niveis[n - 1]; // zumbi-v2 (Etapa 9): Pack-a-Punch níveis 2 e 3 (mais dano, munição e cadência; traçante próprio)
-    W[id + '_pap' + n] = { ...B, name: `${w.papName} ${L.sufixo}`, pap: n, dmg: B.dmg * L.dano, mag: Math.round(B.mag * L.pente), res: Math.round(B.res * L.pente), rate: B.rate * L.cadencia, brate: B.brate && B.brate * L.cadencia, tracer: L.tracer,
+    W[id + '_pap' + n] = { ...B, name: `${w.papName} ${L.sufixo}`, pap: n, dmg: B.dmg * L.dano, mag: w.model === 'dbarrel' ? B.mag : Math.round(B.mag * L.pente) /* zv2-R2: dois canos, sempre 2 */, res: Math.round(B.res * L.pente), rate: B.rate * L.cadencia, brate: B.brate && B.brate * L.cadencia, tracer: L.tracer,
       splash: B.splash && { ...B.splash, dmg: B.splash.dmg * L.dano } }; }
 }
 const PAP_IDS = b => [b + '_pap3', b + '_pap2', b + '_pap']; // zumbi-v2 (Etapa 9): versões melhoradas de uma arma, da mais forte à mais fraca
@@ -746,6 +746,11 @@ function B(x, z, w, d, h, mat = 'wall', y = 0, c) { return { x, y, z, w, h, d, m
 function mir(list) { return list.concat(list.map(b => ({ ...b, x: -b.x, z: -b.z }))); }
 function border(w, d, h, mat = 'wall') { return [B(0, -d / 2 - .5, w + 2, 1, h, mat), B(0, d / 2 + .5, w + 2, 1, h, mat), B(-w / 2 - .5, 0, 1, d, h, mat), B(w / 2 + .5, 0, 1, d, h, mat)]; }
 function floor(w, d, mat = 'floor') { return B(0, 0, w + 2, d + 2, 1, mat, -1); }
+function stairs(sx, sz, dx, dz, n, h, depth, width, mat = 'wall') {
+  const o = [];
+  for (let i = 0; i < n; i++) { const x = sx + dx * depth * i, z = sz + dz * depth * i; o.push(dx ? B(x, z, depth, width, h * (i + 1) / n, mat) : B(x, z, width, depth, h * (i + 1) / n, mat)); }
+  return o;
+}
 
 const MAPS = {
   arena: {
@@ -1301,6 +1306,17 @@ function siteDeco(M) { // chão pintado e letra flutuando em cada bomb
 // ---------- mapas do modo Rodadas inspirados no CS (Dust 2, Mirage, Inferno): bombs fechados, com 2 ou 3 entradas estreitas ----------
 // Planta em grade de 3 m. '#' parede, 'r' passagem com teto, 'c' caixa grande, 'k' mureta, 'x' caixa pequena,
 // A/B chão dos bombs, T/C bases do ataque e da defesa. Norte (z negativo) = defesa.
+function gridBoxes(rows, cell, x0, z0) { // junta células iguais vizinhas em retângulos (menos caixas)
+  const out = [], H = { '#': [6, 0, 'wall'], r: [.6, 3.4, 'roof'], c: [2.2, 0, 'crate'], k: [1.1, 0, 'stone'] }, used = rows.map(r => [...r].map(() => false));
+  for (let r = 0; r < rows.length; r++) for (let c = 0; c < rows[r].length; c++) {
+    const ch = rows[r][c], h = H[ch]; if (!h || used[r][c]) continue;
+    let w = 1; while (rows[r][c + w] === ch && !used[r][c + w]) w++;
+    let d = 1; while (r + d < rows.length && [...Array(w)].every((_, i) => rows[r + d][c + i] === ch && !used[r + d][c + i])) d++;
+    for (let i = 0; i < d; i++) for (let j = 0; j < w; j++) used[r + i][c + j] = true;
+    out.push(B(x0 + (c + w / 2) * cell, z0 + (r + d / 2) * cell, w * cell, d * cell, h[0], h[2], h[1]));
+  }
+  return out;
+}
 function gridMap(rows, cell, meta) {
   const n = rows.length, m = rows[0].length, w = m * cell, d = n * cell, x0 = -w / 2, z0 = -d / 2, sites = {}, sp = { T: [], C: [] }, xs = [];
   rows.forEach((row, r) => [...row].forEach((ch, c) => {
@@ -14882,6 +14898,11 @@ const SANP_ROUGH = `#include <roughnessmap_fragment>
   roughnessFactor = mix(uPisoRg.x, uPisoRg.y, pg) + (1. - smoothstep(.12, .42, dot(sampledDiffuseColor.rgb, vec3(.33)))) * .25; // rejunte e fresta: ásperos
   roughnessFactor = mix(mix(roughnessFactor, 1., max(pe, pa) * .45), .4, pu);
 `;
+function sanpUni() {
+  if (SANP.U) return SANP.U;
+  CHAO.n ||= chaoRuido(); SANP.m ||= sanpMascara(MAPS.sanatorio.z);
+  return SANP.U = { tPisoM: { value: SANP.m }, tPisoN: { value: CHAO.n }, uPisoM: { value: new THREE.Vector3(1 / SANP.E, -SANP.X0 / SANP.E, -SANP.Z0 / SANP.E) } };
+}
 const sanpMats = {};
 function sanpMat(k, c) {
   const key = k + '|' + c; if (sanpMats[key]) return sanpMats[key];
@@ -20480,6 +20501,7 @@ const ADS = { rel: .144, folga: .05, larg: .3, alt: .02, lat: .035, coronha: .06
 // (o carregador sai por cima): desce pelo lado esquerdo, para fora da tela, e volta pelo mesmo caminho.
 const W06 = { pe: .056, g11Vai: [-.12, -.3, .12] };
 ADS.recuo.stg44 = .06; // a STG-44 usa a caixa e a tampa da AK: na mira a tampa enchia a metade de baixo da tela (olho a 0,066 m; com .035 ainda enchia um terço)
+function w06Vai(ud, gp, R, Gp) { const v = ud.rVai; return v ? [[.38, Gp.x + v[0], Gp.y + v[1], Gp.z + v[2]], [.46, Gp.x + v[0], Gp.y + v[1], Gp.z + v[2]]] : [gp(.38, R, -.08, .1), gp(.46, R, -.08, .1)]; }
 // ===== fim 6-w06 =====
 // ===== 6-w08: precisão (AWP, SSG, Dragunov, Kar98k, L96, PSG1) =====
 // Entrada na luneta: a ocular ia ao olho em linha reta, e como a distância cai junto, ela continuava à direita da tela até a arma sumir (G.scR .74)
@@ -21173,11 +21195,11 @@ function shoot() {
     sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: ends, sup: attHas(G.cur, 'sup') ? 1 : undefined });
   }
   if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); muzzleFlash(mz); vmFlashUntil = now + .05; } // supressor: sem clarão, tiro abafado
-  G.kick = (vmGun?.userData.fps2 ? .25 : 1) * attStat(G.cur, 'kick') * (ZBAL.armas.coice[w.base || G.cur] ?? 1); // zumbi-v2 (Etapa 2): coice por arma (zumbi_config.js)
+  G.kick = (vmGun?.userData.fps2 ? .25 : 1) * attStat(G.cur, 'kick') * (w.zw ? ZBAL.armas.coice[w.base || G.cur] ?? 1 : 1); // zumbi-v2 (Etapa 2): coice por arma (zumbi_config.js), só nas armas do modo zumbi (zv2-R2: as do CS herdam base)
   if (vmGun?.userData.fps2) fpPlay(vmGun.userData, 'fire');
   if (!['shotgun', 'launcher', 'dbarrel', 'revolver', 'scout', 'awp'].includes(w.model) || w.rate < .6 && w.model === 'shotgun') ejectShell(w); // bomba/ferrolho ejetam na hora da ação
   if (w.scope && G.scope && w.model !== 'dmr') { G.rezoom = G.scope; G.scope = 0; } // ferrolho manual sai da luneta; Dragunov/PSG1 (semiautomáticas) ficam
-  if (a.mag === 0 && a.res > 0) setTimeout(startReload, w.model === 'shotgun' && w.rate >= .6 ? 550 : 250); // zumbi-v2 (Etapa 2): não corta a bomba da escopeta no último cartucho
+  if (a.mag === 0 && a.res > 0) { const id = G.cur; setTimeout(() => { if (G.cur === id) startReload(); }, w.model === 'shotgun' && w.rate >= .6 ? 550 : 250); } // zumbi-v2 (Etapa 2): não corta a bomba da escopeta no último cartucho; zv2-R2: só recarrega se a arma continua na mão
 }
 function knifeAttack(heavy) {
   const w = W.knife; G.nextFire = now + (heavy ? w.altRate : w.rate); G.swing = 0; G.kan = { type: heavy ? 'stab' : G.lastSlash?.type === 'slash' && now - G.lastSlash.t0 < 1 ? 'slash2' : 'slash', t0: now }; if (!heavy) G.lastSlash = G.kan; // golpes seguidos alternam o lado
@@ -23619,7 +23641,7 @@ function zBuildWorld(M) {
         for (let i = 0; i < 13; i++) { M4.makeTranslation(-.9 + i * .15, 1.3, 0); bars.setMatrixAt(i, M4); }
         h.add(bars); h.traverse(o => { if (o.isMesh) o.castShadow = true; });
       }
-      bx(g, .5, .5, .03, 0, 1.5, .07, mc(0x8a6a2a)); // cadeado
+      halves.cad = bx(g, .5, .5, .03, 0, 1.5, .07, mc(0x8a6a2a)); // cadeado (zv2-R2: guardado para sumir quando o portão abre; antes ficava boiando no meio do vão aberto)
     } else if (ZINT_PORTA[d.kind]) zintPortaVis(g, d); // O2-C08: corta-fogo, cerca, porteira
     else if (d.kind === 'debris') {
       for (let i = 0; i < 10; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(rand(.8, 2), rand(.2, .5), rand(.3, .7)), i % 3 ? woodM : stoneM); b.position.set(rand(-1.5, 1.5), rand(.2, 2.9), rand(-.2, .2)); b.rotation.set(rand(-.3, .3), rand(-.4, .4), rand(-.6, .6)); b.castShadow = true; g.add(b); }
@@ -23779,7 +23801,7 @@ function zUpdateWorld(dt) {
   if (Wd.zint?.length) zintQuadro(dt); // O2-C04
   for (const o of Wd.doors.values()) if (o.open && !o.done) {
     const k = Math.min(1, (now - o.t0) / .9);
-    if (o.d.kind === 'gate') o.halves.forEach((h, i) => h.position.x = (i ? 1 : -1) * (1 + k * 1.9)); // portão corre para os lados e fica aberto
+    if (o.d.kind === 'gate') { o.halves.forEach((h, i) => h.position.x = (i ? 1 : -1) * (1 + k * 1.9)); if (o.halves.cad) o.halves.cad.visible = false; } // portão corre para os lados e fica aberto; o cadeado sai (zv2-R2)
     else o.g.position.y = (o.d.kind === 'debris' || ZINT_PORTA[o.d.kind]?.desce ? -1 : 1) * k * 3.4; // O2-C08: cerca e porteira afundam
     if (k >= 1) { o.done = true; if (o.d.kind !== 'gate') o.g.visible = false; renderer.shadowMap.needsUpdate = true; }
   }
