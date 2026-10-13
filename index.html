@@ -30868,7 +30868,7 @@ CAMP_GANCHOS.concluida.push(() => { // créditos (no lugar do "Volta ao lobby" d
 // infinito no mapa ZBAL.infinito.mapa, com o que cada um tinha (campBagagem) e da rodada em que parou (o zStartGame aplica, CAMP_INFS.cont).
 function campInfContinua() {
   const I = ZBAL.infinito;
-  if (!NET.isHost || !I.aposCampanha || !MAPS[I.mapa] || CAMP.modo !== 'campanha' || CAMP_VS.fase !== 'cred' || S.phase !== 'over' || !CAMP.over) return false;
+  if (!NET.isHost || !I.aposCampanha || !MAPS[I.mapa] || S.st?.mode !== 'zombies' || S.st.zmode !== 'campanha' || CAMP.modo !== 'campanha' || CAMP_VS.fase !== 'cred' || S.phase !== 'over' || !CAMP.over) return false; // revisor: só na campanha (o "Aplicar" da pausa para PvP nos créditos deixava CAMP.over/CAMP_VS.fase)
   const bag = new Map(); for (const p of S.players.values()) bag.set(p.id, campBagagem(p));
   CAMP_INFS.cont = { bag, r: Z.round };
   campVLimpa(); campLimpa();
@@ -30937,7 +30937,7 @@ Object.assign(CAMP_GANCHOS.msg, {
 CAMP_GANCHOS.sync.push(cp => { // quem entra no meio: gaiola já embaixo; créditos com o tempo que falta (a foto do mundo chega a todos, sempre: só para quem ainda não viu)
   const f = Array.isArray(cp.fg) ? cp.fg : null; if (!f || typeof f[0] !== 'string') return;
   if ((f[0] === 'cena' || f[0] === 'fuga' || f[0] === 'final') && !CAMP_VC.fuga) { CAMP_VC.fuga = -2; CAMP_VC.mundo = ZC.world; } // -2: já embaixo (o quadro seguinte acerta o relógio)
-  if (f[0] === 'cred' && finN(f[1]) && !CAMP_VC.cred) { const s = clamp(f[1], 0, 120); CAMP_VC.cred = { t0: -1, fim: Infinity, s: CAMP_V.creditosS, ja: CAMP_V.creditosS - s, pulou: false }; }
+  if (f[0] === 'cred' && finN(f[1]) && !CAMP_VC.cred) { const s = clamp(f[1], 0, 120); CAMP_VC.cred = { t0: -1, fim: Infinity, s: CAMP_V.creditosS, ja: CAMP_V.creditosS - s, pulou: false, inf: !!(ZBAL.infinito.aposCampanha && MAPS[ZBAL.infinito.mapa]) }; } // inf: revisor (o 'creditos' de quem já estava manda inf)
 });
 CAMP_GANCHOS.hud.push(campVHud);
 function campVHud(dt) {
