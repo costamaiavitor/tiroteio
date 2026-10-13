@@ -58,7 +58,7 @@ test('infinito: mais zumbis, rodada mista com cães e Carniceiro, mais Carniceir
     return o;
   });
   assert.equal(r.modo, 'infinito');
-  assert.ok(r.n44[0] >= Math.round(r.n44[1] * 1.55) && r.n44[0] <= Math.round(r.n44[1] * 1.65) + 1, 'rodada 44: +58% ' + r.n44);
+  assert.ok(r.n44[0] >= Math.round(r.n44[1] * 1.38) && r.n44[0] <= Math.round(r.n44[1] * 1.42) + 1, 'rodada 44: +40% (teto) ' + r.n44);
   assert.ok(r.mista.caes >= 1 && r.mista.carn >= 1 && !r.mista.dog, 'rodada mista ' + JSON.stringify(r.mista)); assert.equal(r.ev, null, 'sem evento na mista');
   assert.equal(r.nasceram.caes, r.mista.caes, 'todos os cães nasceram ' + JSON.stringify(r.nasceram)); assert.equal(r.nasceram.carn, r.mista.carn); assert.equal(r.nasceram.mc, 0);
   assert.notEqual(r.nasceram.fim, 'round', 'a rodada mista termina');

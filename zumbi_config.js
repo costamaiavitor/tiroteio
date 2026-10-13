@@ -77,7 +77,7 @@ export const ZBAL = {
   // armas, pontos e bebidas de cada um, da rodada em que parou). No infinito, a escalada (só no infinito; o clássico não muda):
   infinito: {
     aposCampanha: true, mapa: 'sanatorio',
-    qtd: { de: 15, porRodada: .02, max: .6 }, // zumbis da rodada: +2% por rodada depois da 15 (até +60%, na 45); o teto de vivos não muda
+    qtd: { de: 15, porRodada: .02, max: .4 }, // zumbis da rodada: +2% por rodada depois da 15 (até +40%, na 35; com +60% a rodada 49 do Pesadelo passava de 450); o teto de vivos não muda
     carniceiro: { de: 25, cada: 15, max: 3 }, // rodada de Carniceiro: mais 1 a cada 15 rodadas depois da 25 (2 na 40, 3 na 55); nascem espaçados
     espaco: .5, // o Carniceiro seguinte entra quando faltar esta fração do que faltava na hora do anterior
     chefes: { depoisDe: 40, cada: 5 }, // chefes de campo (Vigia, Foguista, Diretor): a cada 10 rodadas da 20 à 40; depois a cada 5 (depoisDe − 20 múltiplo de 10)
