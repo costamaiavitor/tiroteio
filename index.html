@@ -17762,6 +17762,13 @@ function bx(g, w, h, d, x, y, z, m) { const b = new THREE.Mesh(new THREE.BoxGeom
 // Texturas próprias das armas: metal oxidado com desgaste nas quinas, polímero pontilhado, veio de madeira
 // e a camuflagem do Pack-a-Punch (com linhas que brilham).
 let GTX = null;
+// Cores da camuflagem do Pack-a-Punch por nível: fundo, 5 blocos e as 2 cores das linhas que brilham. 1 = a de sempre (roxa com luz
+// azul e rosa); 2 = laranja e dourado; 3 = vermelho escuro com luz vermelha e amarela (as cores do traçante de cada nível).
+const PAP_CORES = {
+  1: { fundo: '#4a1a78', blocos: ['#6a2aa8', '#2e0c4e', '#8e44d0', '#3a1466', '#b060e8'], luz: ['#39e6ff', '#ff4fd8'] },
+  2: { fundo: '#7a3a0a', blocos: ['#b85c12', '#4a1e04', '#e0901e', '#5e2a06', '#f2b23c'], luz: ['#ffd23a', '#ff6a1a'] },
+  3: { fundo: '#5e0a10', blocos: ['#9a1820', '#33040a', '#cc2a2a', '#470810', '#ff5a3a'], luz: ['#ff2a2a', '#ffc02a'] },
+};
 function gunTextures() {
   if (GTX) return GTX;
   const S = 256, mk = (draw, srgb = true) => { const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); draw(g); const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
@@ -17786,16 +17793,19 @@ function gunTextures() {
       for (let i = 0; i < 3; i++) { g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(rand(20, S - 20), rand(20, S - 20), rand(5, 10), rand(3, 5), 0, 0, 7); g.fill(); }
       noise(g, 12); edgeWear(g, .2, 10);
     }),
-    pap: mk(g => {
-      g.fillStyle = '#4a1a78'; g.fillRect(0, 0, S, S);
-      for (let i = 0; i < 90; i++) { const c = ['#6a2aa8', '#2e0c4e', '#8e44d0', '#3a1466', '#b060e8'][Math.floor(Math.random() * 5)], s = [8, 16, 24][Math.floor(Math.random() * 3)]; g.fillStyle = c; g.fillRect(Math.floor(rand(0, S) / 8) * 8, Math.floor(rand(0, S) / 8) * 8, s, s); }
-      noise(g, 12); // 6-w13: sem edgeWear (na projeção triplanar a quina da textura não é a quina da peça)
-    }),
-    papGlow: mk(g => { // linhas de "circuito" que brilham (emissiveMap)
-      g.fillStyle = '#000'; g.fillRect(0, 0, S, S); g.lineWidth = 2;
-      for (let i = 0; i < 16; i++) { g.strokeStyle = Math.random() < .5 ? '#39e6ff' : '#ff4fd8'; let x = rand(0, S), y = rand(0, S); g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 5; k++) { if (Math.random() < .5) x += rand(-60, 60); else y += rand(-60, 60); g.lineTo(x, y); } g.stroke(); }
-    }),
   };
+  for (const [nv, P] of Object.entries(PAP_CORES)) { // decisão do dono (13/10): uma camuflagem por nível do Pack-a-Punch (1 = a roxa/azul de antes)
+    const k = nv === '1' ? '' : nv;
+    GTX['pap' + k] = mk(g => {
+      g.fillStyle = P.fundo; g.fillRect(0, 0, S, S);
+      for (let i = 0; i < 90; i++) { const c = P.blocos[Math.floor(Math.random() * 5)], s = [8, 16, 24][Math.floor(Math.random() * 3)]; g.fillStyle = c; g.fillRect(Math.floor(rand(0, S) / 8) * 8, Math.floor(rand(0, S) / 8) * 8, s, s); }
+      noise(g, 12); // 6-w13: sem edgeWear (na projeção triplanar a quina da textura não é a quina da peça)
+    });
+    GTX['papGlow' + k] = mk(g => { // linhas de "circuito" que brilham (emissiveMap)
+      g.fillStyle = '#000'; g.fillRect(0, 0, S, S); g.lineWidth = 2;
+      for (let i = 0; i < 16; i++) { g.strokeStyle = Math.random() < .5 ? P.luz[0] : P.luz[1]; let x = rand(0, S), y = rand(0, S); g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 5; k++) { if (Math.random() < .5) x += rand(-60, 60); else y += rand(-60, 60); g.lineTo(x, y); } g.stroke(); }
+    });
+  }
   return GTX;
 }
 // ---------- skins: acabamentos das armas (texturas geradas por código) ----------
@@ -17885,10 +17895,11 @@ const GM = {};
 let VM_ENV = 1;
 function gunMats(pap, fp, skin) {
   const f = !pap && typeof skin === 'string' && Object.hasOwn(SKIN_BY, skin) ? SKIN_BY[skin] : null;
-  const key = (pap ? 'p' : 'n') + (fp ? 'f' : 't') + (f ? f.id : ''); if (GM[key]) return GM[key];
+  const nv = pap ? Math.min(3, Math.max(1, pap | 0)) : 0, tk = nv > 1 ? nv : ''; // nível do PaP (true = 1): camuflagem do nível
+  const key = (pap ? 'p' + nv : 'n') + (fp ? 'f' : 't') + (f ? f.id : ''); if (GM[key]) return GM[key];
   const T = gunTextures();
   const mk = o => { if (fp) { const metal = (o.metalness ?? 0) > .5, m = metal ? new THREE.MeshPhysicalMaterial({ ...o, clearcoat: .35, clearcoatRoughness: .35 }) : new THREE.MeshStandardMaterial({ ...o }); m.userData.env = metal ? 1 : .35; m.envMapIntensity = VM_ENV * m.userData.env; return m; } const { metalness, roughness, roughnessMap, ...rest } = o; return new THREE.MeshLambertMaterial(rest); };
-  const camo = pap ? papCamo(mk({ map: T.pap, emissiveMap: T.papGlow, emissive: new THREE.Color(0xffffff).multiplyScalar(fp ? 1.6 : 1), metalness: .55, roughness: .35 })) : null; // 6-w13
+  const camo = pap ? papCamo(mk({ map: T['pap' + tk], emissiveMap: T['papGlow' + tk], emissive: new THREE.Color(0xffffff).multiplyScalar(fp ? 1.6 : 1), metalness: .55, roughness: .35 })) : null; // 6-w13
   const sk = f ? skinMats(f, mk, fp) : null, A = sk?.a, Bm = sk?.b; // skin: 'a' no metal do corpo, 'b' (mais escuro) no polímero/madeira
   const M = {
     metal: camo || A || mk({ map: T.metal, color: 0x3c3f44, metalness: .8, roughness: .5, roughnessMap: T.metal, bumpMap: T.metal, bumpScale: .4 }),
@@ -17973,7 +17984,7 @@ function vGrip(ud, x, yt, zt, yb, zb) {
   ud.lh = bot.clone().lerp(top, VGRIP.at); ud.lh.x += VGRIP.dx;
 }
 function gunModel(id, fp = false, skin = null) {
-  const wd = W[id], pap = !!wd?.pap, M = gunMats(pap, fp, skin), g = new THREE.Group(), ud = g.userData;
+  const wd = W[id], pap = wd?.pap | 0, M = gunMats(pap, fp, skin), g = new THREE.Group(), ud = g.userData; // pap: nível (0 = sem)
   const hi = fp && CFG.gfx !== 'baixo';
   const RB = (w, h, d, r = .004) => { const m = Math.min(w, h, d); return hi && m > .012 ? new RoundedBoxGeometry(w, h, d, 2, Math.min(r, m / 2 - .001)) : new THREE.BoxGeometry(w, h, d); };
   const CY = (r, len, seg = 14, rFront = r) => { const q = new THREE.CylinderGeometry(rFront, r, len, hi ? seg : Math.max(6, seg >> 1)); q.rotateX(-Math.PI / 2); return q; }; // deitado ao longo de z
@@ -19527,7 +19538,7 @@ function fpBuild(id, ud) {
   const arms = [arm('L'), arm('R')];
   if (arms.every(a => a.cl && a.ua && a.fa && a.wr) && (lh || P.sh)) ik = { arms, ...lh, sh: P.sh || [0, 0, 0], Cb: new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A), body };
   root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; if (o.material) { o.material = o.material.clone(); o.material.envMapIntensity = .8; } } });
-  const sk = SKIN_BY[skinOf(id)], pap = !!W[id]?.pap;
+  const sk = SKIN_BY[skinOf(id)], pap = W[id]?.pap | 0;
   if (sk || pap || D?.mat) { // (a13: D.mat = modelo sem textura usa os materiais das armas do jogo, mesmo sem skin) skin: no modelo baixado ou, nas armas do próprio pacote (AK-47, Nova), nas peças da arma do pacote (cartucho fica)
     const M = gunMats(pap, true, skinOf(id)), mats = { a: M.metal, b: M.polymer };
     if (D) { const kp = D.mat ? [...(D.lens || []), ...(D.brass || [])] : D.lens; fpSkin(model.children[0], mats, tips.L, kp); if (F2) fpSkin(F2.g.children[0], mats, tips.L, kp); } // (a13) D.mat: as balas continuam latão
@@ -20816,7 +20827,7 @@ function attScan(gun) { // vértices visíveis da arma no espaço dela (P: x, y,
 function attPartsProc(id, gun, ud) {
   const on = attOn(id); if (!on.length || !ud.muzzle) return;
   const b = attBase(id), sem = ATTV.sem[b] || [], slot = s => { const a = on.find(a => ATT[a].slot === s); return a && !sem.includes(s) && !sem.includes(a) ? a : null; };
-  const N = gunMats(false, true, null), M = gunMats(!!W[id]?.pap, true, skinOf(id)), X = attMats(), hi = CFG.gfx !== 'baixo';
+  const N = gunMats(false, true, null), M = gunMats(W[id]?.pap | 0, true, skinOf(id)), X = attMats(), hi = CFG.gfx !== 'baixo';
   const hg = W[b]?.slot === 'secondary', pis = !!(ud.slide && ud.pistol), sg = ud.rig === 'shell' || ud.rig === 'break', bull = W[b]?.model === 'bull';
   const movers = [ud.slide, ud.pump, ud.brk].filter(Boolean), V = (x, y, z) => new V3(x, y, z);
   gun.updateMatrixWorld(true);
