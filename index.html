@@ -22901,6 +22901,7 @@ const ZSKIN = [0x7f9270, 0x8a9a78, 0x6f8466, 0x96a087, 0x9a9484, 0x7c7468, 0xa3a
 // tipos de zumbi: o índice viaja nos bits 128-512 de f. hp = vida × comum, pts/xp = extra ao matar, sz = escala do modelo (e das caixas de acerto), rad = raio
 const ZKIND = [{ n: 'Zumbi', sz: 1 }, { n: 'Brutamonte', hp: 3.5, pts: 100, xp: 6, sz: 1.32, rad: .4 }, { n: 'Explosivo', hp: 1.1, pts: 40, xp: 3, sz: 1.05 }, { n: 'Veloz', hp: .55, pts: 20, xp: 2, sz: .96 },
   { n: 'Tóxico', hp: 1.3, pts: 40, xp: 3, sz: 1 }, { n: 'Gritador', hp: 1.2, pts: 60, xp: 4, sz: 1.04 }, { n: 'Carniceiro', pts: 1000, xp: 50, sz: 1.6, rad: .55 }];
+{ const T = ZBAL.tipos[17]; ZKIND[17] = { n: 'Tanque', hp: T.vida, pts: T.pts, xp: T.xp, sz: T.s, rad: .45 }; } // pedido do dono (13/10): o Tanque
 for (const k in ZBAL.tipos) ZKIND[k].sz = ZBAL.tipos[k].s; // zumbi-v2 (Etapa 1): tamanho de cada tipo vem do zumbi_config.js
 // zumbi-v2 (Etapa 1): velocidade, dano e ritmo do golpe pelo tamanho (fórmulas e expoentes em ZBAL.tamanho)
 // zumbi-v2 (Etapa 5): zumbi do lado de fora que já está na área jogável (o chão dele leva ao jogador sem passar pela janela)
@@ -22914,7 +22915,7 @@ function zForaJanela(z, P) {
 function zTamanho(z, kind, D) {
   const T = ZBAL.tamanho, K = ZBAL.tipos[kind] || ZBAL.tipos[0], s = K.s;
   z.sc = Math.max(K.marchaMin ?? 0, Math.min(K.marchaMax ?? 2, z.sc)); const [a, b] = ZBAL.marcha[z.sc];
-  z.speed = rand(a, b) * s ** -T.vel * D.spd; z.dm = s ** T.dano; z.ac = s ** T.ritmo; z.aw = T.preparo * z.ac;
+  z.speed = rand(a, b) * s ** -T.vel * D.spd; z.dm = K.dm ?? s ** T.dano; // dm: o Tanque bate fraco apesar do tamanho z.ac = s ** T.ritmo; z.aw = T.preparo * z.ac;
   const E = ZBAL.estilos[K.estilo]; if (E) { z.est = K.estilo; z.speed *= 1 + rand(-E.varia, E.varia); z.fase = Math.random() * 6.28; } // zumbi-v2 (Etapa 5): estilo e variação individual
   const vMax = T.velMax?.[S.st?.zdiff ?? 1]; if (vMax && z.speed > vMax) z.speed = vMax * rand(.96, 1); // decisão do dono (13/10): ninguém mais rápido que o cão da dificuldade
 }
@@ -22985,7 +22986,7 @@ function zombieModel(dog, kind = 0, id = (Math.random() * 1e6) | 0) {
   const ud = { skel }; for (const [k, v] of Object.entries(t.map)) ud[k] = Array.isArray(v) ? v.map(i => bones[i]) : typeof v === 'number' ? bones[v] : v.e !== undefined ? ex[v.e] : v.v;
   g.userData = ud;
   if (!dog) { // variações do mesmo molde
-    const hr = kind === 1 || kind === 6 ? 0 : kind === 3 ? 2 : L.hair; zHide(ud.hairS, hr !== 1); zHide(ud.hairL, hr !== 2); // Brutamonte careca, Carniceiro de capacete
+    const hr = kind === 1 || kind === 6 || kind === 17 ? 0 : kind === 3 ? 2 : L.hair; zHide(ud.hairS, hr !== 1); zHide(ud.hairL, hr !== 2); // Brutamonte careca, Carniceiro de capacete
     zHide(ud.shoeR, L.bare); zHide(ud.bareR, !L.bare); zHide(ud.ribs, !(L.wound || kind === 3));
     zHide(ud.foreL, L.stump); zHide(ud.stumpL, !L.stump); zHide(ud.jaw, L.nojaw); zHide(ud.neckB, 1); zHide(ud.kneeL, 1); zHide(ud.kneeR, 1);
     g.scale.setScalar(zSize(kind, id));
@@ -23015,7 +23016,7 @@ function zBuildDog(g, I) { // cão do inferno: peito fundo, cintura fina, focinh
   return g;
 }
 function zBuildModel(dog, kind, L) {
-  if (kind > 6 && !dog && !L.cm) return campModelo(kind, L); // O3-D06: tipos da campanha (corpo base com as cores e as peças do tipo)
+  if (kind > 6 && kind !== 17 && !dog && !L.cm) return campModelo(kind, L); // O3-D06: tipos da campanha (corpo base com as cores e as peças do tipo)
   const g = new THREE.Group(); g.rotation.order = 'YXZ';
   const inner = zbone(g, 0, 0, 0);
   if (dog) return zBuildDog(g, inner);
@@ -23026,10 +23027,11 @@ function zBuildModel(dog, kind, L) {
   else if (kind === 4) { skin = mc(0x6aa04a); cloth = mc(0x34402a); eye = zGlow(0x7aff3a, 5); }
   else if (kind === 5) { skin = mc(0xb8b4aa); cloth = mc(0x4a3a4a); eye = zGlow(0xd0f0ff, 5); }
   else if (kind === 6) { skin = mc(0x7a6a5a); cloth = mc(0x2a2624); pants = mc(0x1e1c1a); eye = zGlow(0xff1a0a, 6); }
+  else if (kind === 17) { skin = mc(0x5c665e); cloth = mc(0x2c3036); pants = mc(0x23262a); eye = zGlow(0x8ac8ff, 4); } // Tanque
   const blood = mc(0x4a0a0a), gore = mc(0x6e1410), dark = mc(0x14100e), shoe = mc(0x1c1a18), bone = mc(0xcfc6a8), sock = mc(0x0a0606), hairC = mc(kind === 5 ? 0x8a8a84 : 0x1a1510);
   // proporções: membros, largura e fundura do peito, braços, cabeça, comprimento do braço, dedos
   const [lw, cw, cd, aw, hk, al, fl] = kind === 1 ? [1.35, 1.4, 1.25, 1.5, .9, 1.05, 1.1] : kind === 2 ? [.85, 1.02, 1, .8, .92, 1, 1] : kind === 3 ? [.72, .8, .82, .74, .95, 1.12, 1.3]
-    : kind === 5 ? [.8, .88, .9, .82, 1, 1.12, 1.5] : kind === 6 ? [1.3, 1.35, 1.3, 1.35, .95, 1.05, 1.1] : [1, 1, 1, 1, 1, 1, 1];
+    : kind === 5 ? [.8, .88, .9, .82, 1, 1.12, 1.5] : kind === 6 ? [1.3, 1.35, 1.3, 1.35, .95, 1.05, 1.1] : kind === 17 ? [1.45, 1.5, 1.45, 1.45, .86, 1, 1.05] : [1, 1, 1, 1, 1, 1, 1];
   const ud = { inner };
   // pernas: coxa e canela afinando, joelho com osso próprio; o pé direito pode estar descalço (osso ligado/desligado)
   for (const sx of [-1, 1]) {
@@ -23083,6 +23085,12 @@ function zBuildModel(dog, kind, L) {
     zbx(torso, .42, .26, .04, 0, .42, -.17 * cd, iron); zbx(torso, .12, .1, .045, .1, .48, -.175 * cd, rust); zbx(torso, .5, .04, .4, 0, .2, 0, rust);
     for (const H of [ud.handL, ud.handR]) zsp(H, .07, .07, .08, 0, -.07, 0, skin);
     zbx(head, .2, .03, .02, 0, .21, -.105, blood); zbx(ud.jaw, .15, .04, .03, 0, -.02, -.11, bone); // cicatriz e queixo para frente
+  } else if (kind === 17) { // Tanque: colete de chapas de aço na frente e nas costas, ombreiras, capacete de soldador e braçadeiras
+    const aco = mc(0x4a4e54), rebite = mc(0x7a7468), viseira = mc(0x16181a);
+    for (const s of [-1, 1]) { zbx(torso, .46, .34, .045, 0, .36, s * .17 * cd, aco); for (const x of [-.18, .18]) zbx(torso, .03, .03, .05, x, .5, s * .175 * cd, rebite); }
+    zbx(torso, .52, .05, .42, 0, .55, 0, aco);
+    for (const A of [ud.armL, ud.armR]) { zbx(A, .24, .1, .26, 0, .05, 0, aco); zbx(A, .15, .14, .15, 0, -.2, 0, aco); }
+    zbx(head, .24, .2, .24, 0, .1, 0, aco); zbx(head, .2, .05, .02, 0, .06, -.125, viseira);
   } else if (kind === 2) { // Explosivo: barriga enorme com bolhas que brilham e veias
     const bl = zGlow(0xffa020, 2.5), vein = mc(0x5a4a2a), belly = zbone(torso, 0, .24, -.06); ud.belly = belly;
     zsp(belly, .28, .26, .27, 0, 0, -.04, skin);
@@ -23517,7 +23525,7 @@ function zShockRing(p, col, r, life) {
 }
 function zAnimHuman(zc, ud, dt) {
   const f = zc.f, sc = f & 3, atk = !!(f & 4), crawl = !!(f & 8), win = !!(f & 32) || !!(f & 1024), rise = !!(f & 64), K = zc.kind, t = now, spd = zc.spd, side = zc.side;
-  const k = 1 - Math.exp(-dt * 16), run = sc >= 2 || (K === 6 && sc >= 1), mv = clamp(spd / (run ? 2.5 : 1), 0, 1), heavy = K === 1 || K === 6;
+  const k = 1 - Math.exp(-dt * 16), run = sc >= 2 || (K === 6 && sc >= 1), mv = clamp(spd / (run ? 2.5 : 1), 0, 1), heavy = K === 1 || K === 6 || K === 17;
   zc.anim += dt * (spd / ((.9 + spd * .25) * zc.sz) * 6.283 * (K === 2 ? 1.3 : 1) + .4); // a fase anda com a distância: o pé não escorrega
   const a = zc.anim, s = Math.sin(a), c = Math.cos(a), ph = zc.ph;
   let L0 = ZLEAN[sc] + zc.hunch + (K === 1 ? .08 : K === 5 ? .1 : K === 2 ? -.06 : K === 6 && sc ? .2 : 0);
@@ -23727,7 +23735,7 @@ function updateZombies(dt) {
     const sp = Math.hypot(zc.pos.x - zc.last.x, zc.pos.z - zc.last.z) / Math.max(dt, 1e-3); zc.last.copy(zc.pos); zc.spd = lerp(zc.spd, Math.min(sp, 9), .2);
     M_.position.copy(zc.pos); M_.rotation.y = zc.yaw;
     const f = zc.f, atk = !!(f & 4);
-    if (atk && !zc.atk) { zc.atk0 = now; zc.atkN++; zc.atkFx = 0; play(zc.dog ? 'dog' : zc.kind === 6 || zc.kind === 1 ? 'brute' : 'snarl', zc.pos); }
+    if (atk && !zc.atk) { zc.atk0 = now; zc.atkN++; zc.atkFx = 0; play(zc.dog ? 'dog' : zc.kind === 6 || zc.kind === 1 || zc.kind === 17 ? 'brute' : 'snarl', zc.pos); }
     else if (!atk && zc.atk) zc.atkE = now; // a batida é quando o preparo acaba
     zc.atk = atk;
     if (zc.dog) zAnimDog(zc, ud, dt); else zAnimHuman(zc, ud, dt);
@@ -24078,10 +24086,11 @@ const Z = { on: false };
 // bleed = segundos caído, drop = limiar dos power-ups (× 2000; menor = mais), regen = segundos sem levar golpe até começar a regenerar, rgn = vida por segundo (com 100 de vida máxima)
 const ZDIFF = [
   { name: 'Fácil', desc: 'Zumbis 30% mais fracos, mais lentos e em menor número, 3 golpes para cair, a vida volta logo, 1500 pontos iniciais, 35% mais pontos e mais power-ups.', hp: .7, hpR: 1, dmg: 34, atk: 1.4, run: -14, spd: .92, cnt: .75, pts: 1500, gain: 1.35, bleed: 60, drop: .7, regen: 2.5, rgn: 25, dog: [6, 6], max: 20, spawn: 1.25 },
-  { name: 'Normal', desc: 'Como no CoD: 2 golpes para cair, a vida volta 3,5 s depois do último golpe, começa com 500 pontos.', hp: 1, hpR: 1, dmg: 50, atk: 1.2, run: 0, spd: 1, cnt: 1, pts: 500, gain: 1, bleed: 45, drop: 1, regen: 3.5, rgn: 20, dog: [5, 4], max: 24, spawn: 1 },
+  { name: 'Normal', desc: 'Zumbi comum: 3 golpes para cair (no máximo 40 por golpe), um pouco menos de zumbis, a vida volta 3 s depois do último golpe, começa com 500 pontos.', hp: 1, hpR: 1, dmg: 50, atk: 1.2, run: 0, spd: 1, cnt: 1, pts: 500, gain: 1, bleed: 45, drop: 1, regen: 3.5, rgn: 20, dog: [5, 4], max: 24, spawn: 1 },
   { name: 'Difícil', desc: 'Até 30% mais vida (cheia a partir da rodada 6), 20% mais zumbis, correm antes, a vida demora mais a voltar, menos pontos e power-ups, cães mais cedo.', hp: 1.3, hpR: 6, dmg: 60, atk: 1.05, run: 12, spd: 1.05, cnt: 1.2, pts: 500, gain: .9, bleed: 35, drop: 1.25, regen: 4, rgn: 18, dog: [4, 4], max: 28, spawn: .85 },
-  { name: 'Pesadelo', desc: 'Golpes de 75 (2 derrubam; com Juggernog, 4), até 55% mais vida (cheia na rodada 10), 35% mais zumbis, parte já trota na rodada 1, a vida volta devagar, especiais e Carniceiro antes.', hp: 1.55, hpR: 10, dmg: 75, atk: 1, run: 24, spd: 1.08, cnt: 1.35, pts: 500, gain: .8, bleed: 25, drop: 1.5, regen: 4.5, rgn: 16, dog: [4, 3], max: 30, spawn: .75 },
+  { name: 'Pesadelo', desc: 'Especiais batem forte (o zumbi comum, no máximo 40), até 55% mais vida (cheia na rodada 10), 35% mais zumbis, parte já trota na rodada 1, a vida volta devagar, especiais e Carniceiro antes.', hp: 1.55, hpR: 10, dmg: 75, atk: 1, run: 24, spd: 1.08, cnt: 1.35, pts: 500, gain: .8, bleed: 25, drop: 1.5, regen: 4.5, rgn: 16, dog: [4, 3], max: 30, spawn: .75 },
 ];
+for (const [k, o] of Object.entries(ZBAL.dificuldade || {})) Object.assign(ZDIFF[k], o); // pedido do dono (13/10): ajustes por dificuldade
 const zDf = () => ZDIFF[S.st?.zdiff ?? 1] || ZDIFF[1];
 const zHpK = r => { const D = zDf(); return D.hp <= 1 ? D.hp : 1 + (D.hp - 1) * Math.min(1, r / D.hpR); }; // multiplicador de vida dos zumbis nesta rodada
 const zGain = n => Math.round(n * zDf().gain); // pontos de acerto/morte conforme a dificuldade
@@ -24098,6 +24107,7 @@ function zMix(r, n, np) { // quantos de cada tipo especial nesta rodada (índice
   if (q >= 8) m[1] = Math.min(2 + np, Math.max(1, Math.round((1 + Math.floor((q - 8) / 3)) * sp.k))); // Brutamonte: poucos
   if (q >= 10) m[4] = Math.max(1, f(Math.min(.08, .03 + (q - 10) * .006))); // Tóxico
   if (q >= 12) m[5] = Math.min(3, 1 + Math.floor((q - 12) / 5)); // Gritador
+  { const T = ZBAL.tipos[17]; if (q >= T.desde) m[17] = Math.min(1 + np, 1 + Math.floor((q - T.desde) / T.cada)); } // Tanque
   let t = 0; for (let j = 1; j < m.length; j++) t += m[j]; const cap = Math.floor(n * .5); // O3-D03
   while (t > cap) { let i = 1; for (let j = 2; j < m.length; j++) if (m[j] > m[i]) i = j; m[i]--; t--; } // nunca mais da metade da rodada
   Z.mix = m; Z.mixN = t;
@@ -24376,7 +24386,8 @@ function zSpawnOne() {
     let pick = Math.random() * tot, c = cands[cands.length - 1]; for (const cc of cands) { pick -= cc.wt; if (pick <= 0) { c = cc; break; } }
     const D = zDf(); z.hp = Math.round(zHp(r) * zHpK(r)); const v = r * 8 + rand(-12, 12) + D.run; z.sc = v < 35 ? 0 : v < 70 ? 1 : 2; // zumbi-v2: a velocidade sai do zTamanho
     if (kind) z.hp = Math.round(z.hp * ZKIND[kind].hp);
-    if (kind <= 5) zTamanho(z, kind, D); // zumbi-v2: marcha, velocidade, dano e ritmo pelo tamanho do tipo (Brutamonte lento e forte, Veloz rápido e fraco)
+    else z.hp = Math.round(z.hp * ZBAL.comum.vida); // pedido do dono (13/10): o comum com 7% menos vida
+    if (ZBAL.tipos[kind]) zTamanho(z, kind, D); // zumbi-v2: marcha, velocidade, dano e ritmo pelo tamanho do tipo (Brutamonte lento e forte, Veloz rápido e fraco)
     if (kind === 5) z.scrT = now + 3; // Gritador
     if (c.i >= 0) { const w = ZD.windows[c.i], d = rand(4, 7), t = rand(-2, 2); z.st = 'out'; z.win = c.i; P.set(w.x + w.n[0] * d + w.tx * t, 0, w.z + w.n[1] * d + w.tz * t); z.yaw = Math.atan2(w.n[0], w.n[1]); }
     else { let x = c.x, zz = c.z; for (let k = 0; k < 6; k++) { const tx = c.x + rand(-1, 1), tz = c.z + rand(-1, 1), cc = ffCell(tx, tz); if (cc >= 0 && FF.walk[cc]) { x = tx; zz = tz; break; } } z.st = 'rise'; P.set(x, -1.8, zz); }
@@ -24531,7 +24542,7 @@ function zTryAttack(z, q, reach) {
     const D = zDf(); z.atkWind = 0; z.atkT = now + (z.dog ? .8 : ZBAL.tamanho.intervalo * z.ac) * D.atk;
     if (z.kind === 6) { zSlam(z); return; }
     const qq = z.atkQ;
-    if (qq && qq.alive && !qq.downed && S.players.has(qq.id) && hyp(qq.pos[0] - P.x, qq.pos[2] - P.z) < reach + .5 && Math.abs(qq.pos[1] - P.y) < 1.6) { zHurt(qq, z.dog ? Math.round(D.dmg * .8) : (ZBAL.tipos[z.kind] ? Math.round(Math.min(ZBAL.tamanho.tetoGolpe, Math.max(ZBAL.tamanho.pisoGolpe, D.dmg * z.dm))) : Math.round(D.dmg * z.dm)), P); zWidow(qq); } // zumbi-v2: golpe entre o piso e o teto
+    if (qq && qq.alive && !qq.downed && S.players.has(qq.id) && hyp(qq.pos[0] - P.x, qq.pos[2] - P.z) < reach + .5 && Math.abs(qq.pos[1] - P.y) < 1.6) { zHurt(qq, z.dog ? Math.round(D.dmg * .8) : (ZBAL.tipos[z.kind] ? Math.round(Math.min(z.kind ? ZBAL.tamanho.tetoGolpe : ZBAL.comum.danoMax, Math.max(ZBAL.tamanho.pisoGolpe, D.dmg * z.dm))) : Math.round(D.dmg * z.dm)), P); zWidow(qq); } // zumbi-v2: golpe entre o piso e o teto
   }
 }
 function zSlam(z) { // Carniceiro: o cutelo bate no chão e acerta todo mundo no anel (2,9 m), quem saiu a tempo escapa

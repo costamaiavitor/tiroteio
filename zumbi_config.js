@@ -72,7 +72,15 @@ export const ZBAL = {
     3: { s: .86, marchaMin: 2, estilo: 'erratico' }, // Veloz
     4: { s: 1, estilo: 'cambaleante' }, // Tóxico
     5: { s: 1.04, marchaMin: 1, marchaMax: 1, estilo: 'cambaleante' }, // Gritador
+    // Tanque (pedido do dono, 13/10): muita vida, pouco dano, devagar. dm troca o dano pelo tamanho (s^2,5 daria 2,5×); vida × a do comum;
+    // aparece desde a rodada desde (depois do atraso da dificuldade), mais 1 a cada `cada` rodadas, no máximo 1 + nº de jogadores
+    17: { s: 1.45, marchaMax: 0, estilo: 'pesado', dm: .5, vida: 6, pts: 120, xp: 8, desde: 9, cada: 5 },
   },
+  // Pedido do dono (13/10): o zumbi comum (tipo 0, sem os especiais, cães e chefes) com 7% menos vida e golpe de no máximo 40 em todas
+  // as dificuldades (no Normal eram 50: 2 golpes derrubavam; agora 3)
+  comum: { vida: .93, danoMax: 40 },
+  // Pedido do dono (13/10): o Normal estava difícil demais. Ajustes por dificuldade sobre a tabela ZDIFF (0 Fácil, 1 Normal, 2 Difícil, 3 Pesadelo)
+  dificuldade: { 1: { cnt: .9, regen: 3 } },
   // Decisão do dono (13/10): zumbi morto sem tiro por algo que um jogador ligou ou pegou (armadilha, Nuke, fogo do interativo, vapor da
   // válvula) dá pontos a quem ligou/pegou: os de um abate no corpo mais o bônus do tipo (o Carniceiro dá também os 300 do time).
   pontos: { semTiro: 60 },
