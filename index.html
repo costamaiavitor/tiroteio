@@ -24757,7 +24757,7 @@ function zStartRound() {
   broadcast({ t: 'zround', r: Z.round, dog: Z.dogRound ? 1 : 0, bo: Z.bossQ });
   srvState();
 }
-function zEndRound() { Z.phase = 'break'; Z.phaseEnd = now + 10; if (CAMP.on) campFimRodada(); broadcast({ t: 'zrend', r: Z.round }); srvState(); } // O3-D02: campFimRodada
+function zEndRound() { Z.phase = 'break'; Z.phaseEnd = now + 10; broadcast({ t: 'zrend', r: Z.round }); if (CAMP.on) campFimRodada(); srvState(); } // O3-D02: campFimRodada (depois do 'zrend': a mensagem do fim da etapa, como "OBJETIVOS CONCLUÍDOS", não some sob o "Rodada N concluída")
 function zTick(dt) {
   if (!Z.on) return;
   if (S.phase === 'over') { if (now >= S.phaseEnd) srvStartMatch(); return; }
@@ -29610,6 +29610,7 @@ CAMP_CHEFE[14] = {
   cliFase: vgCliFase, cliQuadro: vgCliQuadro,
 };
 CAMP_OBJ['C1.1'] = { tipo: 'matar', titulo: 'Derrube o Vigia', chefe: 14 }; // etapa C1 (O3-D02): o chefe entra pelo relógio do O3-D07
+const VG_ETAPA = 'C1'; // id da etapa do Vigia em CAMP_ATOS (objetivos da Vila: depois do II.4, na versão de campo)
 // ---------- host: estado do Vigia (um por vez) ----------
 const VGSRV = { z: null, modo: 'chao', rota: [], ri: 0, pelT: 0, somT: 0, ult: new Map(), luz: new Map() };
 function vgInicio(z) { Object.assign(VGSRV, { z, modo: 'chao', rota: [], ri: 0, pelT: now + CAMP_VIGIA.pel.primeiro, somT: 0 }); VGSRV.ult.clear(); VGSRV.luz.clear(); }
@@ -29713,9 +29714,13 @@ function vgArameTick(dt) {
   }
 }
 CAMP_GANCHOS.tick.push(vgArameTick);
-CAMP_GANCHOS.rodada.push(() => { // rodada 10 (§8.1): só os 16 comuns da curva (os especiais do clássico ficam fora; os lacaios são do Vigia)
-  if (CAMP.modo === 'campanha' && CAMP_ATOS[CAMP.et]?.mapa === 'forte' && Z.mix) { Z.mix = ZKIND.map(() => 0); Z.mixN = 0; }
+CAMP_GANCHOS.rodada.push(() => { // rodada do Vigia (etapa C1, §8.1): só os comuns da curva (os especiais ficam fora; os lacaios são do Vigia)
+  if (CAMP.modo === 'campanha' && CAMP_ATOS[CAMP.et]?.id === VG_ETAPA && Z.mix) { Z.mix = ZKIND.map(() => 0); Z.mixN = 0; } // objetivos do mapa: o Vigia luta na Vila
 });
+// objetivos do mapa (13/10): a etapa C1 começa em qualquer rodada (a agenda é por rodada): sem cães nem Carniceiro da agenda enquanto
+// o Vigia não cai (a rodada de cães não deixava o chefe nascer: campZNasce recusa na rodada de cães). Depois dos ganchos do O3-D05.
+const vgSemAgenda = () => { if (CAMP.modo === 'campanha' && CAMP_ATOS[CAMP.et]?.id === VG_ETAPA) Z.nextDog = Z.nextBoss = 1e9; };
+CAMP_GANCHOS.inicio.push(vgSemAgenda); CAMP_GANCHOS.fimRodada.push(vgSemAgenda);
 // menu: a arena nunca vira mapa do clássico/PvP. O formulário parte do st da partida (lobby e pausa): na arena o st.map é 'forte' e,
 // trocando para o Clássico, viraria o zmap. O saneamento do campForm0 (O3-D02) ganha esta regra aqui (proposta: mover para o campForm0).
 { const f0 = campForm0; campForm0 = st => { f0(st); if (MAPS[st.zmap]?.camp) st.zmap = 'vila'; if (st.mode !== 'zombies' && MAPS[st.map]?.camp) st.map = 'arena'; }; }
@@ -29818,7 +29823,7 @@ function vgCliFase(zc, f) { // o holofote quebra na fase 3 (o apagão é pelo es
   if (f === 2 && zc) play('power', zc.pos);
 }
 function vgCliQuadro(zc) { const ud = zc.model?.userData; if (ud?.lente) { const f = CAMP.c.ch?.f || 1; zHide(ud.lente, f >= 3); zHide(ud.lenteQ, f < 3); } }
-function vgTela(id, cor) { let el = document.getElementById(id); if (!el) { el = document.createElement('div'); el.id = id; el.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;background:${cor}`; document.body.appendChild(el); } return el; }
+function vgTela(id, cor) { let el = document.getElementById(id); if (!el) { el = document.createElement('div'); el.id = id; el.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;background:${cor}`; (document.getElementById('zhud') || document.body).appendChild(el); } return el; } // dentro do #zhud: some com o HUD (fim da partida no meio da marca)
 CAMP_GANCHOS.msg.vg = m => { // { e: 'marca' | 'cal', s }
   if (typeof m.e !== 'string' || !finN(m.s)) return; const s = clamp(m.s, .2, 10);
   if (m.e === 'marca') { VGCLI.marcaFim = now + s; VGCLI.marca = vgTela('vgMarca', `radial-gradient(ellipse at center, transparent 55%, ${CAMP_VIGIA.cli.marcaCor})`); toast('MARCADO: o Vigia te viu', 2); play('beep'); }
@@ -29842,18 +29847,24 @@ function forteAnim(dt) { // MAP_ANIM da arena (cliente): sinalizadores, cone do 
     if (hemi.intensity !== VGCLI.hemiW) VGCLI.hemiB = hemi.intensity; VGCLI.hemiW = hemi.intensity = VGCLI.hemiB * C_.apagaoLuz;
     if (VIS.fill.parent) { if (VIS.fill.intensity !== VGCLI.fillW) VGCLI.fillB = VIS.fill.intensity; VGCLI.fillW = VIS.fill.intensity = VGCLI.fillB * C_.apagaoLuz; } VGCLI.ap = true; }
   else if (VGCLI.ap) { VGCLI.ap = false; if (hemi.intensity === VGCLI.hemiW) hemi.intensity = VGCLI.hemiB; if (VIS.fill.intensity === VGCLI.fillW) VIS.fill.intensity = VGCLI.fillB; VGCLI.hemiW = VGCLI.fillW = NaN; }
-  if (tel && tel.a === 'rajada' && zc && tel.p[0]) { // os 3 tiros (o host aplica o dano no mesmo compasso)
-    const ta = tel.t0 + tel.s, n = Math.min(3, Math.floor((now - ta) / Math.max(.01, tel.at) * 3) + 1); tel.vgN ||= 0;
-    while (now >= ta && tel.vgN < n) { tel.vgN++; const s = tel.p[0], a = s[3], o = new V3(zc.pos.x - Math.sin(a) * .9, zc.pos.y + 1.35 * (zc.sz || 1), zc.pos.z - Math.cos(a) * .9), d = tel.d1; tracer(o, new V3(s[0] - Math.sin(a) * d, s[1] + 1.1, s[2] - Math.cos(a) * d), C_.rastro); play('rifle', o); }
-  }
   if (camp && me.alive && !me.downed && me.pos.y < CAMP_VIGIA.arame.dy && vgArame(me.pos.x, me.pos.z)) { // arame: anda a ×0,5 (desfaz metade do passo do quadro)
     if (VGCLI.aOk) { const k = 1 - CAMP_VIGIA.arame.lento, nx = me.pos.x - (me.pos.x - VGCLI.ax) * k, nz = me.pos.z - (me.pos.z - VGCLI.az) * k; if (!blockedAt(nx, me.pos.y + .01, nz, me.h)) { me.pos.x = nx; me.pos.z = nz; } }
     VGCLI.aOk = true; VGCLI.ax = me.pos.x; VGCLI.az = me.pos.z; me.sprinting = false;
   } else VGCLI.aOk = false;
-  if (VGCLI.marca) VGCLI.marca.style.opacity = now < VGCLI.marcaFim ? (.75 + .25 * Math.sin(now * 8)).toFixed(2) : '0';
-  if (VGCLI.cal) VGCLI.cal.style.opacity = now < VGCLI.calFim ? clamp((VGCLI.calFim - now) / VGCLI.calS, 0, 1).toFixed(2) : '0';
 }
-if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { matchForm, campForm0, CAMP_VIGIA, VGSRV, VGCLI, FORTE, FORTE_V, vgAlvo, vgFase, vgTick, vgIA, vgArame, vgArameTick, vgMarca, vgEscada, forteAnim, forteEsconde, vgModelo, forteEstado: () => ({ mapa: curMapId, anim: MAP_ANIM.includes(forteAnim), cone: FORTE_V.cone ? !!scene.getObjectById(FORTE_V.cone.id) : null, pap: ZC.world?.pap?.g.visible ?? null, hemi: hemi.intensity }) }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); }
+function vgHud() { // cliente, a cada quadro (CAMP_GANCHOS.hud: objetivos e infinito, em qualquer mapa): os 3 tiros da rajada e as telas da marca e da cal
+  const ch = CAMP.c?.ch, vig = ch?.k === CAMP_VIGIA.k ? ch : null;
+  if (vig) { const tel = vgTelAtivo(), zc = tel && tel.a === 'rajada' && tel.p[0] ? ZC.zs.get(vig.z) : null;
+    if (zc) { // os 3 tiros (o host aplica o dano no mesmo compasso)
+      const ta = tel.t0 + tel.s, n = Math.min(3, Math.floor((now - ta) / Math.max(.01, tel.at) * 3) + 1); tel.vgN ||= 0;
+      while (now >= ta && tel.vgN < n) { tel.vgN++; const s = tel.p[0], a = s[3], o = new V3(zc.pos.x - Math.sin(a) * .9, zc.pos.y + 1.35 * (zc.sz || 1), zc.pos.z - Math.cos(a) * .9), d = tel.d1; tracer(o, new V3(s[0] - Math.sin(a) * d, s[1] + 1.1, s[2] - Math.cos(a) * d), CAMP_VIGIA.cli.rastro); play('rifle', o); }
+    }
+  }
+  if (VGCLI.marca) { const v = now < VGCLI.marcaFim ? (.75 + .25 * Math.sin(now * 8)).toFixed(2) : '0'; if (VGCLI.marca.style.opacity !== v) VGCLI.marca.style.opacity = v; }
+  if (VGCLI.cal) { const v = now < VGCLI.calFim ? clamp((VGCLI.calFim - now) / VGCLI.calS, 0, 1).toFixed(2) : '0'; if (VGCLI.cal.style.opacity !== v) VGCLI.cal.style.opacity = v; }
+}
+CAMP_GANCHOS.hud.push(vgHud);
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { matchForm, campForm0, CAMP_VIGIA, VGSRV, VGCLI, campEtapaPrepara, CAMP_EVS, CAMP_INFS, FORTE, FORTE_V, vgAlvo, vgFase, vgTick, vgIA, vgArame, vgArameTick, vgMarca, vgEscada, forteAnim, vgHud, VG_ETAPA, forteEsconde, vgModelo, forteEstado: () => ({ mapa: curMapId, anim: MAP_ANIM.includes(forteAnim), cone: FORTE_V.cone ? !!scene.getObjectById(FORTE_V.cone.id) : null, pap: ZC.world?.pap?.g.visible ?? null, hemi: hemi.intensity }) }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); }
 // ===== FIM O3-D09 =====
 //
 // @@CAMP-ATO-1@@
