@@ -24391,7 +24391,7 @@ function zInteract(dt) {
     if (dist < 2.4) {
       if (!zConstruida('pap')) cand(dist, zPecasPegas('pap') >= ZD.pecas.pap ? { k: 'zbuild', maq: 'pap', txt: 'Montar o Pack-a-Punch' } : { k: 'pap', ok: false, txt: `Pack-a-Punch desmontado — peças ${zPecasPegas('pap')}/${ZD.pecas.pap}` }); // zumbi-v2 (Etapa 8)
       else if (!ZC.power) cand(dist, { k: 'pap', ok: false, txt: 'Pack-a-Punch — sem energia' });
-      else if (ZC.pap.st === 'idle') { const w = W[G.cur], n = w?.pap | 0, c = ZC.bf > now ? 1000 : ZBAL.pap.custo[n]; if (papProx(G.cur)) cand(dist, { k: 'pap', cost: c, txt: `Pack-a-Punch nível ${n + 1} na ${w.name} [${c}]${ZC.bf > now ? ' — EM OFERTA' : ''}` }); else cand(dist, { k: 'pap', ok: false, txt: n >= 3 ? `${w.name}: nível máximo` : 'Segure uma arma que dá pra melhorar' }); } // zumbi-v2 (Etapa 9)
+      else if (ZC.pap.st === 'idle') { const w = W[G.cur], n = w?.pap | 0, c = (ZC.bf > now ? ZBAL.pap.oferta : ZBAL.pap.custo)[n]; if (papProx(G.cur)) cand(dist, { k: 'pap', cost: c, txt: `Pack-a-Punch nível ${n + 1} na ${w.name} [${c}]${ZC.bf > now ? ' — EM OFERTA' : ''}` }); else cand(dist, { k: 'pap', ok: false, txt: n >= 3 ? `${w.name}: nível máximo` : 'Segure uma arma que dá pra melhorar' }); } // zumbi-v2 (Etapa 9)
       else if (ZC.pap.st === 'ready' && ZC.pap.user === C.myId && ZC.pap.w) cand(dist, { k: 'paptake', txt: `Pegar ${W[ZC.pap.w].name}` });
     } }
   if (!ZC.power) { const P = ZD.power, dist = dd(P.x, P.z); if (dist < 2.2) cand(dist, zConstruida('power') ? { k: 'power', txt: 'Ligar a energia' } : zPecasPegas('power') >= ZD.pecas.power ? { k: 'zbuild', maq: 'power', txt: 'Montar o gerador de energia' } : { k: 'power', ok: false, txt: `Gerador desmontado — peças ${zPecasPegas('power')}/${ZD.pecas.power}` }); } // zumbi-v2 (Etapa 8)
@@ -25128,7 +25128,7 @@ function zPower(type, p) {
     case 'zblood': if (p.alive && !p.downed) p.zbEnd = now + 15; break; // Sangue Zumbi: os zumbis ignoram quem pegou
     case 'bonus': p.money += 500; sendTo(p.id, { t: 'pts', n: 500, m: p.money }); break; // Pontos Bônus: só quem pegou
     case 'fire': Z.fire = now + 30; break; // Liquidação: caixa por 10
-    case 'bonfire': Z.bf = now + 30; break; // Pack-a-Punch por 1000
+    case 'bonfire': Z.bf = now + 30; break; // Pack-a-Punch em oferta (ZBAL.pap.oferta)
     case 'death': if (p.alive && !p.downed) p.dmEnd = now + 30; break; // Máquina da Morte: só quem pegou
     case 'perk': // Bebida Grátis: uma bebida que cada um não tem (passa do limite)
       for (const q of S.players.values()) {
@@ -25218,7 +25218,7 @@ function srvZUse(p, m) {
     case 'pap': {
       const P = ZD.pap; if (!near(P.x, P.z, 3)) return; if (!zConstruida('pap')) return err('Construa o Pack-a-Punch'); if (!Z.power) return err('Sem energia'); if (Z.pap.st !== 'idle') return;
       const w = m.cur, wd = W[w];
-      const prox = papProx(w), preco = Z.bf > now ? 1000 : ZBAL.pap.custo[wd?.pap | 0]; // zumbi-v2 (Etapa 9): nível seguinte (1 → 2 → 3) e preço do nível
+      const prox = papProx(w), preco = (Z.bf > now ? ZBAL.pap.oferta : ZBAL.pap.custo)[wd?.pap | 0]; // zumbi-v2 (Etapa 9): nível seguinte (1 → 2 → 3) e preço do nível
       if (!wd || !prox || !has(w)) return err(wd?.pap >= 3 ? 'Essa arma já está no nível máximo' : 'Essa arma não pode ser melhorada');
       if (finN(m.c) && m.c > 0 && m.c < preco) return err('A oferta do Pack-a-Punch acabou');
       if (!zPay(p, preco)) return; // oferta do Pack-a-Punch: 1000

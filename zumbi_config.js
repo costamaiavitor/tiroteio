@@ -58,6 +58,7 @@ export const ZBAL = {
   // Etapa 9: Pack-a-Punch com 3 níveis. custo[n] = preço para ir do nível n ao n+1; niveis[1] e [2] = bônus do nível 2 e 3 sobre o nível 1
   pap: {
     custo: [5000, 10000, 20000],
+    oferta: [1000, 3000, 5000], // preço de cada nível com o PaP em oferta (poder da fogueira)
     niveis: [null, { sufixo: 'II', dano: 1.5, pente: 1.25, cadencia: .9, tracer: 0xff8a1a }, { sufixo: 'III', dano: 2.2, pente: 1.5, cadencia: .8, tracer: 0xff2a2a }],
   },
   // tipos do clássico (índice de ZKIND): tamanho e marcha mínima/máxima. Carniceiro (6) e cães têm regra própria.
