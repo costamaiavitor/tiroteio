@@ -135,6 +135,7 @@ Lista completa em `docs/zumbi-v2/bugs.md`. Os principais:
 | R1 | 1, 4, 5 | Nenhum golpe derruba de uma vez (menor golpe 23, maior 90). Janelas: 1 zumbi 5,1 s, 2 zumbis 3,2–3,5 s, 3 zumbis 2,7–3,7 s (antes 9,1 s com 1). Fila travada corrigida. Nenhum zumbi ignora o jogador. Hordas chegam espalhadas. IA sem custo extra. |
 | R2 | 2, 3 | 188 armas sem problema. Portas: as 106 abrem e o vão fica livre. Achou o cadeado e a limpeza errada. |
 | R3 | 6–9 | HUD limpo. 80 sementes por mapa: tudo alcançável e sem sobreposição. Peças: quantidade certa e nunca em área cara. Partida do início ao PaP nível 3 no Pesadelo sem travar. |
+| RF (final) | todas | 8 partidas completas (Vila e Sanatório × 4 dificuldades, até a rodada 30), com host e cliente: todas as portas, peças, montagem, energia, PaP 1→2→3, 13 bebidas e 84 usos da caixa por partida. 0 erros, 0 zumbis presos, host e cliente iguais. Campanha, infinito e PvP sem regressão (radar do PvP igual ao da main). Suíte 223/223. Um teste da Etapa 8 falhava às vezes (1 em 10) por defeito do próprio teste; corrigido e conferido 12/12. |
 
 ## 8. Pendências (decisão sua)
 
@@ -146,3 +147,5 @@ Lista completa em `docs/zumbi-v2/bugs.md`. Os principais:
 6. **Energia:** pode sair para o lugar de um giz em área cara. Opção: limitar ao custo médio, como as peças.
 7. **Traçante das armas maravilha:** o PaP II e III troca o traçante próprio delas (a Ray Gun fica laranja ou vermelha).
 8. **Sem animação:** inspeção de arma de fogo, ejeção parcial de cápsulas na Olympia e na Python, e a manga clara no canto da tela nas armas com empunhadura vertical.
+9. **Infinito:** hoje sorteia os lugares e pede as peças, como o clássico (só a campanha fica fixa). Confirmar se é isso que você quer.
+10. **Liquidação:** com ela ativa, qualquer nível do PaP custa 1000, inclusive o nível 3 (normalmente 20000).
