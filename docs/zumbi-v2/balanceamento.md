@@ -63,3 +63,22 @@ Consequências:
 | Veloz | 6,0–6,5 m/s / 35 / 1,44 s | 6,3–6,9 m/s / 34 / 1,24 s |
 | Explosivo, Gritador | ~3,2 m/s trotando / 50 / 1,44 s | 3,3–4,1 m/s / 56 / 1,5 s |
 | Zumbi comum e Tóxico | sem mudança | sem mudança |
+
+## Teto de velocidade (decisão do dono, 13/10)
+
+Nenhum zumbi do clássico passa do cão mais rápido da dificuldade (`ZBAL.tamanho.velMax`): Fácil 5,6, Normal 6,1, Difícil 6,4 e Pesadelo 6,4 m/s.
+Quem passaria do teto fica entre 96% e 100% dele. Na prática só o Veloz é afetado (média antes: 6,06 / 6,58 / 6,91 / 7,11 m/s; máximo no Pesadelo
+chegava a 8). O jogador correndo faz 7,4 m/s com arma leve, então sempre consegue abrir distância de um Veloz; andando (5,1) não.
+
+## Pack-a-Punch em oferta
+
+Com o poder da fogueira (PaP em oferta, 30 s) os níveis custam 1000, 3000 e 5000 (`ZBAL.pap.oferta`), em vez de 5000, 10000 e 20000.
+
+## Energia
+
+A energia cai sempre numa área de custo médio: custo somado das portas até a área entre 1500 e 3500 (`ZBAL.lugares.energiaCusto`), no lugar
+original dela (se for médio) ou trocando com um giz de parede. Sanatório: 9 lugares possíveis (áreas D, E, G, H, I, J, K, L, N); Vila: 2 (F e G).
+
+## Ajustes de arma
+
+`ZBAL.armas.ajuste`: Kar98k 600 de dano (era 400) e M16 com `rate` .22 (era .32). Só existem no modo zumbi; o PaP é calculado a partir daí.

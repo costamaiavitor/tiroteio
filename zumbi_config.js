@@ -9,6 +9,9 @@ export const ZBAL = {
     intervalo: 1.2, preparo: .45, // golpe do zumbi comum (s) antes da dificuldade
     tetoGolpe: 90, // nenhum golpe passa disso (vida do jogador sem Juggernog é 100: nada derruba de um golpe só)
     pisoGolpe: 15, // nem o menor zumbi no Fácil fica inofensivo
+    // teto de velocidade (m/s) por dificuldade (Fácil, Normal, Difícil, Pesadelo) = o cão mais rápido de cada uma: o Veloz chegava a 8 m/s no
+    // Pesadelo, mais que os cães e que o jogador correndo (7,4). Quem passa do teto fica entre 96% e 100% dele (não andam todos iguais).
+    velMax: [5.6, 6.1, 6.4, 6.4],
   },
   // passo do zumbi comum por marcha (0 anda, 1 trota, 2 corre), m/s, antes do tamanho e da dificuldade
   marcha: [[1.3, 1.8], [3.6, 4.3], [5, 5.5]],
