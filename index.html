@@ -21279,6 +21279,7 @@ function updateWeapon(dt) {
     if (G.reload && S_.stage !== 'end' && (G.trigger || mouseDown) && a?.mag > 0 && locked()) { G.reload = null; G.reloadEnd = 0; } // atirar interrompe
     if (G.reload && S_.stage !== 'start') rldFimBala(S_, a); // 6-w16
   } else if (G.reloadEnd && now >= G.reloadEnd) { const a = G.ammo[G.cur]; if (a) { const take = Math.min(wMag(G.cur) - a.mag, a.res); a.mag += take; a.res -= take; } G.reloadEnd = 0; }
+  if (G.reloadEnd) G.trigger = false; // decisão do dono (13/10): clique durante a recarga não fica guardado (atirava sozinho no fim); a escopeta com bala no tubo já saiu da recarga acima
   if (G.rezoom && now >= G.nextFire) { G.scope = G.rezoom; G.rezoom = 0; }
   const since = now - G.lastShot;
   if (since > .08) { const k = Math.exp(-dt * (since > .3 ? 9 : 4)); G.punchP *= k; G.punchY *= k; }
