@@ -594,7 +594,7 @@ let now = performance.now() / 1000;
 // Ambiente de desenvolvimento (testes e ferramentas rodam em localhost/127.0.0.1): só aqui o jogo expõe os ganchos de depuração
 // (window.__T, relógio travável). No site publicado eles não existem: davam a qualquer um, no console, atalhos prontos para trapacear.
 const DEBUG = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
-const PROTO = 5; /* zumbi-v2: peças e montagem (zbuild/zbuilt), armas mudadas; overhaul Ondas 2-3: interativos (zint/zi), campanha (camp/cp), tipo de zumbi com 5 bits, mapas forte/forno/galeria7 */ // versão do protocolo de rede: subir quando mensagens, armas (W) ou mapas mudarem; host e cliente precisam ser iguais
+const PROTO = 6; /* decisões do dono 13/10: rodadas infinitas depois da campanha (créditos com inf), escalada do infinito; zumbi-v2: peças e montagem (zbuild/zbuilt), armas mudadas; overhaul Ondas 2-3: interativos (zint/zi), campanha (camp/cp), tipo de zumbi com 5 bits, mapas forte/forno/galeria7 */ // versão do protocolo de rede: subir quando mensagens, armas (W) ou mapas mudarem; host e cliente precisam ser iguais
 const CFG = {
   name: String(load('name', 'Jogador' + Math.floor(rand(100, 999)))).replace(/[<>]/g, '').slice(0, 16) || 'Jogador', // mesmo filtro do campo (o localStorage é editável)
   sens: load('sens', 1), fov: load('fov', 85), vol: load('vol', 0.6), shadows: load('shadows', true), gfx: load('gfx', null),

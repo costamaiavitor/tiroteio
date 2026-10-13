@@ -134,7 +134,7 @@ test('quem entra no meio na fuga: espectador, recebe o F.2, o Estouro da fuga e 
     const z = T.CAMP_CH.z; z.hp = 10; T.CAMP_CH.inv = 0; T.CAMP_CH.fase = T.CAMP_CH.def.fases.length - 1; T.zHit(p, z.id, 100, 'body', 'm1911', false); T.sim(4.3); T.CAMP.c.cena = null;
     const o = { fase: T.campVEstado().fase, f2: ob('F.2') };
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 5, name: 'Meio' }); T.sim(.2);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 6, name: 'Meio' }); T.sim(.2);
     const q = T.S.players.get(c.pid), st = c.out.filter(m => m.t === 'state' && m.z).pop(), cp = st?.z?.cp;
     Object.assign(o, { vivo: q?.alive, ob: cp?.ob?.find(x => x[0] === 'F.2')?.[1], ev: cp?.ev?.[0], fg: cp?.fg?.[0] });
     T.srvDrop(c); T.campCliReset(); T.CAMP_VC.fuga = 0; T.campSync(cp); T.sim(1 / 60);
