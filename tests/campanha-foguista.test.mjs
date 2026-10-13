@@ -1,6 +1,6 @@
 // O Foguista (tipo 15, Vicente) como objetivo do Sanatório (objetivos do mapa, 13/10): a etapa C2 (objetivo C2.1 'matar') vem depois do
 // IV, no próprio Sanatório, na versão de campo (nada da arena Casa do Forno). Confere: a passagem IV -> C2 -> V pelo intervalo; a rodada do
-// chefe (os 20 comuns da curva, sem os especiais do clássico); onde ele nasce (perto, em chão andável de sala aberta, com caminho até o
+// chefe (os comuns da curva do mapa, sem os especiais do clássico); onde ele nasce (perto, em chão andável de sala aberta, com caminho até o
 // jogador) e que chega até o jogador; a vida pela rodada em que entra (vidaAtual); a barra e o modelo no cliente; os ataques de campo com
 // aviso (pá, brasa, apito pelo relógio com os lacaios perto dos jogadores, explosão de pressão que a parede corta); o fogo da porta do
 // forno nunca entra; as fases (60%: 2,6 m/s, rastro; 25%: manômetro vermelho, explosão a cada 15 s, Pregador no apito); o ponto fraco;
@@ -51,7 +51,7 @@ test('Sanatório: a sequência é III, IV, C2, V; tipo 15 registrado; nada da ar
   assert.deepEqual(J.erros, []);
 });
 
-test('IV -> C2 pelo intervalo: na rodada seguinte, 20 comuns sem especiais do clássico e o Foguista de campo nasce perto, com caminho, vida da rodada, barra e modelo no cliente; chega até o jogador', { timeout: 600000 }, async () => {
+test('IV -> C2 pelo intervalo: na rodada seguinte, os comuns da curva (fração com piso) sem especiais do clássico e o Foguista de campo nasce perto, com caminho, vida da rodada, barra e modelo no cliente; chega até o jogador', { timeout: 600000 }, async () => {
   const r = await rodar((T, arg, H) => {
     const { p } = H, o = { seq: [] }; p.dwEnd = 1e12;
     const ate = ph => { for (let k = 0; k < 600 && T.Z.phase !== ph; k++) T.sim(.1); };
@@ -60,11 +60,12 @@ test('IV -> C2 pelo intervalo: na rodada seguinte, 20 comuns sem especiais do cl
     for (let i = 0; i < 2; i++) { ate('round'); o.seq.push(T.CAMP_ATOS[T.CAMP.et].id); for (const id in T.CAMP.obj) T.campForca(id); acaba(); o.seq.push(T.Z.phase + ':' + T.CAMP_ATOS[T.CAMP.et].id); }
     o.obj = T.campEstado().obj['C2.1']?.st; o.ch0 = !!T.CAMP_CH.z;
     ate('round'); o.round = T.Z.round;
-    o.ts = T.Z.toSpawn + [...T.Z.zs.values()].filter(x => !T.ZKIND[x.kind]?.chefe).length; o.mixN = T.Z.mixN;
+    o.ts = T.Z.toSpawn + [...T.Z.zs.values()].filter(x => !T.ZKIND[x.kind]?.chefe).length; o.mixN = T.Z.mixN; o.espTs = (() => { const K = T.campCurva(T.Z.round), D = T.zDf(), np = Math.max(1, T.S.players.size), b = T.zCount(T.Z.round, np) * D.cnt * K.qtdK; return Math.max(1, Math.round(Math.min(b, Math.max(b * K.chefe, K.chefeMin * D.cnt * (1 + .25 * (np - 1)))))); })(); // a curva do mapa na rodada do chefe (CAMP_CURVA: fração com piso)
     for (let k = 0; k < 100 && !T.CAMP_CH.z; k++) T.sim(.05);
     const z = T.CAMP_CH.z; if (!z) return o;
+    o.chao = H.anda(z.body.pos.x, z.body.pos.z); o.d = Math.hypot(z.body.pos.x - p.pos[0], z.body.pos.z - p.pos[2]); // onde nasceu (depois ele anda, empurrado pelos comuns)
     T.sim(3.5); const P = z.body.pos;
-    o.st = z.st; o.campo = T.CAMP_CH.campo; o.enc = T.CAMP_CH.encerra; o.k = z.kind; o.chao = H.anda(P.x, P.z); o.d = Math.hypot(P.x - p.pos[0], P.z - p.pos[2]);
+    o.st = z.st; o.campo = T.CAMP_CH.campo; o.enc = T.CAMP_CH.encerra; o.k = z.kind;
     o.hp = z.maxHp; o.esp = Math.round(T.zHp(o.round) * T.zHpK(o.round) * (T.CAMP_CHEFE[15].base + T.CAMP_CHEFE[15].porJog) * T.CAMP_CHEFE_BASE.hpChefe);
     o.cli = T.CAMP.c.ch && [T.CAMP.c.ch.k, T.CAMP.c.ch.f, T.CAMP.c.ch.campo]; o.bar = document.getElementById('zboss').firstChild.nodeValue; o.barVis = !document.getElementById('zboss').classList.contains('hidden');
     o.modelo = !!T.ZC.zs.get(z.id)?.model.userData.tanque; o.bo = T.campChefeBo(0);
@@ -74,7 +75,7 @@ test('IV -> C2 pelo intervalo: na rodada seguinte, 20 comuns sem especiais do cl
     return o;
   });
   assert.deepEqual(r.seq, ['III', 'break:IV', 'IV', 'break:C2'], JSON.stringify(r)); assert.equal(r.obj, 'ativo'); assert.equal(r.ch0, false, 'no intervalo ainda não');
-  assert.equal(r.ts, 20, '20 comuns (Normal) ' + JSON.stringify(r)); assert.equal(r.mixN, 0, 'sem especiais do clássico na rodada do chefe');
+  assert.equal(r.ts, r.espTs, 'comuns da etapa de chefe pela curva do mapa (fração da rodada com piso) ' + JSON.stringify(r)); assert.ok(r.ts >= 10, 'piso do Sanatório: 10 comuns no Normal mesmo com o chefe cedo (rodada ' + r.round + ')'); assert.equal(r.mixN, 0, 'sem especiais do clássico na rodada do chefe');
   assert.equal(r.st, 'in'); assert.equal(r.k, 15); assert.equal(r.campo, true, 'versão de campo'); assert.equal(r.enc, true, 'a morte encerra a rodada');
   assert.ok(r.chao, 'nasce em chão andável de sala aberta, com caminho'); assert.ok(r.d < 20, `perto dos jogadores (${r.d})`);
   assert.equal(r.hp, r.esp, 'vida = zHp(rodada atual)·(base + porJog·1)'); assert.deepEqual(r.cli, [15, 1, true]); assert.equal(r.bar, 'O FOGUISTA · FASE 1'); assert.ok(r.barVis, 'barra à vista');

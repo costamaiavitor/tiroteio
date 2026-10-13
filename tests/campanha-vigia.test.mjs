@@ -52,7 +52,7 @@ test('Vila: I -> II -> C1; II.4 feito -> a etapa C1 começa no intervalo e o Vig
     H.fimRodada(); o.ph = T.Z.phase; o.et = T.CAMP_ATOS[T.CAMP.et]?.id; o.obj = T.campEstado().obj['C1.1']?.st; o.nd = [T.Z.nextDog, T.Z.nextBoss];
     o.chAntes = !!CH.z;
     H.ateRodada(); o.round = T.Z.round; o.dog = !!T.Z.dogRound; o.boss = T.Z.bossQ; o.ev = T.CAMP_EVS.id;
-    o.ts = T.Z.toSpawn + [...T.Z.zs.values()].filter(x => !T.ZKIND[x.kind]?.chefe).length; o.mixN = T.Z.mixN;
+    o.ts = T.Z.toSpawn + [...T.Z.zs.values()].filter(x => !T.ZKIND[x.kind]?.chefe).length; o.mixN = T.Z.mixN; o.espTs = (() => { const K = T.campCurva(T.Z.round), D = T.zDf(), np = Math.max(1, T.S.players.size), b = T.zCount(T.Z.round, np) * D.cnt * K.qtdK; return Math.max(1, Math.round(Math.min(b, Math.max(b * K.chefe, K.chefeMin * D.cnt * (1 + .25 * (np - 1)))))); })(); // a curva do mapa na rodada do chefe (CAMP_CURVA: fração com piso)
     T.sim(1); const z = CH.z; o.k = z?.kind; o.campo = CH.campo; o.encerra = CH.encerra;
     if (z) { const P = z.body.pos, d = Math.min(...[...T.S.players.values()].map(q => Math.hypot(q.pos[0] - P.x, q.pos[2] - P.z)));
       o.nasce = { livre: livre(P.x, P.z), d: +d.toFixed(1) }; o.hp = z.maxHp; T.sim(3); o.nasce.y = +P.y.toFixed(2); o.nasce.st = z.st; }
@@ -65,7 +65,7 @@ test('Vila: I -> II -> C1; II.4 feito -> a etapa C1 começa no intervalo e o Vig
   assert.ok(r.ii); assert.notEqual(r.ph, 'round'); assert.equal(r.et, 'C1', 'no intervalo a etapa C1 começa'); assert.equal(r.obj, 'ativo'); assert.equal(r.chAntes, false, 'nada de chefe no intervalo');
   assert.deepEqual(r.nd, [1e9, 1e9], 'sem cães nem Carniceiro da agenda na etapa do Vigia');
   assert.equal(r.round, 13); assert.equal(r.dog, false); assert.equal(r.boss, 0); assert.equal(r.ev, null, 'sem evento na rodada do chefe');
-  assert.equal(r.ts, 16, 'CAMP_CURVA.C1.fixos: 16 comuns (Normal) ' + JSON.stringify(r)); assert.equal(r.mixN, 0, 'sem especiais na rodada do chefe');
+  assert.equal(r.ts, r.espTs, 'comuns da etapa de chefe pela curva do mapa (fração da rodada com piso) ' + JSON.stringify(r)); assert.ok(r.ts >= 8 && r.ts < 47, 'metade da rodada 13, acima do piso da Vila'); assert.equal(r.mixN, 0, 'sem especiais na rodada do chefe');
   assert.equal(r.k, 14); assert.equal(r.campo, true, 'versão de campo'); assert.equal(r.encerra, true, 'a rodada acaba quando ele morre');
   assert.ok(r.nasce.livre, 'nasce em chão andável, alcançável, numa sala aberta ' + JSON.stringify(r.nasce)); assert.ok(Math.abs(r.nasce.y) < .3, JSON.stringify(r));
   assert.ok(r.nasce.d >= 8 && r.nasce.d <= 17, 'perto de um jogador (9 a 16 m) ' + JSON.stringify(r.nasce));

@@ -26700,10 +26700,12 @@ const CAMP_KIT = {
 // Curva dos objetivos do mapa (13/10): cada mapa começa na rodada 1 e a curva sobe com a rodada do mapa, nunca com a etapa (o time leva
 // quantas rodadas precisar em cada uma). pts: [rodada, vidaK, qtdK], linear entre os pontos e o último daí em diante (o infinito depois dos
 // objetivos segue com o último: 1 = o do clássico, sem degrau na troca); vidaK no campZkStatus, qtdK no campRodada. chefe: fração dos comuns
-// nas rodadas de uma etapa de chefe (a luta é o resto da rodada; Vigia na rodada 10 = 17 comuns, Foguista na 13 = 19, como os 16/20 de antes).
+// nas rodadas de uma etapa de chefe (a luta é o resto da rodada; Vigia na rodada 10 = 17 comuns, Foguista na 13 = 19, como os 16/20 de antes);
+// chefeMin: piso dessa fração (Normal, 1 jogador; ×cnt da dificuldade e +25% por jogador), nunca acima da rodada inteira: um chefe que chega
+// cedo (time rápido, rodada 3) ainda vem com uma onda de verdade (10 no Sanatório) em vez de 5.
 const CAMP_CURVA = {
-  vila: { pts: [[1, .9, .9], [6, 1, 1]], chefe: .5 },
-  sanatorio: { pts: [[1, .9, .9], [8, 1, 1]], chefe: .4 },
+  vila: { pts: [[1, .9, .9], [6, 1, 1]], chefe: .5, chefeMin: 8 },
+  sanatorio: { pts: [[1, .9, .9], [8, 1, 1]], chefe: .4, chefeMin: 10 },
 };
 // Mistura dos tipos novos (§6.2; consumida pelo D06/D08): fração da rodada [na estreia, no fim da rampa], teto de vivos. estreia/desde/n são
 // do infinito antigo (zmode 'infinito', rodada da campanha de 25); nos objetivos do mapa vale a CAMP_RITMO (estreia por mapa, nRod).
@@ -26724,14 +26726,14 @@ const CAMP_RITMO = {
   inf: { caes: [2, 4], carn: 2, ev: 2, entreCaes: 4, entreCarn: 6 },
 };
 const campRitmo = () => CAMP.on && S.st?.zmode === 'campanha' ? CAMP_RITMO[curMapId] || null : null; // host: objetivos do mapa (e o infinito depois deles)
-const CAMP_CURVA_C = { r: -1, mapa: null, vidaK: 1, qtdK: 1, chefe: 1 }; // a curva da última rodada pedida (sem alocar por nascimento)
+const CAMP_CURVA_C = { r: -1, mapa: null, vidaK: 1, qtdK: 1, chefe: 1, chefeMin: 0 }; // a curva da última rodada pedida (sem alocar por nascimento)
 function campCurva(r) { // host: vidaK, qtdK e chefe da rodada r do mapa (CAMP_CURVA); null fora dos objetivos do mapa
   const K = campRitmo() && CAMP_CURVA[curMapId]; if (!K) return null; const c = CAMP_CURVA_C;
   if (c.r === r && c.mapa === curMapId) return c;
   const P = K.pts; let a = P[0], b = P[0];
   for (let i = 0; i < P.length; i++) { b = P[i]; if (r <= P[i][0]) break; a = P[i]; }
   const u = b[0] > a[0] ? clamp((r - a[0]) / (b[0] - a[0]), 0, 1) : 1;
-  return Object.assign(c, { r, mapa: curMapId, vidaK: a[1] + (b[1] - a[1]) * u, qtdK: a[2] + (b[2] - a[2]) * u, chefe: K.chefe ?? 1 });
+  return Object.assign(c, { r, mapa: curMapId, vidaK: a[1] + (b[1] - a[1]) * u, qtdK: a[2] + (b[2] - a[2]) * u, chefe: K.chefe ?? 1, chefeMin: K.chefeMin ?? 0 });
 }
 // NPC de escolta (§4.3, II.3): números do projeto; o D10 põe a rota no objetivo, o visual (monta/quadro) e a pistola.
 const CAMP_NPC = {
@@ -26926,7 +26928,8 @@ function campRodada() { // gancho no zStartRound (depois dos jogadores e dos bar
   if (CAMP.modo !== 'campanha' || CAMP.et < 0) return;
   const A = CAMP_ATOS[CAMP.et], K = campCurva(Z.round); // a curva sobe com a rodada do mapa (CAMP_CURVA), não com a etapa
   if (K && !Z.dogRound) { // o +1 do Carniceiro da agenda (Z.bossQ) fica fora da curva
-    const np = Math.max(1, S.players.size), n = Math.max(1, Math.round(zCount(Z.round, np) * zDf().cnt * K.qtdK * (A.chefe ? K.chefe : 1)));
+    const np = Math.max(1, S.players.size), base = zCount(Z.round, np) * zDf().cnt * K.qtdK; // etapa de chefe: fração da rodada, com piso (nunca acima da rodada)
+    const n = Math.max(1, Math.round(A.chefe ? Math.min(base, Math.max(base * K.chefe, K.chefeMin * zDf().cnt * (1 + .25 * (np - 1)))) : base));
     Z.toSpawn = n + Z.bossQ; zMix(Z.round, n, np); if (Z.bossQ) Z.bossAt = Math.max(1, Math.floor(Z.toSpawn * CAMP_EV_AG.carnAt));
   }
   if (!CAMP.radioIni) { CAMP.radioIni = true; if (A.radioIni) campRadio(A.radioIni); }
@@ -27865,7 +27868,7 @@ const campEvPeso = k => CAMP_EVS.id === 'nevoa' && k === CAMP_EV.nevoa.afogado ?
 function campEvEspeciais() { const E = CAMP_EVS, D = campEvDef(); return !D ? null : E.fuga && D.fuga ? D.fuga.especiais : D.especiais || null; }
 function campEvPode(r) { // nunca em rodada de cães nem de chefe
   if (Z.dogRound) return false;
-  if (CAMP.modo === 'campanha') return !CAMP_ATOS[CAMP.et]?.chefe;
+  if (CAMP.modo === 'campanha') return !CAMP_ATOS[CAMP.et]?.chefe && !(CAMP_CH.z && Z.zs.has(CAMP_CH.z.id)); // nem com o chefe de um objetivo em campo (o Diretor do Ato V)
   return !Z.bossQ && !Z.mistaCaes && !campInfChefeDe(r); // infinito: nem na de chefe de campo (campInfChefeDe, com a escalada) nem na mista
 }
 function campEvLiga(id, opc) { // host: liga o evento nesta rodada (agenda, infinito, D14 na fuga, testes)

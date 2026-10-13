@@ -82,7 +82,7 @@ test('V.1 (cargas, segurar F) -> V.2 (a rodada da Névoa) -> F.1: o Diretor entr
 
 test('Diretor de campo: dose, onda, abraço (o tiro no cano solta) e chamada; sem maré nem corrente; fases 2 e 3 sem mergulho; coro', { timeout: 180000 }, async () => {
   const r = await rodar((T, arg, H) => {
-    const { p, CH, agora, poe, quieto, atk, limpa, tel, chao } = H; quieto(); limpa(); chao(18, 4); const z = CH.z; p.dwEnd = 0; p.hp = p.maxHp = 1000; p.perks = []; p.crouch = 0; p.zkDose = null; T.CAMP.c.tel = [];
+    const { p, CH, agora, poe, quieto, atk, limpa, tel, chao } = H; quieto(); limpa(); T.campEvDesliga(); /* sem o evento da agenda da rodada (o Apagão da 3 no Sanatório apagaria as luzes: aqui se mede o Diretor) */ chao(18, 4); const z = CH.z; p.dwEnd = 0; p.hp = p.maxHp = 1000; p.perks = []; p.crouch = 0; p.zkDose = null; T.CAMP.c.tel = [];
     const o = { semCampo: ['mare', 'corrente'].map(id => [atk(id).campo, !!atk(id).ok?.()]) };
     // dose: 3 seringas em leque; 20 + 1 dose do Enfermeiro, nada no aviso
     poe(p, 18, -3); z.yaw = 0; const h0 = p.hp; T.campChefeAtaca(z, atk('dose'), p); T.sim(1 / 60); o.td = [tel().s, tel().f, tel().p.length];
@@ -156,7 +156,8 @@ test('depois dos objetivos: estreias dos tipos, legenda do rádio, chefe de camp
   const r = await rodar((T, arg, H) => {
     const { p, fim } = H; p.dwEnd = 1e12; const o = { modo: T.CAMP.modo, et: T.CAMP.et };
     const cota = (k, r) => { const P = T.CAMP_ZKV.peso, P0 = { ...P }; for (const j of Object.keys(T.CAMP_MIX)) P[j] = +j === k ? 1 : 0; T.Z.round = r; T.Z.dogRound = false; T.Z.toSpawn = 60; T.Z.mixN = 0; T.campZkCotas(); for (const j in P) delete P[j]; Object.assign(P, P0); return T.CAMP_ZKS.rest[k] | 0; };
-    o.est = Object.entries(T.CAMP_MIX).map(([k, M]) => [+k, cota(+k, M.estreia - 1), cota(+k, M.estreia), cota(+k, M.estreia + 3) >= 1]); o.agua = T.CAMP_AGUA.sanatorio.length > 0; // o Afogado pede ponto de água
+    const E = T.campRitmo().estreia; // estreia por mapa (CAMP_RITMO): a mesma dos objetivos; tipo fora da lista do mapa nunca nasce
+    o.est = Object.keys(T.CAMP_MIX).map(Number).map(k => E[k] == null ? [k, Math.max(...[5, 12, 20, 30].map(r => cota(k, r))), 0, false] : [k, cota(k, E[k] - 1), cota(k, E[k]), cota(k, E[k] + 3) >= 1]); o.agua = T.CAMP_AGUA.sanatorio.length > 0; o.estMapa = E; // o Afogado pede ponto de água
     T.Z.round = 18; fim(); fim(); o.r20 = [T.Z.round, T.CAMP_INFS.pend?.k]; T.sim(5.5);
     const z = T.CAMP_CH.z; o.vigia = [z?.kind, T.CAMP_CH.campo];
     for (const x of [...T.Z.zs.values()]) if (x !== z) T.zKill(x, null, 'body', 'nuke', false, true); T.Z.toSpawn = 0; T.sim(1); o.segue = [T.Z.phase, T.Z.zs.has(z.id)];
@@ -168,7 +169,8 @@ test('depois dos objetivos: estreias dos tipos, legenda do rádio, chefe de camp
     return o;
   });
   assert.deepEqual([r.modo, r.et], ['infinito', -1]);
-  assert.deepEqual(r.est, [7, 8, 9, 10, 11, 12, 13].map(k => k === 9 && !r.agua ? [k, 0, 0, false] : [k, 0, 1, true]), JSON.stringify(r.est));
+  assert.deepEqual(r.est, [7, 8, 9, 10, 11, 12, 13].map(k => r.estMapa[k] == null || (k === 9 && !r.agua) ? [k, 0, 0, false] : [k, 0, 1, true]), JSON.stringify(r.est)); // no Sanatório: Penitente e Soldado nunca; Afogado só com água
+  assert.deepEqual(Object.keys(r.estMapa).map(Number), [9, 10, 11, 12, 13], 'tipos do Sanatório');
   assert.deepEqual(r.r20, [20, 14]); assert.deepEqual(r.vigia, [14, true]); assert.deepEqual(r.segue, ['round', true], 'a rodada não termina com o chefe vivo');
   assert.equal(r.morto[0], null); assert.notEqual(r.morto[1], 'round');
   assert.equal(r.r30, 30); assert.deepEqual(r.foguista, [15, true]);
