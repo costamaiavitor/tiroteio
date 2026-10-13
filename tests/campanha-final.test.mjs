@@ -85,20 +85,28 @@ test('Ato V: cargas, Névoa, o Diretor só depois do V.2, fuga pela gaiola, fina
   assert.deepEqual(a.final, ['feito', 0, 0, null, 'final', false, true, 4], 'sem os documentos: c5-final (3) + c5-pos (1)');
   assert.ok(a.salvo[1].fim && a.salvo[0].fim && !a.salvo[2].fim, 'concluída no Normal e nas mais fáceis'); assert.equal(a.infLib, true);
   assert.deepEqual(a.cred, ['over', true, true, true]);
-  // créditos: pular esconde (Enter); o host com Enter de novo volta ao lobby; o formulário mostra o Infinito liberado
+  // créditos: pular esconde (Enter); o host com Enter de novo começa as rodadas infinitas (decisão do dono, 13/10: não volta ao lobby);
+  // o formulário mostra o Infinito liberado
+  const antes = await rodar((T, arg, H) => ({ inv: { ...H.p.inv }, money: H.p.money, perks: [...H.p.perks], r: T.Z.round }));
   await J.page.keyboard.press('Enter');
-  const b = await rodar((T, arg, H) => { T.sim(.1); const o = { pulou: T.campVEstado().pulou, txt: document.querySelector('#campCred .fim')?.textContent }; return o; });
-  assert.equal(b.pulou, true); assert.match(b.txt, /CAMPANHA CONCLUÍDA.*Normal.*Infinito liberado/);
+  const b = await rodar((T, arg, H) => { T.sim(.1); const o = { pulou: T.campVEstado().pulou, txt: document.querySelector('#campCred .fim')?.textContent, small: document.querySelector('#campCred small')?.textContent }; return o; });
+  assert.equal(b.pulou, true); assert.match(b.txt, /CAMPANHA CONCLUÍDA.*Normal.*Infinito liberado/); assert.match(b.small, /Rodadas infinitas em \d+s · Enter: começar agora/);
   await J.page.keyboard.press('Enter');
+  await rodar(T => { T.sim(.2); T.sim(.2); });
+  await esperaMapa('sanatorio');
   const c = await rodar((T, arg, H) => { T.sim(.2); T.sim(.2);
     const el = document.createElement('div'); document.body.appendChild(el); T.matchForm(el, { mode: 'zombies', zmap: 'vila', zmode: 'infinito', zdiff: 1 });
-    const o = { lobby: T.S.lobby, on: T.CAMP.on, inf: el.querySelector('[data-zm="infinito"]')?.disabled, zm: el.querySelector('[data-zm].on')?.dataset.zm, txt: el.textContent, cred: T.campVEstado().credVis }; el.remove(); return o; });
-  assert.equal(c.lobby, true, 'de volta ao lobby'); assert.equal(c.on, false); assert.equal(c.inf, false, 'Infinito liberado'); assert.equal(c.zm, 'infinito');
-  assert.match(c.txt, /Campanha concluída \(Normal\) · Infinito liberado/); assert.match(c.txt, /O VALE AINDA CHAMA/); assert.match(c.txt, /Sem recorde/);
+    const o = { lobby: !!T.S.lobby, on: T.CAMP.on, modo: T.CAMP.modo, zmode: T.S.st.zmode, mapa: T.S.st.map, r: T.Z.round, z: T.Z.on, inv: { ...H.p.inv }, money: H.p.money, perks: [...H.p.perks], vivo: H.p.alive,
+      inf: el.querySelector('[data-zm="infinito"]')?.disabled, zm: el.querySelector('[data-zm].on')?.dataset.zm, txt: el.textContent, cred: T.campVEstado().credVis }; el.remove(); return o; });
+  assert.deepEqual([c.lobby, c.on, c.modo, c.zmode, c.mapa, c.z, c.vivo], [false, true, 'infinito', 'infinito', 'sanatorio', true, true], 'rodadas infinitas no Sanatório');
+  assert.equal(c.r, antes.r, 'segue da rodada em que parou'); assert.deepEqual([c.inv.primary, c.inv.secondary, c.money, c.perks], [antes.inv.primary, antes.inv.secondary, antes.money, antes.perks], 'com o que tinha');
+  assert.equal(c.cred, false, 'os créditos somem');
+  assert.equal(c.inf, false, 'Infinito liberado'); assert.equal(c.zm, 'infinito');
+  assert.match(c.txt, /Campanha concluída \(Normal\) · Infinito liberado/); assert.match(c.txt, /O VALE AINDA CHAMA/);
   assert.deepEqual(J.erros, []);
-  // de volta ao jogo para os próximos testes (o lobby recomeça a partida)
-  await J.page.evaluate(() => { const T = window.__T; T.S.st.zmode = 'campanha'; T.S.st.ato = 4; T.S.st.map = 'galeria7'; T.S.st.zmap = 'galeria7'; T.LB.getForm = () => ({ ...T.S.st }); });
-  await J.page.click('#lbGo'); await esperaMapa('galeria7');
+  // de volta à campanha para os próximos testes
+  await rodar(T => { T.S.st = { ...T.S.st, zmode: 'campanha', ato: 4, map: 'galeria7', zmap: 'galeria7' }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1); });
+  await esperaMapa('galeria7');
   await J.page.waitForFunction(() => window.__T.Z.on && window.__T.CAMP.et === 6, null, { timeout: 60000 });
 });
 
@@ -172,7 +180,7 @@ test('infinito: estreias dos tipos, legenda do rádio, chefe de campo (Vigia na 
   assert.deepEqual(r.vigia, [14, true, true]); assert.deepEqual(r.segue, ['round', true], 'a rodada não termina com o chefe vivo');
   assert.equal(r.morto[0], null); assert.notEqual(r.morto[1], 'round', 'a rodada termina quando ele morre');
   assert.equal(r.r30, 30); assert.deepEqual(r.foguista, [15, true]);
-  assert.deepEqual(r.diretor, [16, true, 'chao', true], 'o Diretor de campo anda no chão, sem púlpito'); assert.deepEqual(r.rod, [[14, 1], [15, 1], [16, 1], [14, 1.25], [15, 1.25], [16, 1.25], [14, 1.5], null]);
-  assert.ok(r.rec >= 20 && r.rec2 >= 30, `recorde ${r.rec} -> ${r.rec2}`); assert.deepEqual(r.cartao, ['Recorde: rodada ' + r.rec2, 'Sem recorde']);
+  assert.deepEqual(r.diretor, [16, true, 'chao', true], 'o Diretor de campo anda no chão, sem púlpito'); assert.deepEqual(r.rod, [[14, 1], [15, 1], [16, 1], [15, 1.25], [14, 1.5], [16, 1.5], [15, 1.75], null], 'depois da 40, um chefe a cada 5 rodadas (decisão do dono, 13/10)');
+  assert.ok(r.rec >= 20 && r.rec2 >= 30, `recorde ${r.rec} -> ${r.rec2}`); assert.equal(r.cartao[0], 'Recorde: rodada ' + r.rec2); assert.match(r.cartao[1], /^(Sem recorde|Recorde: rodada 2\d)$/, 'Sanatório: o das rodadas infinitas depois da campanha (se chegou a contar)');
   assert.deepEqual(J.erros, []);
 });

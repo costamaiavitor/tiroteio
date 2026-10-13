@@ -73,4 +73,14 @@ export const ZBAL = {
     4: { s: 1, estilo: 'cambaleante' }, // Tóxico
     5: { s: 1.04, marchaMin: 1, marchaMax: 1, estilo: 'cambaleante' }, // Gritador
   },
+  // Decisão do dono (13/10): modo infinito. Depois dos créditos da campanha a partida segue em rodadas infinitas (no mapa abaixo, com as
+  // armas, pontos e bebidas de cada um, da rodada em que parou). No infinito, a escalada (só no infinito; o clássico não muda):
+  infinito: {
+    aposCampanha: true, mapa: 'sanatorio',
+    qtd: { de: 15, porRodada: .02, max: .6 }, // zumbis da rodada: +2% por rodada depois da 15 (até +60%, na 45); o teto de vivos não muda
+    carniceiro: { de: 25, cada: 15, max: 3 }, // rodada de Carniceiro: mais 1 a cada 15 rodadas depois da 25 (2 na 40, 3 na 55); nascem espaçados
+    espaco: .5, // o Carniceiro seguinte entra quando faltar esta fração do que faltava na hora do anterior
+    chefes: { depoisDe: 40, cada: 5 }, // chefes de campo (Vigia, Foguista, Diretor): a cada 10 rodadas da 20 à 40; depois a cada 5 (depoisDe − 20 múltiplo de 10)
+    mista: { de: 25, cada: 6, caes: .2, avisoS: 2.5 }, // rodada mista: zumbis + cães (20% a mais, misturados) + Carniceiro garantido; nunca na rodada de chefe de campo nem na de cães
+  },
 };
