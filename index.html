@@ -26808,7 +26808,7 @@ function campFormOut(st) { // matchForm: o que vai no st (o host prende o ato ao
 }
 const campSaneSt = st => ({ zmode: CAMP_MODOS.includes(st.zmode) ? st.zmode : 'classico', ato: clamp(st.ato | 0, 0, CAMP_ATO_CARTAO.length - 1) }); // saneSt (entrada não confiável)
 // ---------- host: começo, etapas, kit e bagagem ----------
-function campLimpa() { Object.assign(CAMP, { objFim: false, obj: {}, alvos: [], itens: {}, chaves: new Set(), chama: null, npc: null, fim: null, trans: null, over: false, overSt: null, repetir: false, vistos: new Set(), kitPend: new Set(), falaT: {}, radioIni: false }); }
+function campLimpa() { Object.assign(CAMP, { objFim: false, etUlt: -1, obj: {}, alvos: [], itens: {}, chaves: new Set(), chama: null, npc: null, fim: null, trans: null, over: false, overSt: null, repetir: false, vistos: new Set(), kitPend: new Set(), falaT: {}, radioIni: false }); }
 function campInicio() { // gancho no começo do zStartGame: devolve true quando a campanha montou a partida (o clássico não segue)
   const md = S.st?.mode === 'zombies' ? S.st.zmode : null;
   if (md !== 'campanha' && md !== 'infinito') { if (CAMP.on) { CAMP.on = false; CAMP.modo = null; campLimpa(); } return false; }
@@ -26893,7 +26893,7 @@ function campBagagem(p) { // o que o jogador leva para o mapa seguinte (§3.3); 
 }
 function campEtapaPrepara(e, mundo) { // estado da etapa: objetivos, mundo do checkpoint (energia e portas), rádio
   const A = CAMP_ATOS[e], K = CAMP_KIT[A.id] || {};
-  CAMP.et = e; CAMP.obj = {}; CAMP.alvos = []; CAMP.itens = {}; CAMP.chama = null; CAMP.npc = null; CAMP.radioIni = false;
+  CAMP.et = CAMP.etUlt = e; CAMP.obj = {}; CAMP.alvos = []; CAMP.itens = {}; CAMP.chama = null; CAMP.npc = null; CAMP.radioIni = false;
   if (mundo) {
     if (K.energia) campEnergia();
     for (const ae of campLista(K.portasDe)) { const k = CAMP_ATOS.findIndex(x => x.id === ae); for (const id of campObjsDe(k)) for (const d of campLista(CAMP_OBJ[id].abre)) campAbreHistoria(d, true); }
@@ -27187,7 +27187,7 @@ function campItemTick(id, D, O) {
 // ---------- host: rede ----------
 function campCp() { // estado completo da campanha (zWorldState.cp e { k: 'est' }): etapa, objetivos, itens, troca de mapa, checkpoint
   const cp = { et: CAMP.et, ob: Object.entries(CAMP.obj).map(([id, O]) => [id, O.st, r2(O.p), r2(O.h), O.q]), it: Object.entries(CAMP.itens).filter(([, it]) => it.i >= 0).map(([ch, it]) => [ch, it.i, it.st, r2(it.x), r2(it.z), it.quem]),
-    tr: CAMP.trans ? 1 : 0, ov: CAMP.over ? 1 : 0, fo: CAMP.objFim ? 1 : 0 }; // fo: os objetivos do mapa acabaram (rodadas infinitas)
+    tr: CAMP.trans ? 1 : 0, ov: CAMP.over ? 1 : 0, fo: CAMP.objFim ? 1 : 0, eu: CAMP.etUlt ?? -1 }; // fo: os objetivos do mapa acabaram (rodadas infinitas); eu: a última etapa
   for (const f of CAMP_GANCHOS.cp) f(cp);
   return cp;
 }
@@ -27195,7 +27195,7 @@ function campSrvMsg(p, m) { // srvHandle 'camp' (cliente -> host): só o 'pronto
   if (m.k === 'pronto' && CAMP.trans?.fase === 'carga') CAMP.trans.ok.add(p.id);
 }
 // ---------- cliente ----------
-function campCliReset() { CAMP.c = { et: -1, obj: {}, ordem: [], npc: null, trans: null, prontoEnv: false, cena: null, radioQ: [], radio: null, over: null, fim: false, el: null, zd: null, idx: new Map() }; }
+function campCliReset() { CAMP.c = { et: -1, etUlt: -1, obj: {}, ordem: [], npc: null, trans: null, prontoEnv: false, cena: null, radioQ: [], radio: null, over: null, fim: false, el: null, zd: null, idx: new Map() }; }
 campCliReset();
 const campIdOk = s => typeof s === 'string' && s.length <= 40;
 function campMsg(m) { // onMsg 'camp' (host -> todos; entrada não confiável: forma conferida)
@@ -27226,7 +27226,7 @@ function campObjCli(id, st, p, h, q) {
 function campSync(cp) { // zSyncWorld (quem entra no meio) e { k: 'est' }: monta o HUD sem tocar a cena
   if (!cp || typeof cp !== 'object') return;
   if (!NET.isHost) CAMP.on = campCliOn();
-  const c = CAMP.c; c.et = Number.isInteger(cp.et) && CAMP_ATOS[cp.et] ? cp.et : -1; c.fo = cp.fo === 1 && c.et < 0;
+  const c = CAMP.c; c.et = Number.isInteger(cp.et) && CAMP_ATOS[cp.et] ? cp.et : -1; c.fo = cp.fo === 1 && c.et < 0; c.etUlt = Number.isInteger(cp.eu) && CAMP_ATOS[cp.eu] ? cp.eu : c.et;
   if (Array.isArray(cp.ob)) for (const o of cp.ob.slice(0, 32)) if (Array.isArray(o) && campIdOk(o[0]) && ['oculto', 'ativo', 'feito', 'falhou'].includes(o[1])) campObjCli(o[0], o[1], o[2], o[3], o[4]);
   if (Array.isArray(cp.it)) for (const a of cp.it.slice(0, 8)) if (Array.isArray(a) && campIdOk(a[0]) && Number.isInteger(a[1])) campMsg({ k: 'item', i: a[1], x: a[3], z: a[4] }); // posição do item no chão
   for (const f of CAMP_GANCHOS.sync) f(cp);
@@ -27304,6 +27304,7 @@ function campHud(dt) { // gancho no fim do zHud (cada quadro do cliente)
     if (!n) h += c.trans || c.cena ? '' : '<div class="o ok">Objetivos cumpridos: aguente até o fim da rodada</div>';
   }
   campSet(E.obj, 'o', h); E.obj.style.display = h ? '' : 'none';
+  { const np = ZD?.pecas ? Object.keys(ZD.pecas).length : 0, tp = np ? 82 + np * 20 + 'px' : ''; if (E.k.tp !== tp) { E.k.tp = tp; E.obj.style.top = tp; } } // a contagem das peças (#zpecas, zumbi-v2) fica no mesmo canto (top 78): o painel desce uma linha por máquina
   // seta: o objetivo ativo mais perto
   let mk = '';
   if (me.alive && !c.cena) { let best = null, bd = 1e9, bid = null;
@@ -29988,6 +29989,12 @@ const campSinoGratis = i => { const id = campObjComZint(i, 'usar'); return !!id 
 { const F = ZINT_FN.sino, usar0 = F.usar, prompt0 = F.prompt;
   F.usar = function (p, i, o, E, D, err, m) { if (CAMP.on && CAMP.modo === 'campanha' && E.st === 'pronto' && campSinoGratis(i)) return zintPoe(i, 'tocando', D.dura, p.id); return usar0.call(this, p, i, o, E, D, err, m); };
   F.prompt = function (o, i, c, D) { if (c.st === 'pronto' && campCliOn() && CAMP.c.obj['I.1']?.st === 'ativo' && CAMP_OBJ['I.1']?.gratis && o.id === CAMP_VILA.sino) return { k: 'zint', id: i, cost: 0, txt: CAMP_VILA.sinoTxt }; return prompt0.call(this, o, i, c, D); };
+}
+// gerador (I.2) e alçapão (II.4): o F só aparece com o objetivo deles em andamento (ou o gerador afogado esperando a volta). Antes o alçapão
+// do Castelo (área do PaP) dizia "Segure F" desde a primeira rodada e segurar não fazia nada; o gerador dizia "Ligar" e respondia "não pega agora".
+const campVilaObjDe = o => { for (const id in CAMP_OBJ) if (campLista(CAMP_OBJ[id].alvo?.zint).includes(o.id)) return CAMP.c.obj[id]?.st || 'oculto'; return null; }; // null: interativo sem objetivo
+for (const t of ['gerador', 'alcapao']) { const F = ZINT_FN[t], prompt0 = F.prompt;
+  F.prompt = function (o, i, c, D) { const st = campVilaObjDe(o); return st === null || st === 'ativo' || (st === 'falhou' && c.st === 'afogado') ? prompt0.call(this, o, i, c, D) : null; };
 }
 // ---------- host: Nogueira parado (II.2 e depois da escolta) e a fala do alçapão ----------
 let campVilaNpcT = 0;
