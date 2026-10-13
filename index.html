@@ -25886,6 +25886,75 @@ function zintPlacaTex(txt, cor, fundo) { // placa de texto (guardada entre as pa
 }
 function zintPlaca(g, txt, cor, fundo, w, h, x, y, z, ry = 0) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: zintPlacaTex(txt, cor, fundo), toneMapped: false })); m.position.set(x, y, z); m.rotation.y = ry; g.add(m); return m; }
 const zintLuzM = c => { const m = new THREE.MeshBasicMaterial({ color: c, toneMapped: false }); return m; }; // lâmpada de estado (cor muda: material próprio)
+// Decisão do dono (13/10): passagem secreta igual ao muro. Raios dos dois lados do vão acham o muro vizinho (a base e as camadas por cima:
+// faixa, sujeira) e cada camada continua por cima da passagem com o MESMO material e as coordenadas de textura prolongadas (o mapeamento
+// do muro é linear na parede: 3 amostras dão a conta). A espessura e o lugar da parede saem das faces medidas (na Vila a passagem
+// saía 0,5 m do muro). Batente em volta do vão (Sanatório): a parede falsa cresce e fica 4 mm na frente dele, cobrindo-o (quando a
+// passagem abre, o batente aparece). Só na montagem: uma passada pelos triângulos das malhas perto separa os do vão (em coordenadas da
+// porta: lat, y, prof); cada raio é reto na profundidade, então vira um teste de ponto no triângulo em 2D (sem o Raycaster, que testava
+// todos os triângulos das malhas juntadas de 48 m a cada raio). Devolve false se não achou muro.
+const ZFALSA = { lat: .6, y: [.5, 2.5], h: 3.2, w: 3.95, passo: .1, camada: .05, batente: [1.9, 3, .05], topo: [3, 3.35] }; // topo até 3,35: a passagem afunda 3,4 m ao abrir
+function zFalsaCamufla(g, d) {
+  const ang = g.rotation.y, nx = Math.sin(ang), nz = Math.cos(ang), tx = nz, tz = -nx, F = ZFALSA, o = new V3(), TR = [];
+  scene.traverse(m => { // triângulos perto do vão: |lat| < 4,5, |prof| < 3,2, y < 4,5 (sem instâncias, vegetação e o que se mexe)
+    if (!m.isMesh || m.isInstancedMesh || m.isSkinnedMesh || !m.geometry?.attributes.uv || m.userData.dyn || !m.visible) return; for (let p = m; p; p = p.parent) if (p === g) return;
+    const G = m.geometry, bs = G.boundingSphere || (G.computeBoundingSphere(), G.boundingSphere); if (!bs) return;
+    const c = o.copy(bs.center).applyMatrix4(m.matrixWorld); if (Math.hypot(c.x - d.x, c.z - d.z) > bs.radius * m.matrixWorld.getMaxScaleOnAxis() + 5) return;
+    const P = G.attributes.position, U = G.attributes.uv, I = G.index, n = I ? I.count : P.count, mw = m.matrixWorld, V = new Float32Array(P.count * 3), ok = new Uint8Array(P.count);
+    for (let k = 0; k < P.count; k++) { o.fromBufferAttribute(P, k).applyMatrix4(mw); const ex = o.x - d.x, ez = o.z - d.z; V[k * 3] = ex * tx + ez * tz; V[k * 3 + 1] = o.y; V[k * 3 + 2] = ex * nx + ez * nz; }
+    const grupos = G.groups.length ? G.groups : [{ start: 0, count: n, materialIndex: 0 }];
+    for (const gr of grupos) { const mat = Array.isArray(m.material) ? m.material[gr.materialIndex] : m.material; if (!mat) continue;
+      for (let t = gr.start; t < Math.min(n, gr.start + gr.count); t += 3) { const a = I ? I.getX(t) : t, b = I ? I.getX(t + 1) : t + 1, cc = I ? I.getX(t + 2) : t + 2;
+        const la = V[a * 3], lb = V[b * 3], lc = V[cc * 3], pa = V[a * 3 + 2], pb = V[b * 3 + 2], pc = V[cc * 3 + 2];
+        if (Math.min(la, lb, lc) > 4.5 || Math.max(la, lb, lc) < -4.5 || Math.min(pa, pb, pc) > 3.2 || Math.max(pa, pb, pc) < -3.2 || Math.min(V[a * 3 + 1], V[b * 3 + 1], V[cc * 3 + 1]) > 4.5) continue;
+        TR.push({ v: [a, b, cc].map(q => [V[q * 3], V[q * 3 + 1], V[q * 3 + 2], U.getX(q), U.getY(q)]), mat, obj: m, lado: mat.side }); } }
+  });
+  const tiro = (s, lat, y) => { // raio de prof = 3s para -s (até 3,6 m): acertos em ordem, com uv; só os de até 5 cm atrás do primeiro (as camadas)
+    const hs = [];
+    for (const T of TR) { const [A, B, Cv] = T.v, d1 = (B[0] - A[0]) * (Cv[1] - A[1]) - (Cv[0] - A[0]) * (B[1] - A[1]); if (Math.abs(d1) < 1e-9) continue;
+      const u = ((lat - A[0]) * (Cv[1] - A[1]) - (Cv[0] - A[0]) * (y - A[1])) / d1, v = ((B[0] - A[0]) * (y - A[1]) - (lat - A[0]) * (B[1] - A[1])) / d1; if (u < 0 || v < 0 || u + v > 1) continue;
+      if (T.lado === THREE.FrontSide && d1 * s < 0 || T.lado === THREE.BackSide && d1 * s > 0) continue; // face de costas para o raio (como o Raycaster)
+      const w = 1 - u - v, p = A[2] * w + B[2] * u + Cv[2] * v, dist = 3 - s * p; if (dist < 0 || dist > 3.6) continue;
+      hs.push({ distance: dist, object: T.obj, mat: T.mat, uv: { x: A[3] * w + B[3] * u + Cv[3] * v, y: A[4] * w + B[4] * u + Cv[4] * v } }); }
+    if (!hs.length) return []; hs.sort((a, b) => a.distance - b.distance); return hs.filter(h => h.distance < hs[0].distance + F.camada); };
+  const matDe = h => h.mat;
+  const lados = []; let meiaL = F.w / 2, alto = F.h;
+  for (const s of [1, -1]) { // batente: o que fica na frente da face do muro em volta do vão (de cada lado do vão e em cima)
+    const longe = tiro(s, F.batente[1] + 1, F.y[0])[0] || tiro(s, -F.batente[1] - 1, F.y[0])[0]; if (!longe) continue; const dMuro = longe.distance;
+    for (const sl of [-1, 1]) for (let l = F.batente[0]; l <= F.batente[1]; l += F.batente[2]) { const h = tiro(s, sl * l, 1.5)[0]; if (h && h.distance < dMuro - .003) meiaL = Math.max(meiaL, l + .03); }
+    for (let y = F.topo[0]; y <= F.topo[1]; y += F.batente[2]) { const h = tiro(s, 0, y)[0]; if (h && h.distance < dMuro - .003) alto = Math.max(alto, y + .03); }
+  }
+  for (const s of [1, -1]) {
+    let base = null, camadas = [], frente = 0;
+    for (const sl of [-1, 1]) { // lado esquerdo ou direito do vão: o primeiro em que o muro aparece nas 3 amostras
+      const l0 = sl * (meiaL + .2), l1 = l0 + sl * F.lat, [y0, y1] = F.y, h0 = tiro(s, l0, y0); if (!h0.length) continue;
+      const b0 = h0[h0.length - 1], b1 = tiro(s, l1, y0).find(h => h.object === b0.object), b2 = tiro(s, l0, y1).find(h => h.object === b0.object); if (!b1 || !b2) continue;
+      const uvL = (p, q, dl) => [(q.uv.x - p.uv.x) / dl, (q.uv.y - p.uv.y) / dl];
+      base = { m: matDe(b0), face: 3 - b0.distance, l0, y0, uv: [b0.uv.x, b0.uv.y], dLat: uvL(b0, b1, l1 - l0), dY: uvL(b0, b2, y1 - y0), ya: 0, yb: F.h, prof: 0 };
+      for (const h of h0.slice(0, -1)) { // camadas na frente do muro (faixa, sujeira): altura que cobrem e o mapeamento delas
+        const ys = []; for (let y = F.passo / 2; y < F.h; y += F.passo) if (tiro(s, l0, y).some(k => k.object === h.object)) ys.push(y); if (ys.length < 2) continue;
+        const ya = ys[0], yb = ys[ys.length - 1], q0 = tiro(s, l0, ya).find(k => k.object === h.object), q1 = tiro(s, l1, ya).find(k => k.object === h.object), q2 = tiro(s, l0, yb).find(k => k.object === h.object); if (!q0 || !q1) continue;
+        camadas.push({ m: matDe(h), l0, y0: ya, uv: [q0.uv.x, q0.uv.y], dLat: uvL(q0, q1, l1 - l0), dY: q2 && yb > ya ? uvL(q0, q2, yb - ya) : [0, 0], ya: Math.max(0, ya - F.passo / 2), yb: Math.min(F.h, yb + F.passo / 2), prof: b0.distance - h.distance });
+      }
+      for (const l of [-meiaL + .01, meiaL - .01]) for (let y = .05; y < alto; y += .2) { const h = tiro(s, l, y)[0]; if (h) frente = Math.max(frente, b0.distance - h.distance); } // quanto o batente sai do muro
+      for (let y = F.h; y < alto; y += .05) { const h = tiro(s, 0, y)[0]; if (h) frente = Math.max(frente, b0.distance - h.distance); }
+      break;
+    }
+    if (!base) return false;
+    lados.push({ s, base, camadas, frente: frente > .003 ? frente + .004 : 0 });
+  }
+  const fa = lados[0].base.face, fb = lados[1].base.face, esp = fa + fb; if (!(esp > .1 && esp < 3)) return false; // faces do muro: de -fb a +fa (em z local)
+  const caixa = bx(g, F.w, F.h, esp - .02, 0, F.h / 2, (fa - fb) / 2, lados[0].base.m); caixa.castShadow = true; // miolo (as laterais ficam no vão)
+  for (const { s, base, camadas, frente } of lados) for (const C of [base, ...camadas]) {
+    const ya = C.ya, yb = C === base || C.yb >= F.h ? (frente ? alto : F.h) : C.yb, larg = frente ? meiaL * 2 : F.w; // com batente: cobre o batente; sem: só o vão
+    const geo = new THREE.PlaneGeometry(larg, yb - ya); if (s < 0) geo.rotateY(Math.PI); geo.translate(0, (ya + yb) / 2, s * ((s > 0 ? fa : fb) + C.prof + frente));
+    const p = geo.attributes.position, uv = geo.attributes.uv;
+    for (let k = 0; k < p.count; k++) { const lat = p.getX(k), y = p.getY(k); uv.setXY(k, C.uv[0] + (lat - C.l0) * C.dLat[0] + (y - C.y0) * C.dY[0], C.uv[1] + (lat - C.l0) * C.dLat[1] + (y - C.y0) * C.dY[1]); }
+    if (C.m.vertexColors) geo.setAttribute('color', new THREE.Float32BufferAttribute(new Array(p.count * 3).fill(1), 3));
+    const m = new THREE.Mesh(geo, C.m); m.receiveShadow = true; m.renderOrder = C === base ? 0 : 1; g.add(m);
+  }
+  return true;
+}
 function zintPortaVis(g, d) { // zBuildWorld: aparência das portas novas (frente +z/-z, largura 4 m ao longo de x)
   const Wd = ZC.world; Wd.portaTrava ||= new Map();
   if (d.kind === 'cortafogo') { // duas folhas de aço vermelho, barra antipânico, visor aramado, faixa e placa dos dois lados
@@ -25903,8 +25972,9 @@ function zintPortaVis(g, d) { // zBuildWorld: aparência das portas novas (frent
     }
     return;
   }
-  if (d.kind === 'falsa') { // zumbi-v2 (Etapa 6): parede falsa da cor da parede do mapa, só com rachaduras finas (descobre quem olha de perto)
-    const par = mc(d.cor ?? 0x9a917e), rach = mc(0x2a2622);
+  if (d.kind === 'falsa') { // zumbi-v2 (Etapa 6): parede falsa. Decisão do dono (13/10): bem secreta, com as camadas do muro vizinho (zFalsaCamufla)
+    if (zFalsaCamufla(g, d)) return;
+    const par = mc(d.cor ?? 0x9a917e), rach = mc(0x2a2622); // sem muro achado em volta (não deveria acontecer): a parede lisa de antes
     bx(g, 3.95, 3.2, d.esp ?? 1, 0, 1.6, 0, par).castShadow = true;
     for (const s of [-1, 1]) for (const [x, y, w, r] of [[-.6, 1.4, .9, .5], [.2, 1.9, .7, -.7], [.7, .9, .6, .3]]) { const c = bx(g, w, .02, .02, x, y, s * ((d.esp ?? 1) / 2 + .005), rach); c.rotation.z = r; }
     return;
@@ -32518,7 +32588,7 @@ if (DEBUG) window.__T = { get NOW() { return now; }, showPause, MARKS, startFire
 // ===== O2-C01: ganchos de teste para a auditoria de itens (tools/itens/auditoria.mjs); só leitura e as funções do próprio jogo, nada de gameplay =====
 if (DEBUG) Object.assign(window.__T, { zBuildWalk, footFreeR, segClearR, zRoomAt, zActive, zDoorOpen, zBoxPlace, zHigh, colQuery, ffCell, ZPERKS, ZTRAP, ZMAXPERKS, ZWEAP, PR, STEP, ZVAULT, ZTOP });
 // ===== FIM O2-C01 =====
-if (DEBUG) Object.assign(window.__T, { scene, ZBAL, zSorteiaLugares, zRng, papProx, PAP_IDS, zConstruida, zPecasPegas, srvZBuild, zTamanho, zForaJanela, zCustoAreas, srvZUse, get ZDIFF() { return ZDIFF; } }); // zumbi-v2: cena, balanceamento e funções novas para os testes
+if (DEBUG) Object.assign(window.__T, { scene, ZBAL, zFalsaCamufla, zSorteiaLugares, zRng, papProx, PAP_IDS, zConstruida, zPecasPegas, srvZBuild, zTamanho, zForaJanela, zCustoAreas, srvZUse, get ZDIFF() { return ZDIFF; } }); // zumbi-v2: cena, balanceamento e funções novas para os testes
 // ===== O2-C04: ganchos de teste dos interativos (tests/interativos-zumbi.test.mjs e tools/itens/auditoria.mjs) =====
 if (DEBUG) Object.assign(window.__T, { ZINT, ZINT_MAPA, ZINT_BARRIL, ZINT_FN, zintUsar, zintTiro, zintExplosao, zintBarrilBoom, zintEstado, zintAud, zintSync, zintMsg, zExplode, zWorldState });
 // ===== FIM O2-C04 =====
