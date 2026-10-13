@@ -51,7 +51,7 @@ test('fogo: F longe e sem pontos não acende; com pontos acende, cobra o preço 
   assert.equal(r.aceso, 'aceso'); assert.equal(r.cli, 'aceso', 'cliente não soube'); assert.equal(r.gasto, r.custo); assert.equal(r.chamas, true);
 });
 
-test('fogo: mata o zumbi na faixa (sem pontos) na rodada 10 em ~1 s; o de fora vive; quem saiu queima e anda mais devagar', { timeout: 60000 }, async () => {
+test('fogo: mata o zumbi na faixa (pontos para quem acendeu) na rodada 10 em ~1 s; o de fora vive; quem saiu queima e anda mais devagar', { timeout: 60000 }, async () => {
   const r = await noJogo(J.page, (T, PREP) => {
     const { p, L, fogos, poe, segura, zumbi, uso, zera } = (new Function('return ' + PREP)())(T), D = T.ZINT.fogo, i = fogos[1], o = L[i], [ax, az, aw, ad] = o.a;
     segura(); zera(i); T.Z.round = 10; p.money = 5000; p.dwEnd = 1e12; poe(...uso(o)); T.srvZUse(p, { k: 'zint', id: i }); const m0 = p.money;
@@ -61,10 +61,10 @@ test('fogo: mata o zumbi na faixa (sem pontos) na rodada 10 em ~1 s; o de fora v
     // queimando fora da faixa: dano e lentidão por queima s
     const saiu = zumbi(ax, az); saiu.hp = saiu.maxHp = 1e6; T.sim(.1); saiu.body.pos.set(ax + aw / 2 + 2, 0, az);
     const resta = saiu.fogoT - window.__simNow; T.sim(.5); const h1 = saiu.hp; T.sim(D.queima); const h2 = saiu.hp; T.sim(.5);
-    return { meio, morreu: !T.Z.zs.has(dentro.id), foraVivo: T.Z.zs.has(fora.id), pontos: p.money - m0, resta, queima: D.queima, h1, h2, h3: saiu.hp };
+    return { meio, morreu: !T.Z.zs.has(dentro.id), foraVivo: T.Z.zs.has(fora.id), pontos: p.money - m0, semTiro: T.ZBAL.pontos.semTiro, resta, queima: D.queima, h1, h2, h3: saiu.hp };
   }, PREP);
   assert.ok(r.meio > .2 && r.meio < .8, `em 0,5 s devia estar no meio da vida: ${r.meio}`); assert.equal(r.morreu, true, 'zumbi na faixa não morreu');
-  assert.equal(r.foraVivo, true, 'zumbi fora da faixa morreu'); assert.equal(r.pontos, 0, 'abate do fogo deu pontos');
+  assert.equal(r.foraVivo, true, 'zumbi fora da faixa morreu'); assert.equal(r.pontos, r.semTiro, 'abate do fogo: pontos para quem acendeu (decisão do dono, 13/10)');
   assert.ok(Math.abs(r.resta - r.queima) < .05, `queima depois de sair: ${r.resta}`);
   assert.ok(r.h1 < 1e6, 'quem saiu da faixa não continuou queimando'); assert.ok(r.h2 < r.h1, 'parou de queimar cedo'); assert.equal(r.h3, r.h2, 'queimou além de queima s');
 });
@@ -138,7 +138,7 @@ test('elétricas novas (Sanatório): 4 armadilhas montadas; cada nova liga com o
       (T.ZD.zint || []).forEach((o, k) => { if (o.t === 'interruptor') { p.money = 5000; poe(o.x + o.n[0], o.z + o.n[1]); T.srvZUse(p, { k: 'zint', id: k }); } }); // O2-C08: as novas dependem do interruptor da ala
       const res = [];
       for (let i = 1; i < T.ZD.traps.length; i++) { const t = T.ZD.traps[i]; p.money = 5000; poe(t.sx + t.n[0], t.sz + t.n[1]); T.srvZUse(p, { k: 'trap', id: i });
-        const z = zumbi(t.x, t.z); T.sim(.3); res.push({ i, gasto: 5000 - p.money, st: T.Z.traps[i].st, morto: !T.Z.zs.has(z.id) }); T.Z.zs.clear(); }
+        const gasto = 5000 - p.money, z = zumbi(t.x, t.z); T.sim(.3); res.push({ i, gasto, st: T.Z.traps[i].st, morto: !T.Z.zs.has(z.id) }); T.Z.zs.clear(); } // gasto antes do abate (o abate dá pontos a quem ligou)
       return { n: T.ZD.traps.length, wd: T.ZC.world.traps.length, res, custo: T.ZTRAP.cost };
     }, PREP);
     assert.equal(r.n, 4); assert.equal(r.wd, 4);
