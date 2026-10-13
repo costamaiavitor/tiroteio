@@ -23645,7 +23645,7 @@ function zOnSnap(m) {
     zc.buf.push({ t, p: [a[i + 1], a[i + 2], a[i + 3]], y: a[i + 4] }); if (zc.buf.length > 30) zc.buf.shift();
     netFix(zc, zc.buf, .2, ZVMAX);
     zc.f = a[i + 5]; zc.lastSeen = now;
-    if (fresh) { zc.pos.set(a[i + 1], a[i + 2], a[i + 3]); zc.last.copy(zc.pos); zc.yaw = a[i + 4]; zc.model.position.copy(zc.pos); if (zc.dog || zc.kind === 6) zLightning(zc.pos); if (zc.f & 64) { _zv.set(zc.pos.x, .05, zc.pos.z); puff(_zv, 0x4a3a28, 2, .9, .4); play('crack', _zv); } }
+    if (fresh) { zc.pos.set(a[i + 1], a[i + 2], a[i + 3]); zc.last.copy(zc.pos); zc.yaw = a[i + 4]; zc.model.position.copy(zc.pos); if (zc.dog || zc.kind === 6) zLightning(zc.pos); if ((zc.f & 64) && zc.kind !== 9) { _zv.set(zc.pos.x, .05, zc.pos.z); puff(_zv, 0x4a3a28, 2, .9, .4); play('crack', _zv); } } // O3-D16: o Afogado (9) nasce submerso: sem a terra do chão
   }
   if (typeof m.b === 'string') m.b = zBoardsDec(m.b); // tábuas vêm como texto ("6b4c": letra = corrida de janelas inteiras)
   if (m.b) for (let i = 0; i < m.b.length; i++) {
@@ -24734,6 +24734,7 @@ function zScream(z) { // Gritador: zumbis em volta (9 m) correm 30% mais por 5 s
 }
 function zBloatBoom(x, y, zz, p) { // Explosivo estoura: muito dano nos zumbis em volta, pouco nos jogadores; só com linha livre (como granada)
   const R = 4.5, c = new V3(x, y + 1, zz), D = zDf(), dz = zHp(Z.round) * zHpK(Z.round) * 1.4;
+  if (CAMP.on) campZk2Explosao(c, R); // O3-D16: o Explosivo (e o Inchado do evento) também destrói os corpos que o Pregador levantaria
   for (const o of [...Z.zs.values()]) {
     if (!Z.zs.has(o.id)) continue;
     const t = o.body.pos.clone(); t.y += o.dog ? .5 : 1; const d = t.distanceTo(c);
@@ -26739,11 +26740,12 @@ function campCena(ids, troca) { // cartões da cena (3 s cada, até 8 s por cena
 }
 function campCenaPula() { const ce = CAMP.c.cena; if (!ce) return; if (ce.troca && CAMP.c.trans !== null) { ce.k = ce.L.length; return; } CAMP.c.cena = null; } // na troca, pular só pula os cartões
 addEventListener('keydown', e => { if (!CAMP.c?.cena && !CAMP.c?.over) return; if (e.code === 'Enter' || e.code === 'Space') { if (CAMP.c.cena) campCenaPula(); else if (CAMP.c.over && NET.isHost) campRepetir(); } });
+function campEliteCli() { if (typeof CAMP_ZK2C === 'undefined') return null; for (const id of CAMP_ZK2C.elite) { const zc = ZC.zs.get(id); if (zc && !zc.dead) return zc.pos; } return null; } // O3-D16: a seta da III.2 aponta a Enfermeira-chefe enquanto a chave não cai
 function campObjPos(id) { // onde fica o objetivo (para a seta): interativo, zona, NPC, item ou portador
   const D = CAMP_OBJ[id], o = CAMP.c.obj[id]; if (!D) return null;
   if (D.tipo === 'escoltar' && CAMP.c.npc) return CAMP.c.npc;
   if (D.tipo === 'coletar') { if (o?.q) { if (o.q === C.myId) { const de = D.destino; return de?.porta ? ZD.doors.find(d => d.id === de.porta) : de?.zint ? ZD.zint?.[campZintIdx(de.zint)] : de; } const rp = R.get(o.q); return rp ? rp.pos : null; }
-    const i = (ZD.zint || []).findIndex(z => z.t === 'chave' && (z.chave || z.id) === D.item); return i >= 0 && ZC.zint?.[i]?.st === 'chao' ? ZD.zint[i] : null; }
+    const i = (ZD.zint || []).findIndex(z => z.t === 'chave' && (z.chave || z.id) === D.item); return i >= 0 && ZC.zint?.[i]?.st === 'chao' ? ZD.zint[i] : D.origem === 'elite' ? campEliteCli() : null; }
   if (D.zona && D.zona !== 'tudo') return D.zona;
   for (const r of campLista(D.alvo?.zint)) { const i = campZintIdx(r), z = ZD.zint?.[i]; if (z && !(CAMP_ZINT_FIM[z.t] || D.alvo.st || []).includes(ZC.zint?.[i]?.st)) return z; }
   return null;
@@ -28034,7 +28036,7 @@ CAMP_ZKF.msg.agarra = m => { // só para o agarrado: anda devagar por s segundos
 CAMP_GANCHOS.sync.push(cp => { // quem entra no meio
   const z = cp?.zk; if (!z || typeof z !== 'object') return; campZkMundo();
   if (Array.isArray(z.c)) for (const id of z.c.slice(0, 64)) if (Number.isInteger(id)) { CAMP_ZKC.semCap.add(id); const zc = ZC.zs.get(id); if (zc) zHide(zc.model.userData.capacete, 1); }
-  if (Array.isArray(z.n)) for (const a of z.n.slice(0, CAMP_ZK[7].nuvem.max)) if (Array.isArray(a) && a.length === 3) CAMP_ZKF.msg.nuvem({ x: a[0], z: a[1], s: a[2] });
+  if (Array.isArray(z.n)) for (const a of z.n.slice(0, CAMP_ZK[7].nuvem.max)) if (Array.isArray(a) && a.length === 3 && !CAMP_ZKC.nuvens.some(n => n.fim > now && Math.abs(n.x - a[0]) < .05 && Math.abs(n.z - a[1]) < .05)) CAMP_ZKF.msg.nuvem({ x: a[0], z: a[1], s: a[2] }); // O3-D16: a foto chega todo segundo: só a que falta
 });
 // ---------- sons (síntese, no estilo do SND) ----------
 SND.penitente = o => { campSomTom(o, 98, 96, .8, .08, 'sawtooth', .12, 0, ['bandpass', 520, 4]); campSomTom(o, 87, 85, .9, .08, 'sawtooth', .12, .42, ['bandpass', 520, 4]); vox(o, rand(70, 85), .9, .8, .12); }; // coro grave de 2 notas
@@ -28266,7 +28268,7 @@ function campChefeAtaca(z, a, tg) { // começa o aviso: o host manda a forma, a 
   const d1 = a.dims?.[0] ?? 3, d2 = a.dims?.[1] ?? (a.forma === 'setor' ? 60 : 1);
   const A = { a, t0: now, fa: now + aviso, fb: now + aviso + ativo, fc: now + aviso + ativo + (a.rec ?? 0), sh, d1, d2, len: sh.map(() => d1), hit: new Set(), pil: new Set(), golpe: 0, acc: {}, ini: false, anda: 0, ang, tg, msg: null };
   CH.atk = A; CH.cd[a.id] = now + (a.cd ?? 0);
-  A.msg = { t: 'camp', k: 'tel', a: a.id, f: a.forma || null, p: sh, d1: r2(d1), d2: r2(d2), g: a.gira || 0, s: r2(aviso), at: r2(ativo), som: a.som || undefined };
+  A.msg = { t: 'camp', k: 'tel', a: a.id, f: a.forma || null, p: sh, d1: r2(d1), d2: r2(d2), g: a.gira || 0, s: r2(aviso), at: r2(ativo), som: a.som || undefined, cr: a.cresce ? r2(a.cresce) : undefined }; // O3-D16: cr = fração inicial do disco que cresce no aviso
   broadcast(A.msg);
   if (a.fala) campFala(a.fala);
   a.inicio?.(z, A, CH);
@@ -28450,7 +28452,7 @@ Object.assign(CAMP_GANCHOS.msg, {
     if (typeof m.a !== 'string' || m.a.length > 40 || !campChOk(m.s, 0, 10) || !campChOk(m.at, 0, 30)) return;
     const f = ['disco', 'linha', 'setor'].includes(m.f) ? m.f : null, p = f && Array.isArray(m.p) ? m.p.slice(0, 8).filter(s => Array.isArray(s) && s.length === 4 && s.every(v => campChOk(v, -1e4, 1e4))) : [];
     const c = CAMP.c, L = c.tel ||= []; if (L.length >= 12) L.shift();
-    L.push({ a: m.a, f, p, d1: campChOk(m.d1, 0, 100) ? m.d1 : 0, d2: campChOk(m.d2, 0, 360) ? m.d2 : 0, g: campChOk(m.g, -720, 720) ? m.g : 0, s: m.s, at: m.at, t0: now });
+    L.push({ a: m.a, f, p, d1: campChOk(m.d1, 0, 100) ? m.d1 : 0, d2: campChOk(m.d2, 0, 360) ? m.d2 : 0, g: campChOk(m.g, -720, 720) ? m.g : 0, s: m.s, at: m.at, t0: now, cr: campChOk(m.cr, .01, 1) ? m.cr : 0 }); // O3-D16: cr
     if (typeof m.som === 'string' && /^[a-z]{1,16}$/.test(m.som)) play(m.som, p[0] ? new V3(p[0][0], p[0][1] + 1, p[0][2]) : undefined);
   },
   telx() { if (CAMP.c.tel) CAMP.c.tel.length = 0; },
@@ -28506,7 +28508,7 @@ function campAvisosMonta() {
     scene.add(M); AV[t] = M;
   }
   try { // compila agora (na cena/carga do começo da campanha) e já entra no aquecimento de todo mapa seguinte (fica na cena)
-    for (const t of ['disco', 'linha', 'setor']) { const M = AV[t]; M.count = 1; M.visible = true; renderer.setRenderTarget(CFG.gfx === 'alto' ? composer.readBuffer : null); try { renderer.compile(M, camera); } finally { renderer.setRenderTarget(null); M.count = 0; M.visible = false; } }
+    for (const t of ['disco', 'linha', 'setor']) { const M = AV[t]; M.count = 1; M.visible = true; renderer.setRenderTarget(CFG.gfx === 'alto' ? composer.readBuffer : null); try { renderer.compile(M, camera, scene); } finally { renderer.setRenderTarget(null); M.count = 0; M.visible = false; } /* O3-D16: com as luzes da cena (sem elas a chave do programa saía sem sombra e o 1º aviso compilava 2 programas na luta) */ }
   } catch (e) { }
   return AV;
 }
@@ -28521,7 +28523,7 @@ function campChefeAvisos() { // a cada quadro: some quem acabou; amarelo pulsand
     for (const s of t.p) {
       const j = n[t.f]; if (j >= P[t.f]) break; n[t.f]++;
       AV.q.setFromAxisAngle(AV.up, s[3] + gi); AV.v.set(s[0], s[1] + P.y, s[2]);
-      if (t.f === 'linha') AV.e.set(t.d2, 1, t.d1); else AV.e.set(t.d1, 1, t.d1);
+      if (t.f === 'linha') AV.e.set(t.d2, 1, t.d1); else { const r = t.d1 * (t.cr && !ativo ? t.cr + (1 - t.cr) * k : 1); AV.e.set(r, 1, r); } // O3-D16: disco que cresce no aviso (cr)
       M.setMatrixAt(j, AV.m4.compose(AV.v, AV.q, AV.e)); M.setColorAt(j, AV.cor);
       if (t.f === 'setor') AV.span.setX(j, t.d2 * Math.PI / 180);
     }
@@ -28925,7 +28927,7 @@ CAMP_ZKF.modelo[13] = (g, ud, C_) => { // batina preta molhada até a canela, go
 };
 // ---------- cliente: animação (pelo campAnim do O3-D06, depois da pose do zAnimHuman) ----------
 CAMP_ZKF.anim[10] = (zc, ud, dt, K) => { // segura a seringa; aviso: mão sobe e brilha (bipe); depois arremessa; elite: escala e chave
-  if (zc.zk2 !== 1) { zc.zk2 = 1; zHide(ud.chave, 1); zHide(ud.serBr, 1); if (CAMP_ZK2C.elite.has(zc.id)) campZk2EliteCli(zc); }
+  if (zc.zk2 !== 1) { zc.zk2 = 1; zHide(ud.chave, zc.zkElite ? 0 : 1); zHide(ud.serBr, 1); if (CAMP_ZK2C.elite.has(zc.id)) campZk2EliteCli(zc); } // O3-D16: a elite marcada antes do 1º quadro continua com a chave
   const A = K.anim, k = Math.min(1, dt * 18), esp = (zc.f & 3) === 3 && (zc.f & 4);
   if (esp && !zc.espA) { zc.espA = now; zHide(ud.serBr, 0); play('enfBipe', zc.pos); }
   if (!esp && zc.espA) { zc.espA = 0; zc.espJ = now; zHide(ud.serBr, 1); }
@@ -29027,7 +29029,7 @@ function campZk2EliteCli(zc) { if (zc.zkElite || zc.kind !== 10) return; zc.zkEl
 CAMP_GANCHOS.sync.push(cp => { // quem entra no meio
   const z = cp?.zk2; if (!z || typeof z !== 'object') return; campZk2Mundo();
   if (Array.isArray(z.e)) for (const id of z.e.slice(0, 4)) CAMP_ZKF.msg.elite({ id });
-  if (Array.isArray(z.b)) for (const a of z.b.slice(0, CAMP_ZK[12].brasa.max)) if (Array.isArray(a) && a.length === 4) CAMP_ZKF.msg.brasa({ x: a[0], y: a[1], z: a[2], s: a[3] });
+  if (Array.isArray(z.b)) for (const a of z.b.slice(0, CAMP_ZK[12].brasa.max)) if (Array.isArray(a) && a.length === 4 && !CAMP_ZK2C.brasas.some(b => b.fim > now && Math.abs(b.x - a[0]) < .05 && Math.abs(b.z - a[2]) < .05)) CAMP_ZKF.msg.brasa({ x: a[0], y: a[1], z: a[2], s: a[3] }); // O3-D16: a foto chega todo segundo: só a que falta
 });
 // ---------- sons (síntese, no estilo do SND) ----------
 SND.enfermeiro = o => { vox(o, rand(95, 125), .9, .7, .2); nz(o, .55, 650, 300, .1, 'lowpass', 1); }; // gemido abafado pela máscara
@@ -29505,7 +29507,7 @@ CAMP_CHEFE[15] = {
     { id: 'forno', fases: [1, 2, 3], peso: 3, cd: 9, aviso: 1.5, ativo: 2, rec: 0, forma: 'linha', dims: [10, 2.4], dps: 25, vista: 0, campo: 0, fala: 'fog-forno', som: 'fgforno', alcance: [0, 60], pos: fgFornoPos, ok: fgFornoOk },
     { id: 'brasa', fases: [1, 2, 3], peso: 3, cd: 5, aviso: 1, ativo: 4, rec: .6, forma: 'disco', dims: [3], onde: 'alvo', dps: 15, som: 'fgbrasa', alcance: [4, 24] },
     { id: 'apito', fases: [1, 2, 3], peso: 0, aviso: 2, ativo: 0, rec: 1.5, forma: null, fraco: 1, fala: 'fog-apito', som: 'fgapito', ok: () => false, ativa: fgApito }, // fora do sorteio: o relógio (fgTick) chama
-    { id: 'pressao', fases: [3], peso: 0, aviso: 3, ativo: 0, rec: 2, forma: 'disco', dims: [7], dano: 80, cobre: 1, pilarFrac: 1 / 3, fraco: 1, vista: 0, som: 'fgpressao', ok: () => false, ativa: fgPressaoFx }, // idem
+    { id: 'pressao', fases: [3], peso: 0, aviso: 3, ativo: 0, rec: 2, forma: 'disco', dims: [7], cresce: .15, dano: 80, cobre: 1, pilarFrac: 1 / 3, fraco: 1, vista: 0, som: 'fgpressao', ok: () => false, ativa: fgPressaoFx }, // idem
   ],
   fraco: { caixa: { f: -.26, r: .2, y0: 1.02, y1: 1.48 } }, // o tanque das costas (×sz)
   ia: fgIA, tick: fgTick, fase: fgFase, inicio: fgInicio, morte: z => { campFala('fog-morte'); FGSRV.z = null; FGSRV.rastro.length = 0; },
@@ -29761,7 +29763,7 @@ function fgEmbMonta() {
   const M = new THREE.InstancedMesh(g, mat, CAMP_FOG.cli.emb); M.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   for (let i = 0; i < CAMP_FOG.cli.emb; i++) M.setColorAt(i, FG_FX.cor.set(CAMP_FOG.cli.embCor));
   M.count = 0; M.visible = false; M.frustumCulled = false; M.renderOrder = 2; M.castShadow = M.receiveShadow = false; M.userData.noShadow = true; M.name = 'fgBrasas'; scene.add(M); FG_FX.emb = M;
-  try { M.count = 1; M.visible = true; renderer.setRenderTarget(CFG.gfx === 'alto' ? composer.readBuffer : null); try { renderer.compile(M, camera); } finally { renderer.setRenderTarget(null); M.count = 0; M.visible = false; } } catch (e) { }
+  try { M.count = 1; M.visible = true; renderer.setRenderTarget(CFG.gfx === 'alto' ? composer.readBuffer : null); try { renderer.compile(M, camera, scene); } finally { renderer.setRenderTarget(null); M.count = 0; M.visible = false; } /* O3-D16: com as luzes da cena (sem elas a chave do programa saía sem sombra e o 1º aviso compilava 2 programas na luta) */ } catch (e) { }
   return M;
 }
 function fgEmb(i, x, y, z, r) { const F = FG_FX; F.v.set(x, y + CAMP_FOG.cli.embY, z); F.e.set(r, 1, r); F.emb.setMatrixAt(i, F.m4.compose(F.v, F.q, F.e)); }
@@ -30223,7 +30225,7 @@ CAMP_GANCHOS.msg.dr = m => { // { e: 'preso' | 'solta' | 'mare' | 'agua' | 'romp
 };
 CAMP_GANCHOS.sync.push(cp => { if (Array.isArray(cp?.dr) && finN(cp.dr[0])) { drCliMundo(); DRCLI.mareAte = now + clamp(cp.dr[0], 0, 30); } }); // quem entra no meio
 { const tel0 = CAMP_GANCHOS.msg.tel; CAMP_GANCHOS.msg.tel = m => { // correção (O3-D07, visto pelo O3-D11): o mesmo aviso (cp + mensagem do ar) uma vez só
-  const L = CAMP.c?.tel; if (L?.length && m && typeof m.a === 'string' && finN(m.s)) { const fim = now + m.s, k = JSON.stringify(Array.isArray(m.p) ? m.p : []); if (L.some(t => t.a === m.a && Math.abs(t.t0 + t.s - fim) < .15 && JSON.stringify(t.p) === k)) return; }
+  const L = CAMP.c?.tel; if (L?.length && m && typeof m.a === 'string' && finN(m.s)) { const fim = now + m.s, k = JSON.stringify(['disco', 'linha', 'setor'].includes(m.f) && Array.isArray(m.p) ? m.p.slice(0, 8) : []); /* O3-D16: o p como o tel guarda (sem forma = []) */ if (L.some(t => t.a === m.a && Math.abs(t.t0 + t.s - fim) < .15 && JSON.stringify(t.p) === k)) return; }
   return tel0(m); }; }
 function drTela() { let el = DRCLI.tela; if (!el?.isConnected) { el = DRCLI.tela = document.createElement('div'); el.id = 'drMare'; el.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;background:radial-gradient(ellipse at center, transparent 45%, ${CAMP_DIRETOR.cli.mareCor})`; document.body.appendChild(el); } return el; }
 const _drM = new THREE.Matrix4(), _drO = new THREE.Object3D();
