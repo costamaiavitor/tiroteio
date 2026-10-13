@@ -23602,9 +23602,9 @@ function zSorteiaLugares(D, seed) {
   if (D.pap && R() < ZBAL.lugares.papChance) { // PaP no lugar de uma bebida, se couber (1,6 m × 1 m na frente da parede)
     const cabe = l => [-.45, 0, .45].every(t => footFreeR(l.x + l.n[0] * .55 - l.n[1] * t, l.z + l.n[1] * .55 + l.n[0] * t, .42));
     L.papCabe ||= L.perks.map(cabe); // calculado uma vez, com o COL só do mapa (igual no host e nos clientes)
-    const ks = D.perks.map((pk, i) => i).filter(i => L.papCabe[L.perks.findIndex(l => l.x === D.perks[i].x && l.z === D.perks[i].z)]); if (ks.length) { const i = ks[Math.floor(R() * ks.length)], l = pos(D.perks[i]); put(D.perks[i], L.pap); put(D.pap, l); }
+    const ks = D.perks.map((pk, i) => i).filter(i => L.papCabe[L.perks.findIndex(l => l.x === D.perks[i].x && l.z === D.perks[i].z)]); if (ks.length) { const i = ks[Math.floor(R() * ks.length)], l = pos(D.perks[i]); put(D.perks[i], L.pap); put(D.pap, { x: l.x + l.n[0] * .05, z: l.z + l.n[1] * .05, n: l.n }); } /* zv2-R3: o corpo do PaP tem 1 m de fundo e o da bebida 0,9: meio da diferença para fora, senão o PaP entrava 5 cm na parede */
   }
-  if (D.power && D.wall?.length && R() < ZBAL.lugares.energiaChance) { const i = Math.floor(R() * D.wall.length), l = pos(D.wall[i]); put(D.wall[i], L.power); put(D.power, l); }
+  if (D.power && D.wall?.length && R() < ZBAL.lugares.energiaChance) { const ks = D.wall.map((w, i) => i).filter(i => !D.wall[i].post); /* zv2-R3: só giz pintado na parede (o de placa em pé deixava o quadro da energia flutuando sem parede atrás) */ if (ks.length) { const i = ks[Math.floor(R() * ks.length)], l = pos(D.wall[i]); put(D.wall[i], L.power); put(D.power, l); } }
 }
 function zBuildWorld(M) {
   zSorteiaLugares(M.z || ZD, C.st?.seed); // zumbi-v2 (Etapa 7)
@@ -25053,7 +25053,7 @@ function zKill(z, p, zone, w, splash, nuke) {
   const dx = wi ? wi.ix : z.body.pos.x, dz = wi ? wi.iz : z.body.pos.z;
   let pts = 0;
   if (p && !nuke) { pts = (w === 'knife' ? 130 : splash ? 50 : zone === 'head' ? 100 : zone === 'legs' ? 50 : 60) + (ZKIND[z.kind]?.pts || 0); zPts(p, zGain(pts)); p.kills++; if (zone === 'head' && !splash) p.hs++; }
-  const K = z.kind | 0, msg = { t: 'zdie', id: z.id, w: p && !nuke ? W[w]?.base || w : undefined, hs: zone === 'head' && !splash ? 1 : 0, fl: w === 'thundergun' || w === 'thundergun_pap' ? 1 : 0, by: p ? p.id : null };
+  const K = z.kind | 0, msg = { t: 'zdie', id: z.id, w: p && !nuke ? W[w]?.base || w : undefined, hs: zone === 'head' && !splash ? 1 : 0, fl: W[w]?.thunder ? 1 : 0 /* zv2-R3: Arma Trovão em qualquer nível do PaP (o _pap2/_pap3 não arremessava) */, by: p ? p.id : null };
   if (W[w]?.frost) msg.ic = 1; // Uivo do Inverno: o zumbi congelado se estilhaça
   const bx = z.body.pos.x, bz = z.body.pos.z; // dx/dz é o ponto de dentro da janela (para o power-up); estouro e nuvem ficam onde ele está
   if (K) msg.k = K; if (K === 2 && !nuke) msg.ex = [r2(bx), r2(Math.max(0, z.body.pos.y)), r2(bz)];
@@ -26414,9 +26414,10 @@ function zSorteiaPecas(D, R) {
   const B = ZBAL.construcao, dif = C.st?.zdiff ?? 1; if (!B.ligada || !D.power || !D.pap || !ZINT_MAPA[curMapId]) return;
   const n = B.pecas[dif] ?? 3, custo = zCustoAreas(D), sp = D.spawns?.[0] || [0, 0], ocup = [...D.perks, D.pap, D.power, ...(D.wall || []), ...(D.boxes || [])];
   const L0 = D.lugares0, M = curMap; // pontos de chão: onde zumbi sai do chão + grade de chão livre (uma vez por mapa, com o COL só do mapa: igual em todos os PCs)
-  if (!L0.chao) { const pts = L0.chao = [...(D.risers || [])]; if (M?.w && D.zoneAt) for (let x = -M.w / 2 + 2; x < M.w / 2 - 2; x += B.grade) for (let z = -M.d / 2 + 2; z < M.d / 2 - 2; z += B.grade) { const r = D.zoneAt(x, z); if (r && footFreeR(x, z, B.livre)) pts.push([x, z, r]); } }
+  if (!L0.chao) { const pts = L0.chao = []; if (M?.w && D.zoneAt) for (let x = -M.w / 2 + 2; x < M.w / 2 - 2; x += B.grade) for (let z = -M.d / 2 + 2; z < M.d / 2 - 2; z += B.grade) { const r = D.zoneAt(x, z); if (r && footFreeR(x, z, B.livre)) pts.push([x, z, r]); } }
   const pts = L0.chao;
-  const fora = r => ocup.every(o => Math.hypot(o.x - r[0], o.z - r[1]) > B.distMin) && D.doors.every(d => Math.hypot(d.x - r[0], d.z - r[1]) > 3) && D.windows.every(w => Math.hypot(w.x - r[0], w.z - r[1]) > 3);
+  const zi = ZINT_MAPA[curMapId].filter(o => o.t !== 'peca'), dZi = B.distInterativo ?? 3; // zv2-R3: longe dos interativos (barril, terminal, alavanca...): a peça ficava dentro do barril ou disputava o F
+  const fora = r => ocup.every(o => Math.hypot(o.x - r[0], o.z - r[1]) > B.distMin) && zi.every(o => Math.hypot(o.x - r[0], o.z - r[1]) > dZi) && D.doors.every(d => Math.hypot(d.x - r[0], d.z - r[1]) > 3) && D.windows.every(w => Math.hypot(w.x - r[0], w.z - r[1]) > 3);
   const cands = pts.filter(r => custo[r[2]] !== undefined && custo[r[2]] <= B.custoMax[dif] && fora(r));
   const esc = [], peso = r => Math.max(4, Math.hypot(r[0] - sp[0], r[1] - sp[1])) ** B.longe[dif];
   for (let k = 0; k < n * 2 && cands.length; k++) {
@@ -26462,12 +26463,12 @@ function zBuiltVis() { // cliente: máquina ainda desmontada fica escondida, com
 }
 function zPecasHud() { // HUD: peças pegas (sem dizer onde); no Fácil, marcador nas peças
   let el = $('#zpecas'); if (!ZD?.pecas || !ZC.on || !inGame) { if (el) el.style.display = 'none'; return ''; }
-  if (!el) { el = document.createElement('div'); el.id = 'zpecas'; el.style.cssText = 'position:absolute;top:34px;left:12px;font:700 15px Rajdhani,sans-serif;color:#e8e8e8;text-shadow:0 1px 3px #000;line-height:1.35;pointer-events:none'; ($('#zhud') || document.body).appendChild(el); }
+  if (!el) { el = document.createElement('div'); el.id = 'zpecas'; el.style.cssText = 'position:absolute;top:78px;left:12px;font:700 15px Rajdhani,sans-serif;color:#e8e8e8;text-shadow:0 1px 3px #000;line-height:1.35;pointer-events:none'; ($('#zhud') || document.body).appendChild(el); }
   el.style.display = '';
   const t = maq => `${maq === 'pap' ? 'Pack-a-Punch' : 'Energia'}: ${zConstruida(maq) ? 'montado' : `peças ${zPecasPegas(maq)}/${ZD.pecas[maq]}`}`;
   setHTML('zpecas', `${t('power')}<br>${t('pap')}`);
   zBuiltVis();
-  if (!ZBAL.dicas.dificuldades.includes(C.st?.zdiff ?? 1)) return '';
+  if (!ZBAL.dicas.dificuldades.includes(C.st?.zdiff ?? 1) || !CFG.zmarks || !me.alive) return '';
   let ob = ''; (ZD.zint || []).forEach((o, i) => { if (o.t !== 'peca' || ZC.zint?.[i]?.st === 'pega') return; const v = visScr(o.x, .6, o.z); if (v.off) return; const d = Math.hypot(o.x - me.pos.x, o.z - me.pos.z); if (d < 3) return; ob += `<span style="left:${v.x}px;top:${v.y}px"><i>◆</i>PEÇA ${Math.round(d)}m</span>`; });
   return ob;
 }
@@ -30894,7 +30895,7 @@ function zTickObjects() {
   } else if (Bx.st === 'offer' && now >= Bx.t) { Bx.st = 'idle'; Bx.uses++; broadcast({ t: 'zbox', st: 'idle', loc: Bx.loc }); }
   else if (Bx.st === 'teddy' && now >= Bx.t) { Bx.st = 'gone'; Bx.t = now + 5; broadcast({ t: 'zbox', st: 'gone' }); }
   else if (Bx.st === 'gone' && now >= Bx.t) {
-    const act = zActive(), ok = []; ZD.boxes.forEach((L, i) => { if (i !== Bx.loc && (ZBAL.caixa.qualquerLugar || act.has(zRoomAt(L.x + L.n[0], L.z + L.n[1])))) ok.push(i); }); // zumbi-v2 (Etapa 7): depois do ursinho a caixa vai para qualquer lugar válido do mapa (os lugares da caixa são todos alcançáveis abrindo portas)
+    const act = zActive(), ok = []; ZD.boxes.forEach((L, i) => { if (i !== Bx.loc && ((ZBAL.caixa.qualquerLugar && S.st?.zmode !== 'campanha') || act.has(zRoomAt(L.x + L.n[0], L.z + L.n[1])))) ok.push(i); }); // zumbi-v2 (Etapa 7): depois do ursinho a caixa vai para qualquer lugar válido do mapa (os lugares da caixa são todos alcançáveis abrindo portas)
     const nl = ok.length ? ok[Math.floor(Math.random() * ok.length)] : Bx.loc; // sem outro lugar nas áreas abertas: volta no mesmo lugar
     Bx.loc = nl; Bx.st = 'idle'; Bx.uses = 0; broadcast({ t: 'zbox', st: 'idle', loc: nl }); zBuildWalk();
   }
@@ -31455,7 +31456,7 @@ addEventListener('keydown', e => {
   if (G.cur === 'dmach' && hasW('dmach') && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ'].includes(e.code)) return; // Máquina da Morte: não troca até acabar
   switch (e.code) {
     case 'KeyF': if (ZC.on) zUse(); else knifeInspect(); break;
-    case 'KeyM': if (C.st?.mode === 'rounds') { RMM.big = !RMM.big; RMM.tb = 0; } break; // mapa grande do modo Zumbi: 1 = em volta de você, 2 = inteiro, 0 = fecha
+    case 'KeyM': if (C.st?.mode === 'rounds') { RMM.big = !RMM.big; RMM.tb = 0; } break; // radar do modo Rodadas: M alterna o mapa inteiro (o minimapa do modo Zumbi saiu na zumbi-v2)
     case 'KeyV': if (ZC.on && me.alive && !me.sprinting && !(ZC.revLocal > 0) && now >= G.nextFire && now >= G.switchEnd) knifeAttack(false); break;
     case 'Digit1': G.inv.primary && equip(G.inv.primary); break;
     case 'Digit2': G.inv.secondary && equip(G.inv.secondary); break;

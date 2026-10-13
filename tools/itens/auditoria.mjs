@@ -378,10 +378,10 @@ async function abrir(br, port) {
   return { pg, erros };
 }
 async function carregar(pg, mapa) {
-  await pg.evaluate(({ mapa, GFX, CAMP }) => { const T = window.__T; T.CFG.gfx = GFX; try { T.applyQuality(); } catch { }
-    T.startHost({ map: mapa, zmap: mapa, mode: 'zombies', rounds: 8, frags: 20, bots: 0, diff: 1, zdiff: 1 });
+  await pg.evaluate(({ mapa, GFX, CAMP, SEED, ZDIFF }) => { const T = window.__T; T.CFG.gfx = GFX; try { T.applyQuality(); } catch { }
+    T.startHost({ map: mapa, zmap: mapa, mode: 'zombies', rounds: 8, frags: 20, bots: 0, diff: 1, zdiff: ZDIFF, ...(SEED ? { seed: SEED } : null) }); // zv2-R3: ZV2_SORTEIO=1 dá semente à partida (o startHost não sorteia); ZV2_SEED e ZV2_ZDIFF opcionais
     if (CAMP) { T.C.st = { ...T.C.st, zmode: 'campanha' }; if (T.ZNOTA) T.ZNOTA.forca = true; T.buildMap(mapa); } // O3-D10: --camp monta os interativos e as notas da campanha (portas fechadas, como no clássico)
-    window.__simLock = true; T.curMapId = mapa; }, { mapa, GFX, CAMP: CAMPF }); // relógio travado: nenhum zumbi nasce nem a Caixa muda durante a leitura
+    window.__simLock = true; T.curMapId = mapa; }, { mapa, GFX, CAMP: CAMPF, SEED: process.env.ZV2_SORTEIO ? (+process.env.ZV2_SEED || 1 + Math.floor(Math.random() * 2e9)) : 0, ZDIFF: +(process.env.ZV2_ZDIFF ?? 1) }); // relógio travado: nenhum zumbi nasce nem a Caixa muda durante a leitura
   await pg.waitForFunction(() => !document.getElementById('warmMsg') && window.__T.ZC.world, null, { timeout: 600000, polling: 250 });
 }
 

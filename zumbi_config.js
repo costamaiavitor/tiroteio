@@ -45,6 +45,7 @@ export const ZBAL = {
     custoMax: [2500, 2500, 3000, 3000], // só áreas baratas ou médias: custo somado das portas até a área (desde o início) no máximo isso
     longe: [-.5, .5, 1.2, 2], // peso pela distância do nascimento: d^longe (negativo = perto no Fácil; maior = mais longe nos difíceis)
     distMin: 7, // distância mínima entre duas peças e de uma peça a qualquer máquina, arma ou caixa
+    distInterativo: 3, // e a mais disso de qualquer interativo (barril, terminal, alavanca...)
     grade: 3, livre: .9, // procura de chão para as peças: grade de 3 m, ponto com 0,9 m livres em volta
   },
   // Etapa 2: coice visual por arma (× no tranco do modelo; 1 = antes). Valores das revisões por arma (docs/zumbi-v2/relatorio_final.md)
