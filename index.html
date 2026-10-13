@@ -28632,7 +28632,7 @@ function campChefeNasce(k, o = {}) { // host: o chefe entra (campanha: objetivo 
   const d = campChefeDef(k); if (!d) return null;
   const B = CAMP_CHEFE_BASE, campo = !!o.campo || CAMP.modo === 'infinito';
   campChefeLimpa();
-  Object.assign(CAMP_CH, { k, def: d, campo, vidaK: o.vidaK || 1, rod: o.rodada ?? d.rodada ?? Z.round, encerra: o.encerra ?? (CAMP.modo === 'campanha' && d.encerra !== false), prox: now + (d.primeiroS ?? B.primeiroS) });
+  Object.assign(CAMP_CH, { k, def: d, campo, vidaK: o.vidaK || 1, rod: o.rodada ?? (campo && CAMP.modo === 'campanha' && d.vidaAtual ? Z.round : d.rodada) ?? Z.round, encerra: o.encerra ?? (CAMP.modo === 'campanha' && d.encerra !== false), prox: now + (d.primeiroS ?? B.primeiroS) });
   CAMP_CH.lacT = now + campChefeLacCada();
   const z = campZNasce(k, o.onde ?? (campo ? { perto: B.nascePerto } : d.nasce ?? { perto: B.nascePerto }));
   if (!z) { campChefeLimpa(); return null; }
@@ -29989,6 +29989,7 @@ const fgLac = tipo => ZKIND[tipo] ? tipo : 0; // sem o O3-D08 (Carvoeiro 12, Pre
 const fgLacOnde = () => CAMP_CH.campo || curMapId !== 'forno' ? 'perto' : FORNO.lacaio; // a calha só existe na arena (versão de campo: perto dos jogadores)
 CAMP_CHEFE[15] = {
   nome: 'O Foguista', rodada: 20, base: 9, porJog: 6, vel: 2, dm: 1.6, aw: .7, ac: 1.5, // O3-D15: vida ×1,5 (era base 6 e porJog 4: com o kit de 2 armas com PaP a luta caía para ~3 min; meta 4–6)
+  vidaAtual: 1, // objetivos do mapa (13/10): no Sanatório a etapa chega em qualquer rodada, sem kit; a vida é a da rodada em que ele entra (a rodada 20 da tabela só vale na arena)
   nasce: CAMP_FOG.nasce, entrada: 'fog-entrada', primeiroS: 3,
   fases: [{ de: 1, vel: 2 }, { de: .6, vel: 2.6, fala: 'fog-fase2' }, { de: .25, vel: 2.6, fala: 'fog-fase3', baixa: 1 }],
   ataques: [
@@ -30082,8 +30083,8 @@ function fgArenaTick(dt) {
   }
 }
 CAMP_GANCHOS.tick.push(fgArenaTick);
-CAMP_GANCHOS.rodada.push(() => { // rodada 20 (§8.2): os 20 comuns da curva (os especiais do clássico ficam fora; os lacaios são do Foguista)
-  if (CAMP.modo === 'campanha' && CAMP_ATOS[CAMP.et]?.mapa === 'forno' && Z.mix) { Z.mix = ZKIND.map(() => 0); Z.mixN = 0; }
+CAMP_GANCHOS.rodada.push(() => { // rodada do Foguista (§8.2): os 20 comuns da curva (os especiais do clássico ficam fora; os lacaios são do Foguista), na arena ou no Sanatório
+  if (CAMP.modo === 'campanha' && (CAMP_ATOS[CAMP.et]?.mapa === 'forno' || CAMP_ATOS[CAMP.et]?.id === 'C2') && Z.mix) { Z.mix = ZKIND.map(() => 0); Z.mixN = 0; }
 });
 CAMP_GANCHOS.inicio.push(e => { // etapa da arena: energia ligada (máquina de munição; a arena não tem chave de energia)
   if (CAMP_ATOS[e]?.mapa === 'forno' && curMapId === 'forno') campEnergia();
@@ -30302,7 +30303,7 @@ function fornoAnim(dt) { // portas dos fornos, brilho do aviso e o fogo, a lona 
     FGCLI.aOk = true; FGCLI.ax = me.pos.x; FGCLI.az = me.pos.z; me.sprinting = false;
   } else FGCLI.aOk = false;
 }
-if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { matchForm, campForm0, CAMP_FOG, FGSRV, FGCLI, FG_FX, FORNO, FORNO_V, fgTick, fgIA, fgFase, fgEsteira, fgBoca, fgPoco, fgArenaTick, fgFornoPos, fgFornoOk, fgNaFrente, fgHud, fgImune, fgCliCorta, fgDif, fornoAnim, fornoEsconde, fgModelo, fgValvC, fornoFace,
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { matchForm, campForm0, campEtapaPrepara, campProxObjetivos, CAMP_FOG, FGSRV, FGCLI, FG_FX, FORNO, FORNO_V, fgTick, fgIA, fgFase, fgEsteira, fgBoca, fgPoco, fgArenaTick, fgFornoPos, fgFornoOk, fgNaFrente, fgHud, fgImune, fgCliCorta, fgDif, fornoAnim, fornoEsconde, fgModelo, fgValvC, fornoFace,
   fornoEstado: () => ({ mapa: curMapId, anim: MAP_ANIM.includes(fornoAnim), chama: FORNO_V.chama ? !!scene.getObjectById(FORNO_V.chama.id) : null, portas: FORNO_V.portas?.map(P => +P.a.toFixed(2)) ?? null, pap: ZC.world?.pap?.g.visible ?? null, power: ZC.world?.power?.g.visible ?? null, emb: FG_FX.emb?.count ?? null }) }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); }
 // ===== FIM O3-D11 =====
 //
