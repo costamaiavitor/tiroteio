@@ -210,7 +210,7 @@ test('quem entra no meio: espectador na rodada de chefe; recebe o chefe, a fase,
     const i = idx('forno-valvula-2'), v = T.ZD.zint[i]; poe(p, v.x + 1, v.z); T.srvZUse(p, { k: 'zint', id: i }); T.sim(2.2); poe(p, -6, -19);
     T.campChefeAtaca(z, atk('forno'), p); T.sim(.1);
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 3, name: 'Meio' }); T.sim(.2);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 4, name: 'Meio' }); T.sim(.2);
     const q = T.S.players.get(c.pid), st = c.out.filter(m => m.t === 'state' && m.z).pop(), cp = st?.z?.cp;
     const o = { vivo: q?.alive, ch: cp?.ch?.slice(0, 3), tel: cp?.tel?.[0]?.a, zint: st?.z?.zi?.[i]?.[0] ?? null };
     T.srvDrop(c); T.campCliReset(); T.campSync(cp); T.sim(1 / 60); o.cli = T.CAMP.c.ch && [T.CAMP.c.ch.k, T.CAMP.c.ch.f]; CH.fase = 0; limpa(); T.sim(20);

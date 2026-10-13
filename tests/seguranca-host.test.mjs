@@ -67,7 +67,14 @@ test('V01 hit (faca): perto e à vista vale; através do chão (3 m abaixo) é r
 });
 
 test('V02 pos: andar normal (o próprio cliente do host a 30 Hz) é aceito sem anomalia', async () => {
-  const r = await noJogo(J.page, T => { const { h } = __prep(.1); h.anom = null; const x0 = T.me.pos.x; for (let i = 1; i <= 30; i++) { T.me.pos.x = x0 + .2 * i; T.sim(1 / 30); } return { d: h.pos[0] - x0, anom: h.anom?.n || 0 }; });
+  const r = await noJogo(J.page, T => {
+    const { h } = __prep(.1); h.anom = null;
+    // O3-D16: o nascimento na arena é sorteado; anda para um lado com 7 m livres (com parede a 0,4 m o teste falhava sem anomalia nenhuma)
+    const V3 = T.camera.position.constructor, livre = (x, z) => [.4, 1].every(y => T.trace(new V3(T.me.pos.x, T.me.pos.y + y, T.me.pos.z), new V3(x, 0, z), 7, null).t >= 7 - .05);
+    const [dx, dz] = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([x, z]) => livre(x, z)) || [1, 0];
+    const x0 = T.me.pos.x, z0 = T.me.pos.z; for (let i = 1; i <= 30; i++) { T.me.pos.x = x0 + dx * .2 * i; T.me.pos.z = z0 + dz * .2 * i; T.sim(1 / 30); }
+    return { d: (h.pos[0] - x0) * dx + (h.pos[2] - z0) * dz, anom: h.anom?.n || 0 };
+  });
   assert.ok(r.d > 1 && r.d <= 6.5, `andou ${r.d}`); assert.equal(r.anom, 0); // pode parar antes dos 6 m numa parede do mapa (física do próprio cliente), nunca por anomalia
 });
 

@@ -48,7 +48,10 @@ test('clássico sem efeito: nenhum chefe da campanha, barra do Carniceiro, sem c
     if (T.Z.phase !== 'round') T.zStartRound();
     const z0 = T.campChefeNasce(TK), ch0 = T.campChefeEstado();
     // Carniceiro pela fila: bo é o dele, sem caixa 'fraco'
-    T.Z.zs.clear(); T.Z.reQ.push([6, 0, 0]); T.Z.toSpawn++; const id = T.Z.nextId; T.zSpawnOne(); const c = T.Z.zs.get(id); c.hp = c.maxHp * .5; T.sim(.3);
+    // O3-D16: o Carniceiro nasce num raio sorteado em volta do jogador, só em células com o campo de fluxo pronto (no começo da partida
+    // ele ainda está sendo calculado em fatias): sem chão, a chamada falha; tenta de novo andando um pouco o relógio
+    T.Z.zs.clear(); T.Z.spawnT = 1e12; let id, c = null; for (let k = 0; k < 40 && !c; k++) { T.Z.reQ = [[6, 0, 0]]; T.Z.toSpawn++; id = T.Z.nextId; if (T.zSpawnOne()) c = T.Z.zs.get(id); else { T.Z.toSpawn--; T.sim(.1); } }
+    c.hp = c.maxHp * .5; T.sim(.3);
     const zc = T.ZC.zs.get(id), caixas = zc ? T.zBoxes(zc).map(b => b[0]) : null;
     return { on: T.CAMP.on, z0, ch0, bo: T.ZC.bo, txt: document.getElementById('zboss').firstChild.nodeValue, caixas, fbx: zc?.fbx ?? null, av: T.CAMP_AV, pil: T.ZD.zint.filter(o => o.t === 'pilar').length, d: T.campDanoPilar(0, 100), tk: TK };
   }, DEF.toString());
@@ -211,7 +214,7 @@ test('quem entra no meio: cp com o chefe, a fase e o aviso no ar; o cliente mont
     quieto(); const z = CH.z; CH.inv = 0; z.body.pos.set(0, 0, -4); poe(p, 0, 2); p.dwEnd = 1e12;
     T.campChefeAtaca(z, atk('setor'), p); T.sim(.1);
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 3, name: 'Meio' }); T.sim(.05);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 4, name: 'Meio' }); T.sim(.05);
     T.sim(.15); const st = c.out.filter(m => m.t === 'state' && m.z).pop(), zs = c.out.filter(m => m.t === 'zs' && m.bo).pop();
     T.srvDrop(c);
     const cp = st?.z?.cp;

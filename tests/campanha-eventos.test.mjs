@@ -202,7 +202,7 @@ test('agenda: 13 Silêncio com o Carniceiro, 14 cães (sem evento), 15 Estouro; 
     const passa = rr => { limpa(); T.Z.round = rr - 1; T.Z.phase = 'round'; T.Z.toSpawn = 0; T.zEndRound(); const nd = T.Z.nextDog, nb = T.Z.nextBoss; T.zStartRound(); return { r: T.Z.round, ev: ev(), dog: T.Z.dogRound, bo: T.Z.bossQ, nd, nb, nd2: T.Z.nextDog, nb2: T.Z.nextBoss, toS: T.Z.toSpawn }; };
     const a12 = passa(12), a13 = passa(13);
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 3, name: 'Meio' }); T.sim(.05);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 4, name: 'Meio' }); T.sim(.05);
     const st = c.out.filter(m => m.t === 'state' && m.z).pop(); T.srvDrop(c);
     const cp = st?.z?.cp; T.CAMP_EVC.id = null; T.campSync(cp); const sync = T.CAMP_EVC.id;
     const a14 = passa(14), a15 = passa(15);

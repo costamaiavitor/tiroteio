@@ -137,7 +137,7 @@ test('fase 1 -> 2: ×0,2 com tanque de pé; os 4 tanques caídos passam à fase 
     T.sim(.8); o.fundo = +z.body.pos.y.toFixed(2); for (let k = 0; k < 60 && T.DRSRV.modo !== 'chao'; k++) T.sim(.05); o.sai = [T.DRSRV.modo, +z.body.pos.y.toFixed(2), +Math.min(...T.GAL7.pocos.map(w => Math.hypot(w[0] - z.body.pos.x, w[1] - z.body.pos.z))).toFixed(2)];
     T.sim(2); const zc = T.ZC.zs.get(z.id); o.cli = [T.CAMP.c.ch.f, +(zc?.sz ?? 0).toFixed(2)];
     CH.inv = 0; const h2 = z.hp; T.zHit(p, z.id, 1000, 'body', 'm1911', false); o.semProt = h2 - z.hp;
-    T.campChefeLacaios(CH.def.lacaios); T.sim(.1); const af = [...T.Z.zs.values()].filter(x => x.lac); o.afogados = [af.length, af.every(x => x.kind === 9), af.every(x => T.GAL7.agua.some(a => Math.hypot(a[0] - x.body.pos.x, a[1] - x.body.pos.z) < 1.6))]; for (const x of af) T.Z.zs.delete(x.id);
+    T.campChefeLacaios(CH.def.lacaios); const af = [...T.Z.zs.values()].filter(x => x.lac), naAgua = af.every(x => T.GAL7.agua.some(a => Math.hypot(a[0] - x.body.pos.x, a[1] - x.body.pos.z) < 1.6)); T.sim(.1); o.afogados = [af.length, af.every(x => x.kind === 9 && T.Z.zs.has(x.id)), naAgua]; for (const x of af) T.Z.zs.delete(x.id); // O3-D16: a posição no nascimento (no T.sim o Afogado já anda submerso para o alvo)
     return o;
   });
   assert.equal(r.prot, 200, 'protegido: ×0,2'); assert.deepEqual(r.f1, [0, 'protegido']);
@@ -166,7 +166,7 @@ test('ataques das fases 2 e 3: maré (plataforma seca), onda (45 + empurrão), a
     chao(2, 0); poe(p, 14, 10); T.DRSRV.nadaT = agora(); T.sim(1 / 30); o.nada = T.DRSRV.modo; for (let k = 0; k < 100 && T.DRSRV.modo !== 'chao'; k++) T.sim(.05); o.nadou = [T.DRSRV.modo, +Math.hypot(z.body.pos.x - 11, z.body.pos.z - 6).toFixed(2)]; T.DRSRV.nadaT = 1e12;
     return o;
   });
-  assert.ok(Math.abs(r.tm[0] - 2) <= 1 / 30 && r.tm[1] === null, 'maré: aviso de 2 s ' + r.tm); // O3-D15: o cp pode reenviar o aviso no ar 1 tick depois (s 1,98; pendência do aviso duplicado no host, D07) assert.equal(r.mAntes, 0); assert.ok(r.subindo, 'a água sobe no aviso'); assert.equal(r.mare, 10, 'maré 10/s ' + JSON.stringify(r)); assert.ok(r.cliMare);
+  assert.deepEqual(r.tm, [2, null], 'maré: aviso de 2 s (O3-D16: o cp não reenvia mais o aviso no ar)'); assert.equal(r.mAntes, 0); assert.ok(r.subindo, 'a água sobe no aviso'); assert.equal(r.mare, 10, 'maré 10/s ' + JSON.stringify(r)); assert.ok(r.cliMare);
   assert.equal(r.seco, 0, 'plataforma seca'); assert.ok(Array.isArray(r.cp) && r.cp[0] > 0, 'maré no cp'); assert.deepEqual(r.acabou, [false, false]); assert.equal(r.desce, false);
   assert.deepEqual(r.to, [1.2, 'linha', 16, 3]); assert.equal(r.oAntes, 0); assert.equal(r.onda, 45); assert.ok(r.emp, 'empurrão');
   assert.deepEqual(r.ta, [.8, 'disco']); assert.equal(r.aAntes, 0); assert.deepEqual(r.preso, [true, true, true]); assert.deepEqual(r.solto, [0, false, true, true], 'o tiro no cano soltou');
@@ -209,7 +209,7 @@ test('quem entra no meio: espectador, recebe o chefe na fase 3, o aviso no ar (u
     const { p, CH, quieto, atk, limpa, chao, poe } = H; quieto(); limpa(); chao(0, 8); const z = CH.z; poe(p, 0, 14);
     T.campChefeAtaca(z, atk('mare'), p); T.sim(2.2); limpa(); T.campChefeAtaca(z, atk('onda'), p); T.sim(.1);
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 3, name: 'Meio' }); T.sim(.2);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 4, name: 'Meio' }); T.sim(.2);
     const q = T.S.players.get(c.pid), st = c.out.filter(m => m.t === 'state' && m.z).pop(), cp = st?.z?.cp;
     const o = { vivo: q?.alive, ch: cp?.ch?.slice(0, 3), tel: cp?.tel?.[0]?.a, dr: cp?.dr };
     T.srvDrop(c); T.campCliReset(); T.DRCLI.mareAte = 0; T.campSync(cp); T.campSync(cp); T.sim(1 / 60);

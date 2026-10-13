@@ -63,7 +63,9 @@ test('Ato V: cargas, Névoa, o Diretor só depois do V.2, fuga pela gaiola, fina
     T.sim(3); o.zs = T.Z.zs.size;
     // embarque: o host entra na gaiola; 10 s depois ela sobe
     p.dwEnd = 1e12; const g = T.ZD.zint[idx('g7-gaiola')]; poe(p, g.x, g.z); T.sim(.2); o.emb = T.Z.zint[idx('g7-gaiola')].st;
-    for (let k = 0; k < 11; k++) { poe(p, g.x, g.z); T.sim(1); }
+    // O3-D16: o host segura a posição na gaiola a cada passo (antes era 1 vez por segundo: os zumbis da fuga o empurravam até 3 m no
+    // segundo inteiro, para fora do raio de 2,2 m, e ele não contava como fugido)
+    for (let k = 0; k < 11 * 30; k++) { poe(p, g.x, g.z); T.sim(1 / 30); }
     o.final = [ob('F.2'), T.Z.zs.size, T.Z.toSpawn, T.CAMP_EVS.id, T.campVEstado().fase, T.campVEstado().completo, T.CAMP.fugiram?.includes('h'), T.CAMP.c.cena?.L.length];
     o.salvo = T.campSalvo().dif; o.infLib = T.campInfLiberado();
     T.sim(T.CAMP.fim.t - agora() + .3); T.sim(.2);
@@ -124,7 +126,7 @@ test('quem entra no meio na fuga: espectador, recebe o F.2, o Estouro da fuga e 
     const z = T.CAMP_CH.z; z.hp = 10; T.CAMP_CH.inv = 0; T.CAMP_CH.fase = T.CAMP_CH.def.fases.length - 1; T.zHit(p, z.id, 100, 'body', 'm1911', false); T.sim(4.3); T.CAMP.c.cena = null;
     const o = { fase: T.campVEstado().fase, f2: ob('F.2') };
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 3, name: 'Meio' }); T.sim(.2);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 4, name: 'Meio' }); T.sim(.2);
     const q = T.S.players.get(c.pid), st = c.out.filter(m => m.t === 'state' && m.z).pop(), cp = st?.z?.cp;
     Object.assign(o, { vivo: q?.alive, ob: cp?.ob?.find(x => x[0] === 'F.2')?.[1], ev: cp?.ev?.[0], fg: cp?.fg?.[0] });
     T.srvDrop(c); T.campCliReset(); T.CAMP_VC.fuga = 0; T.campSync(cp); T.sim(1 / 60);

@@ -124,12 +124,12 @@ async function fps(br) {
         const estado = () => { const CH = T.CAMP_CH; return { z: T.Z.zs.size, lac: T.campChefeLacVivos(), f: CH?.fase ?? null, atk: CH?.atk?.a?.id ?? CH?.atk?.id ?? null, prog: R.info.programs?.length ?? 0, geo: R.info.memory.geometries, tex: R.info.memory.textures }; };
         let ant = estado();
         await new Promise(ok => { let last = performance.now(), t0 = last; const f = () => { const t = performance.now(), dt = t - last; dts.push(dt); last = t; calls.push(R.info.render.calls); tris.push(R.info.render.triangles); R.info.reset();
-          const e = estado(); zs.push(e.z); lac.push(e.lac); if (dt > LENTO && lentos.length < 40) { const dif = {}; for (const k in e) if (e[k] !== ant[k]) dif[k] = [ant[k], e[k]]; lentos.push({ t: +((t - t0) / 1000).toFixed(2), ms: +dt.toFixed(1), ...dif }); } ant = e;
+          const e = estado(); if (e.prog > ant.prog && R.info.programs) (window.__novos ||= []).push(...R.info.programs.slice(ant.prog).map(p => `${((t - t0) / 1000).toFixed(2)} s, ataque ${e.atk}: ${String(p.cacheKey || p.name || '').replace(/\s+/g, ' ').slice(0, 300)}`)); zs.push(e.z); /* O3-D16: chave de cada programa novo (compilação na luta) */ lac.push(e.lac); if (dt > LENTO && lentos.length < 40) { const dif = {}; for (const k in e) if (e[k] !== ant[k]) dif[k] = [ant[k], e[k]]; lentos.push({ t: +((t - t0) / 1000).toFixed(2), ms: +dt.toFixed(1), ...dif }); } ant = e;
           if (t - t0 < SEG * 1000) requestAnimationFrame(f); else ok(); }; requestAnimationFrame(f); });
         R.info.autoReset = true; dts.shift(); calls.shift(); tris.shift(); const s = [...dts].sort((a, b) => a - b), q = p => s[Math.min(s.length - 1, Math.floor(p * s.length))];
         const media = a => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length), tot = dts.reduce((a, b) => a + b, 0), pior1 = s.slice(Math.floor(s.length * .99));
         return { fpsMedio: +(1000 * dts.length / tot).toFixed(1), fps1low: +(1000 / media(pior1)).toFixed(1), msMediana: +q(.5).toFixed(2), msP90: +q(.9).toFixed(2), msP99: +q(.99).toFixed(2), msMax: +s[s.length - 1].toFixed(1),
-          drawCalls: Math.round(media(calls)), drawMax: Math.max(...calls), triangulos: Math.round(media(tris)), zumbis: +media(zs).toFixed(1), zumbisMax: Math.max(...zs), lacaiosMax: Math.max(...lac), programas: [prog0, R.info.programs?.length ?? 0], lentos,
+          drawCalls: Math.round(media(calls)), drawMax: Math.max(...calls), triangulos: Math.round(media(tris)), zumbis: +media(zs).toFixed(1), zumbisMax: Math.max(...zs), lacaiosMax: Math.max(...lac), programas: [prog0, R.info.programs?.length ?? 0], programasNovos: window.__novos || [], lentos,
           memJsMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null };
       }, { SEG, LENTO });
       const M = { etapa, dif, np, rep, rodada: rod, cargaMs: carga, ...m }; if (erros.length) M.erros = erros.slice(0, 5); out.medidas.push(M);

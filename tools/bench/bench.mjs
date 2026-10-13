@@ -4,7 +4,7 @@
 // Uso:
 //   node tools/bench/bench.mjs [--pagina index.html] [--gfx medio] [--mapas vila,sanatorio,arena,dust,armazem,favela,neve]
 //                              [--rodadas 1,5,10,15] [--seg 10] [--saida bench-resultado.json] [--repetir 1]
-//                              [--horda 1] [--zdiff 1] [--espera 150] [--arma mp40]
+//                              [--horda 1] [--zdiff 1] [--espera 150] [--arma mp40] [--gpuDedicada 1]
 // Por medida: FPS médio, FPS mínimo, "1% low", quadro mediano/p90/p99 (ms), draw calls e triângulos médios,
 // zumbis ativos, memória JS e de vídeo (geometrias/texturas) e tempos de carga (montagem + aquecimento).
 // --horda 1 (A20, estresse): em vez dos primeiros segundos da rodada, espera os zumbis vivos chegarem ao teto da dificuldade
@@ -30,6 +30,7 @@ const SEG = +arg('seg', 10), REP = +arg('repetir', 1);
 const SAIDA = arg('saida', 'bench-resultado.json');
 const ZUMBI = new Set(['vila', 'sanatorio']);
 const HORDA = +arg('horda', 0), ZDIFF = +arg('zdiff', 1), ESPERA = +arg('espera', 150), ARMA = arg('arma', 'mp40');
+const GPUHP = +arg('gpuDedicada', 0); // O3-D16: 1 = força a placa dedicada (notebook híbrido; sem isso o Chromium usa a integrada, como no bench-campanha)
 const TETO = [20, 24, 28, 30][ZDIFF] ?? 24; // zDf().max de cada dificuldade (ZDIFF do jogo)
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.png': 'image/png', '.jpg': 'image/jpeg', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav' };
@@ -114,7 +115,7 @@ async function hordaFim(pg, h) {
 
 (async () => {
   await new Promise(r => srv.listen(0, '127.0.0.1', r)); const port = srv.address().port;
-  const br = await chromium.launch({ args: ['--use-angle=d3d11', '--enable-gpu-rasterization', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit', '--autoplay-policy=no-user-gesture-required', '--enable-precise-memory-info'] });
+  const br = await chromium.launch({ args: ['--use-angle=d3d11', '--enable-gpu-rasterization', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit', '--autoplay-policy=no-user-gesture-required', '--enable-precise-memory-info', ...(GPUHP ? ['--force_high_performance_gpu'] : [])] });
   const out = { pagina: path.relative(RAIZ, PAGINA) || PAGINA, gfx: GFX, seg: SEG, quando: new Date().toISOString(), medidas: [] };
   for (let rep = 0; rep < REP; rep++) for (const mapa of MAPAS) {
     const { pg, erros } = await abrir(br, port);

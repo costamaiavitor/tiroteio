@@ -26,7 +26,7 @@ const PREP = `(T => {
 })`;
 // jogador falso (como nos testes de rede): entra pela porta da frente do host
 const FALSO = `(T => { const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-  T.srvOnData(c, { t: 'join', v: 2, pv: 3, name: 'Outro' }); const q = T.S.players.get(c.pid); if (q) { q.alive = true; q.downed = false; } return { c, q }; })`;
+  T.srvOnData(c, { t: 'join', v: 2, pv: 4, name: 'Outro' }); const q = T.S.players.get(c.pid); if (q) { q.alive = true; q.downed = false; } return { c, q }; })`;
 
 test('máquinas (Vila): monta munição, baú do armeiro e sino (colisor no COL, estado pronto, preços da tabela na auditoria)', { timeout: 240000 }, async () => {
   await criarSala(J.page, { mode: 'zombies', map: 'vila', zdiff: 1 });
