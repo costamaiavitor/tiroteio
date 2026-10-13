@@ -51,11 +51,12 @@ test('Etapa 8: peças no chão (por dificuldade); energia e PaP só funcionam de
     T.srvZUse(p, { k: 'power' }); T.sim(.1); out.ligou = !!T.Z.power;
     return out;
   });
-  assert.equal(r.n, r.esperado, 'peças da energia + do PaP');
-  assert.ok(r.areasOk, 'nenhuma peça em área cara');
-  assert.equal(r.ligouSemMontar, false, 'não liga antes de montar');
-  assert.deepEqual(r.pegas, [r.esperado / 2, r.esperado / 2], 'todas as peças pegas');
-  assert.ok(r.montada && r.ligou, 'monta e depois liga');
+  const info = JSON.stringify({ ...r, custo: undefined });
+  assert.equal(r.n, r.esperado, 'peças da energia + do PaP ' + info);
+  assert.ok(r.areasOk, 'nenhuma peça em área cara ' + info);
+  assert.equal(r.ligouSemMontar, false, 'não liga antes de montar ' + info);
+  assert.deepEqual(r.pegas, [r.esperado / 2, r.esperado / 2], 'todas as peças pegas ' + info);
+  assert.ok(r.montada && r.ligou, 'monta e depois liga ' + info);
 });
 
 test('Etapa 9: Pack-a-Punch 1 → 2 → 3, preço por nível, não passa do 3', async () => {
