@@ -23624,7 +23624,7 @@ function zSorteiaLugares(D, seed) {
   if (!D.lugares0) D.lugares0 = { perks: D.perks.map(pos), pap: D.pap && pos(D.pap), power: D.power && pos(D.power), wall: (D.wall || []).map(pos) };
   const L = D.lugares0; L.perks.forEach((l, i) => put(D.perks[i], l)); if (D.pap) put(D.pap, L.pap); if (D.power) put(D.power, L.power); (D.wall || []).forEach((w, i) => put(w, L.wall[i]));
   if (curMapId && ZINT_MAPA[curMapId]) ZINT_MAPA[curMapId] = ZINT_MAPA[curMapId].filter(o => o.t !== 'peca'); D.pecas = null; // zumbi-v2 (Etapa 8): peças da partida anterior saem
-  if (!seed || C.st?.zmode === 'campanha' || !D.perks.length) return; // a campanha usa os lugares fixos (os objetivos dependem deles)
+  if (!seed || !D.perks.length) return;
   zSorteiaPecas(D, zRng(seed ^ 0x9e3779b9)); // zumbi-v2 (Etapa 8)
   if (!ZBAL.lugares.sortear) return;
   const R = zRng(seed), sl = L.perks.map(l => l);
@@ -23635,7 +23635,7 @@ function zSorteiaLugares(D, seed) {
     L.papCabe ||= L.perks.map(cabe); // calculado uma vez, com o COL só do mapa (igual no host e nos clientes)
     const ks = D.perks.map((pk, i) => i).filter(i => L.papCabe[L.perks.findIndex(l => l.x === D.perks[i].x && l.z === D.perks[i].z)]); if (ks.length) { const i = ks[Math.floor(R() * ks.length)], l = pos(D.perks[i]); put(D.perks[i], L.pap); put(D.pap, { x: l.x + l.n[0] * .05, z: l.z + l.n[1] * .05, n: l.n }); } /* zv2-R3: o corpo do PaP tem 1 m de fundo e o da bebida 0,9: meio da diferença para fora, senão o PaP entrava 5 cm na parede */
   }
-  if (D.power) { // decisão do dono (13/10): a energia cai sempre numa área de custo médio (ZBAL.lugares.energiaCusto), no lugar dela ou trocando com um giz
+  if (D.power && C.st?.zmode !== 'campanha') { // objetivos do mapa: a energia fica no lugar (IV.1 e o gerador da Pedreira dependem dela). Decisão do dono (13/10): a energia cai sempre numa área de custo médio (ZBAL.lugares.energiaCusto), no lugar dela ou trocando com um giz
     const [cMin, cMax] = ZBAL.lugares.energiaCusto, custo = zCustoAreas(D), medio = o => { const c = custo[D.zoneAt?.(o.x, o.z)]; return c !== undefined && c >= cMin && c <= cMax; };
     const ks = [...(medio(D.power) ? [-1] : []), ...(D.wall || []).map((w, i) => i).filter(i => !D.wall[i].post && medio(D.wall[i]))]; /* zv2-R3: só giz pintado na parede (o de placa em pé deixava o quadro da energia flutuando sem parede atrás) */
     if (ks.length) { const i = ks[Math.floor(R() * ks.length)]; if (i >= 0) { const l = pos(D.wall[i]); put(D.wall[i], L.power); put(D.power, l); } }
@@ -24722,6 +24722,7 @@ function zStartGame() {
     else if (cont) p.money = Math.max(p.money, Math.round(campMediaPts() * CAMP.ptsEntrada)); // sangrou no fim da campanha
     srvSpawn(p, zSpawnPoint(i++), true, Math.PI); p.hp = p.maxHp;
   }
+  if (CAMP.on && CAMP.modo === 'campanha') campComeca(); // objetivos do mapa: a primeira etapa
   if (cont) { const V = CAMP_V.txt; Z.round = cont.r; Z.nextDog = cont.r + 2 + Math.floor(Math.random() * 3); Z.nextBoss = cont.r + 1; Z.phaseEnd = now + 12; broadcast({ t: 'msg', txt: V.infTitulo, sub: `${V.infSub} ${cont.r + 1}`, dur: 5 }); }
   else broadcast({ t: 'msg', txt: 'SOBREVIVA', sub: 'Mate zumbis para ganhar pontos · F para comprar e abrir portas', dur: 4.5 });
   srvState();
@@ -26536,17 +26537,18 @@ function zSorteiaPecas(D, R) {
   const fora = r => ocup.every(o => Math.hypot(o.x - r[0], o.z - r[1]) > B.distMin) && zi.every(o => Math.hypot(o.x - r[0], o.z - r[1]) > dZi) && D.doors.every(d => Math.hypot(d.x - r[0], d.z - r[1]) > 3) && D.windows.every(w => Math.hypot(w.x - r[0], w.z - r[1]) > 3);
   const cands = pts.filter(r => custo[r[2]] !== undefined && custo[r[2]] <= B.custoMax[dif] && fora(r));
   const esc = [], peso = r => Math.max(4, Math.hypot(r[0] - sp[0], r[1] - sp[1])) ** B.longe[dif];
-  for (let k = 0; k < n * 2 && cands.length; k++) {
+  const maqs = C.st?.zmode === 'campanha' ? ['pap'] : ['power', 'pap'], tot = n * maqs.length; // objetivos do mapa: a energia vem dos objetivos (só peças do PaP)
+  for (let k = 0; k < tot && cands.length; k++) {
     const ok = cands.filter(r => esc.every(e => Math.hypot(e[0] - r[0], e[1] - r[1]) > B.distMin)); if (!ok.length) break;
     let tot = 0; for (const r of ok) tot += peso(r); let v = R() * tot, pick = ok[ok.length - 1]; for (const r of ok) if ((v -= peso(r)) <= 0) { pick = r; break; }
     esc.push(pick);
   }
-  if (esc.length < n * 2) return; // mapa sem pontos suficientes: fica como antes (energia e PaP prontos)
-  esc.forEach((r, i) => ZINT_MAPA[curMapId].push({ t: 'peca', x: r[0], z: r[1], n: [0, 1], maq: i % 2 ? 'pap' : 'power' }));
-  D.pecas = { power: n, pap: n };
+  if (esc.length < tot) return; // mapa sem pontos suficientes: fica como antes (energia e PaP prontos)
+  esc.forEach((r, i) => ZINT_MAPA[curMapId].push({ t: 'peca', x: r[0], z: r[1], n: [0, 1], maq: maqs[i % maqs.length] }));
+  D.pecas = Object.fromEntries(maqs.map(m => [m, n]));
 }
 const zPecasPegas = maq => { const L = ZD?.zint || [], E = NET.isHost ? Z.zint : null; let k = 0; L.forEach((o, i) => { if (o.t === 'peca' && o.maq === maq && (E ? E[i]?.st : ZC.zint?.[i]?.st) === 'pega') k++; }); return k; };
-const zConstruida = maq => !ZD?.pecas || !!(NET.isHost ? Z.built?.[maq] : ZC.built?.[maq]);
+const zConstruida = maq => !ZD?.pecas?.[maq] || !!(NET.isHost ? Z.built?.[maq] : ZC.built?.[maq]); // máquina sem peças na partida: pronta
 ZINT.peca = { nome: 'Peça', custo: 0, usoR: 1.8, srvR: 2.6, forca: 0 };
 ZINT_FN.peca = {
   est: ['pronto', 'pega'], // pronto = no chão
@@ -26582,7 +26584,7 @@ function zPecasHud() { // HUD: peças pegas (sem dizer onde); no Fácil, marcado
   if (!el) { el = document.createElement('div'); el.id = 'zpecas'; el.style.cssText = 'position:absolute;top:78px;left:12px;font:700 15px Rajdhani,sans-serif;color:#e8e8e8;text-shadow:0 1px 3px #000;line-height:1.35;pointer-events:none'; ($('#zhud') || document.body).appendChild(el); }
   el.style.display = '';
   const t = maq => `${maq === 'pap' ? 'Pack-a-Punch' : 'Energia'}: ${zConstruida(maq) ? 'montado' : `peças ${zPecasPegas(maq)}/${ZD.pecas[maq]}`}`;
-  setHTML('zpecas', `${t('power')}<br>${t('pap')}`);
+  setHTML('zpecas', ['power', 'pap'].filter(m => ZD.pecas[m]).map(t).join('<br>'));
   zBuiltVis();
   if (!ZBAL.dicas.dificuldades.includes(C.st?.zdiff ?? 1) || !CFG.zmarks || !me.alive) return '';
   let ob = ''; (ZD.zint || []).forEach((o, i) => { if (o.t !== 'peca' || ZC.zint?.[i]?.st === 'pega') return; const v = visScr(o.x, .6, o.z); if (v.off) return; const d = Math.hypot(o.x - me.pos.x, o.z - me.pos.z); if (d < 3) return; ob += `<span style="left:${v.x}px;top:${v.y}px"><i>◆</i>PEÇA ${Math.round(d)}m</span>`; });
@@ -26657,12 +26659,17 @@ const CAMP_GANCHOS = { // funções dos próximos blocos (D05, D07...): o motor 
 const CAMP_ATOS = [
   { id: 'I', ato: 0, nome: 'A família 413', mapa: 'vila', rod0: 1, rodMin: 4, rodMax: 4, cenaIni: 'c0-abertura', cenaFim: 'c1-fim', radioIni: 'r1-inicio', objs: ['I.1', 'I.2'], ini: ['I.1'] },
   { id: 'II', ato: 1, nome: 'A quarentena', mapa: 'vila', rod0: 5, rodMin: 9, rodMax: 9, cenaFim: 'c2-forte', radioIni: 'r2-inicio', objs: ['II.1', 'II.2', 'II.3', 'II.4'], ini: ['II.1'] },
-  { id: 'C1', ato: 1, nome: 'O Vigia', mapa: 'forte', rod0: 10, rodMin: 10, rodMax: 10, chefe: 1, cenaFim: 'c2-fim', objs: ['C1.1'], ini: ['C1.1'] },
+  { id: 'C1', ato: 1, nome: 'O Vigia', mapa: 'vila', rod0: 10, rodMin: 10, rodMax: 10, chefe: 1, cenaFim: 'c2-fim', objs: ['C1.1'], ini: ['C1.1'] },
   { id: 'III', ato: 2, nome: 'O Programa', mapa: 'sanatorio', rod0: 11, rodMin: 15, rodMax: 15, cenaIni: 'c3-abertura', cenaFim: 'c3-fim', radioIni: 'r3-inicio', objs: ['III.1', 'III.2', 'III.3', 'III.4'], ini: ['III.1'] },
   { id: 'IV', ato: 3, nome: 'O apito', mapa: 'sanatorio', rod0: 16, rodMin: 19, rodMax: 19, cenaFim: 'c4-forno', radioIni: 'r4-inicio', objs: ['IV.1', 'IV.2', 'IV.3'], ini: ['IV.1'] },
-  { id: 'C2', ato: 3, nome: 'O Foguista', mapa: 'forno', rod0: 20, rodMin: 20, rodMax: 20, chefe: 1, cenaFim: 'c4-fim', objs: ['C2.1'], ini: ['C2.1'] },
-  { id: 'V', ato: 4, nome: 'A Galeria 7', mapa: 'galeria7', rod0: 21, rodMin: 25, rodMax: 25, cenaIni: 'c5-abertura', radioIni: 'r5-inicio', objs: ['V.1', 'V.2', 'F.1', 'F.2'], ini: ['V.1'] },
+  { id: 'C2', ato: 3, nome: 'O Foguista', mapa: 'sanatorio', rod0: 20, rodMin: 20, rodMax: 20, chefe: 1, cenaFim: 'c4-fim', objs: ['C2.1'], ini: ['C2.1'] },
+  { id: 'V', ato: 4, nome: 'A Galeria 7', mapa: 'sanatorio', rod0: 21, rodMin: 25, rodMax: 25, cenaIni: 'c5-abertura', radioIni: 'r5-inicio', objs: ['V.1', 'V.2', 'F.1', 'F.2'], ini: ['V.1'] },
 ];
+// Decisão do dono (13/10): não existe mais "campanha" no menu. O modo zumbi tem objetivos dentro do mapa escolhido, em sequência: cada
+// etapa abaixo começa quando a anterior acaba (no fim da rodada), sem troca de mapa nem arena (os chefes lutam no próprio mapa, na versão
+// de campo), sem cena, sem kit e sem checkpoint (o time caído acaba a partida, como sempre). Depois da última, a partida segue em rodadas
+// infinitas (o mesmo do infinito: escalada, eventos e chefes de campo). Internamente o modo continua sendo zmode 'campanha'.
+const OBJ_MAPA = { vila: ['I', 'II', 'C1'], sanatorio: ['III', 'IV', 'C2', 'V'] };
 const CAMP_ATO_CARTAO = ['I · A família 413', 'II · A quarentena', 'III · O Programa', 'IV · O apito', 'V · A Galeria 7']; // menu (lore.md §5)
 // Objetivos (§4.1): { id, tipo, titulo, abre: [portas], radio: { ini, ok, falha, lembra }, depois: [ids], ...campos do tipo }
 //  usar:     alvo: { zint: id ou [ids], st: [estados de pronto] (padrão: o estado final do tipo da campanha), n }
@@ -26734,12 +26741,11 @@ const campAtoMax = dif => { let a = campLiberado(dif); while (a > 0 && campEtapa
 const campInfLiberado = () => Object.values(campSalvo().dif).some(d => d.fim);
 // ---------- menu (matchForm) e saneSt ----------
 const CAMP_MODOS = ['classico', 'campanha', 'infinito'];
-function campForm0(st) { // matchForm: zmode e ato vindos do localStorage (editável) só da lista e até o ato liberado
-  if (!CAMP_MODOS.includes(st.zmode)) st.zmode = 'classico';
-  if (st.zmode === 'infinito' && !campInfLiberado()) st.zmode = 'classico';
-  st.ato = clamp(st.ato | 0, 0, campAtoMax(st.zdiff));
+function campForm0(st) { // matchForm: um modo só, com os objetivos do mapa (os testes do clássico de antes ligam window.__semObjetivos)
+  st.zmode = DEBUG && window.__semObjetivos ? 'classico' : 'campanha'; st.ato = 0;
 }
-function campFormRender(el, st) { // matchForm: linha "Modo" e, na campanha, os cartões dos atos no lugar dos mapas
+function campFormRender(el, st) { // matchForm: sem a linha "Modo" (um modo só)
+  return;
   if (st.mode !== 'zombies') return;
   campForm0(st);
   const lbls = el.querySelectorAll(':scope > .lbl'), lm = lbls[1]; if (!lm) return; // "Mapa"
@@ -26767,7 +26773,6 @@ function campFormClick(b, st) { // matchForm: botões da campanha (true = tratou
 function campFormOut(st) { // matchForm: o que vai no st (o host prende o ato ao liberado; na campanha o mapa é o da etapa)
   campForm0(st);
   const o = { zmode: st.zmode, ato: st.ato };
-  if (st.mode === 'zombies' && st.zmode === 'campanha') { let e = campEtapaDoAto(st.ato); if (e < 0) { o.ato = 0; e = campEtapaDoAto(0); } if (e >= 0) o.map = CAMP_ATOS[e].mapa; }
   return o;
 }
 const campSaneSt = st => ({ zmode: CAMP_MODOS.includes(st.zmode) ? st.zmode : 'classico', ato: clamp(st.ato | 0, 0, CAMP_ATO_CARTAO.length - 1) }); // saneSt (entrada não confiável)
@@ -26778,6 +26783,12 @@ function campInicio() { // gancho no começo do zStartGame: devolve true quando 
   if (md !== 'campanha' && md !== 'infinito') { if (CAMP.on) { CAMP.on = false; CAMP.modo = null; campLimpa(); } return false; }
   CAMP.on = true; CAMP.modo = md;
   if (md === 'infinito') { campLimpa(); CAMP.et = -1; return false; } // o infinito começa como o clássico (D14)
+  if (md === 'campanha') { // objetivos do mapa: a partida começa como a do clássico e o zStartGame chama o campComeca
+    campLimpa(); CAMP.docs = new Set(); CAMP.et = -1;
+    CAMP.cadeia = (OBJ_MAPA[S.st.map] || []).map(id => CAMP_ATOS.findIndex(a => a.id === id)).filter(e => e >= 0 && campEtapaOk(e));
+    if (!CAMP.cadeia.length) CAMP.modo = 'infinito'; // mapa sem objetivos: rodadas infinitas desde o começo
+    return false;
+  }
   const trans = CAMP.trans?.fase === 'troca' ? CAMP.trans : null, doOver = S.phase === 'over' && CAMP.over && S.st === CAMP.overSt;
   if (doOver && !CAMP.repetir && campInfContinua()) return true; // campanha concluída: rodadas infinitas
   if (doOver && !CAMP.repetir && S.fromLobby) { campLimpa(); CAMP.on = false; Z.on = false; Z.zs = new Map(); backToLobby(); return true; } // ninguém pediu para repetir: lobby
@@ -26813,6 +26824,18 @@ function campInicio() { // gancho no começo do zStartGame: devolve true quando 
   }
   srvState();
   return true;
+}
+function campComeca() { // host: primeira etapa da sequência do mapa (depois do zReset e dos jogadores)
+  Z.nextDog = Z.nextBoss = 1e9; // cães e Carniceiro do clássico desligados enquanto houver objetivos: só os da agenda (D05)
+  CAMP.etR = 0; campEtapaPrepara(CAMP.cadeia[0], false);
+}
+function campProxObjetivos() { // host: fim de uma etapa (no intervalo): a seguinte do mapa ou, sem mais, as rodadas infinitas
+  const k = CAMP.cadeia ? CAMP.cadeia.indexOf(CAMP.et) : -1, prox = k >= 0 ? CAMP.cadeia[k + 1] : undefined;
+  if (prox !== undefined) { CAMP.etR = Z.round; campEtapaPrepara(prox, false); return; }
+  CAMP.modo = 'infinito'; CAMP.et = -1; CAMP.obj = {}; CAMP.alvos = []; CAMP.npc = null; CAMP.cadeia = null;
+  Z.nextDog = Z.round + 2 + Math.floor(Math.random() * 3); Z.nextBoss = Z.round + 2; CAMP_EVS.inf.prox = Z.round + 2; CAMP_EVS.inf.vistoR = Z.round;
+  broadcast({ t: 'camp', k: 'est', ...campCp() });
+  broadcast({ t: 'msg', txt: 'OBJETIVOS CONCLUÍDOS', sub: 'Agora é sobreviver: as rodadas não acabam', dur: 5 });
 }
 function campDocsSala() { // host: documentos lidos pela sala na campanha inteira (soma os do mapa atual, O3-D04 campDocs)
   if (typeof campDocs === 'function') for (const id of campDocs().lidos) CAMP.docs.add(id);
@@ -26872,8 +26895,8 @@ function campFimRodada() { // gancho no zEndRound
   const A = CAMP_ATOS[CAMP.et];
   for (const id in CAMP.obj) if (CAMP.obj[id].st === 'falhou') campObjVolta(id); // falhou: volta no intervalo
   for (const f of CAMP_GANCHOS.fimRodada) f(Z.round);
-  if (campEtapaFeita() && Z.round >= A.rodMin) return campFimEtapa();
-  if (Z.round >= A.rodMax) { for (const id in CAMP.obj) { const O = CAMP.obj[id], D = CAMP_OBJ[id]; if (O.st === 'ativo' && (D.radio?.lembra || D.radio?.ini)) { campRadio(D.radio.lembra || D.radio.ini); break; } } }
+  if (campEtapaFeita()) return campProxObjetivos();
+  if (Z.round - (CAMP.etR || 0) >= 2 && (Z.round - (CAMP.etR || 0)) % 2 === 0) { for (const id in CAMP.obj) { const O = CAMP.obj[id], D = CAMP_OBJ[id]; if (O.st === 'ativo' && (D.radio?.lembra || D.radio?.ini)) { campRadio(D.radio.lembra || D.radio.ini); break; } } }
 }
 const campEtapaFeita = () => Object.values(CAMP.obj).every(O => O.st === 'feito');
 function campFimEtapa() { // cena, salvo do próximo ato e (depois da cena) a etapa seguinte ou a troca de mapa
@@ -26898,7 +26921,8 @@ function campConcluida() { // fim da campanha (o D14 põe créditos e o infinito
   broadcast({ t: 'camp', k: 'fim', dif: S.st.zdiff | 0 });
   S.phase = 'over'; S.phaseEnd = now + CAMP.repetirS; Z.phase = 'over'; CAMP.over = true; CAMP.overSt = S.st; CAMP.repetir = false; srvState();
 }
-function campOver() { // gancho no zCheckOver: o time inteiro caiu (checkpoint)
+function campOver() { // gancho no zCheckOver: o time inteiro caiu. Objetivos do mapa: fim de jogo como no clássico (sem checkpoint)
+  return;
   if (CAMP.modo !== 'campanha' || CAMP.et < 0) return;
   CAMP.over = true; CAMP.overSt = S.st; CAMP.repetir = false; CAMP.fim = null; CAMP.trans = null; S.phaseEnd = now + CAMP.repetirS;
   for (const a of CAMP.alvos) a.alive = false; CAMP.alvos = [];
@@ -26927,7 +26951,8 @@ function campAlvos(tg, dt) { // a cada tick do servidor com a campanha ligada: o
   if (CAMP.et >= 0) campObjTick(dt);
   for (const f of CAMP_GANCHOS.tick) f(dt);
 }
-function campEntradas() { // quem entrou no meio (§12): no intervalo, kit do ato; em rodada, espera a próxima (espectador)
+function campEntradas() { // quem entrou no meio: como no clássico (sem kit do ato)
+  return;
   for (const p of S.players.values()) {
     if (CAMP.vistos.has(p.id)) continue; CAMP.vistos.add(p.id);
     if (p.isBot) continue;
@@ -27168,7 +27193,7 @@ function campRoundFx(r, dog) { // gancho no zRoundFx: banner da rodada na campan
   if (!campCliOn()) return false;
   for (const f of CAMP_GANCHOS.roundFx) if (f(r, dog)) return true;
   if (dog) return false;
-  const A = CAMP_ATOS[CAMP.c.et]; centerMsg('RODADA ' + r, A ? A.nome : '', 2.5); return true;
+  return false; // o banner do clássico (sem nome de ato)
 }
 // ---------- cliente: HUD (painel do objetivo, seta, rádio, cena, checkpoint) ----------
 const CAMP_CSS = `#campHud{position:absolute;inset:0;pointer-events:none}
@@ -27224,7 +27249,7 @@ function campHud(dt) { // gancho no fim do zHud (cada quadro do cliente)
   // painel do objetivo
   const A = CAMP_ATOS[c.et]; let h = '';
   if (A) {
-    h = `<h4>${A.chefe ? 'Chefe' : 'Ato ' + CAMP_ATO_CARTAO[A.ato].split(' · ')[0]} · ${esc(A.nome)}</h4>`; let n = 0;
+    h = `<h4>${A.chefe ? 'Chefe' : 'Objetivo'}</h4>`; let n = 0;
     for (const id of c.ordem) { const o = c.obj[id], D = CAMP_OBJ[id]; if (!D || (o.st !== 'ativo' && o.st !== 'falhou') || n >= 3) continue; n++;
       const extra = o.st === 'falhou' ? ' <small>(falhou: volta no intervalo)</small>' : o.q ? ` <small>· com ${esc(C.players.get(o.q)?.n || '?')}</small>` : '';
       const bar = o.p > 0 || ['defender', 'segurar', 'escoltar', 'fugir'].includes(D.tipo) ? `<i><b style="width:${(o.p * 100).toFixed(0)}%"></b></i>` : '';
@@ -28674,7 +28699,7 @@ CAMP_GANCHOS.inicio.push(() => { if (CAMP_CH.z) broadcast({ t: 'camp', k: 'telx'
 // ---------- host: relógio (CAMP_GANCHOS.tick, campanha e infinito) ----------
 function campChefeBusca() { // campanha: objetivo 'matar' ativo com chefe na tabela e nenhum vivo = o chefe entra (na rodada)
   const CH = CAMP_CH; if (CAMP.modo !== 'campanha' || CH.z || now < CH.buscaT || Z.phase !== 'round') return; CH.buscaT = now + CAMP_CHEFE_BASE.busca;
-  for (const id in CAMP.obj) { const O = CAMP.obj[id], D = CAMP_OBJ[id]; if (O.st === 'ativo' && D?.tipo === 'matar' && CAMP_CHEFE[D.chefe]) { campChefeNasce(D.chefe, D.onde ? { onde: D.onde } : {}); return; } }
+  for (const id in CAMP.obj) { const O = CAMP.obj[id], D = CAMP_OBJ[id]; if (O.st === 'ativo' && D?.tipo === 'matar' && CAMP_CHEFE[D.chefe]) { const campo = !MAPS[curMapId]?.camp; campChefeNasce(D.chefe, { ...(D.onde && !campo ? { onde: D.onde } : {}), campo }); return; } } // objetivos do mapa: fora das arenas, a versão de campo
 }
 CAMP_GANCHOS.rodada.push(() => { CAMP_CH.buscaT = 0; });
 function campChefeTick(dt) {
@@ -31043,7 +31068,7 @@ function zTickObjects() {
   } else if (Bx.st === 'offer' && now >= Bx.t) { Bx.st = 'idle'; Bx.uses++; broadcast({ t: 'zbox', st: 'idle', loc: Bx.loc }); }
   else if (Bx.st === 'teddy' && now >= Bx.t) { Bx.st = 'gone'; Bx.t = now + 5; broadcast({ t: 'zbox', st: 'gone' }); }
   else if (Bx.st === 'gone' && now >= Bx.t) {
-    const act = zActive(), ok = []; ZD.boxes.forEach((L, i) => { if (i !== Bx.loc && ((ZBAL.caixa.qualquerLugar && S.st?.zmode !== 'campanha') || act.has(zRoomAt(L.x + L.n[0], L.z + L.n[1])))) ok.push(i); }); // zumbi-v2 (Etapa 7): depois do ursinho a caixa vai para qualquer lugar válido do mapa (os lugares da caixa são todos alcançáveis abrindo portas)
+    const act = zActive(), ok = []; ZD.boxes.forEach((L, i) => { if (i !== Bx.loc && ((ZBAL.caixa.qualquerLugar) || act.has(zRoomAt(L.x + L.n[0], L.z + L.n[1])))) ok.push(i); }); // zumbi-v2 (Etapa 7): depois do ursinho a caixa vai para qualquer lugar válido do mapa (os lugares da caixa são todos alcançáveis abrindo portas)
     const nl = ok.length ? ok[Math.floor(Math.random() * ok.length)] : Bx.loc; // sem outro lugar nas áreas abertas: volta no mesmo lugar
     Bx.loc = nl; Bx.st = 'idle'; Bx.uses = 0; broadcast({ t: 'zbox', st: 'idle', loc: nl }); zBuildWalk();
   }
