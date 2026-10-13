@@ -27307,7 +27307,6 @@ function campHud(dt) { // gancho no fim do zHud (cada quadro do cliente)
     if (!n) h += c.trans || c.cena ? '' : '<div class="o ok">Objetivos cumpridos: aguente até o fim da rodada</div>';
   }
   campSet(E.obj, 'o', h); E.obj.style.display = h ? '' : 'none';
-  { const np = ZD?.pecas ? Object.keys(ZD.pecas).length : 0, tp = np ? 82 + np * 20 + 'px' : ''; if (E.k.tp !== tp) { E.k.tp = tp; E.obj.style.top = tp; } } // a contagem das peças (#zpecas, zumbi-v2) fica no mesmo canto (top 78): o painel desce uma linha por máquina
   // seta: o objetivo ativo mais perto
   let mk = '';
   if (me.alive && !c.cena) { let best = null, bd = 1e9, bid = null;
