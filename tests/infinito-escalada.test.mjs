@@ -15,8 +15,8 @@ const AJUDA = `(T => {
   const limpa = () => { for (const z of [...T.Z.zs.values()]) T.zKill(z, null, 'body', 'nuke', false, true); T.Z.toSpawn = 0; T.Z.reQ = []; T.Z.mistaCaes = 0; T.Z.bossQ = 0; };
   const rodada = (r, o = {}) => {
     limpa(); T.Z.round = r - 1; T.Z.phase = 'break'; T.Z.phaseEnd = 0; T.Z.nextDog = o.cao ? r : 1e9; T.Z.nextBoss = o.carn ? r : 1e9;
-    T.sim(.05);
-    return { r: T.Z.round, n: T.Z.toSpawn, caes: T.Z.mistaCaes, carn: T.Z.bossQ, dog: T.Z.dogRound };
+    T.zStartRound(); const d = { r: T.Z.round, n: T.Z.toSpawn, caes: T.Z.mistaCaes, carn: T.Z.bossQ, dog: T.Z.dogRound }; // medido antes do tick (um evento sorteado do infinito pode mudar o total)
+    T.sim(.05); return d;
   };
   return { p, limpa, rodada };
 })`;
