@@ -54,13 +54,14 @@ test('Enfermeira-chefe: a chave aparece mesmo com a mensagem elite antes do 1º 
 
 test('aviso sem forma (maré, apito) na foto do mundo não entra de novo', { timeout: 60000 }, async () => {
   const r = await rodar((T, H) => {
+    const Z = T.Z, ph0 = [Z.phase, Z.phaseEnd]; Z.phase = 'break'; Z.phaseEnd = 1e12; // objetivos do mapa: sem rodada mínima, o fim de rodada (sem zumbis) trocaria a etapa vazia e o 'est' recriaria o CAMP.c no meio do teste
     const c = T.CAMP.c; c.tel = []; const tel = T.CAMP_GANCHOS.msg.tel;
     const m = { a: 'mare', f: null, p: [[1, 0, 2, 0]], d1: 3, d2: 1, g: 0, s: 2, at: 4 };
     tel(m); T.sim(1 / 60); tel({ ...m, s: 2 - 1 / 60, at: 4 }); // o cp de 1 tick depois
     const n1 = c.tel.length;
     const d = { a: 'pa', f: 'disco', p: [[1, 0, 2, 0]], d1: 3, d2: 1, g: 0, s: 1, at: 0 }; tel(d); tel({ ...d }); const n2 = c.tel.length;
     tel({ ...m, s: 3 }); const n3 = c.tel.length; // outro aviso de maré (fim diferente): entra
-    c.tel = []; return [n1, n2, n3];
+    c.tel = []; [Z.phase, Z.phaseEnd] = ph0; return [n1, n2, n3];
   });
   assert.deepEqual(r, [1, 2, 3], 'uma vez só cada aviso; um aviso novo com o mesmo nome entra');
 });

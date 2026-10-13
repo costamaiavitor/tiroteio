@@ -35,8 +35,10 @@ export async function criarSala(page, { mode = 'zombies', map = mode === 'zombie
   else await page.click(`#hostForm [data-k="bots"][data-v="${bots}"]`);
   await page.click('#btnHost'); // abre o lobby (menu novo); "Começar partida" inicia de fato
   await page.waitForSelector('#lbGo', { timeout: 60000 });
-  await page.click('#lbGo');
-  await page.waitForFunction(() => { const T = window.__T; return T.S.players.get('h')?.alive && (T.S.st.mode !== 'zombies' || T.Z.on); }, null, { timeout: 60000 });
+  // o clique pelo setTimeout (como no campanha-base): a montagem da Vila trava a aba por mais de 30 s com a máquina carregada e o
+  // page.click esperava 'scheduled navigations' até estourar o prazo (falha só de ambiente, os testes seguintes do arquivo caíam juntos)
+  await page.evaluate(() => { setTimeout(() => document.querySelector('#lbGo').click(), 0); });
+  await page.waitForFunction(() => { const T = window.__T; return T.S.players.get('h')?.alive && (T.S.st.mode !== 'zombies' || T.Z.on); }, null, { timeout: 180000 });
   // trava o relógio: a partir daqui só T.sim(seg) avança o jogo (testes determinísticos)
   await page.evaluate(() => { window.__T.sim(0.1); });
 }
