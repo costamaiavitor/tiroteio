@@ -24860,11 +24860,13 @@ function zTickZombies(dt) {
       case 'out': {
         const J = ZBAL.janela, w = ZD.windows[z.win], wt = Z.winT[z.win], cheia = (wt.nPrev || 0) >= J.maxPorJanela; // zumbi-v2 (Etapa 4): encostado na barricada; com a janela cheia, espera atrás
         const enc = .35 + z.rad + J.encosto + (cheia ? J.espera : 0), gx = w.x + w.n[0] * enc + w.tx * z.off, gz = w.z + w.n[1] * enc + w.tz * z.off, dx = gx - P.x, dz = gz - P.z, d = hyp(dx, dz);
-        if (d < .25 && !cheia) z.st = 'tear'; else if (d >= .25) { const s = Math.min(d, z.speed * dt); P.x += dx / d * s; P.z += dz / d * s; z.yaw = Math.atan2(-dx, -dz); } else z.yaw = Math.atan2(w.n[0], w.n[1]);
+        const sN = (P.x - w.x) * w.n[0] + (P.z - w.z) * w.n[1], sT = (P.x - w.x) * w.tx + (P.z - w.z) * w.tz; // zv2-R1: na frente da janela e perto do plano (a separação empurra de lado)
+        if (!cheia && sN < enc + .25 && Math.abs(sT) < 1) z.st = 'tear'; else if (d >= .25) { const s = Math.min(d, z.speed * dt); P.x += dx / d * s; P.z += dz / d * s; z.yaw = Math.atan2(-dx, -dz); } else z.yaw = Math.atan2(w.n[0], w.n[1]);
         break;
       }
       case 'tear': { // arranca as tábuas uma a uma; se alguém estiver colado na janela, bate através dela
         const wi = z.win, w = ZD.windows[wi], wt = Z.winT[wi]; z.yaw = Math.atan2(w.n[0], w.n[1]);
+        { const e = .35 + z.rad + ZBAL.janela.encosto, sN = (P.x - w.x) * w.n[0] + (P.z - w.z) * w.n[1]; if (sN > e + .01) { const st = Math.min(sN - e, z.speed * dt); P.x -= w.n[0] * st; P.z -= w.n[1] * st; } } // zv2-R1: termina de encostar na barricada
         if (Z.boards[wi] > 0) {
           { const J = ZBAL.janela; wt.n++; const n = Math.min(J.maxPorJanela, Math.max(1, wt.nPrev || 1)), k = (1 + J.acelera * (n - 1) ** J.curva) / n; // zumbi-v2 (Etapa 4): vários juntos quebram mais rápido (curva no zumbi_config.js)
             if (wt.n <= J.maxPorJanela) { wt.tear += dt * k / (J.tabua[z.sc] * (z.kind === 1 ? J.tabuaBruto : 1)); if (wt.tear >= 1) { wt.tear = 0; Z.boards[wi]--; } } }
@@ -24907,7 +24909,7 @@ function zTickZombies(dt) {
   }
   for (let zi = 0; zi < arr.length; zi++) { const z = arr[zi]; if (z.st !== 'out' && z.st !== 'tear') continue; // quem está fora nunca atravessa a parede
     const w = ZD.windows[z.win], P = z.body.pos, s = (P.x - w.x) * w.n[0] + (P.z - w.z) * w.n[1];
-    if (s < .75) { P.x += w.n[0] * (.75 - s); P.z += w.n[1] * (.75 - s); }
+    const lim = Math.min(.75, .35 + z.rad + ZBAL.janela.encosto); if (s < lim) { P.x += w.n[0] * (lim - s); P.z += w.n[1] * (lim - s); } // zv2-R1: limite = encosto (antes 0,75 fixo: o ponto do encosto ficava atrás do limite)
   }
   arr.length = 0; tg.length = 0; // não segura referência de zumbi morto
 }
@@ -24976,7 +24978,7 @@ function zTryAttack(z, q, reach) {
     const D = zDf(); z.atkWind = 0; z.atkT = now + (z.dog ? .8 : ZBAL.tamanho.intervalo * z.ac) * D.atk;
     if (z.kind === 6) { zSlam(z); return; }
     const qq = z.atkQ;
-    if (qq && qq.alive && !qq.downed && S.players.has(qq.id) && hyp(qq.pos[0] - P.x, qq.pos[2] - P.z) < reach + .5 && Math.abs(qq.pos[1] - P.y) < 1.6) { zHurt(qq, z.dog ? Math.round(D.dmg * .8) : Math.round(Math.min(ZBAL.tamanho.tetoGolpe, Math.max(ZBAL.tamanho.pisoGolpe, D.dmg * z.dm))), P); zWidow(qq); } // zumbi-v2: golpe entre o piso e o teto
+    if (qq && qq.alive && !qq.downed && S.players.has(qq.id) && hyp(qq.pos[0] - P.x, qq.pos[2] - P.z) < reach + .5 && Math.abs(qq.pos[1] - P.y) < 1.6) { zHurt(qq, z.dog ? Math.round(D.dmg * .8) : (ZBAL.tipos[z.kind] ? Math.round(Math.min(ZBAL.tamanho.tetoGolpe, Math.max(ZBAL.tamanho.pisoGolpe, D.dmg * z.dm))) : Math.round(D.dmg * z.dm)), P); zWidow(qq); } // zumbi-v2: golpe entre o piso e o teto
   }
 }
 function zSlam(z) { // Carniceiro: o cutelo bate no chão e acerta todo mundo no anel (2,9 m), quem saiu a tempo escapa

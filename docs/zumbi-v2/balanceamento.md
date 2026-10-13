@@ -13,7 +13,7 @@ Seja `s` o tamanho do tipo (1 = zumbi comum):
 Consequências:
 
 - DPS ∝ `s^1,5`: o grande bate mais forte, mas chega mais devagar.
-- A "ameaça" (DPS × √ da velocidade relativa) fica perto da do zumbi comum em todos os tipos, de −12% a +7%.
+- A "ameaça" (DPS × √ da velocidade relativa) fica perto da do zumbi comum, menos onde o teto de 90 corta (ver a tabela).
 - **Teto do golpe (90):** nenhum golpe derruba o jogador sem Juggernog (100 de vida) de uma vez. Antes, o Brutamonte no Pesadelo dava 120.
 - **Piso do golpe (15):** nem o menor zumbi no Fácil fica inofensivo.
 - **Marcha por tipo:** o Brutamonte e o Explosivo nunca correm, o Veloz sempre corre e o Gritador sempre trota.
@@ -21,33 +21,39 @@ Consequências:
 
 ## Tabela (marcha máxima de cada tipo, média do sorteio de passo)
 
-| Modo | Tipo | Tamanho | Marcha (máx.) | Velocidade m/s | Dano/golpe | Intervalo s | DPS | Ameaça (DPS·√(v/v₀)) | Golpes até cair (100 / Jug 250) |
-|---|---|---|---|---|---|---|---|---|---|
-| Fácil | Zumbi | 1 | corre | 4.83 | 34 | 1.68 | 20.2 | 20.2 | 3 / 8 |
-| Fácil | Brutamonte | 1.32 | trota | 2.40 | 68 | 2.22 | 30.7 | 21.6 | 2 / 4 |
-| Fácil | Explosivo | 1.05 | trota | 3.38 | 38 | 1.76 | 21.5 | 18.0 | 3 / 7 |
-| Fácil | Veloz | 0.86 | corre | 6.06 | 23 | 1.44 | 15.9 | 17.8 | 5 / 11 |
-| Fácil | Tóxico | 1 | corre | 4.83 | 34 | 1.68 | 20.2 | 20.2 | 3 / 8 |
-| Fácil | Gritador | 1.04 | trota | 3.43 | 38 | 1.75 | 21.7 | 18.3 | 3 / 7 |
-| Normal | Zumbi | 1 | corre | 5.25 | 50 | 1.44 | 34.7 | 34.7 | 2 / 5 |
-| Normal | Brutamonte | 1.32 | trota | 2.60 | 90 | 1.90 | 47.3 | 33.3 | 2 / 3 |
-| Normal | Explosivo | 1.05 | trota | 3.67 | 56 | 1.51 | 37.0 | 31.0 | 2 / 5 |
-| Normal | Veloz | 0.86 | corre | 6.58 | 34 | 1.24 | 27.5 | 30.7 | 3 / 8 |
-| Normal | Tóxico | 1 | corre | 5.25 | 50 | 1.44 | 34.7 | 34.7 | 2 / 5 |
-| Normal | Gritador | 1.04 | trota | 3.72 | 55 | 1.50 | 36.7 | 30.9 | 2 / 5 |
-| Difícil | Zumbi | 1 | corre | 5.51 | 60 | 1.26 | 47.6 | 47.6 | 2 / 5 |
-| Difícil | Brutamonte | 1.32 | trota | 2.73 | 90 | 1.66 | 54.1 | 38.1 | 2 / 3 |
-| Difícil | Explosivo | 1.05 | trota | 3.85 | 68 | 1.32 | 51.4 | 43.0 | 2 / 4 |
-| Difícil | Veloz | 0.86 | corre | 6.91 | 41 | 1.08 | 37.8 | 42.4 | 3 / 7 |
-| Difícil | Tóxico | 1 | corre | 5.51 | 60 | 1.26 | 47.6 | 47.6 | 2 / 5 |
-| Difícil | Gritador | 1.04 | trota | 3.91 | 66 | 1.31 | 50.4 | 42.4 | 2 / 4 |
-| Pesadelo | Zumbi | 1 | corre | 5.67 | 75 | 1.20 | 62.5 | 62.5 | 2 / 4 |
-| Pesadelo | Brutamonte | 1.32 | trota | 2.81 | 90 | 1.58 | 56.8 | 40.0 | 2 / 3 |
-| Pesadelo | Explosivo | 1.05 | trota | 3.96 | 85 | 1.26 | 67.5 | 56.4 | 2 / 3 |
-| Pesadelo | Veloz | 0.86 | corre | 7.11 | 51 | 1.03 | 49.4 | 55.3 | 2 / 5 |
-| Pesadelo | Tóxico | 1 | corre | 5.67 | 75 | 1.20 | 62.5 | 62.5 | 2 / 4 |
-| Pesadelo | Gritador | 1.04 | trota | 4.02 | 83 | 1.25 | 66.5 | 56.0 | 2 / 4 |
+**Medido pelo revisor R1:** o ciclo de um golpe é o intervalo × o ritmo da dificuldade **mais** o preparo do golpe.
 
+| Modo | Tipo | Tamanho | Marcha (máx.) | Velocidade m/s | Dano/golpe | Ciclo do golpe s | DPS | Golpes até cair (100 / Jug 250) |
+|---|---|---|---|---|---|---|---|---|
+| Fácil | Zumbi | 1 | corre | 4.83 | 34 | 2.13 | 16.0 | 3 / 8 |
+| Fácil | Brutamonte | 1.32 | trota | 2.40 | 68 | 2.81 | 24.2 | 2 / 4 |
+| Fácil | Explosivo | 1.05 | trota | 3.38 | 38 | 2.24 | 17.0 | 3 / 7 |
+| Fácil | Veloz | 0.86 | corre | 6.06 | 23 | 1.83 | 12.6 | 5 / 11 |
+| Fácil | Tóxico | 1 | corre | 4.83 | 34 | 2.13 | 16.0 | 3 / 8 |
+| Fácil | Gritador | 1.04 | trota | 3.43 | 38 | 2.22 | 17.2 | 3 / 7 |
+| Normal | Zumbi | 1 | corre | 5.25 | 50 | 1.89 | 26.5 | 2 / 5 |
+| Normal | Brutamonte | 1.32 | trota | 2.60 | 90 | 2.49 | 36.1 | 2 / 3 |
+| Normal | Explosivo | 1.05 | trota | 3.67 | 56 | 1.98 | 28.2 | 2 / 5 |
+| Normal | Veloz | 0.86 | corre | 6.58 | 34 | 1.63 | 20.9 | 3 / 8 |
+| Normal | Tóxico | 1 | corre | 5.25 | 50 | 1.89 | 26.5 | 2 / 5 |
+| Normal | Gritador | 1.04 | trota | 3.72 | 55 | 1.97 | 28.0 | 2 / 5 |
+| Difícil | Zumbi | 1 | corre | 5.51 | 60 | 1.71 | 35.1 | 2 / 5 |
+| Difícil | Brutamonte | 1.32 | trota | 2.73 | 90 | 2.26 | 39.9 | 2 / 3 |
+| Difícil | Explosivo | 1.05 | trota | 3.85 | 68 | 1.80 | 37.9 | 2 / 4 |
+| Difícil | Veloz | 0.86 | corre | 6.91 | 41 | 1.47 | 27.9 | 3 / 7 |
+| Difícil | Tóxico | 1 | corre | 5.51 | 60 | 1.71 | 35.1 | 2 / 5 |
+| Difícil | Gritador | 1.04 | trota | 3.91 | 66 | 1.78 | 37.1 | 2 / 4 |
+| Pesadelo | Zumbi | 1 | corre | 5.67 | 75 | 1.65 | 45.5 | 2 / 4 |
+| Pesadelo | Brutamonte | 1.32 | trota | 2.81 | 90 | 2.18 | 41.3 | 2 / 3 |
+| Pesadelo | Explosivo | 1.05 | trota | 3.96 | 85 | 1.73 | 49.1 | 2 / 3 |
+| Pesadelo | Veloz | 0.86 | corre | 7.11 | 51 | 1.42 | 35.9 | 2 / 5 |
+| Pesadelo | Tóxico | 1 | corre | 5.67 | 75 | 1.65 | 45.5 | 2 / 4 |
+| Pesadelo | Gritador | 1.04 | trota | 4.02 | 83 | 1.72 | 48.4 | 2 / 4 |
+
+
+- **Teto de 90:** o Brutamonte no Difícil e no Pesadelo fica abaixo da fórmula (ameaça −20% e −36% em relação ao comum). É a escolha "nada derruba de um golpe".
+- **O teto só vale para os tipos do clássico:** os chefes da campanha mantêm o golpe próprio.
+- **Brutamonte nas rodadas baixas:** anda a 0,86–1,19 m/s (antes 1,35) e só trota a partir das rodadas em que os zumbis trotam.
 
 ## Antes × depois (Normal)
 
