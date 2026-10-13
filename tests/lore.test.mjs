@@ -1,6 +1,9 @@
 // Lore em jogo (Onda 3, O3-D04; docs/overhaul/lore.md §7–§10 e campanha.md §4.2): textos dos terminais e das tabelas da campanha
 // iguais aos da lore.md e dentro do limite; nenhum id repetido; todo id citado no campanha.md existe; o tipo ZINT 'nota' (só com a
 // campanha) abre e fecha como o terminal; os sons sintetizados (rádio, apito, coro, papel) saem com som e sem NaN.
+// Objetivos do mapa (13/10, o modo novo): rádio, falas e documentos continuam; cenas em tela cheia e créditos não aparecem mais
+// (as tabelas de cena continuam iguais às da lore.md, só não são mostradas); as notas seguem a etapa e, depois do último objetivo,
+// todas continuam no mapa.
 // As notas de verdade são posicionadas pelos agentes dos atos (D10/D12/D14): aqui entram 3 notas de TESTE, empurradas no
 // ZINT_MAPA.sanatorio antes de criar a sala (fora dos dados do mapa) e tiradas no fim. O3-D12: as notas de teste têm teste: 1 (as de
 // verdade do Sanatório usam os mesmos ids): o teste conta e tira só as dele.
@@ -191,5 +194,43 @@ test('lore: terminal com o texto novo; sons do rádio, apito, coro e papel com s
     return { txt: document.querySelector('#zlore .zlx').textContent, titulo: document.getElementById('zloreT').textContent }; });
   assert.equal(t.titulo, 'Livro de admissões, última linha'); assert.match(t.txt, /^Família 413\./);
   await noJogo(J.page, (T, N) => { T.zintLoreFecha(false); const L = T.ZINT_MAPA.sanatorio; for (const n of N) { const k = L.findIndex(o => o.id === n.id && o.t === 'nota' && o.teste); if (k >= 0) L.splice(k, 1); } T.ZNOTA.forca = false; }, NOTAS);
+  assert.deepEqual(J.erros, []);
+});
+
+// objetivos do mapa (decisão do dono, 13/10): a história fica no rádio, nas falas e nos documentos; cenas em tela cheia e créditos saíram
+test('objetivos do mapa: rádio e falas aparecem; cena e créditos não; notas seguem a etapa e, depois dos objetivos, todas continuam', { timeout: 300000 }, async () => {
+  await J.fechar(); process.env.ZV2_OBJ = '1'; try { J = await abrirJogo(); } finally { delete process.env.ZV2_OBJ; }
+  await criarSala(J.page, { mode: 'zombies', map: 'sanatorio', zdiff: 1 });
+  const r = await noJogo(J.page, T => {
+    T.ZNOTA.forca = false; T.Z.toSpawn = 50; T.Z.spawnT = 1e12; T.Z.zs.clear(); T.sim(.2);
+    const L = T.ZD.zint, i3 = L.findIndex(o => o.t === 'nota' && o.id === 'n-torre-registro'), i2 = L.findIndex(o => o.t === 'nota' && o.id === 'n-enfermaria-dose');
+    const vis = i => !!T.ZC.world.zint[i]?.corpo?.visible, radio = document.getElementById('campRadio');
+    const etapa = T.CAMP_ATOS[T.CAMP.et]?.id, notas = [T.zintNotaLigada(L[i2]), T.zintNotaLigada(L[i3]), vis(i2), vis(i3)];
+    // rádio e fala (a fila do HUD)
+    T.CAMP.c.radio = null; T.CAMP.c.radioQ.length = 0; T.campMsg({ k: 'radio', id: 'r3-livro' }); T.sim(.1); const rd = [radio.style.opacity, radio.innerText];
+    T.CAMP.c.radio = null; T.campMsg({ k: 'fala', id: 'cabo-ferido' }); T.sim(.1); const fl = radio.innerText;
+    // cena e créditos (mensagens de um host antigo): nada em tela cheia
+    T.campMsg({ k: 'cena', ids: ['c3-abertura', 'c3-fim'] }); T.campMsg({ k: 'creditos', s: 30, dif: 1 }); T.sim(.2);
+    const cenaEl = document.getElementById('campCena'), credEl = document.getElementById('campCred');
+    const tela = [!!T.CAMP.c.cena, cenaEl ? getComputedStyle(cenaEl).display : 'none', credEl ? getComputedStyle(credEl).display : 'none'];
+    // o host não manda cena em nenhuma etapa do mapa; depois da última, todas as notas
+    const msgs = [], b0 = T.broadcast; T.broadcast = m => { msgs.push(m); return b0(m); };
+    try {
+      for (let k = 0; k < 6 && T.CAMP.modo === 'campanha'; k++) {
+        for (let n = 0; n < 12; n++) for (const id in T.CAMP.obj) if (T.CAMP.obj[id].st !== 'feito') T.campForca(id);
+        if (T.Z.phase !== 'round') { T.Z.phaseEnd = 0; T.sim(.1); }
+        T.Z.toSpawn = 0; T.Z.zs.clear(); T.sim(.3); T.Z.toSpawn = 50; T.Z.spawnT = 1e12;
+      }
+    } finally { T.broadcast = b0; }
+    T.sim(.2);
+    return { etapa, notas, rd, rdTxt: T.CAMP_RADIO_TXT['r3-livro'].txt, fl, flTxt: T.CAMP_FALA_TXT['cabo-ferido'].txt, tela, modo: T.CAMP.modo,
+      depois: [T.zintNotaLigada(L[i2]), T.zintNotaLigada(L[i3]), vis(i2), vis(i3)], cenas: msgs.filter(m => m.t === 'camp' && (m.k === 'cena' || m.k === 'creditos')).map(m => m.k) };
+  });
+  assert.equal(r.etapa, 'III');
+  assert.deepEqual(r.notas, [true, false, true, false], 'na etapa III: a nota do ato 2 sim, a do ato 3 ainda não');
+  assert.equal(r.rd[0], '1'); assert.ok(r.rd[1].includes(r.rdTxt), r.rd[1]); assert.ok(r.fl.includes(r.flTxt), r.fl);
+  assert.deepEqual(r.tela, [false, 'none', 'none'], 'cena ou créditos em tela cheia');
+  assert.deepEqual(r.cenas, [], 'o host mandou cena ou créditos');
+  assert.equal(r.modo, 'infinito'); assert.deepEqual(r.depois, [true, true, true, true], 'depois dos objetivos as notas de todas as etapas continuam');
   assert.deepEqual(J.erros, []);
 });

@@ -353,6 +353,9 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 .pk.s{font-size:14px}
 #zrem{position:absolute;top:52px;left:12px;font-size:16px;color:#ddd;text-shadow:0 1px 2px #000}
 #zrem b{color:#fff}
+#zcolE{position:absolute;top:78px;left:12px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;max-width:46vw;pointer-events:none}
+@media (max-width:900px){#zboss:not(.hidden)~#zcolE{top:118px}}
+@media (max-width:600px){#zcolE{top:72px}}
 #zstreak{position:absolute;left:0;right:0;top:16%;text-align:center;font-size:34px;font-weight:700;color:#ffcf5a;text-shadow:0 0 10px rgba(255,120,0,.6),0 2px 2px #000;opacity:0}
 #zstreak.go{animation:zst 1.6s ease-out}
 @keyframes zst{0%{opacity:1;transform:scale(1.4)}70%{opacity:1;transform:scale(1)}100%{opacity:0}}
@@ -26580,9 +26583,13 @@ function zBuiltVis() { // cliente: máquina ainda desmontada fica escondida, com
     if (Wd['banc_' + maq] && Wd['banc_' + maq].visible === pronta) Wd['banc_' + maq].visible = !pronta;
   }
 }
+function zColEsq() { // coluna do alto à esquerda (#zcolE, no #zhud): o painel do objetivo em cima e as peças embaixo, sem se sobrepor
+  let c = document.getElementById('zcolE'); if (c) return c;
+  c = document.createElement('div'); c.id = 'zcolE'; ($('#zhud') || document.body).appendChild(c); return c;
+}
 function zPecasHud() { // HUD: peças pegas (sem dizer onde); no Fácil, marcador nas peças
   let el = $('#zpecas'); if (!ZD?.pecas || !ZC.on || !inGame) { if (el) el.style.display = 'none'; return ''; }
-  if (!el) { el = document.createElement('div'); el.id = 'zpecas'; el.style.cssText = 'position:absolute;top:78px;left:12px;font:700 15px Rajdhani,sans-serif;color:#e8e8e8;text-shadow:0 1px 3px #000;line-height:1.35;pointer-events:none'; ($('#zhud') || document.body).appendChild(el); }
+  if (!el) { el = document.createElement('div'); el.id = 'zpecas'; el.style.cssText = 'font:700 15px Rajdhani,sans-serif;color:#e8e8e8;text-shadow:0 1px 3px #000;line-height:1.35;pointer-events:none'; zColEsq().appendChild(el); } // abaixo do painel do objetivo (a coluna empilha os dois)
   el.style.display = '';
   const t = maq => `${maq === 'pap' ? 'Pack-a-Punch' : 'Energia'}: ${zConstruida(maq) ? 'montado' : `peças ${zPecasPegas(maq)}/${ZD.pecas[maq]}`}`;
   setHTML('zpecas', ['power', 'pap'].filter(m => ZD.pecas[m]).map(t).join('<br>'));
@@ -26640,7 +26647,7 @@ const CAMP = {
   over: false, overSt: null, repetir: false, vistos: new Set(), kitPend: new Set(), falaT: {}, radioIni: false, alvoN: 1, npcT: 0,
   c: null, // cliente (campCliReset)
   docs: new Set(), // host: documentos (terminais e notas) lidos pela sala na campanha inteira (os lidos do mapa zeram na troca: campDocsSala)
-  get ato() { const e = NET.isHost ? this.et : this.c?.et; return CAMP_ATOS[e]?.ato ?? 0; }, // ato (cartão 0..4) da etapa atual: host ou o que o cliente sabe (O3-D04: zintNotaLigada)
+  get ato() { const e = NET.isHost ? this.et : this.c?.et; if (e < 0 && (NET.isHost ? this.on && this.objFim : this.c?.fo)) return CAMP_ATO_CARTAO.length - 1; return CAMP_ATOS[e]?.ato ?? 0; }, // objetivos do mapa: depois do último, os documentos de todas as etapas continuam; // ato (cartão 0..4) da etapa atual: host ou o que o cliente sabe (O3-D04: zintNotaLigada)
 };
 const CAMP_GANCHOS = { // funções dos próximos blocos (D05, D07...): o motor chama na ordem, sem gancho novo no código compartilhado
   inicio: [], // (etapa) host: começo da etapa (depois dos objetivos)
@@ -26778,7 +26785,7 @@ function campFormOut(st) { // matchForm: o que vai no st (o host prende o ato ao
 }
 const campSaneSt = st => ({ zmode: CAMP_MODOS.includes(st.zmode) ? st.zmode : 'classico', ato: clamp(st.ato | 0, 0, CAMP_ATO_CARTAO.length - 1) }); // saneSt (entrada não confiável)
 // ---------- host: começo, etapas, kit e bagagem ----------
-function campLimpa() { Object.assign(CAMP, { obj: {}, alvos: [], itens: {}, chaves: new Set(), chama: null, npc: null, fim: null, trans: null, over: false, overSt: null, repetir: false, vistos: new Set(), kitPend: new Set(), falaT: {}, radioIni: false }); }
+function campLimpa() { Object.assign(CAMP, { objFim: false, obj: {}, alvos: [], itens: {}, chaves: new Set(), chama: null, npc: null, fim: null, trans: null, over: false, overSt: null, repetir: false, vistos: new Set(), kitPend: new Set(), falaT: {}, radioIni: false }); }
 function campInicio() { // gancho no começo do zStartGame: devolve true quando a campanha montou a partida (o clássico não segue)
   const md = S.st?.mode === 'zombies' ? S.st.zmode : null;
   if (md !== 'campanha' && md !== 'infinito') { if (CAMP.on) { CAMP.on = false; CAMP.modo = null; campLimpa(); } return false; }
@@ -26833,7 +26840,7 @@ function campComeca() { // host: primeira etapa da sequência do mapa (depois do
 function campProxObjetivos() { // host: fim de uma etapa (no intervalo): a seguinte do mapa ou, sem mais, as rodadas infinitas
   const k = CAMP.cadeia ? CAMP.cadeia.indexOf(CAMP.et) : -1, prox = k >= 0 ? CAMP.cadeia[k + 1] : undefined;
   if (prox !== undefined) { CAMP.etR = Z.round; campEtapaPrepara(prox, false); return; }
-  CAMP.modo = 'infinito'; CAMP.et = -1; CAMP.obj = {}; CAMP.alvos = []; CAMP.npc = null; CAMP.cadeia = null;
+  CAMP.modo = 'infinito'; CAMP.objFim = true; CAMP.et = -1; CAMP.obj = {}; CAMP.alvos = []; CAMP.npc = null; CAMP.cadeia = null; // objFim: os documentos de todas as etapas continuam (getter ato)
   Z.nextDog = Z.round + 2 + Math.floor(Math.random() * 3); Z.nextBoss = Z.round + 2; CAMP_EVS.inf.prox = Z.round + 2; CAMP_EVS.inf.vistoR = Z.round;
   broadcast({ t: 'camp', k: 'est', ...campCp() });
   CAMP.fimMsg = now; // A5: o aviso sai no tick seguinte (no fim da rodada, o 'zrend' logo depois escrevia "Rodada N concluída" por cima dele)
@@ -27146,7 +27153,7 @@ function campItemTick(id, D, O) {
 // ---------- host: rede ----------
 function campCp() { // estado completo da campanha (zWorldState.cp e { k: 'est' }): etapa, objetivos, itens, troca de mapa, checkpoint
   const cp = { et: CAMP.et, ob: Object.entries(CAMP.obj).map(([id, O]) => [id, O.st, r2(O.p), r2(O.h), O.q]), it: Object.entries(CAMP.itens).filter(([, it]) => it.i >= 0).map(([ch, it]) => [ch, it.i, it.st, r2(it.x), r2(it.z), it.quem]),
-    tr: CAMP.trans ? 1 : 0, ov: CAMP.over ? 1 : 0 };
+    tr: CAMP.trans ? 1 : 0, ov: CAMP.over ? 1 : 0, fo: CAMP.objFim ? 1 : 0 }; // fo: os objetivos do mapa acabaram (rodadas infinitas)
   for (const f of CAMP_GANCHOS.cp) f(cp);
   return cp;
 }
@@ -27168,8 +27175,7 @@ function campMsg(m) { // onMsg 'camp' (host -> todos; entrada não confiável: f
     case 'trans': if (typeof m.mapa === 'string' && Object.hasOwn(MAPS, m.mapa)) { c.trans = m.mapa; c.prontoEnv = false; } break;
     case 'pronto': c.trans = null; if (c.cena) c.cena.troca = false; break;
     case 'salva': if (Number.isInteger(m.ato) && Number.isInteger(m.dif)) campLibera(m.ato, m.dif, !!m.fim); break;
-    case 'over': c.over = { et: Number.isInteger(m.et) ? m.et : c.et, fim: now + (finN(m.s) ? clamp(m.s, 0, 60) : CAMP.repetirS) }; break;
-    case 'fim': c.fim = true; centerMsg('CAMPANHA CONCLUÍDA', ZDIFF[m.dif | 0]?.name || '', 8); c.over = { et: c.et, fim: now + CAMP.repetirS, conc: 1 }; break;
+    case 'over': case 'fim': case 'creditos': break; // objetivos do mapa: sem checkpoint, sem "concluída" e sem créditos (caminho velho: ignora)
     case 'npc': if (campIdOk(m.id) && Array.isArray(m.p) && m.p.length === 5 && m.p.every(finN)) { const n = c.npc ||= { id: m.id, x: m.p[0], y: m.p[1], z: m.p[2], yaw: m.p[3], h: 1, model: null }; n.tx = m.p[0]; n.ty = m.p[1]; n.tz = m.p[2]; n.tyaw = m.p[3]; n.h = clamp(m.p[4], 0, 1); n.t = now; } break;
     case 'item': { const o = Number.isInteger(m.i) ? ZD?.zint?.[m.i] : null; if (o?.t === 'chave' && finN(m.x) && finN(m.z) && Math.abs(m.x) < 1e4 && Math.abs(m.z) < 1e4) { o.x = m.x; o.z = m.z; } break; }
     case 'porta': { const d = ZD?.doors?.find(x => x.id === m.id); if (d) puff(new V3(d.x, 1.2, d.z), 0x8a7a64, 2.2, 1, .4); break; }
@@ -27186,10 +27192,9 @@ function campObjCli(id, st, p, h, q) {
 function campSync(cp) { // zSyncWorld (quem entra no meio) e { k: 'est' }: monta o HUD sem tocar a cena
   if (!cp || typeof cp !== 'object') return;
   if (!NET.isHost) CAMP.on = campCliOn();
-  const c = CAMP.c; c.et = Number.isInteger(cp.et) && CAMP_ATOS[cp.et] ? cp.et : -1;
+  const c = CAMP.c; c.et = Number.isInteger(cp.et) && CAMP_ATOS[cp.et] ? cp.et : -1; c.fo = cp.fo === 1 && c.et < 0;
   if (Array.isArray(cp.ob)) for (const o of cp.ob.slice(0, 32)) if (Array.isArray(o) && campIdOk(o[0]) && ['oculto', 'ativo', 'feito', 'falhou'].includes(o[1])) campObjCli(o[0], o[1], o[2], o[3], o[4]);
   if (Array.isArray(cp.it)) for (const a of cp.it.slice(0, 8)) if (Array.isArray(a) && campIdOk(a[0]) && Number.isInteger(a[1])) campMsg({ k: 'item', i: a[1], x: a[3], z: a[4] }); // posição do item no chão
-  if (cp.ov && !c.over) c.over = { et: c.et, fim: now + CAMP.repetirS };
   for (const f of CAMP_GANCHOS.sync) f(cp);
 }
 function campRoundFx(r, dog) { // gancho no zRoundFx: banner da rodada na campanha (o evento do D05 pode tomar o lugar)
@@ -27200,7 +27205,7 @@ function campRoundFx(r, dog) { // gancho no zRoundFx: banner da rodada na campan
 }
 // ---------- cliente: HUD (painel do objetivo, seta, rádio, cena, checkpoint) ----------
 const CAMP_CSS = `#campHud{position:absolute;inset:0;pointer-events:none}
-#campObj{position:absolute;top:78px;left:12px;width:300px;max-width:46vw;background:rgba(0,0,0,.42);border-left:3px solid #a8100c;padding:6px 10px 7px;font-size:14px;color:#ddd;text-shadow:0 1px 2px #000}
+#campObj{position:relative;width:300px;max-width:46vw;box-sizing:border-box;background:rgba(0,0,0,.42);border-left:3px solid #a8100c;padding:6px 10px 7px;font-size:14px;color:#ddd;text-shadow:0 1px 2px #000}
 #campObj h4{margin:0 0 4px;font-size:12px;letter-spacing:2px;color:#ff8a6a;text-transform:uppercase}
 #campObj .o{margin-top:5px;line-height:1.2}#campObj .o.ok{color:#8f8;opacity:.8}#campObj .o.f{color:#ff8a8a}
 #campObj .o i{display:block;height:4px;margin-top:3px;background:rgba(255,255,255,.18)}#campObj .o i b{display:block;height:100%;background:#ffd36a}
@@ -27215,19 +27220,22 @@ const CAMP_CSS = `#campHud{position:absolute;inset:0;pointer-events:none}
 #campCena small{position:absolute;bottom:14vh;right:4vw;color:#888;font-size:14px}
 #campOver{position:absolute;left:50%;top:62%;transform:translateX(-50%);text-align:center;pointer-events:auto;font-size:20px;color:#fff;text-shadow:0 1px 2px #000;display:none}
 #campOver button{margin-top:6px;font-size:20px;padding:8px 18px}
-@media (max-width:600px){#campObj{font-size:12px;top:72px}#campRadio{font-size:15px;top:178px}#campCena p{font-size:19px}}`;
+@media (max-width:600px){#campObj{font-size:12px}#campRadio{font-size:15px;top:178px}#campCena p{font-size:19px}}`;
 function campHudEl() { // cria o HUD da campanha uma vez (dentro do #zhud; a cena por cima de tudo)
   const c = CAMP.c; if (c.el?.root?.isConnected) return c.el;
   if (!document.getElementById('campCss')) { const s = document.createElement('style'); s.id = 'campCss'; s.textContent = CAMP_CSS; document.head.appendChild(s); }
   const zh = document.getElementById('zhud'), root = document.createElement('div'); root.id = 'campHud';
   root.innerHTML = '<div id="campObj"></div><div id="campMark"></div><div id="campRadio"></div><div id="campOver"></div>'; zh.appendChild(root);
+  document.querySelectorAll('#zcolE > #campObj').forEach(e => e.remove()); const obj = root.querySelector('#campObj'); obj.style.display = 'none'; zColEsq().prepend(obj); // o painel vai para a coluna da esquerda, acima das peças do Pack-a-Punch
   const cena = document.getElementById('campCena') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'campCena' }));
   cena.onclick = () => campCenaPula();
   root.querySelector('#campOver').onclick = e => { if (e.target.closest('button')) campRepetir(); };
-  return (c.el = { root, obj: root.querySelector('#campObj'), mark: root.querySelector('#campMark'), radio: root.querySelector('#campRadio'), over: root.querySelector('#campOver'), cena, k: {} });
+  return (c.el = { root, obj, mark: root.querySelector('#campMark'), radio: root.querySelector('#campRadio'), over: root.querySelector('#campOver'), cena, k: {} });
 }
+const campCenaOn = () => false; // as cenas em tela cheia e os créditos saíram do modo zumbi (a história fica no rádio, nas falas e nos documentos)
 const campSet = (el, k, html) => { const E = CAMP.c.el; if (E.k[k] !== html) { E.k[k] = html; el.innerHTML = html; } };
 function campCena(ids, troca) { // cartões da cena (3 s cada, até 8 s por cena); na troca de mapa, depois dos cartões, "Carregando"
+  if (!campCenaOn()) { CAMP.c.cena = null; return; } // objetivos do mapa (decisão do dono, 13/10): sem cenas em tela cheia
   const L = []; for (const id of ids) { const t = campTxt('cena', id), a = Array.isArray(t) ? t.filter(x => typeof x === 'string') : [id]; const s = Math.min(CAMP.cartaoS, CAMP.cenaMaxS / Math.max(1, a.length)); for (const x of a) L.push([x, s]); }
   CAMP.c.cena = { L, k: 0, t: now, troca, ate: now + 60 };
 }
@@ -27237,6 +27245,7 @@ function campEliteCli() { if (typeof CAMP_ZK2C === 'undefined') return null; for
 function campObjPos(id) { // onde fica o objetivo (para a seta): interativo, zona, NPC, item ou portador
   const D = CAMP_OBJ[id], o = CAMP.c.obj[id]; if (!D) return null;
   if (D.tipo === 'escoltar' && CAMP.c.npc) return CAMP.c.npc;
+  if (D.tipo === 'matar') { const ch = CAMP.c.ch, zc = ch?.k === D.chefe ? ZC.zs.get(ch.z) : null; return zc && !zc.dead && zc.pos ? zc.pos : null; } // objetivos do mapa: o chefe luta no mapa grande (a seta aponta para ele)
   if (D.tipo === 'coletar') { if (o?.q) { if (o.q === C.myId) { const de = D.destino; return de?.porta ? ZD.doors.find(d => d.id === de.porta) : de?.zint ? ZD.zint?.[campZintIdx(de.zint)] : de; } const rp = R.get(o.q); return rp ? rp.pos : null; }
     const i = (ZD.zint || []).findIndex(z => z.t === 'chave' && (z.chave || z.id) === D.item); return i >= 0 && ZC.zint?.[i]?.st === 'chao' ? ZD.zint[i] : D.origem === 'elite' ? campEliteCli() : null; }
   if (D.zona && D.zona !== 'tudo') return D.zona;
@@ -27245,7 +27254,7 @@ function campObjPos(id) { // onde fica o objetivo (para a seta): interativo, zon
 }
 function campHud(dt) { // gancho no fim do zHud (cada quadro do cliente)
   if (!NET.isHost) CAMP.on = campCliOn(); // cliente: CAMP.on espelha a partida (só o host roda os ganchos do servidor; a nota do O3-D04 lê CAMP.on e CAMP.ato)
-  if (!campCliOn()) { if (C.st?.mode === 'zombies' && C.st.zmode === 'infinito') for (const f of CAMP_GANCHOS.hud) f(dt); /* coordenador: avisos e barra do chefe e eventos também no infinito */ const E = CAMP.c.el; if (E?.root?.isConnected && E.root.style.display !== 'none') { E.root.style.display = 'none'; E.cena.style.display = 'none'; } return; }
+  if (!campCliOn()) { if (C.st?.mode === 'zombies' && C.st.zmode === 'infinito') for (const f of CAMP_GANCHOS.hud) f(dt); /* coordenador: avisos e barra do chefe e eventos também no infinito */ const E = CAMP.c.el; if (E?.root?.isConnected && E.root.style.display !== 'none') { E.root.style.display = 'none'; E.cena.style.display = 'none'; E.obj.style.display = 'none'; E.k.o = ''; } return; }
   const c = CAMP.c, E = campHudEl(); if (E.root.style.display === 'none') E.root.style.display = '';
   // troca de mapa: avisa o host quando o mapa novo está montado e aquecido
   if (c.trans && !c.prontoEnv && curMapId === c.trans && !WARM && ZC.world) { c.prontoEnv = true; sendToHost({ t: 'camp', k: 'pronto' }); }
@@ -27266,9 +27275,10 @@ function campHud(dt) { // gancho no fim do zHud (cada quadro do cliente)
   if (me.alive && !c.cena) { let best = null, bd = 1e9, bid = null;
     for (const id of c.ordem) { if (c.obj[id].st !== 'ativo') continue; const P = campObjPos(id); if (!P) continue; const d = Math.hypot(P.x - me.pos.x, P.z - me.pos.z); if (d < bd) { bd = d; best = P; bid = id; } }
     if (best && bd > 2.5) { const v = visScr(best.x, (best.y || 0) + 1.6, best.z); let ar = '';
-      if (v.off) { v.x = clamp(v.x, 60, innerWidth - 60); v.y = clamp(v.y, 50, innerHeight - 50); ar = `<u style="transform:rotate(${Math.atan2(v.y - innerHeight / 2, v.x - innerWidth / 2) + Math.PI / 2}rad)">▲</u>`; } else ar = '<u>▼</u>';
+      if (v.off) { const mg = Math.min(innerWidth / 2, Math.max(60, 14 + (Math.min(28, (CAMP_OBJ[bid].marca || CAMP_OBJ[bid].titulo || 'OBJETIVO').length) + 5) * 4.4)); v.x = clamp(v.x, mg, innerWidth - mg); /* o texto inteiro na tela (centrado no ponto) */ v.y = clamp(v.y, 50, innerHeight - 50); ar = `<u style="transform:rotate(${Math.atan2(v.y - innerHeight / 2, v.x - innerWidth / 2) + Math.PI / 2}rad)">▲</u>`; } else ar = '<u>▼</u>';
       mk = `<span${v.off ? ' class="off"' : ''} style="left:${v.x}px;top:${v.y}px">${ar}${esc((CAMP_OBJ[bid].marca || CAMP_OBJ[bid].titulo || 'OBJETIVO').toUpperCase().slice(0, 28))} ${Math.round(bd)}m</span>`; } }
   campSet(E.mark, 'm', mk);
+  campRadioPos(E);
   // rádio e falas (fila)
   if (c.radio && now >= c.radio.fim) c.radio = null;
   if (!c.radio && c.radioQ.length) { const [k, id] = c.radioQ.shift(), t = campTxt(k, id), txt = String(t?.txt ?? id), quem = String(t?.quem ?? (k === 'radio' ? 'RÁDIO' : ''));
@@ -27282,13 +27292,16 @@ function campHud(dt) { // gancho no fim do zHud (cada quadro do cliente)
   if (c.cena) { E.cena.style.display = 'flex'; const fim = ce.k >= ce.L.length; campSet(E.cena, 'c', `<p>${esc(fim ? 'Carregando…' : ce.L[ce.k][0])}</p><small>${fim ? '' : 'Enter ou clique: pular'}</small>`); }
   else if (E.cena.style.display !== 'none') E.cena.style.display = 'none';
   { const v = c.cena || c.trans ? 'hidden' : ''; if (E.k.zr !== v) { E.k.zr = v; $('#zrem').style.visibility = v; } }
-  // checkpoint
-  const ov = c.over && ZC.over ? c.over : c.over?.conc ? c.over : null;
-  if (ov) { const s = Math.max(0, Math.ceil(ov.fim - now)), Aov = CAMP_ATOS[ov.et], nome = Aov ? (Aov.chefe ? Aov.nome : 'o Ato ' + CAMP_ATO_CARTAO[Aov.ato].split(' · ')[0]) : 'o ato';
-    campSet(E.over, 'v', ov.conc ? `Volta ao lobby em ${s}s` : NET.isHost ? `<button type="button">Repetir ${esc(nome)} (Enter)</button><div><small>sem resposta, volta ao lobby em ${s}s</small></div>` : `Aguardando o host · ${s}s`); E.over.style.display = ''; }
-  else { E.over.style.display = 'none'; if (c.over && !ZC.over && !c.over.conc) c.over = null; }
+  // objetivos do mapa: sem checkpoint (time caído = fim de jogo, como no clássico); o painel antigo nunca aparece
+  if (E.over.style.display !== 'none') E.over.style.display = 'none'; c.over = null;
   campNpcQuadro(dt);
   for (const f of CAMP_GANCHOS.hud) f(dt);
+}
+function campRadioPos(E) { // a legenda do rádio desce para baixo da coluna da esquerda (objetivo e peças) quando as duas se cruzariam (telas estreitas)
+  const pe = document.getElementById('zpecas'), zb = document.getElementById('zboss'), k = `${E.k.o}|${pe?.style.display}|${hudCache.zpecas}|${innerWidth}x${innerHeight}|${zb?.classList.contains('hidden')}`;
+  if (E.k.rp === k) return; E.k.rp = k; // só mede quando algo muda (nada por quadro)
+  E.radio.style.top = ''; const col = zColEsq().getBoundingClientRect(), r = E.radio.getBoundingClientRect();
+  if (col.height > 0 && r.left < col.right + 8 && r.top < col.bottom + 8) E.radio.style.top = Math.round(col.bottom + 8) + 'px';
 }
 function campNpcQuadro(dt) { // NPC de escolta no cliente: interpolação da posição do host (o visual é do D10: CAMP_NPC[id].monta/quadro)
   const n = CAMP.c.npc; if (!n) return;
