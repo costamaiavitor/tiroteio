@@ -12,7 +12,9 @@ before(async () => {
 after(async () => { await J?.fechar(); });
 
 const clique = (id, mag) => noJogo(J.page, (T, a) => {
-  const p = T.S.players.get('h'), id = a.id, sl = T.W[id].slot === 'secondary' ? 'secondary' : 'primary'; p.inv[sl] = id; T.G.inv[sl] = id; T.equip(id, true); T.sim(1);
+  const p = T.S.players.get('h'), id = a.id, sl = T.W[id].slot === 'secondary' ? 'secondary' : 'primary';
+  for (const z of [...T.Z.zs.values()]) T.zKill(z, null, 'body', 'nuke', false, true); T.Z.toSpawn = 0; T.Z.phase = 'break'; T.Z.phaseEnd = 1e12; // sem zumbis: caído, a arma vira a pistola e atirava
+  p.inv[sl] = id; T.G.inv[sl] = id; T.equip(id, true); T.sim(1);
   const am = T.G.ammo[id] || (T.G.ammo[id] = { mag: T.W[id].mag, res: T.W[id].res }); am.mag = a.mag; am.res = 40;
   T.G.reload = null; T.G.reloadEnd = 0; T.G.trigger = false; T.G.nextFire = 0; T.startReload(); T.sim(.3);
   T.G.trigger = true; // clique (aperta e solta) no meio da recarga
