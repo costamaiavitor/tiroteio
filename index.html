@@ -746,11 +746,6 @@ function B(x, z, w, d, h, mat = 'wall', y = 0, c) { return { x, y, z, w, h, d, m
 function mir(list) { return list.concat(list.map(b => ({ ...b, x: -b.x, z: -b.z }))); }
 function border(w, d, h, mat = 'wall') { return [B(0, -d / 2 - .5, w + 2, 1, h, mat), B(0, d / 2 + .5, w + 2, 1, h, mat), B(-w / 2 - .5, 0, 1, d, h, mat), B(w / 2 + .5, 0, 1, d, h, mat)]; }
 function floor(w, d, mat = 'floor') { return B(0, 0, w + 2, d + 2, 1, mat, -1); }
-function stairs(sx, sz, dx, dz, n, h, depth, width, mat = 'wall') {
-  const o = [];
-  for (let i = 0; i < n; i++) { const x = sx + dx * depth * i, z = sz + dz * depth * i; o.push(dx ? B(x, z, depth, width, h * (i + 1) / n, mat) : B(x, z, width, depth, h * (i + 1) / n, mat)); }
-  return o;
-}
 
 const MAPS = {
   arena: {
@@ -1306,17 +1301,6 @@ function siteDeco(M) { // chão pintado e letra flutuando em cada bomb
 // ---------- mapas do modo Rodadas inspirados no CS (Dust 2, Mirage, Inferno): bombs fechados, com 2 ou 3 entradas estreitas ----------
 // Planta em grade de 3 m. '#' parede, 'r' passagem com teto, 'c' caixa grande, 'k' mureta, 'x' caixa pequena,
 // A/B chão dos bombs, T/C bases do ataque e da defesa. Norte (z negativo) = defesa.
-function gridBoxes(rows, cell, x0, z0) { // junta células iguais vizinhas em retângulos (menos caixas)
-  const out = [], H = { '#': [6, 0, 'wall'], r: [.6, 3.4, 'roof'], c: [2.2, 0, 'crate'], k: [1.1, 0, 'stone'] }, used = rows.map(r => [...r].map(() => false));
-  for (let r = 0; r < rows.length; r++) for (let c = 0; c < rows[r].length; c++) {
-    const ch = rows[r][c], h = H[ch]; if (!h || used[r][c]) continue;
-    let w = 1; while (rows[r][c + w] === ch && !used[r][c + w]) w++;
-    let d = 1; while (r + d < rows.length && [...Array(w)].every((_, i) => rows[r + d][c + i] === ch && !used[r + d][c + i])) d++;
-    for (let i = 0; i < d; i++) for (let j = 0; j < w; j++) used[r + i][c + j] = true;
-    out.push(B(x0 + (c + w / 2) * cell, z0 + (r + d / 2) * cell, w * cell, d * cell, h[0], h[2], h[1]));
-  }
-  return out;
-}
 function gridMap(rows, cell, meta) {
   const n = rows.length, m = rows[0].length, w = m * cell, d = n * cell, x0 = -w / 2, z0 = -d / 2, sites = {}, sp = { T: [], C: [] }, xs = [];
   rows.forEach((row, r) => [...row].forEach((ch, c) => {
@@ -3495,11 +3479,6 @@ function A_mtx(O, x, y, z, sx, sy, sz) { O.position.set(x, y, z); O.scale.set(sx
     m.position.set((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2); m.quaternion.setFromUnitVectors(g2Y, d.normalize()); return m;
   };
   // matriz de uma peça alinhada entre dois pontos (para instâncias)
-  const g2MtxBarra = (p, q, giro = 0, s = 1) => {
-    const d = new V3(q[0] - p[0], q[1] - p[1], q[2] - p[2]), L = d.length(), qq = new THREE.Quaternion().setFromUnitVectors(g2Y, d.normalize());
-    if (giro) qq.multiply(new THREE.Quaternion().setFromAxisAngle(g2Y, giro));
-    return new THREE.Matrix4().compose(new V3((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2), qq, new V3(s, L, s));
-  };
   // ruído que cresce e some (rajada, sopro, respiração): dur s, filtro f1 -> f2
   const g2Sopro = (out, dur, f1, f2, q, vol, tipo = 'bandpass', dl = 0) => {
     const t = AC.currentTime + dl, s = AC.createBufferSource(); s.buffer = NOISE; s.loop = true;
@@ -6196,7 +6175,6 @@ const _g6M = new THREE.Matrix4(), _g6P = new V3(), _g6Q = new THREE.Quaternion()
   const fwd = () => _f.set(0, 0, -1).applyQuaternion(camera.quaternion);
   const pts = (A, n, col, size, op) => { const g = new THREE.BufferGeometry(), a = new Float32Array(n * 3).fill(-999); g.setAttribute('position', new THREE.BufferAttribute(a, 3)); const p = new THREE.Points(g, new THREE.PointsMaterial({ map: SOFT, color: col, size, transparent: true, opacity: op, depthWrite: false })); p.frustumCulled = false; p.userData.own = true; p.userData.dyn = 1; A.root.add(p); return p; };
   const wrapTex = t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
-  const tooFar = (A, r) => { const p = A.playerPos(); return Math.hypot(p.x - A.cx, p.z - A.cz) > r; };
 
   // ================================================================ Margem do rio (b10): as trouxas
   ATMOS.vila.b10 = A => {
@@ -14904,11 +14882,6 @@ const SANP_ROUGH = `#include <roughnessmap_fragment>
   roughnessFactor = mix(uPisoRg.x, uPisoRg.y, pg) + (1. - smoothstep(.12, .42, dot(sampledDiffuseColor.rgb, vec3(.33)))) * .25; // rejunte e fresta: ásperos
   roughnessFactor = mix(mix(roughnessFactor, 1., max(pe, pa) * .45), .4, pu);
 `;
-function sanpUni() {
-  if (SANP.U) return SANP.U;
-  CHAO.n ||= chaoRuido(); SANP.m ||= sanpMascara(MAPS.sanatorio.z);
-  return SANP.U = { tPisoM: { value: SANP.m }, tPisoN: { value: CHAO.n }, uPisoM: { value: new THREE.Vector3(1 / SANP.E, -SANP.X0 / SANP.E, -SANP.Z0 / SANP.E) } };
-}
 const sanpMats = {};
 function sanpMat(k, c) {
   const key = k + '|' + c; if (sanpMats[key]) return sanpMats[key];
@@ -18946,11 +18919,6 @@ function knifeHand(A) { // faca em pé: índice em cima encostado na guarda, ded
   const w = f.userData.wrist; forearm(h, [w[0] * 1.12, w[1] * 1.12, w[2] * 1.12], [.8, -1, .45], .52, A, false);
   return h;
 }
-function karambitHand(A) { // karambit (como no CS2): cabo em pé, indicador no anel em cima, dedos virados para a câmera
-  const h = new THREE.Group(), f = fistHand(A, { key: 'karambit', R: .018, fy: [.047, .026, .007, -.011] }); h.add(f);
-  forearm(h, f.userData.wrist, [.8, -1, .45], .52, A, false);
-  return h;
-}
 // Karambit no estilo do CS:GO, na mão direita: cabo deitado na horizontal, dorso da mão virado para cima/câmera,
 // anel para o lado de dentro (esquerda), garra saindo para a direita e curvando para cima. A outra mão fica aberta.
 // ---------- mãos 3D de verdade (modelo anatômico com esqueleto, pacote aberto WebXR "generic-hand", licença MIT) ----------
@@ -19847,63 +19815,10 @@ function knArmsTex(src) {
 }
 // dedos do pacote da faca / da pistola → referencial do punho: origem no meio dos dedos fechados, Y do mindinho para o indicador
 // (eixo do cabo), Z para os nós dos dedos
-function knFist(ch) {
-  const c = new V3(), p = new V3(); let n = 0;
-  for (const f of ch) for (const b of f) { c.add(p.setFromMatrixPosition(b.matrixWorld)); n++; }
-  c.divideScalar(n);
-  const kn = new V3(); for (const f of ch) kn.add(p.setFromMatrixPosition(f[0].matrixWorld)); kn.divideScalar(ch.length);
-  const Y = new V3().setFromMatrixPosition(ch[0][0].matrixWorld).sub(p.setFromMatrixPosition(ch[3][0].matrixWorld));
-  return fpFrame(c, kn.sub(c), Y); // Z = nós dos dedos, Y = cabo
-}
 function knCurl(R) { for (let i = 0; i < 3; i++) R.idx[i].quaternion.copy(R.mid[i].quaternion); }
 // a cada quadro: anima o pacote da faca e os braços; a mão dos braços vai para onde o pacote da faca põe o punho, e braço e
 // antebraço seguem por IK (o ombro avança se o braço não alcança)
 const _kn = { m: new THREE.Matrix4(), p: new V3(), q: new THREE.Quaternion(), s: new V3(), t: new V3(), c: new V3() };
-function knRetarget(F, dt) {
-  const { R, cmixer, box } = F.kn, I = _kn;
-  R.cl.position.copy(R.cl0); cmixer.update(dt); knCurl(R);
-  for (const b of R.hideL) b.scale.setScalar(1e-3);
-  box.updateMatrixWorld(true);
-  // punho alvo (sem escala) e controle da mão
-  I.m.copy(R.knife.matrixWorld).multiply(R.Rk); I.m.decompose(I.p, I.q, I.s);
-  // a mão pode girar em volta do cabo sem soltar a faca: escolhe o giro em que o antebraço natural da mão (pulso reto) fica na mesma
-  // direção do antebraço da animação da faca; a faca gira ao contrário dentro da mão e continua onde a animação põe
-  const Yh = new V3(0, 1, 0).applyQuaternion(I.q), Fq = new THREE.Matrix4().compose(I.p, I.q, new V3(1, 1, 1));
-  let th = 0;
-  if (R.kelbow && R.kwrist) {
-    const T0 = Fq.clone().multiply(R.Ghi), dc = R.el.clone().applyMatrix4(T0).sub(R.wl.clone().applyMatrix4(T0));
-    const dt = I.c.setFromMatrixPosition(R.kelbow.matrixWorld).sub(I.t.setFromMatrixPosition(R.kwrist.matrixWorld));
-    dc.addScaledVector(Yh, -dc.dot(Yh)); dt.addScaledVector(Yh, -dt.dot(Yh));
-    if (dc.lengthSq() > 1e-12 && dt.lengthSq() > 1e-12) th = Math.atan2(Yh.dot(new V3().crossVectors(dc, dt)), dc.dot(dt));
-  }
-  const T = Fq.clone().multiply(new THREE.Matrix4().makeRotationY(th)).multiply(R.Ghi);
-  R.kg.matrix.copy(R.GhiInv).multiply(new THREE.Matrix4().makeRotationY(-th)).multiply(R.kgBase);
-  I.m.copy(R.hand.parent.matrixWorld).invert().multiply(T); I.m.decompose(R.hand.position, R.hand.quaternion, R.hand.scale);
-  R.hand.updateMatrixWorld(true);
-  // braço montado a partir da mão: o antebraço sai reto do pulso (direção natural da mão, pulso reto), o cotovelo fica onde esse
-  // antebraço termina e o braço vai do cotovelo para o ombro, que se move (fora da tela) para onde o braço chegar
-  const tw = R.wl.clone().applyMatrix4(R.hand.matrixWorld), ew = R.el.clone().applyMatrix4(R.hand.matrixWorld);
-  const s = new V3().setFromMatrixPosition(R.ua.matrixWorld), e = new V3().setFromMatrixPosition(R.fa.matrixWorld), w = new V3().setFromMatrixPosition(R.wr.matrixWorld);
-  const L1 = e.distanceTo(s), L2 = w.distanceTo(e);
-  const e2 = tw.clone().addScaledVector(ew.sub(tw).normalize(), L2);
-  // braço: na direção do braço da animação da faca (cotovelo → ombro), puxada para o ombro de referência para o corte da manga ficar fora da tela
-  const up = R.kshoulder && R.kelbow ? I.c.setFromMatrixPosition(R.kshoulder.matrixWorld).sub(I.t.setFromMatrixPosition(R.kelbow.matrixWorld)).normalize() : new V3();
-  const anchor = box.localToWorld(R.anchor.clone()).sub(e2).normalize(), s2 = e2.clone().addScaledVector(up.add(anchor).normalize(), L1);
-  R.cl.position.add(R.cl.parent.worldToLocal(s2.clone()).sub(R.cl.parent.worldToLocal(s.clone()))); R.cl.updateMatrixWorld(true);
-  I.t.setFromMatrixPosition(R.ua.matrixWorld); fpRot(R.ua, e.clone().sub(s), e2.clone().sub(I.t)); // (ombro já no lugar novo: e - s é a direção atual do braço)
-  I.t.setFromMatrixPosition(R.fa.matrixWorld); fpRot(R.fa, I.c.setFromMatrixPosition(R.wr.matrixWorld).sub(I.t), tw.clone().sub(I.t));
-}
-function fpTwoBone(a) { // braço e antebraço: o pulso (a.wr) vai para a.tw, cotovelo no mesmo plano de antes
-  const I = _ik;
-  I.s.setFromMatrixPosition(a.ua.matrixWorld); I.e.setFromMatrixPosition(a.fa.matrixWorld); I.w.setFromMatrixPosition(a.wr.matrixWorld);
-  const L1 = I.e.distanceTo(I.s), L2 = I.w.distanceTo(I.e), d = Math.min(a.tw.distanceTo(I.s), (L1 + L2) * .999);
-  I.u.copy(a.tw).sub(I.s).normalize(); I.n.copy(I.e).sub(I.s); I.n.addScaledVector(I.u, -I.n.dot(I.u)).normalize();
-  const x = (L1 * L1 - L2 * L2 + d * d) / (2 * d), hh = Math.sqrt(Math.max(0, L1 * L1 - x * x));
-  const e2 = I.s.clone().addScaledVector(I.u, x).addScaledVector(I.n, hh);
-  fpRot(a.ua, I.e.clone().sub(I.s), e2.sub(I.s));
-  I.e.setFromMatrixPosition(a.fa.matrixWorld); I.w.setFromMatrixPosition(a.wr.matrixWorld);
-  fpRot(a.fa, I.w.clone().sub(I.e), a.tw.clone().sub(I.e));
-}
 function vmSetWeapon(id) {
   if (vmGun) { vmRoot.remove(vmGun); if (!VMC.dono.has(vmGun)) vmGun.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); } // 6-w17: a guardada no cache fica inteira
   if (ARMS.knife) { ARMS.knife.removeFromParent(); ARMS.knife = null; } // a faca antiga sai do soquete dos braços
@@ -20565,7 +20480,6 @@ const ADS = { rel: .144, folga: .05, larg: .3, alt: .02, lat: .035, coronha: .06
 // (o carregador sai por cima): desce pelo lado esquerdo, para fora da tela, e volta pelo mesmo caminho.
 const W06 = { pe: .056, g11Vai: [-.12, -.3, .12] };
 ADS.recuo.stg44 = .06; // a STG-44 usa a caixa e a tampa da AK: na mira a tampa enchia a metade de baixo da tela (olho a 0,066 m; com .035 ainda enchia um terço)
-function w06Vai(ud, gp, R, Gp) { const v = ud.rVai; return v ? [[.38, Gp.x + v[0], Gp.y + v[1], Gp.z + v[2]], [.46, Gp.x + v[0], Gp.y + v[1], Gp.z + v[2]]] : [gp(.38, R, -.08, .1), gp(.46, R, -.08, .1)]; }
 // ===== fim 6-w06 =====
 // ===== 6-w08: precisão (AWP, SSG, Dragunov, Kar98k, L96, PSG1) =====
 // Entrada na luneta: a ocular ia ao olho em linha reta, e como a distância cai junto, ela continuava à direita da tela até a arma sumir (G.scR .74)
@@ -25081,7 +24995,6 @@ function zTickClouds() { // nuvem do Tóxico (7 s, 2,8 m): tira vida de quem fic
 }
 function zRecycle(z) { Z.zs.delete(z.id); Z.toSpawn++; if (z.kind) Z.reQ.push([z.kind, ZKIND[z.kind].chefe ? z.hp : 0, z.maxHp]); broadcast({ t: 'zgone', id: z.id }); } // especial volta para a fila com o mesmo tipo
 const ZSEE_R = 45, ZSEE_MAX = 60, _zsA = new V3(), _zsB = new V3();
-function zAtGoal(x, z) { const c = ffCell(x, z); return c >= 0 && FF.walk[c] && isFinite(FF.dist[c]) && FF.dist[c] <= 15; } // ate ~3 m de caminho da origem do campo
 function zSeen(z) { const P = z.body.pos; _zsB.set(P.x, P.y + 1.1, P.z); for (const q of S.players.values()) { if (!q.alive) continue; const d = hyp(q.pos[0] - P.x, q.pos[2] - P.z); if (d > ZSEE_R) continue; _zsA.set(q.pos[0], q.pos[1] + 1.6, q.pos[2]); if (losClear(_zsA, _zsB) || losClear(_zsA, _zsB.set(P.x, P.y + 1.7, P.z))) return true; _zsB.set(P.x, P.y + 1.1, P.z); } return false; }
 function zSeenHold(z) { if (!zSeen(z)) { z.hold0 = 0; return false; } if (!z.hold0) z.hold0 = now; return now - z.hold0 < ZSEE_MAX; } // visto: adia (o jogador pode matar)
 function zCrowded(z, dist) { if (dist > 12) return false; const P = z.body.pos; for (const o of Z.zs.values()) { if (o === z || o.st !== 'in') continue; const r = z.rad + o.rad + .3; if (Math.abs(o.body.pos.x - P.x) < r && Math.abs(o.body.pos.z - P.z) < r) return true; } return false; }
@@ -29906,7 +29819,6 @@ const CAMP_FOG = { // números do Foguista que não são de ataque (§7.3 e §8.
   cores: { pele: 0x6e5c50, roupa: 0x2f3b44, calca: 0x2b343b, olho: [0xff7a1a, 5], cabelo: 0x1a1510, couro: 0x4a2e1a, luva: 0x2a1c12, bone: 0x22262a, metal: 0x5c5f62, ferro: 0x24262a,
     cobre: 0x8a5a2e, madeira: 0x5a3c22, aco: 0x7c8086, vidro: 0x1a1c1c, racha: 0xff5a10, mano: [0x40ff60, 0xffb020, 0xff2010], pulseira: 0x1a1412 },
 };
-const fgAng = (P, q) => Math.atan2(-(q.pos[0] - P.x), -(q.pos[2] - P.z));
 const fgLac = tipo => ZKIND[tipo] ? tipo : 0; // sem o O3-D08 (Carvoeiro 12, Pregador 13): comuns
 const fgLacOnde = () => CAMP_CH.campo || curMapId !== 'forno' ? 'perto' : FORNO.lacaio; // a calha só existe na arena (versão de campo: perto dos jogadores)
 CAMP_CHEFE[15] = {
@@ -31388,7 +31300,6 @@ function bombHud(dt) {
   for (let i = MARKS.length - 1; i >= 0; i--) if (now > MARKS[i].end || !inGame) { scene.remove(MARKS[i].s); MARKS.splice(i, 1); }
   drawMinimap(dt); // zumbi-v2 (Etapa 6): minimapa do modo Zumbi removido
 }
-const W_NAME = id => W[id]?.name || id;
 // ---------- radar do modo Rodadas (como o do CS2): redondo, centrado em você e girando com a visão; M abre o mapa inteiro ----------
 const RMM = { key: null, bg: null, S: 4, t: 0, tb: 0, big: false };
 function rmmBuild(M) { // fundo: chão, paredes, coberturas, passagens cobertas, bombs e bases (4 px por metro), pintado uma vez por mapa
