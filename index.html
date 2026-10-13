@@ -246,10 +246,6 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #feed .hs{color:var(--red)}
 #room{position:absolute;top:10px;left:12px;font-size:16px;color:#ccc}
 #mmLbl{position:absolute;top:262px;left:12px;width:220px;text-align:center;font-size:17px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000}
-#zmm{position:absolute;top:34px;left:12px;width:220px;height:220px;border-radius:50%;display:none;box-shadow:0 0 0 2px rgba(255,255,255,.22),0 4px 14px rgba(0,0,0,.6)}
-#zmmLbl{position:absolute;top:258px;left:12px;width:220px;text-align:center;font-size:17px;font-weight:700;color:#fff;text-shadow:0 1px 3px #000}
-#zmmLbl small{display:block;font-size:13px;font-weight:600;color:#c8ccd0;line-height:1.25}
-#zbig{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.8)}
 #zprompt span{display:inline-block;max-width:min(760px,92vw)}
 #zprompt small{display:block;font-size:17px;font-weight:600;color:#e6e6e6;margin-top:3px}
 #mmap{position:absolute;top:34px;left:12px;width:220px;height:220px;border-radius:50%;display:none;box-shadow:0 0 0 2px rgba(255,255,255,.22),0 4px 14px rgba(0,0,0,.6)}
@@ -434,9 +430,6 @@ summary{cursor:pointer;color:#fff;font-weight:700}
   <div id="mmLbl"></div>
   <div id="drep" class="hidden"></div>
   <div id="flashov"></div>
-  <canvas id="zmm" width="440" height="440"></canvas>
-  <div id="zmmLbl"></div>
-  <canvas id="zbig"></canvas>
   <div id="bombui"></div>
   <div id="top"><div id="score"></div><div id="timer"></div></div>
   <div id="feed"></div>
@@ -601,7 +594,7 @@ let now = performance.now() / 1000;
 // Ambiente de desenvolvimento (testes e ferramentas rodam em localhost/127.0.0.1): só aqui o jogo expõe os ganchos de depuração
 // (window.__T, relógio travável). No site publicado eles não existem: davam a qualquer um, no console, atalhos prontos para trapacear.
 const DEBUG = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
-const PROTO = 4; /* overhaul Ondas 2-3: interativos (zint/zi), campanha (camp/cp), tipo de zumbi com 5 bits, mapas forte/forno/galeria7 */ // versão do protocolo de rede: subir quando mensagens, armas (W) ou mapas mudarem; host e cliente precisam ser iguais
+const PROTO = 5; /* zumbi-v2: peças e montagem (zbuild/zbuilt), armas mudadas; overhaul Ondas 2-3: interativos (zint/zi), campanha (camp/cp), tipo de zumbi com 5 bits, mapas forte/forno/galeria7 */ // versão do protocolo de rede: subir quando mensagens, armas (W) ou mapas mudarem; host e cliente precisam ser iguais
 const CFG = {
   name: String(load('name', 'Jogador' + Math.floor(rand(100, 999)))).replace(/[<>]/g, '').slice(0, 16) || 'Jogador', // mesmo filtro do campo (o localStorage é editável)
   sens: load('sens', 1), fov: load('fov', 85), vol: load('vol', 0.6), shadows: load('shadows', true), gfx: load('gfx', null),
@@ -650,37 +643,37 @@ const ZWEAP = {
   m1911:      { name: 'M1911', slot: 'secondary', dmg: 35, rate: .17, mag: 8, res: 80, reload: 1.6, spread: .01, head: 3, model: 'pistol', snd: 'pistol', papName: 'Mustang & Sally', papSplash: { r: 2.5, dmg: 700, self: 20 }, papMag: 12, papRes: 50, papTracer: 0xff8a30 },
   cz75:       { name: 'CZ75', slot: 'secondary', box: 6, dmg: 60, rate: .12, mag: 15, res: 135, reload: 1.8, spread: .01, head: 3, model: 'pistol', snd: 'pistol', papName: 'Calamidade' },
   python:     { name: 'Python', slot: 'secondary', box: 6, dmg: 180, rate: .35, mag: 6, res: 36, reload: 3, spread: .008, head: 3, model: 'revolver', snd: 'deagle', papName: 'Cobra' },
-  olympia:    { name: 'Olympia', wall: 500, dmg: 60, pellets: 8, rate: .3, mag: 2, res: 38, reload: 2.4, spread: .07, head: 1.5, rm: .6, model: 'dbarrel', snd: 'shotgun', papName: 'Hades' },
+  olympia:    { name: 'Olympia', wall: 500, dmg: 60, pellets: 8, rate: .3, mag: 2, res: 38, reload: 2.4, spread: .07, head: 1.5, rm: .6, model: 'dbarrel', snd: 'shotgun', papName: 'Hades', papMag: 2 }, // zv2-A01: dois canos (o padrão ×1,5 dava 3 no pente)
   m14:        { name: 'M14', wall: 500, dmg: 100, rate: .15, mag: 8, res: 92, reload: 2.3, spread: .005, head: 3, speed: .95, model: 'ak', snd: 'rifle2', papName: 'Mnesia' },
-  mp40:       { name: 'MP40', wall: 1000, dmg: 50, rate: .1, auto: 1, mag: 32, res: 192, reload: 2.3, spread: .015, head: 2.5, model: 'mp40', snd: 'smg', papName: 'Afterburner' },
-  mp5k:       { name: 'MP5K', wall: 1000, dmg: 45, rate: .075, auto: 1, mag: 30, res: 120, reload: 2.2, spread: .015, head: 2.5, model: 'smg', snd: 'smg', papName: 'MP115 Kollider' },
-  ak74u:      { name: 'AK-74u', wall: 1200, dmg: 60, rate: .085, auto: 1, mag: 20, res: 160, reload: 2.4, spread: .012, head: 2.5, model: 'ak', snd: 'rifle', papName: 'AK-74fu2' },
+  mp40:       { name: 'MP40', wall: 1000, dmg: 50, rate: .1, auto: 1, mag: 32, res: 192, reload: 2.3, spread: .015, head: 2.5, rm: .88, model: 'mp40', snd: 'smg', papName: 'Afterburner' },
+  mp5k:       { name: 'MP5K', wall: 1000, dmg: 45, rate: .075, auto: 1, mag: 30, res: 120, reload: 2.2, spread: .015, head: 2.5, rm: .87, model: 'smg', snd: 'smg', papName: 'MP115 Kollider' },
+  ak74u:      { name: 'AK-74u', wall: 1200, dmg: 60, rate: .085, auto: 1, mag: 20, res: 160, reload: 2.4, spread: .012, head: 2.5, rm: .9, model: 'ak', snd: 'rifle', papName: 'AK-74fu2' },
   stakeout:   { name: 'Stakeout', wall: 1500, dmg: 80, pellets: 8, shellTime: .55, rate: .75, mag: 6, res: 54, reload: 3.2, spread: .06, head: 1.5, rm: .65, model: 'shotgun', snd: 'shotgun', papName: 'Raid' },
   galil:      { name: 'Galil', box: 8, dmg: 90, rate: .085, auto: 1, mag: 35, res: 315, reload: 2.8, spread: .008, head: 2.5, speed: .95, model: 'ak', snd: 'rifle', papName: 'Lamentação' },
   commando:   { name: 'Commando', box: 8, dmg: 80, rate: .075, auto: 1, mag: 30, res: 270, reload: 2.5, spread: .008, head: 2.5, model: 'm4', snd: 'rifle2', papName: 'Predador' },
   fal:        { name: 'FN FAL', box: 8, dmg: 130, rate: .12, mag: 20, res: 180, reload: 2.7, spread: .005, head: 3, model: 'm4', snd: 'rifle', papName: 'EPC WN' },
   rpk:        { name: 'RPK', box: 6, dmg: 90, rate: .09, auto: 1, mag: 100, res: 400, reload: 4.5, spread: .014, head: 2.5, speed: .9, model: 'lmg', snd: 'rifle', papName: 'R115 Ressonador' },
-  hk21:       { name: 'HK21', box: 6, dmg: 110, rate: .1, auto: 1, mag: 125, res: 500, reload: 5, spread: .014, head: 2.5, speed: .9, model: 'lmg', snd: 'rifle2', papName: 'H115 Oscilador' },
+  hk21:       { name: 'HK21', box: 6, dmg: 110, rate: .1, auto: 1, mag: 125, res: 500, reload: 5, spread: .014, head: 2.5, speed: .9, model: 'lmg', snd: 'rifle', papName: 'H115 Oscilador' }, // A03: 7,62×51 como o FAL (rifle2 é o som leve do 5,56)
   spas:       { name: 'SPAS-12', box: 6, dmg: 90, pellets: 8, shellTime: .42, rate: .35, mag: 8, res: 32, reload: 3.5, spread: .06, head: 1.5, rm: .65, model: 'shotgun', snd: 'shotgun', papName: 'SPAZ-24' },
-  dragunov:   { name: 'Dragunov', box: 5, dmg: 450, rate: .25, mag: 10, res: 40, reload: 3.2, spread: .04, sspread: .001, scope: [40], head: 4, model: 'dmr', snd: 'sniper', papName: 'D115 Desintegrador' },
+  dragunov:   { name: 'Dragunov', box: 5, dmg: 450, rate: .25, mag: 10, res: 40, reload: 3.2, spread: .04, sspread: .001, scope: [40], head: 4, rm: 1, model: 'dmr', snd: 'sniper', papName: 'D115 Desintegrador' }, // zv2-A04 rm 1: sem queda de dano com a distância, como a PSG1 e a L96 (antes .95 do padrão: 81% do dano a 40 m)
   chinalake:  { name: 'China Lake', box: 4, dmg: 200, rate: 1, mag: 2, res: 20, reload: 3, spread: .004, head: 1, splash: { r: 4, dmg: 1300, self: 70 }, tracer: 0xffb060, model: 'launcher', shellTime: .9, snd: 'launcher', papName: 'China Beach' },
   // caixa: armas novas (burst = tiros por rajada, brate = intervalo dentro da rajada; rate = pausa depois dela)
   fiveseven:  { name: 'Five-seven', slot: 'secondary', box: 6, dmg: 55, rate: .1, mag: 20, res: 120, reload: 1.6, spread: .009, head: 3, model: 'pistol', snd: 'pistol', papName: 'Ultra' },
   b23r:       { name: 'B23R', slot: 'secondary', box: 6, burst: 3, brate: .06, dmg: 70, rate: .3, mag: 15, res: 120, reload: 1.7, spread: .008, head: 3, model: 'pistol', snd: 'pistol', papName: 'B34R', papMag: 24 },
   c96:        { name: 'Mauser C96', slot: 'secondary', box: 6, dmg: 90, rate: .14, mag: 10, res: 80, reload: 2.4, spread: .007, head: 3.5, model: 'pistol', snd: 'deagle', papName: 'Boomhilda' },
   ppsh:       { name: 'PPSh-41', box: 6, dmg: 50, rate: .055, auto: 1, mag: 71, res: 284, reload: 3, spread: .016, head: 2.5, rm: .85, speed: .95, model: 'ppsh', snd: 'smg', papName: 'The Reaper', papMag: 115 },
-  thompson:   { name: 'M1927 Thompson', box: 6, dmg: 60, rate: .085, auto: 1, mag: 50, res: 250, reload: 2.8, spread: .014, head: 2.5, rm: .88, model: 'ppsh', snd: 'smg', papName: 'Gibs-o-Matic' },
+  thompson:   { name: 'M1927 Thompson', box: 6, dmg: 60, rate: .085, auto: 1, mag: 50, res: 250, reload: 2.8, spread: .014, head: 2.5, rm: .88, speed: .95, model: 'ppsh', snd: 'smg', papName: 'Gibs-o-Matic' }, // zv2-A05: speed .95 como a PPSh (a Thompson é a mais pesada das SMGs, 4,9 kg)
   spectre:    { name: 'Spectre', box: 6, dmg: 45, rate: .06, auto: 1, mag: 30, res: 180, reload: 2.3, spread: .016, head: 2.5, rm: .85, model: 'smg', snd: 'smg', papName: 'Phantom' },
-  kiparis:    { name: 'Kiparis', box: 6, dmg: 48, rate: .055, auto: 1, mag: 20, res: 160, reload: 2, spread: .017, head: 2.5, rm: .82, model: 'smg', snd: 'silenced', papName: 'Russian Ruin' },
+  kiparis:    { name: 'Kiparis', box: 6, dmg: 48, rate: .055, auto: 1, mag: 20, res: 160, reload: 2, spread: .017, head: 2.5, rm: .82, model: 'smg', snd: 'smg', papName: 'Russian Ruin' }, // zv2-A05: o modelo não tem supressor e o tiro tem clarão: o som abafado não combinava (o Supressor do Armeiro continua abafando)
   uzi:        { name: 'Uzi', box: 6, dmg: 48, rate: .07, auto: 1, mag: 32, res: 192, reload: 2.4, spread: .016, head: 2.5, rm: .84, model: 'uzi', snd: 'smg', papName: 'Uncle Gal' },
   pm63:       { name: 'PM63', box: 6, dmg: 42, rate: .05, auto: 1, mag: 20, res: 160, reload: 1.8, spread: .018, head: 2.5, rm: .8, model: 'uzi', snd: 'smg', papName: 'Tokyo & Rose' },
   stg44:      { name: 'STG-44', box: 7, dmg: 100, rate: .1, auto: 1, mag: 30, res: 270, reload: 2.6, spread: .008, head: 2.5, speed: .95, model: 'ak', snd: 'rifle', papName: 'Spatz-447 +' },
   m16:        { name: 'M16', box: 7, burst: 3, brate: .065, dmg: 95, rate: .32, mag: 30, res: 270, reload: 2.4, spread: .005, head: 3, model: 'm4', snd: 'rifle2', papName: 'Skullpiercer' },
   aug:        { name: 'AUG', box: 7, dmg: 95, rate: .085, auto: 1, mag: 30, res: 270, reload: 2.7, spread: .006, head: 2.5, model: 'bull', snd: 'rifle2', papName: 'AUG-50M3' },
   famas:      { name: 'Famas', box: 7, dmg: 85, rate: .065, auto: 1, mag: 30, res: 270, reload: 2.5, spread: .008, head: 2.5, model: 'bull', snd: 'rifle2', papName: 'G16-GL35' },
-  g11:        { name: 'G11', box: 6, burst: 3, brate: .035, dmg: 110, rate: .35, mag: 45, res: 270, reload: 3, spread: .005, head: 3, model: 'bull', snd: 'rifle2', papName: 'G115 Generator', papMag: 66 },
+  g11:        { name: 'G11', box: 6, semCapsula: 1, burst: 3, brate: .035, dmg: 110, rate: .35, mag: 45, res: 270, reload: 3, spread: .005, head: 3, model: 'bull', snd: 'rifle2', papName: 'G115 Generator', papMag: 66 },
   enfield:    { name: 'Enfield', box: 7, dmg: 100, rate: .09, auto: 1, mag: 30, res: 270, reload: 2.6, spread: .007, head: 2.5, model: 'bull', snd: 'rifle', papName: 'Enfield Upgrayedd' },
-  mg42:       { name: 'MG42', box: 5, dmg: 120, rate: .05, auto: 1, mag: 125, res: 500, reload: 5, spread: .016, head: 2.5, speed: .88, model: 'lmg', snd: 'rifle', papName: 'Barracuda FU-A11' },
+  mg42:       { name: 'MG42', box: 5, dmg: 80, rate: .05, auto: 1, mag: 125, res: 500, reload: 5, spread: .016, head: 2.5, speed: .88, model: 'lmg', snd: 'rifle', papName: 'Barracuda FU-A11' },
   stoner:     { name: 'Stoner63', box: 5, dmg: 100, rate: .08, auto: 1, mag: 75, res: 375, reload: 4.2, spread: .012, head: 2.5, speed: .9, model: 'lmg', snd: 'rifle2', papName: 'Stoner6000' },
   trench:     { name: 'Trench Gun', box: 6, dmg: 85, pellets: 8, shellTime: .45, rate: .6, mag: 6, res: 60, reload: 3, spread: .065, head: 1.5, rm: .65, model: 'shotgun', snd: 'shotgun', papName: 'Gut Shot' },
   hs10:       { name: 'HS10', box: 6, dmg: 70, pellets: 8, shellTime: .4, rate: .28, mag: 6, res: 48, reload: 3, spread: .075, head: 1.5, rm: .6, model: 'shotgun', snd: 'shotgun', papName: 'Typhoid & Mary' },
@@ -694,16 +687,21 @@ const ZWEAP = {
   wunderwaffe: { name: 'Wunderwaffe DG-2', box: 1.2, wonder: 1, dmg: 50000, rate: 1.1, mag: 3, res: 9, reload: 3.6, spread: .003, head: 1, rm: 1, chain: { n: 8, r: 6 }, papChain: { n: 14, r: 8 }, tracer: 0x66ccff, papTracer: 0xff5050, model: 'waffe', snd: 'waffe', papName: 'Wunderwaffe DG-3 JZ', papMag: 6, papRes: 24 },
   wintershowl: { name: "Winter's Howl", box: 1.2, wonder: 1, dmg: 1100, rate: .35, mag: 6, res: 36, reload: 2.6, spread: 0, head: 1, frost: { range: 9, cos: .9, n: 12 }, papFrost: { range: 12, cos: .85, n: 16 }, tracer: 0xaee8ff, papTracer: 0x7fd8ff, model: 'howl', snd: 'frost', papName: "Winter's Fury" },
   raygun2:    { name: 'Ray Gun Mark II', box: 2, wonder: 1, burst: 3, brate: .07, dmg: 700, rate: .38, mag: 21, res: 168, reload: 2.6, spread: .006, head: 2, rm: 1, tracer: 0xff3030, papTracer: 0x30e0ff, model: 'raygun', snd: 'ray', papName: "Porter's Mark II Ray Gun", papMag: 33 },
-  raygun:     { name: 'Ray Gun', box: 4, wonder: 1, dmg: 1000, rate: .3, mag: 20, res: 160, reload: 2.7, spread: .008, head: 1, splash: { r: 2.2, dmg: 300, self: 25 }, tracer: 0x33ff55, model: 'raygun', snd: 'ray', papName: "Porter's X2 Ray Gun", papTracer: 0xff3355 },
+  raygun:     { name: 'Ray Gun', box: 4, wonder: 1, dmg: 1000, rate: .3, mag: 20, res: 160, reload: 2.7, spread: .008, head: 1, rm: 1, splash: { r: 2.2, dmg: 300, self: 25 }, tracer: 0x33ff55, model: 'raygun', snd: 'ray', papName: "Porter's X2 Ray Gun", papMag: 40, papRes: 200, papTracer: 0xff3355 }, // zv2-A10: PaP 40/200 como no CoD (a regra 1,5x dava 30/240); rm 1: raio sem queda de dano com a distância, como Mark II e Wunderwaffe
   thundergun: { name: 'Arma Trovão', box: 1.5, wonder: 1, thunder: 1, dmg: 0, rate: 1, mag: 2, res: 12, reload: 3.2, spread: 0, model: 'thunder', snd: 'thunder', papName: 'Canhão de Zeus', papMag: 4, papRes: 24 },
 };
 for (const [id, w] of Object.entries(ZWEAP)) {
   const base = { slot: 'primary', speed: 1, move: .03, air: .12, rm: .95, pen: 1, zw: 1, ...w };
   W[id] = base;
-  W[id + '_pap'] = { ...base, name: w.papName, pap: 1, base: id, dmg: w.dmg * 2, mag: w.papMag ?? Math.round(w.mag * 1.5), res: w.papRes ?? Math.round(w.res * 1.5), reload: w.reload * .9,
+  W[id + '_pap'] = { ...base, name: w.papName, pap: 1, base: id, dmg: w.dmg * 2, mag: w.papMag ?? Math.round(w.mag * 1.5), res: w.papRes ?? Math.round(w.res * 1.5), reload: w.reload * .9, ...(w.shellTime ? { shellTime: w.shellTime * .9 } : null) /* zumbi-v2 (Etapa 2): escopeta com PaP também recarrega 10% mais rápido */,
     splash: w.papSplash ?? (w.splash && { r: w.splash.r * 1.2, dmg: w.splash.dmg * 2, self: w.splash.self }), tracer: w.papTracer ?? w.tracer ?? 0xb070ff,
     chain: w.papChain ?? w.chain, frost: w.papFrost ?? w.frost };
+  for (let n = 2; n <= 3; n++) { const B = W[id + '_pap'], L = ZBAL.pap.niveis[n - 1]; // zumbi-v2 (Etapa 9): Pack-a-Punch níveis 2 e 3 (mais dano, munição e cadência; traçante próprio)
+    W[id + '_pap' + n] = { ...B, name: `${w.papName} ${L.sufixo}`, pap: n, dmg: B.dmg * L.dano, mag: Math.round(B.mag * L.pente), res: Math.round(B.res * L.pente), rate: B.rate * L.cadencia, brate: B.brate && B.brate * L.cadencia, tracer: L.tracer,
+      splash: B.splash && { ...B.splash, dmg: B.splash.dmg * L.dano } }; }
 }
+const PAP_IDS = b => [b + '_pap3', b + '_pap2', b + '_pap']; // zumbi-v2 (Etapa 9): versões melhoradas de uma arma, da mais forte à mais fraca
+const papProx = id => { const w = W[id]; if (!w?.zw || w.ls) return null; const n = w.pap | 0; return n >= 3 ? null : (w.base || id) + (n ? '_pap' + (n + 1) : '_pap'); }; // próximo nível (null no 3)
 W.m1911_ls = { ...W.m1911, ls: 1 }; // pistola temporária de quem caiu sem pistola
 W.monkey = { name: 'Macaco com Pratos', slot: 'nade', model: 'monkey', speed: 1 };
 W.semtex = { name: 'Semtex', slot: 'nade', model: 'semtex', speed: 1 }; // granada que gruda (troca a HE)
@@ -17722,7 +17720,7 @@ function muzzleFlash(pos, world, sz = .5) {
 // cápsulas saindo da arma (desenhadas na cena da arma, em primeira pessoa)
 const vmFx = [];
 function ejectShell(w, force) {
-  if (!vmGun || CFG.gfx === 'baixo' || !w || w.thunder || w.wonder || w.slot === 'knife' || w.slot === 'nade' || w.model === 'raygun' || w.model === 'law' || w.model === 'xbow' || (w.splash && !force && w.model !== 'pistol')) return;
+  if (!vmGun || CFG.gfx === 'baixo' || !w || w.semCapsula || w.thunder || w.wonder || w.slot === 'knife' || w.slot === 'nade' || w.model === 'raygun' || w.model === 'law' || w.model === 'xbow' || (w.splash && !force && w.model !== 'pistol')) return;
   const f = w19Capsula(w); vmScene.add(f.m); vmFx.push(f); // 6-w19: cápsula do pool, saindo da janela de ejeção da arma
   setTimeout(() => play('shell'), 350);
 }
@@ -18084,8 +18082,10 @@ function gunModel(id, fp = false, skin = null) {
       if (b23) { add(g, RB(.034, .03, .036, .004), M.dark, 0, .034, mz - .016); bore(0, .036, mz - .035, .004); mz -= .036; add(g, RB(.02, .007, .06, .002), M.dark, 0, .0, -.105); } // compensador e trilho
       if (c96) { // Mauser "cabo de vassoura": cano comprido e carregador na frente do gatilho
         add(g, CY(.0065, .12, 12), M.steel, 0, .036, mz - .055); bore(0, .036, mz - .116, .004); mz -= .118;
-        add(g, EX([[.05, .0], [.11, .0], [.105, -.05], [.055, -.05]], .028, null, .003), M.steel, 0, .015, 0);
-        for (let k = 0; k < 3; k++) add(g, new THREE.BoxGeometry(.03, .003, .045), M.dark, 0, -.006 - k * .012, -.08);
+        g.remove(ud.mag); // zv2-A04: a C96 não tem carregador no punho; a recarga tirava um carregador de pistola comum de dentro do cabo de madeira
+        const mag = grp(g, 0, .015, -.08); add(mag, EX([[-.03, .0], [.03, .0], [.025, -.05], [-.025, -.05]], .028, null, .003), M.steel);
+        for (let k = 0; k < 3; k++) add(mag, new THREE.BoxGeometry(.03, .003, .045), M.dark, 0, -.021 - k * .012, 0);
+        ud.mag = mag; ud.magGrab = new V3(0, -.047, -.08); // carregador na frente do gatilho: é ele que sai e entra na recarga (mão por baixo dele)
       }
       break;
     }
@@ -18098,7 +18098,7 @@ function gunModel(id, fp = false, skin = null) {
       bore(0, .047, -.246, .005);
       const cyl = grp(g, 0, .031, -.03); add(cyl, CY(.02, .044, 16), st);
       for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; add(cyl, CY(.0045, .046, 8), M.dark, Math.cos(a) * .012, Math.sin(a) * .012, 0); add(cyl, new THREE.BoxGeometry(.003, .003, .03), M.dark, Math.cos(a + .52) * .019, Math.sin(a + .52) * .019, 0, 0, 0, a + .52); }
-      ud.hammer = add(g, EX([[-.035, .05], [-.02, .05], [-.02, .064], [-.03, .072], [-.05, .07]], .008), st); ud.hammerP = new V3(0, .052, .025); // cão (pistolas, a1: cai no tiro)
+      ud.hammer = add(g, EX([[-.035, .05], [-.02, .05], [-.02, .06], [-.03, .065], [-.05, .063]], .008), st); ud.hammerP = new V3(0, .052, .025); // cão (pistolas, a1: cai no tiro). zv2-A01: espora 0,9 cm abaixo da linha de mira (antes a 0,2 cm, a 8 cm do olho tapava a alça e a massa na mira)
       add(g, EX([[-.03, .003], [-.004, -.012], ['q', .002, -.06, -.02, -.105], [-.064, -.105], ['q', -.074, -.04, -.03, .003]], .033, null, .004), M.woodDark);
       add(g, EX([[.014, -.004], [.02, -.004], ['q', .022, -.016, .014, -.026], [.009, -.024], ['q', .014, -.014, .014, -.004]], .006), M.dark);
       ud.cyl = cyl; ud.rig = 'revolver'; mz = -.25; my = .047;
@@ -18416,7 +18416,7 @@ function gunModel(id, fp = false, skin = null) {
         const mag = grp(g, 0, .07, .035); add(mag, CY(.012, .05, 12), M.glowR); add(mag, CY(.014, .01, 12), M.chrome, 0, 0, .03); add(mag, CY(.014, .01, 12), M.chrome, 0, 0, -.03);
         ud.mag = mag; ud.magUp = 1; ud.magGrab = new V3(0, .085, .035);
         mz = -.3; my = .04; ud.lh = new V3(-.02, -.075, .035); ud.rh = new V3(0, -.055, .04); ud.pistol = 1; ud.vm = [.012, .012, -.03];
-        irons(.118, .05, -.2, { notch: 1, base: .02, fbase: .02 });
+        irons(.118, -.02, -.2, { notch: 1, base: .022, fbase: .02 }); // zv2-A09: alça na placa cromada (em z .05 ela flutuava 14 mm acima da bateria, que saía por dentro dela na recarga)
         r8(g, ud, { d: [0, 1, .25], ins: .11, pop: .035, drop: 1, H: [-.04, -.005, .01], rz: .45, rx: .12, f: pap ? 0x30e0ff : 0xff3030, fim: 1 }); // (a8) bateria sai por cima
         break;
       }
@@ -18518,11 +18518,11 @@ function gunModel(id, fp = false, skin = null) {
       else { add(mag, EX(banana(.12, 1.2, .054, .05), .028, null, .003), aug ? M.polymer : M.metal); ud.magGrab = new V3(0, -.17, .05); }
       const bolt = grp(g, ...(aug ? [-.034, .005, -.2] : fam ? [0, .068, -.02] : g11 ? [-.034, .0, -.17] : [.03, .03, .1])); add(bolt, RB(.012, .012, .02, .003), M.dark); ud.bolt = bolt; // alavanca de manejo de cada uma
       ud.rh = new V3(0, -.05, -.11); ud.lh = new V3(-.005, -.03, -.2); ud.via = new V3(0, -.16, -.11); // via: a mão esquerda passa por baixo da mão do gatilho (carregador atrás do punho)
-      if (aug) { optic(.105, -.0, .13, .019, M.green); add(g, EX([[.27, .0], [.3, .0], ['q', .298, -.04, .294, -.07], [.272, -.07], ['q', .27, -.035, .27, .0]], .03, null, .004), M.green, 0, -.012, 0); ud.lh = new V3(-.005, -.06, -.285); } // luneta integrada e empunhadura
+      if (aug) { optic(.105, -.0, .13, .019, M.green); add(g, EX([[.27, .0], [.3, .0], ['q', .298, -.04, .294, -.07], [.272, -.07], ['q', .27, -.035, .27, .0]], .03, null, .004), M.green, 0, -.012, 0); add(g, EX([[.23, .014], [.29, .014], [.305, .004], [.305, -.016], [.295, -.022], [.23, -.022]], .048, null, .004), M.green); ud.lh = new V3(-.005, -.06, -.285); } // luneta integrada e empunhadura; zv2-A06: a frente da caixa desce até a empunhadura (antes ela ficava solta no ar, 3 cm à frente da caixa e 3 cm abaixo do cano)
       else if (fam) { // alça de transporte comprida com as miras dentro; bipé dobrado
         add(g, EX([[-.2, .0], [.14, .0], [.14, .045], [.1, .048], [-.16, .048], [-.2, .03]], .02, [[[-.15, .008], [.09, .008], [.09, .034], [-.15, .034]]]), M.dark, 0, .055, 0);
         for (const s of [-1, 1]) add(g, CY(.003, .18, 8), M.metal, s * .012, .0, -.3);
-        irons(.112, .17, -.12, { base: .006, fbase: .008 });
+        irons(.112, .17, -.12, { base: .016, fbase: .008 }); // zv2-A06: base .006 dava suporte de altura zero e a alça ficava solta 4,5 mm acima da alça de transporte
       }
       else if (g11) optic(.11, -.02, .12, .017, M.dark);
       else optic(.11, .0, .1, .021, M.metal); // Enfield: SUSAT
@@ -18552,7 +18552,7 @@ function gunModel(id, fp = false, skin = null) {
       ud.mag = mag; ud.magUp = 1; ud.magGrab = new V3(0, .11, -.02);
       grip(g, -.05, -.01, .09, M.polymer); guard(g, -.02, -.01);
       mz = -.37; my = .03; ud.lh = new V3(-.005, -.02, -.2);
-      irons(.124, .03, -.22, { notch: 1, base: .05, fbase: .06 });
+      irons(.124, .03, -.22, { notch: 1, base: .06, fbase: .06 }); // zv2-A09: base .05 -> .06 (a alça flutuava 8 mm acima do corpo)
       r8(g, ud, { d: [0, 1, -.3], ins: .11, pop: .035, drop: 1, H: [-.04, -.005, -.04], rz: .25, rx: .15, dy: -.06, dz: -.04, f: pap ? 0x7fd8ff : 0xcff4ff, fim: 1 }); // (a8) tubo de gelo de cima
       break;
     }
@@ -18561,8 +18561,8 @@ function gunModel(id, fp = false, skin = null) {
       add(g, RB(.02, .03, .07, .004), M.dark, 0, .0, -.0); grip(g, -.02, .006, .085, M.dark, .03); guard(g, .02, .006);
       const mag = grp(g, 0, .04, -.44); add(mag, CY(.026, .06, 14, .006), M.green, 0, 0, -.04); ud.mag = mag; ud.magUp = 1; ud.magGrab = new V3(0, .1, -.4);
       mz = -.5; my = .04; ud.lh = new V3(-.005, .0, -.25);
-      irons(.1, .02, -.3, { base: .028, fbase: .028 });
-      r8(g, ud, { d: [0, 0, -1], ins: .2, pop: 0, drop: 0, H: [-.02, -.01, .02], rz: .3, rx: -.12, dz: .2, f: 0xffb070 }); // (a8) foguete novo entra pela boca
+      irons(.12, .02, -.3, { base: .048, fbase: .048 }); // zv2-A09: mira 4,6 cm acima do tubo (era 2,6): na mira a tampa de trás do tubo enchia um terço de baixo da tela
+      r8(g, ud, { d: [0, 0, -1], ins: .2, pop: 0, drop: 0, H: [-.02, -.01, .02], rz: .3, rx: -.12, dz: .2, f: 0xffb070, fim: 1 }); // (a8) foguete novo entra pela boca; zv2-A09: fim (a arma voltava 0,15 s antes de poder atirar)
       break;
     }
     case 'xbow': { // besta: coronha de madeira, arco de metal, corda e virote de ponta explosiva
@@ -18579,7 +18579,7 @@ function gunModel(id, fp = false, skin = null) {
       grip(g, -.04, -.01, .085, M.polymer, .03); guard(g, .0, -.01);
       mz = -.5; my = .056; ud.lh = new V3(-.005, .0, -.24);
       irons(.098, .08, -.33, { base: .05, fbase: .05 });
-      r8(g, ud, { d: [0, .35, 1], ins: .2, pop: 0, drop: 0, H: [-.03, -.02, .06], rz: .3, rx: .1, f: 0 }); // (a8) virote novo deita no trilho por trás; sem clarão
+      r8(g, ud, { d: [0, .35, 1], ins: .2, pop: 0, drop: 0, H: [-.03, -.02, .06], rz: .3, rx: .1, f: 0, fim: 1 }); // (a8) virote novo deita no trilho por trás; sem clarão; zv2-A09: fim (a arma voltava 0,15 s antes de poder atirar)
       break;
     }
     case 'knife': {
@@ -20082,7 +20082,7 @@ function reloadAnim(ud, t, o) {
       else if (!ud.rock && t >= .31 && t < RLD.novo) ud.mag.visible = false;
     }
     if (E) { // recarga com a arma vazia: solta o slide / puxa o ferrolho
-      if (ud.pistol && ud.slide) { if (t < .72) ud.slide.position.z = ud.slideRest.z + .03; ev('sl', .72, () => play('slide')); }
+      if (ud.slide) { if (t < .72) ud.slide.position.z = ud.slideRest.z + .03; ev('sl', .72, () => play('slide')); }
       else if (ud.bolt && !ud.boltAction) { if (t > .71 && t < .785) ud.bolt.position.z = ud.boltRest.z + seg(t, .71, .75) * .05; ev('bolt', .785, () => play('bolt')); }
       else if (ud.boltAction) { boltAnim(ud, (t - .7) / .2, o); ev('bolt', .74, () => play('bolt')); }
     }
@@ -20326,6 +20326,7 @@ function gunAnim(ud, w, o) {
   if (!ud?.muzzle || !w) return;
   const a = G.ammo[G.cur];
   if (ud.mag) { ud.mag.position.copy(ud.magRest); ud.mag.visible = true; }
+  if (ud.mag && ud.r8 && !ud.r8.drop && a && a.mag === 0 && !G.reloadEnd) ud.mag.visible = false; // zumbi-v2 (Etapa 2): foguete da LAW e virote da besta somem depois do tiro
   if (ud.rock) ud.mag.rotation.x = 0; // a3: carregador da AK volta reto
   if (ud.slide) ud.slide.position.copy(ud.slideRest);
   if (ud.bolt) { ud.bolt.position.copy(ud.boltRest); ud.bolt.rotation.set(0, 0, 0); }
@@ -20586,6 +20587,7 @@ function lunetaCentro(o, ud, ak, hx, hy, tx, ty) {
 const W10 = { fim: [.84, 1], cone: { trovao: .3, gelo: .3 } };
 FRAME_ARMA.wintershowl = { hi: [.14, .08, .07] }; // corpo grosso e curto: vinha a 0,147 m do olho no quadril, enchendo um terço da tela
 ADS.recuo.wunderwaffe = .035; // a traseira de bronze e a coronha enchiam o pé da tela na mira (olho a 0,09 m)
+ADS.recuo.raygun2 = .07; // zv2-A09: a alça da Mk II foi 7 cm para a frente (placa cromada): o olho fica onde estava (z .194)
 let w10Geo = null; const w10Pool = [];
 function w10Cone(o, f, len, rad, col, op, life) { // cone do tiro, de uma peça guardada (sem geometria nem material novos por tiro)
   if (!w10Geo) { // cone unitário aberto (ponta em +y), alfa por vértice: 0 na boca, pico a 18% e 0 na base
@@ -20618,8 +20620,11 @@ function adsEye(gun, ud) {
 // A caixa da culatra das escopetas fica 1,2 cm abaixo da conta (KS-23: 1,8 cm, no limite de ADS.alt, mas ainda conta) e o olho ficava a
 // 7–8 cm da traseira dela: a tampa da caixa (com o brilho da luz) enchia 40% de baixo da tela, e roxa com o Pack-a-Punch. Com o olho mais
 // para trás (rosto no pente, como numa escopeta de verdade), a caixa fica no pé da tela e a conta e a fita aparecem inteiras.
-ADS.recuo.nova = .05; ADS.recuo.stakeout = .05; ADS.recuo.spas = .05; ADS.recuo.trench = .05; ADS.recuo.ks23 = .05; ADS.recuo.olympia = .05; ADS.recuo.hs10 = .03;
+ADS.recuo.nova = .05; ADS.recuo.stakeout = .05; ADS.recuo.spas = .05; ADS.recuo.trench = .05; ADS.recuo.ks23 = .05; ADS.recuo.olympia = .05; ADS.recuo.hs10 = .12; // zv2-A08: a HS10 não tem coronha: com .03 a traseira da caixa enchia o pé da tela na mira (olho a 0,106 m, caixa com 300 px de largura); com .12 o olho fica a 0,21 m e aparecem o punho e a mão, como numa pistola
+ADS.recuo.mp40 = .035; // zv2-A02: MP40 na mira: o tubo da caixa e a alça ficavam a 0,059 m do olho e enchiam o pé da tela (as outras SMGs ficam a 0,08-0,11 m)
 ADS.recuo.law = .08; // 6-w11: LAW na mira (a tampa de trás do tubo ficava a 0,081 m do olho)
+ADS.recuo.thundergun = .05; // zv2-A10: Arma Trovão na mira: o olho ficava em cima da célula (tampa a 0,006 m e célula a 0,021 m do olho, borrão claro no pé da tela)
+ADS.recuo.mg42 = .04; ADS.recuo.stoner = .03; // zv2-A07: na mira a tampa de alimentação enchia a metade de baixo da tela (olho a 0,099 m na MG42 e 0,102 m na Stoner; HK21: 0,141 m)
 // ---------- luneta (a6): entrada com a arma subindo até o olho, retícula de cada arma, vinheta da ocular ----------
 // G.scR (0..1) é só visual: G.scope continua mudando na hora (precisão e sensibilidade não mudam). Entrada em ent s, saída em sai s;
 // a arma some em some; a tela da luneta aparece entre luz[0] e luz[1]; o zoom chega entre zoom[0] e zoom[1]; olho: distância olho→ocular (m);
@@ -20753,7 +20758,7 @@ function equip(id, force) {
   if (id !== G.cur) G.last = G.cur;
   G.ads = 0;
   G.swing = 0; // 6-w18: o balanço do arremesso/colocação (G.swing, só visual) ficava para a arma nova, que girava até 63° logo depois do saque
-  G.cur = id; G.reloadEnd = 0; G.reload = null; G.scope = 0; G.rezoom = 0; G.burstN = 0; G.switchDur = id === 'awp' ? .6 : id === 'knife' ? .55 : .35; G.kan = null; G.switchEnd = now + G.switchDur; G.shots = 0;
+  G.cur = id; G.reloadEnd = 0; G.reload = null; G.scope = 0; G.rezoom = 0; G.burstN = 0; G.switchDur = W[id]?.model === 'awp' ? .6 : id === 'knife' ? .55 : .35; G.kan = null; G.switchEnd = now + G.switchDur; G.shots = 0;
   vmSetWeapon(id); play('draw');
 }
 function applyInv(inv, refill, got) {
@@ -21254,11 +21259,11 @@ function shoot() {
     sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: ends, sup: attHas(G.cur, 'sup') ? 1 : undefined });
   }
   if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); muzzleFlash(mz); vmFlashUntil = now + .05; } // supressor: sem clarão, tiro abafado
-  G.kick = (vmGun?.userData.fps2 ? .25 : 1) * attStat(G.cur, 'kick');
+  G.kick = (vmGun?.userData.fps2 ? .25 : 1) * attStat(G.cur, 'kick') * (ZBAL.armas.coice[w.base || G.cur] ?? 1); // zumbi-v2 (Etapa 2): coice por arma (zumbi_config.js)
   if (vmGun?.userData.fps2) fpPlay(vmGun.userData, 'fire');
   if (!['shotgun', 'launcher', 'dbarrel', 'revolver', 'scout', 'awp'].includes(w.model) || w.rate < .6 && w.model === 'shotgun') ejectShell(w); // bomba/ferrolho ejetam na hora da ação
   if (w.scope && G.scope && w.model !== 'dmr') { G.rezoom = G.scope; G.scope = 0; } // ferrolho manual sai da luneta; Dragunov/PSG1 (semiautomáticas) ficam
-  if (a.mag === 0 && a.res > 0) setTimeout(startReload, 250);
+  if (a.mag === 0 && a.res > 0) setTimeout(startReload, w.model === 'shotgun' && w.rate >= .6 ? 550 : 250); // zumbi-v2 (Etapa 2): não corta a bomba da escopeta no último cartucho
 }
 function knifeAttack(heavy) {
   const w = W.knife; G.nextFire = now + (heavy ? w.altRate : w.rate); G.swing = 0; G.kan = { type: heavy ? 'stab' : G.lastSlash?.type === 'slash' && now - G.lastSlash.t0 < 1 ? 'slash2' : 'slash', t0: now }; if (!heavy) G.lastSlash = G.kan; // golpes seguidos alternam o lado
@@ -23419,10 +23424,19 @@ const ZKIND = [{ n: 'Zumbi', sz: 1 }, { n: 'Brutamonte', hp: 3.5, pts: 100, xp: 
   { n: 'Tóxico', hp: 1.3, pts: 40, xp: 3, sz: 1 }, { n: 'Gritador', hp: 1.2, pts: 60, xp: 4, sz: 1.04 }, { n: 'Carniceiro', pts: 1000, xp: 50, sz: 1.6, rad: .55 }];
 for (const k in ZBAL.tipos) ZKIND[k].sz = ZBAL.tipos[k].s; // zumbi-v2 (Etapa 1): tamanho de cada tipo vem do zumbi_config.js
 // zumbi-v2 (Etapa 1): velocidade, dano e ritmo do golpe pelo tamanho (fórmulas e expoentes em ZBAL.tamanho)
+// zumbi-v2 (Etapa 5): zumbi do lado de fora que já está na área jogável (o chão dele leva ao jogador sem passar pela janela)
+// ou com o jogador colado nele larga a janela e vai atrás do jogador. Roda a cada reavaliação do alvo (escalonada), não a cada quadro.
+function zForaJanela(z, P) {
+  if (z.st !== 'out' && z.st !== 'tear') return;
+  const c = ffCell(P.x, P.z), noJogo = c >= 0 && FF.walk[c] && isFinite(FF.dist[c]) && zActive().has(zRoomAt(P.x, P.z));
+  const t = z.tgt, perto = t && hyp(t.pos[0] - P.x, t.pos[2] - P.z) < ZBAL.alvo.perto && Math.abs(t.pos[1] - P.y) < 1.5 && segClearH(P.x, P.z, t.pos[0], t.pos[2], P.y + STEP, P.y);
+  if (noJogo || perto) { z.st = 'in'; z.win = -1; z.chkT = now + 6; z.chkX = P.x; z.chkZ = P.z; z.body.onGround = true; }
+}
 function zTamanho(z, kind, D) {
   const T = ZBAL.tamanho, K = ZBAL.tipos[kind] || ZBAL.tipos[0], s = K.s;
   z.sc = Math.max(K.marchaMin ?? 0, Math.min(K.marchaMax ?? 2, z.sc)); const [a, b] = ZBAL.marcha[z.sc];
   z.speed = rand(a, b) * s ** -T.vel * D.spd; z.dm = s ** T.dano; z.ac = s ** T.ritmo; z.aw = T.preparo * z.ac;
+  const E = ZBAL.estilos[K.estilo]; if (E) { z.est = K.estilo; z.speed *= 1 + rand(-E.varia, E.varia); z.fase = Math.random() * 6.28; } // zumbi-v2 (Etapa 5): estilo e variação individual
 }
 const ZGEO = {};
 function zbx(g, w, h, d, x, y, z, m) { // caixa com geometria em cache (não é descartada quando o zumbi sai)
@@ -23634,11 +23648,34 @@ function zClearDynamic() {
   for (const id of [...ZC.clays.keys()]) zClayRemove(id, false);
   for (const id of [...ZC.vult.keys()]) zVultRemove(id);
 }
+// zumbi-v2 (Etapa 7): a cada partida (semente st.seed, igual no host e nos clientes) as bebidas trocam de lugar entre si, o Pack-a-Punch
+// pode ir para o lugar de uma bebida que tenha espaço para ele (a bebida fica no lugar antigo do PaP) e a energia troca com um giz de arma
+// (os dois ficam na parede). Só lugares já auditados (sem sobreposição, sem bloquear passagem, alcançáveis abrindo portas). Sem semente: lugares fixos.
+function zRng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function zSorteiaLugares(D, seed) {
+  const pos = o => ({ x: o.x, z: o.z, n: o.n }), put = (o, l) => { o.x = l.x; o.z = l.z; o.n = l.n; };
+  if (!D.lugares0) D.lugares0 = { perks: D.perks.map(pos), pap: D.pap && pos(D.pap), power: D.power && pos(D.power), wall: (D.wall || []).map(pos) };
+  const L = D.lugares0; L.perks.forEach((l, i) => put(D.perks[i], l)); if (D.pap) put(D.pap, L.pap); if (D.power) put(D.power, L.power); (D.wall || []).forEach((w, i) => put(w, L.wall[i]));
+  if (curMapId && ZINT_MAPA[curMapId]) ZINT_MAPA[curMapId] = ZINT_MAPA[curMapId].filter(o => o.t !== 'peca'); D.pecas = null; // zumbi-v2 (Etapa 8): peças da partida anterior saem
+  if (!seed || C.st?.zmode === 'campanha' || !D.perks.length) return; // a campanha usa os lugares fixos (os objetivos dependem deles)
+  zSorteiaPecas(D, zRng(seed ^ 0x9e3779b9)); // zumbi-v2 (Etapa 8)
+  if (!ZBAL.lugares.sortear) return;
+  const R = zRng(seed), sl = L.perks.map(l => l);
+  for (let i = sl.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [sl[i], sl[j]] = [sl[j], sl[i]]; }
+  D.perks.forEach((pk, i) => put(pk, sl[i]));
+  if (D.pap && R() < ZBAL.lugares.papChance) { // PaP no lugar de uma bebida, se couber (1,6 m × 1 m na frente da parede)
+    const cabe = l => [-.45, 0, .45].every(t => footFreeR(l.x + l.n[0] * .55 - l.n[1] * t, l.z + l.n[1] * .55 + l.n[0] * t, .42));
+    L.papCabe ||= L.perks.map(cabe); // calculado uma vez, com o COL só do mapa (igual no host e nos clientes)
+    const ks = D.perks.map((pk, i) => i).filter(i => L.papCabe[L.perks.findIndex(l => l.x === D.perks[i].x && l.z === D.perks[i].z)]); if (ks.length) { const i = ks[Math.floor(R() * ks.length)], l = pos(D.perks[i]); put(D.perks[i], L.pap); put(D.pap, l); }
+  }
+  if (D.power && D.wall?.length && R() < ZBAL.lugares.energiaChance) { const i = Math.floor(R() * D.wall.length), l = pos(D.wall[i]); put(D.wall[i], L.power); put(D.power, l); }
+}
 function zBuildWorld(M) {
+  zSorteiaLugares(M.z || ZD, C.st?.seed); // zumbi-v2 (Etapa 7)
   const D = ZD = M.z;
   if (FF.nx !== D.ff.nx || FF.nz !== D.ff.nz || !FF.walk) { Object.assign(FF, D.ff); FF.walk = new Uint8Array(FF.nx * FF.nz); FF.dist = new Float32Array(FF.nx * FF.nz); }
   else Object.assign(FF, D.ff);
-  Object.assign(ZC, { on: true, round: 0, phase: '', power: false, doors: new Set(), box: { loc: 0, st: 'idle', user: null, w: null, t0: now }, pap: { st: 'idle', user: null, w: null, t0: now },
+  Object.assign(ZC, { built: {}, on: true, round: 0, phase: '', power: false, doors: new Set(), box: { loc: 0, st: 'idle', user: null, w: null, t0: now }, pap: { st: 'idle', user: null, w: null, t0: now },
     boards: D.windows.map(() => 6), insta: 0, dbl: 0, dog: false, fogDog: false, perks: [], bowie: false, qrBuys: 0, act: null, over: false, builtAt: now, selfRev: false, gone: new Set(),
     fire: 0, bf: 0, dmEnd: 0, traps: (D.traps || []).map(() => ({ st: 'idle', end: 0 })), streak: 0, streakT: 0, rem: 0, nextR: 0, widow: 0, dwEnd: 0, dwCd: 0, zbEnd: 0 }); // snapTs fica: a hora do host só sobe, e uma foto de antes do reinício é descartada
   const Wd = ZC.world = { doors: new Map(), planks: [], perks: new Map(), lights: [], box: null, pap: null, power: null, boxCol: null };
@@ -24315,7 +24352,7 @@ function thunderBlast(w, mz) { // Arma Trovão: onda de ar que derruba tudo num 
     if (dist > range) continue; d.divideScalar(dist); if (d.dot(f) < cosA && dist > 2.2) continue; if (!losClear(o, c)) continue;
     sendToHost({ t: 'zhit', v: zc.id, dmg: 1e7, z: 'body', w: G.cur }); n++;
   }
-  if (n) showHitmarker(false);
+  if (n) { showHitmarker(false); play('hit'); } // zv2-A10: som de acerto como no Winter's Howl (só o marcador aparecia)
   thunderFx(mz, f, range);
   sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: [[r3(mz.x + f.x * 8), r3(mz.y + f.y * 8), r3(mz.z + f.z * 8)]] });
   me.shake = Math.max(me.shake, .4);
@@ -24382,7 +24419,7 @@ function zInteract(dt) {
   const px = me.pos.x, pz = me.pos.z, solo = zSolo(); let best = null, bd = 1e9;
   const cand = (dist, a) => { if (dist < bd) { bd = dist; best = a; } };
   const dd = (x, z) => Math.hypot(px - x, pz - z);
-  for (const d of ZD.doors) if (!ZC.doors.has(d.id)) { const dist = dd(d.x, d.z); if (dist < 2.6) { const tr = d.atalho && zintPortaTrava(d, false); cand(dist, tr ? { k: 'door', id: d.id, ok: false, txt: tr } : { k: 'door', id: d.id, cost: d.cost, txt: `${ZINT_PORTA[d.kind]?.verbo || (d.kind === 'debris' ? 'Remover entulho' : d.kind === 'gate' ? 'Abrir portão' : 'Abrir porta')} [${d.cost}]` }); } } // O2-C08: atalhos
+  for (const d of ZD.doors) if (!ZC.doors.has(d.id)) { const dist = dd(d.x, d.z); if (dist < (d.secreta ? ZBAL.secreta.alcance : 2.6)) { const tr = d.atalho && zintPortaTrava(d, false); if (d.secreta && tr) continue; /* zumbi-v2 (Etapa 6): passagem secreta só aparece colado nela e sem dica */ cand(dist, tr ? { k: 'door', id: d.id, ok: false, txt: tr } : { k: 'door', id: d.id, cost: d.cost, txt: `${ZINT_PORTA[d.kind]?.verbo || (d.kind === 'debris' ? 'Remover entulho' : d.kind === 'gate' ? 'Abrir portão' : 'Abrir porta')}${d.cost ? ` [${d.cost}]` : ''}` }); } } // O2-C08: atalhos
   ZD.wall.forEach((wb, i) => {
     const dist = dd(wb.x, wb.z); if (dist > 2) return;
     let txt, cost, ok = true;
@@ -24391,9 +24428,9 @@ function zInteract(dt) {
     else if (wb.w === 'clay') { cost = wb.cost; if (G.inv.clay >= 2) { txt = 'Claymores cheias'; ok = false; } else txt = `2 Claymores [${cost}]`; }
     else if (wb.w === 'bowie') { cost = wb.cost; if (ZC.bowie) { txt = 'Faca Bowie (já tem)'; ok = false; } else txt = `Faca Bowie [${cost}]`; }
     else {
-      const has = zHasG(wb.w), hasP = zHasG(wb.w + '_pap');
+      const has = zHasG(wb.w), idP = PAP_IDS(wb.w).find(zHasG), hasP = !!idP; // zumbi-v2 (Etapa 9)
       if (has || hasP) {
-        const id = has ? wb.w : wb.w + '_pap', a = G.ammo[id]; cost = has ? Math.round(wb.cost / 2) : 4500;
+        const id = has ? wb.w : idP, a = G.ammo[id]; cost = has ? Math.round(wb.cost / 2) : 4500;
         if (a && a.mag >= wMag(id) && a.res >= W[id].res) { txt = 'Munição cheia'; ok = false; } else txt = `Munição ${W[id].name} [${cost}]`;
       } else { cost = wb.cost; txt = `Comprar ${W[wb.w].name} [${cost}]`; }
     }
@@ -24416,11 +24453,12 @@ function zInteract(dt) {
     } }
   { const P = ZD.pap, dist = dd(P.x, P.z);
     if (dist < 2.4) {
-      if (!ZC.power) cand(dist, { k: 'pap', ok: false, txt: 'Pack-a-Punch — sem energia' });
-      else if (ZC.pap.st === 'idle') { const w = W[G.cur], c = ZC.bf > now ? 1000 : 5000; if (w?.zw && !w.pap && !w.ls) cand(dist, { k: 'pap', cost: c, txt: `Pack-a-Punch na ${w.name} [${c}]${c < 5000 ? ' — EM OFERTA' : ''}` }); else cand(dist, { k: 'pap', ok: false, txt: 'Segure uma arma que dá pra melhorar' }); }
+      if (!zConstruida('pap')) cand(dist, zPecasPegas('pap') >= ZD.pecas.pap ? { k: 'zbuild', maq: 'pap', txt: 'Montar o Pack-a-Punch' } : { k: 'pap', ok: false, txt: `Pack-a-Punch desmontado — peças ${zPecasPegas('pap')}/${ZD.pecas.pap}` }); // zumbi-v2 (Etapa 8)
+      else if (!ZC.power) cand(dist, { k: 'pap', ok: false, txt: 'Pack-a-Punch — sem energia' });
+      else if (ZC.pap.st === 'idle') { const w = W[G.cur], n = w?.pap | 0, c = ZC.bf > now ? 1000 : ZBAL.pap.custo[n]; if (papProx(G.cur)) cand(dist, { k: 'pap', cost: c, txt: `Pack-a-Punch nível ${n + 1} na ${w.name} [${c}]${ZC.bf > now ? ' — EM OFERTA' : ''}` }); else cand(dist, { k: 'pap', ok: false, txt: n >= 3 ? `${w.name}: nível máximo` : 'Segure uma arma que dá pra melhorar' }); } // zumbi-v2 (Etapa 9)
       else if (ZC.pap.st === 'ready' && ZC.pap.user === C.myId && ZC.pap.w) cand(dist, { k: 'paptake', txt: `Pegar ${W[ZC.pap.w].name}` });
     } }
-  if (!ZC.power) { const P = ZD.power, dist = dd(P.x, P.z); if (dist < 2.2) cand(dist, { k: 'power', txt: 'Ligar a energia' }); }
+  if (!ZC.power) { const P = ZD.power, dist = dd(P.x, P.z); if (dist < 2.2) cand(dist, zConstruida('power') ? { k: 'power', txt: 'Ligar a energia' } : zPecasPegas('power') >= ZD.pecas.power ? { k: 'zbuild', maq: 'power', txt: 'Montar o gerador de energia' } : { k: 'power', ok: false, txt: `Gerador desmontado — peças ${zPecasPegas('power')}/${ZD.pecas.power}` }); } // zumbi-v2 (Etapa 8)
   (ZD.traps || []).forEach((t, i) => { // armadilha elétrica
     const dist = dd(t.sx, t.sz); if (dist > 2.2) return;
     const T = ZC.traps[i] || { st: 'idle' }; let txt, ok = true;
@@ -24466,6 +24504,7 @@ function zRoundFx(r, dog) {
 function zSyncWorld(z) {
   if (!ZC.on || !ZC.world) return;
   ZC.round = z.r; ZC.phase = z.ph; ZC.qrBuys = z.qr; ZC.dog = !!z.dog;
+  if (z.bt) ZC.built = { power: !!z.bt[0], pap: !!z.bt[1] }; // zumbi-v2 (Etapa 8)
   if (z.pw) zPowerOn();
   for (const id of z.d) zDoorOpen(id);
   const Bx = ZC.box; if (z.box[1] !== 'gone' && z.box[0] !== Bx.loc) zBoxPlace(z.box[0]);
@@ -24537,10 +24576,13 @@ function zHud(dt) {
     const add = (o, txt, edge) => { if (!o) return; const v = visScr(o.x, 1.4, o.z); if (v.off && !edge) return; const d = Math.hypot(o.x - me.pos.x, o.z - me.pos.z); if (d < 3) return;
       if (v.off) { v.x = clamp(v.x, 70, innerWidth - 70); v.y = clamp(v.y + nOff++ * 34, 40, innerHeight - 40); }
       ob += `<span${v.off ? ' class="off"' : ''} style="left:${v.x}px;top:${v.y}px"><i>◆</i>${txt} ${Math.round(d)}m</span>`; };
-    if (!ZC.power) add(ZD.power, 'ENERGIA', true);
-    else if (now - (ZC.powT || 0) < 15) add(ZD.pap, 'PACK-A-PUNCH', true);
+    if (ZBAL.dicas.dificuldades.includes(C.st?.zdiff ?? 1)) { // zumbi-v2 (Etapa 6): onde fica a energia e o Pack-a-Punch só no Fácil
+      if (!ZC.power) add(ZD.power, 'ENERGIA', true);
+      else if (now - (ZC.powT || 0) < 15) add(ZD.pap, 'PACK-A-PUNCH', true);
+    }
     if (ZC.box.st !== 'gone' && now - (ZC.boxT || 0) < 15) add(ZD.boxes?.[ZC.box.loc], 'CAIXA', true);
   }
+  ob += zPecasHud(); // zumbi-v2 (Etapa 8): peças (contagem; marcador só no Fácil)
   setHTML('zobj', ob);
   campHud(dt); // O3-D02 (fora da campanha devolve na hora)
 }
@@ -24689,7 +24731,7 @@ function zReset() {
   S.left = new Map(); // partida nova: ninguém recupera nada da anterior
   Object.assign(Z, { on: true, round: 0, phase: 'pre', phaseEnd: now + 5, toSpawn: 0, spawnT: 0, spawnDelay: 2, zs: new Map(), nextId: 1, dogRound: false, nextDog: zDf().dog[0] + Math.floor(Math.random() * 3),
     drops: [], dropId: 1, dropsRound: 0, dropThresh: 2000 * zDf().drop, dropScore: 0, bag: [], insta: 0, dbl: 0, power: false, doors: new Set(), boards: ZD.windows.map(() => 6),
-    winT: ZD.windows.map(() => ({ tear: 0, climb: 0, busy: false })), box: { loc: 0, st: 'idle', user: null, w: null, t: 0, uses: 0 }, pap: { st: 'idle', user: null, w: null, t: 0, slot: null },
+    built: {} /* zumbi-v2 (Etapa 8): máquinas montadas */, winT: ZD.windows.map(() => ({ tear: 0, climb: 0, busy: false })), box: { loc: 0, st: 'idle', user: null, w: null, t: 0, uses: 0 }, pap: { st: 'idle', user: null, w: null, t: 0, slot: null },
     qrBuys: 0, lure: null, zsT: 0, ffT: 0, repPts: new Map(), repT: {}, fire: 0, bf: 0, clays: [], clayId: 1, vult: [], vultId: 1, traps: (ZD.traps || []).map(() => ({ st: 'idle', t: 0, by: null, hurt: {} })) });
   Object.assign(Z, { mix: ZKIND.map(() => 0), mixN: 0, reQ: [], bossQ: 0, bossAt: 0, nextBoss: zSp().boss, clouds: [], cloudId: 1 }); // especiais, Carniceiro e nuvens tóxicas
   zintReset(); // O2-C04
@@ -24862,7 +24904,7 @@ function zSpawnOne() {
 }
 const ZTG = [], ZARR = []; // listas do zTickZombies reaproveitadas a cada tick (sem lixo)
 function zTickZombies(dt) {
-  for (const w of Z.winT) w.busy = false;
+  for (const w of Z.winT) { w.nPrev = w.n || 0; w.n = 0; w.busy = false; } // zumbi-v2 (Etapa 4): quantos arrancaram tábua no passo anterior
   const tg = ZTG, arr = ZARR; tg.length = 0; arr.length = 0;
   for (const p of S.players.values()) if (p.alive && !p.downed && !(p.zbEnd > now)) tg.push(p); // Sangue Zumbi: ninguém persegue quem pegou
   if (CAMP.on) campAlvos(tg, dt); // O3-D02: relógio da campanha no host (objetivos, NPC, troca de mapa)
@@ -24874,22 +24916,25 @@ function zTickZombies(dt) {
     if (z.nukeAt && now >= z.nukeAt) { if (ZKIND[z.kind].chefe) { z.nukeAt = 0; z.hp = Math.max(1, z.hp - z.maxHp * ZKIND[z.kind].capNuke); } else { zKill(z, null, 'body', 'nuke', false, true); continue; } } // Nuke não mata chefe: tira capNuke (Carniceiro 20%)
     const P = z.body.pos;
     if (z.tgt && (!z.tgt.alive || z.tgt.downed || !S.players.has(z.tgt.id) || z.tgt.zbEnd > now)) { if (z.tgt.zbEnd > now && z.atkQ === z.tgt) z.atkWind = 0; z.tgt = null; z.tgtT = 0; }
-    if (now >= z.tgtT) { z.tgtT = now + .5; let best = null, bd = 1e9; for (let qi = 0; qi < tg.length; qi++) { const q = tg[qi], d = hyp(q.pos[0] - P.x, q.pos[2] - P.z); if (d < bd) { bd = d; best = q; } } z.tgt = best; }
+    if (now >= z.tgtT) { z.tgtT = now + ZBAL.alvo.reavalia + Math.random() * ZBAL.alvo.sorteio; zForaJanela(z, P); let best = null, bd = 1e9; for (let qi = 0; qi < tg.length; qi++) { const q = tg[qi], d = hyp(q.pos[0] - P.x, q.pos[2] - P.z); if (d < bd) { bd = d; best = q; } } z.tgt = best; }
     if (CAMP.on) campAlvoZ(z, P); // O3-D02: alvo falso perto e golpe nele
     if (z.ck && campIA(z, dt, z.tgt)) continue; // O3-D03: comportamento próprio (z.ck só existe na campanha)
     switch (z.st) {
       case 'rise': { const k = (now - z.t0) / 1.6; P.y = Math.min(0, -1.8 + k * 1.8); if (k >= 1) { z.st = 'in'; P.y = 0; z.body.onGround = true; z.chkT = now + 6; } break; }
       case 'out': {
-        const w = ZD.windows[z.win], gx = w.ox + w.tx * z.off, gz = w.oz + w.tz * z.off, dx = gx - P.x, dz = gz - P.z, d = hyp(dx, dz);
-        if (d < .25) z.st = 'tear'; else { const s = Math.min(d, z.speed * dt); P.x += dx / d * s; P.z += dz / d * s; z.yaw = Math.atan2(-dx, -dz); }
+        const J = ZBAL.janela, w = ZD.windows[z.win], wt = Z.winT[z.win], cheia = (wt.nPrev || 0) >= J.maxPorJanela; // zumbi-v2 (Etapa 4): encostado na barricada; com a janela cheia, espera atrás
+        const enc = .35 + z.rad + J.encosto + (cheia ? J.espera : 0), gx = w.x + w.n[0] * enc + w.tx * z.off, gz = w.z + w.n[1] * enc + w.tz * z.off, dx = gx - P.x, dz = gz - P.z, d = hyp(dx, dz);
+        if (d < .25 && !cheia) z.st = 'tear'; else if (d >= .25) { const s = Math.min(d, z.speed * dt); P.x += dx / d * s; P.z += dz / d * s; z.yaw = Math.atan2(-dx, -dz); } else z.yaw = Math.atan2(w.n[0], w.n[1]);
         break;
       }
       case 'tear': { // arranca as tábuas uma a uma; se alguém estiver colado na janela, bate através dela
         const wi = z.win, w = ZD.windows[wi], wt = Z.winT[wi]; z.yaw = Math.atan2(w.n[0], w.n[1]);
         if (Z.boards[wi] > 0) {
-          if (!wt.busy) { wt.busy = true; wt.tear += dt; if (wt.tear >= (z.kind === 1 ? .7 : z.sc ? .9 : 1.5)) { wt.tear = 0; Z.boards[wi]--; } }
+          { const J = ZBAL.janela; wt.n++; const n = Math.min(J.maxPorJanela, Math.max(1, wt.nPrev || 1)), k = (1 + J.acelera * (n - 1) ** J.curva) / n; // zumbi-v2 (Etapa 4): vários juntos quebram mais rápido (curva no zumbi_config.js)
+            if (wt.n <= J.maxPorJanela) { wt.tear += dt * k / (J.tabua[z.sc] * (z.kind === 1 ? J.tabuaBruto : 1)); if (wt.tear >= 1) { wt.tear = 0; Z.boards[wi]--; } } }
           let near = null, nd = 1e9; for (let qi = 0; qi < tg.length; qi++) { const q = tg[qi], d = hyp(q.pos[0] - w.ix, q.pos[2] - w.iz); if (d < nd) { nd = d; near = q; } }
           if (near && nd < 1.3) zTryAttack(z, near, 2.6);
+          else if (z.tgt && hyp(z.tgt.pos[0] - P.x, z.tgt.pos[2] - P.z) < 1.6) zTryAttack(z, z.tgt, 1.35); // zumbi-v2 (Etapa 5): jogador ao alcance do lado de fora: ataca ele
         } else if (now >= wt.climb) { wt.climb = now + 1.1; z.st = 'climb'; z.t0 = now; z.cx = P.x; z.cz = P.z; z.atkWind = 0; }
         break;
       }
@@ -24939,12 +24984,15 @@ function zChase(z, dt) {
     if (now >= z.losT) { z.losT = now + .35 + Math.random() * .1; const gy = Z.lure ? 0 : tgt.pos[1]; z.los = dist < 14 && segClearH(P.x, P.z, gx, gz, Math.max(P.y + STEP, gy + .05), Math.min(P.y, gy)); }
     if (z.los || dist < 1.2) { if (dist > .01) { dX = dx / dist; dZ = dz / dist; } z.lost = 0; }
     else { const fd = zFlowDir(P.x, P.z); if (fd) { dX = fd[0]; dZ = fd[1]; } else if (dist > .01) { dX = dx / dist; dZ = dz / dist; } const fc = ffCell(P.x, P.z); z.lost = fd || (fc >= 0 && FF.dist[fc] < Infinity) ? 0 : (z.lost || 0) + dt; } // sem caminho (longe demais de todos): anda reto
+    if (z.est && (dX || dZ) && dist > ZBAL.estilos.semDesvioPerto) { const E = ZBAL.estilos[z.est]; let ang = Math.sin(now * E.freq * 6.283 + z.fase) * E.amp; // zumbi-v2 (Etapa 5): desvio do caminho conforme o estilo
+      if (E.rumo) { if (now >= (z.rumoT || 0)) { z.rumoT = now + rand(E.rumo[0], E.rumo[1]); z.rumoA = rand(-E.rumoAng, E.rumoAng); } ang += z.rumoA; } // errático: troca brusca de rumo
+      const c = Math.cos(ang), s = Math.sin(ang), x = dX * c - dZ * s; dZ = dX * s + dZ * c; dX = x; }
     if (z.lost > 8 && zSeenHold(z)) z.lost = 4;
     if (z.lost > 8) { zRecycle(z); return; } // e se continuar sem caminho volta para a fila e renasce perto
     if (!Z.lure && tgt) { if (z.los || z.atkWind) zTryAttack(z, tgt, z.dog ? 1.5 : ZKIND[z.kind].alc || (z.kind === 1 ? 1.6 : z.crawler ? 1.2 : 1.35)); if (dist < (z.dog ? .9 : .85 + (z.rad - .3) * 2)) dX = dZ = 0; } // sem linha livre (grade no meio) não bate
     else if (Z.lure && dist < 1) dX = dZ = 0;
   }
-  const spd = (z.crawler ? .9 : z.speed * (z.buffT > now ? 1.3 : 1) * (z.hp < z.maxHp * .5 && ZKIND[z.kind].furia || 1) * (z.slowT > now ? .6 : 1) * (z.webT > now ? .2 : 1)) * (z.atkWind ? .35 : 1) * (z.fogoT > now ? ZINT.fogo.lento : 1) * (z.barrL ? ZINT.barricada.lento : 1) * (z.cv || 1), k = Math.min(1, dt * 8); // O2-C06: queimando anda mais devagar (armadilha de fogo); O2-C09: barricada com tábuas; grito: +30%; Carniceiro furioso abaixo da metade (ZKIND.furia); O3-D03: z.cv da campanha
+  const spd = (z.crawler ? .9 : z.speed * (z.est && ZBAL.estilos[z.est].balanco ? 1 + Math.sin(now * 6.283 * 1.8 + z.fase) * ZBAL.estilos[z.est].balanco : 1) * (z.buffT > now ? 1.3 : 1) * (z.hp < z.maxHp * .5 && ZKIND[z.kind].furia || 1) * (z.slowT > now ? .6 : 1) * (z.webT > now ? .2 : 1)) * (z.atkWind ? .35 : 1) * (z.fogoT > now ? ZINT.fogo.lento : 1) * (z.barrL ? ZINT.barricada.lento : 1) * (z.cv || 1), k = Math.min(1, dt * 8); // O2-C06: queimando anda mais devagar (armadilha de fogo); O2-C09: barricada com tábuas; grito: +30%; Carniceiro furioso abaixo da metade (ZKIND.furia); O3-D03: z.cv da campanha
   b.vel.x += (dX * spd - b.vel.x) * k; b.vel.z += (dZ * spd - b.vel.z) * k;
   const face = (dX || dZ) ? Math.atan2(-dX, -dZ) : has ? Math.atan2(-(gx - P.x), -(gz - P.z)) : z.yaw;
   z.yaw += clamp(angDiff(z.yaw, face), -8 * dt, 8 * dt);
@@ -25170,7 +25218,7 @@ function zGive(p, w, cur, pref) { // até 2 armas (3 com Mule Kick): se estiver 
   zSendInv(p, w);
 }
 function zBoxPick(p) {
-  const own = w => zHas(p, w) || zHas(p, w + '_pap') || (Z.pap.user === p.id && Z.pap.st !== 'idle' && Z.pap.w === w + '_pap'), pool = [];
+  const own = w => zHas(p, w) || PAP_IDS(w).some(i => zHas(p, i)) || (Z.pap.user === p.id && Z.pap.st !== 'idle' && W[Z.pap.w]?.base === w), pool = [];
   for (const [id, w] of Object.entries(ZWEAP)) if (w.box && !own(id)) pool.push([id, w.box]);
   if (!(p.inv.monkey > 0)) pool.push(['monkey', 10]); // a caixa ficou maior: macacos com peso 10 para continuar saindo de vez em quando
   let r = Math.random() * pool.reduce((s, x) => s + x[1], 0);
@@ -25198,7 +25246,7 @@ function srvZUse(p, m) {
       else if (wb.w === 'clay') { if (p.inv.clay >= 2) return err('Claymores cheias'); if (!zPay(p, wb.cost)) return; p.inv.clay = 2; p.clayHad = true; zSendInv(p); }
       else if (wb.w === 'bowie') { if (p.bowie) return err('Você já tem'); if (!zPay(p, wb.cost)) return; p.bowie = true; sendTo(p.id, { t: 'zbowie' }); }
       else if (has(wb.w)) { if (!zPay(p, Math.round(wb.cost / 2))) return; sendTo(p.id, { t: 'ammo', w: wb.w }); }
-      else if (has(wb.w + '_pap')) { if (!zPay(p, 4500)) return; sendTo(p.id, { t: 'ammo', w: wb.w + '_pap' }); }
+      else if (PAP_IDS(wb.w).some(has)) { if (!zPay(p, 4500)) return; sendTo(p.id, { t: 'ammo', w: PAP_IDS(wb.w).find(has) }); } // zumbi-v2 (Etapa 9): qualquer nível
       else { if (!zPay(p, wb.cost)) return; zGive(p, wb.w, m.cur); }
       break;
     }
@@ -25223,7 +25271,7 @@ function srvZUse(p, m) {
     case 'boxtake': {
       const L = ZD.boxes[Z.box.loc]; if (Z.box.st !== 'offer' || Z.box.user !== p.id || !near(L.x, L.z, 3)) return;
       const w = Z.box.w;
-      const owned = w !== 'monkey' && (zHas(p, w) || zHas(p, w + '_pap') || (Z.pap.user === p.id && Z.pap.st !== 'idle' && Z.pap.w === w + '_pap'));
+      const owned = w !== 'monkey' && (zHas(p, w) || PAP_IDS(w).some(i => zHas(p, i)) || (Z.pap.user === p.id && Z.pap.st !== 'idle' && W[Z.pap.w]?.base === w));
       const back = Z.box.paid ?? 950;
       if (w === 'monkey') { p.inv.monkey = 3; p.monkeyHad = true; zSendInv(p, 'monkey'); }
       else if (owned) { p.money += back; sendTo(p.id, { t: 'pts', n: back, m: p.money }); sendTo(p.id, { t: 'err', txt: 'Você já tem essa arma: pontos devolvidos' }); }
@@ -25231,20 +25279,22 @@ function srvZUse(p, m) {
       Z.box.st = 'idle'; Z.box.uses++; broadcast({ t: 'zbox', st: 'idle', loc: Z.box.loc }); break;
     }
     case 'pap': {
-      const P = ZD.pap; if (!near(P.x, P.z, 3)) return; if (!Z.power) return err('Sem energia'); if (Z.pap.st !== 'idle') return;
+      const P = ZD.pap; if (!near(P.x, P.z, 3)) return; if (!zConstruida('pap')) return err('Construa o Pack-a-Punch'); if (!Z.power) return err('Sem energia'); if (Z.pap.st !== 'idle') return;
       const w = m.cur, wd = W[w];
-      if (!wd || !wd.zw || wd.pap || wd.ls || !has(w)) return err('Essa arma não pode ser melhorada');
-      if (finN(m.c) && m.c > 0 && m.c < (Z.bf > now ? 1000 : 5000)) return err('A oferta do Pack-a-Punch acabou');
-      if (!zPay(p, Z.bf > now ? 1000 : 5000)) return; // oferta do Pack-a-Punch: 1000
+      const prox = papProx(w), preco = Z.bf > now ? 1000 : ZBAL.pap.custo[wd?.pap | 0]; // zumbi-v2 (Etapa 9): nível seguinte (1 → 2 → 3) e preço do nível
+      if (!wd || !prox || !has(w)) return err(wd?.pap >= 3 ? 'Essa arma já está no nível máximo' : 'Essa arma não pode ser melhorada');
+      if (finN(m.c) && m.c > 0 && m.c < preco) return err('A oferta do Pack-a-Punch acabou');
+      if (!zPay(p, preco)) return; // oferta do Pack-a-Punch: 1000
       const slot = ['primary', 'secondary', 'third'].find(k => p.inv[k] === w); p.inv[slot] = null;
-      Z.pap = { st: 'work', user: p.id, w: w + '_pap', t: now + 3.5 * (p.perks.includes('slip') ? ZPK.slip : 1), slot };
+      Z.pap = { st: 'work', user: p.id, w: prox, t: now + 3.5 * (p.perks.includes('slip') ? ZPK.slip : 1), slot };
       zSendInv(p); broadcast({ t: 'zpap', st: 'work', user: p.id }); break;
     }
     case 'paptake': {
       const P = ZD.pap; if (Z.pap.st !== 'ready' || Z.pap.user !== p.id || !near(P.x, P.z, 3)) return;
       zGive(p, Z.pap.w, m.cur, Z.pap.slot); Z.pap.st = 'idle'; broadcast({ t: 'zpap', st: 'idle' }); break;
     }
-    case 'power': { const P = ZD.power; if (Z.power || !near(P.x, P.z, 3)) return; Z.power = true; broadcast({ t: 'zpower' }); break; }
+    case 'zbuild': srvZBuild(p, m.maq === 'pap' ? 'pap' : 'power', near); break; // zumbi-v2 (Etapa 8)
+    case 'power': { const P = ZD.power; if (Z.power || !near(P.x, P.z, 3) || !zConstruida('power')) return; Z.power = true; broadcast({ t: 'zpower' }); break; }
     case 'zint': zintUsar(p, m); break; // O2-C04: interativos novos
     case 'trap': { // armadilha elétrica: perto da alavanca, com energia, pronta e com pontos
       const i = m.id, t = ZD.traps?.[i], T = Z.traps[i]; if (!Number.isInteger(i) || !t || !T || !near(t.sx, t.sz, 2.8)) return;
@@ -25830,18 +25880,25 @@ const ZINT_PORTA = { // tipos de porta nova: verbo do F, som ao abrir e se afund
   cortafogo: { verbo: 'Abrir a porta corta-fogo', som: 'door' },
   cerca: { verbo: 'Derrubar a cerca', som: 'crack', desce: 1 },
   porteira: { verbo: 'Abrir a porteira', som: 'crack', desce: 1 },
+  falsa: { verbo: 'Empurrar a parede rachada', som: 'crack', desce: 1 }, // zumbi-v2 (Etapa 6): passagem secreta (parede falsa, sem placa nem luz)
 };
 const ZINT_PORTAS = { // atalhos (id único 'atalho-*'; axis como nas portas: 'x' = parede ao longo de x); msg: texto da porta trancada
   sanatorio: [
     { id: 'atalho-DG', x: -27, z: 13.9, axis: 'z', cost: 750, rooms: ['D', 'G'], kind: 'cortafogo', atalho: 1, trava: 'ala-oeste', msg: 'Trancada: ligue a Ala Oeste (interruptor na Biblioteca)' },
     { id: 'atalho-EK', x: 27, z: 17, axis: 'z', cost: 750, rooms: ['E', 'K'], kind: 'cortafogo', atalho: 1, trava: 'ala-leste', msg: 'Trancada: ligue a Ala Leste (interruptor no Jardim)' },
     { id: 'atalho-r12r13', x: -24, z: 84, axis: 'z', cost: 1000, rooms: ['r12', 'r13'], kind: 'cortafogo', atalho: 1 }, // margem do brejo
+    // zumbi-v2 (Etapa 6): passagens secretas (parede falsa, de graça; achadas pela sonda: parede entre as duas áreas, longe de portas e itens)
+    { id: 'secreta-GN', x: -33, z: -8, axis: 'x', cost: 0, rooms: ['G', 'N'], kind: 'falsa', atalho: 1, secreta: 1, cor: 0x9a917e },
+    { id: 'secreta-KL', x: 57, z: 24, axis: 'x', cost: 0, rooms: ['K', 'L'], kind: 'falsa', atalho: 1, secreta: 1, cor: 0x9a917e },
+    { id: 'secreta-r4r5', x: -88, z: -46, axis: 'x', cost: 0, rooms: ['r4', 'r5'], kind: 'falsa', atalho: 1, secreta: 1, cor: 0x8a8578 },
   ],
   vila: [ // cercas dos quintais no muro do meio (lados retos, longe dos portões das diagonais): catavento B/F, C/G, E/H, D/I
     { id: 'atalho-BF', x: 16, z: -50.5, axis: 'x', cost: 500, rooms: ['B', 'F'], kind: 'cerca', atalho: 1 },
     { id: 'atalho-CG', x: 50.5, z: 18.5, axis: 'z', cost: 500, rooms: ['C', 'G'], kind: 'porteira', atalho: 1, trava: 'porteira-estacao', msg: 'Trancada: solte a tranca do lado da Estação (no muro, perto da porteira)' },
     { id: 'atalho-EH', x: -16, z: 50.5, axis: 'x', cost: 500, rooms: ['E', 'H'], kind: 'cerca', atalho: 1 },
     { id: 'atalho-DI', x: -50.5, z: -18.5, axis: 'z', cost: 750, rooms: ['D', 'I'], kind: 'cerca', atalho: 1 },
+    { id: 'secreta-DH', x: -50, z: 3, axis: 'z', cost: 0, rooms: ['D', 'H'], kind: 'falsa', atalho: 1, secreta: 1, cor: 0xb8b098 }, // zumbi-v2 (Etapa 6): passagens secretas no muro do meio
+    { id: 'secreta-EG', x: 15, z: 50, axis: 'x', cost: 0, rooms: ['E', 'G'], kind: 'falsa', atalho: 1, secreta: 1, cor: 0xb8b098 },
   ],
 };
 ZINT_MAPA.sanatorio.push( // sonda do O2-C08 (face de parede alta, 2,5 m livres na frente, 3 m de portas, janelas, chão que solta zumbi e itens)
@@ -25902,6 +25959,12 @@ function zintPortaVis(g, d) { // zBuildWorld: aparência das portas novas (frent
       const m = zintLuzM(0xff2a1a), l = bx(g, .16, .12, .26, 0, 3.02, 0, m); l.userData.dyn = true;
       Wd.portaTrava.set(d.id, on => m.color.set(on ? 0x33ff66 : 0xff2a1a));
     }
+    return;
+  }
+  if (d.kind === 'falsa') { // zumbi-v2 (Etapa 6): parede falsa da cor da parede do mapa, só com rachaduras finas (descobre quem olha de perto)
+    const par = mc(d.cor ?? 0x9a917e), rach = mc(0x2a2622);
+    bx(g, 3.95, 3.2, d.esp ?? 1, 0, 1.6, 0, par).castShadow = true;
+    for (const s of [-1, 1]) for (const [x, y, w, r] of [[-.6, 1.4, .9, .5], [.2, 1.9, .7, -.7], [.7, .9, .6, .3]]) { const c = bx(g, w, .02, .02, x, y, s * ((d.esp ?? 1) / 2 + .005), rach); c.rotation.z = r; }
     return;
   }
   const mad = mc(0x6a4a2c), esc = mc(0x4a321e), poste = mc(0x3e2a18);
@@ -26253,7 +26316,7 @@ ZINT_FN.wunderfizz = {
 // Sem ursinho e sem mudar de lugar; 1 vez por jogador por rodada. A arma girando usa modelos guardados (ZBAU_M, como o ZBOXM da Caixa).
 const zintBauLista = v => ZINT.bau.listas[v] || ZINT.bau.listas.armeiro;
 const zintBauTem = (p, w) => w === 'monkey' ? p.inv.monkey > 0 : w === 'semtex' || w === 'he' ? p.inv[w] >= 4 : w === 'clay' ? p.inv.clay >= 2
-  : zHas(p, w) || zHas(p, w + '_pap') || (Z.pap.user === p.id && Z.pap.st !== 'idle' && Z.pap.w === w + '_pap');
+  : zHas(p, w) || PAP_IDS(w).some(i => zHas(p, i)) || (Z.pap.user === p.id && Z.pap.st !== 'idle' && W[Z.pap.w]?.base === w);
 function zintBauSorteia(p, v) { // host: peso da lista, sem o que a pessoa já tem
   const pool = Object.entries(zintBauLista(v)).filter(([w]) => !zintBauTem(p, w)); if (!pool.length) return null;
   let r = Math.random() * pool.reduce((s, x) => s + x[1], 0); for (const [w, k] of pool) { r -= k; if (r <= 0) return w; } return pool[0][0];
@@ -26401,6 +26464,80 @@ ZINT_FN.sino = {
 };
 if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { ZINT_BAU_VIS, ZBAU_M, zintIsca, zintBauSorteia, zintWunderOpc }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
 // ===== FIM O2-C10 =====
+// ===== zumbi-v2 (Etapa 8): energia e Pack-a-Punch construídos com peças =====
+// A cada partida (com semente, fora da campanha) a energia e o PaP começam desmontados: N peças de cada (por dificuldade, ZBAL.construcao)
+// aparecem no chão, sorteadas pela semente (iguais no host e nos clientes) entre os pontos de chão das áreas baratas/médias (custo das portas
+// até a área <= custoMax), longe umas das outras e das máquinas; quanto mais difícil, maior a chance de ficarem longe do nascimento.
+// Pegar uma peça (F, interativo 'peca' da base ZINT) soma para o time; com todas, F na bancada monta; só depois a energia liga e o PaP funciona.
+// O HUD mostra as peças pegas (Energia 2/4) sem dizer onde estão, menos no Fácil (marcador na tela, como as dicas da Etapa 6).
+function zCustoAreas(D) { // custo mínimo (soma das portas) para chegar a cada área a partir da inicial
+  const c = { [D.start || 'A']: 0 }, fila = [D.start || 'A'];
+  while (fila.length) { const a = fila.shift(); for (const d of D.doors) { if (d.atalho) continue; const i = d.rooms.indexOf(a); if (i < 0) continue; const b = d.rooms[1 - i], v = c[a] + (d.cost || 0); if (c[b] === undefined || v < c[b]) { c[b] = v; fila.push(b); } } }
+  return c;
+}
+function zSorteiaPecas(D, R) {
+  const B = ZBAL.construcao, dif = C.st?.zdiff ?? 1; if (!B.ligada || !D.power || !D.pap || !ZINT_MAPA[curMapId]) return;
+  const n = B.pecas[dif] ?? 3, custo = zCustoAreas(D), sp = D.spawns?.[0] || [0, 0], ocup = [...D.perks, D.pap, D.power, ...(D.wall || []), ...(D.boxes || [])];
+  const L0 = D.lugares0, M = curMap; // pontos de chão: onde zumbi sai do chão + grade de chão livre (uma vez por mapa, com o COL só do mapa: igual em todos os PCs)
+  if (!L0.chao) { const pts = L0.chao = [...(D.risers || [])]; if (M?.w && D.zoneAt) for (let x = -M.w / 2 + 2; x < M.w / 2 - 2; x += B.grade) for (let z = -M.d / 2 + 2; z < M.d / 2 - 2; z += B.grade) { const r = D.zoneAt(x, z); if (r && footFreeR(x, z, B.livre)) pts.push([x, z, r]); } }
+  const pts = L0.chao;
+  const fora = r => ocup.every(o => Math.hypot(o.x - r[0], o.z - r[1]) > B.distMin) && D.doors.every(d => Math.hypot(d.x - r[0], d.z - r[1]) > 3) && D.windows.every(w => Math.hypot(w.x - r[0], w.z - r[1]) > 3);
+  const cands = pts.filter(r => custo[r[2]] !== undefined && custo[r[2]] <= B.custoMax[dif] && fora(r));
+  const esc = [], peso = r => Math.max(4, Math.hypot(r[0] - sp[0], r[1] - sp[1])) ** B.longe[dif];
+  for (let k = 0; k < n * 2 && cands.length; k++) {
+    const ok = cands.filter(r => esc.every(e => Math.hypot(e[0] - r[0], e[1] - r[1]) > B.distMin)); if (!ok.length) break;
+    let tot = 0; for (const r of ok) tot += peso(r); let v = R() * tot, pick = ok[ok.length - 1]; for (const r of ok) if ((v -= peso(r)) <= 0) { pick = r; break; }
+    esc.push(pick);
+  }
+  if (esc.length < n * 2) return; // mapa sem pontos suficientes: fica como antes (energia e PaP prontos)
+  esc.forEach((r, i) => ZINT_MAPA[curMapId].push({ t: 'peca', x: r[0], z: r[1], n: [0, 1], maq: i % 2 ? 'pap' : 'power' }));
+  D.pecas = { power: n, pap: n };
+}
+const zPecasPegas = maq => { const L = ZD?.zint || [], E = NET.isHost ? Z.zint : null; let k = 0; L.forEach((o, i) => { if (o.t === 'peca' && o.maq === maq && (E ? E[i]?.st : ZC.zint?.[i]?.st) === 'pega') k++; }); return k; };
+const zConstruida = maq => !ZD?.pecas || !!(NET.isHost ? Z.built?.[maq] : ZC.built?.[maq]);
+ZINT.peca = { nome: 'Peça', custo: 0, usoR: 1.8, srvR: 2.6, forca: 0 };
+ZINT_FN.peca = {
+  est: ['pronto', 'pega'], // pronto = no chão
+  efeito: () => 'peça da energia ou do Pack-a-Punch',
+  monta(o, i) {
+    const g = zintGrupo(o), corpo = new THREE.Group(); g.add(corpo);
+    const met = mc(o.maq === 'pap' ? 0x6a3a8a : 0x8a7a2a), esc = mc(0x2a2a2e);
+    bx(corpo, .5, .14, .34, 0, .07, 0, esc); bx(corpo, .34, .1, .22, 0, .19, 0, met); bx(corpo, .06, .2, .06, .17, .3, .06, met); // caixa de ferramentas com a peça em cima
+    corpo.traverse(m => { if (m.isMesh) m.castShadow = true; }); mergeParts(corpo);
+    world.add(g); cullAdd(g, o.x, o.z, .8);
+    return { g, corpo };
+  },
+  estado(o, e, c) { e.corpo.visible = c.st !== 'pega'; renderer.shadowMap.needsUpdate = true; },
+  prompt(o, i, c) { return c.st === 'pega' ? null : { k: 'zint', id: i, cost: 0, txt: `Pegar a peça (${o.maq === 'pap' ? 'Pack-a-Punch' : 'energia'})` }; },
+  usar(p, i, o, E) { if (E.st !== 'pronto') return; zintPoe(i, 'pega', 0, p.id); },
+};
+function srvZBuild(p, maq, near) { // host: F na bancada com todas as peças monta a máquina
+  const P = maq === 'pap' ? ZD.pap : ZD.power; if (!ZD.pecas || Z.built?.[maq] || !near(P.x, P.z, 3)) return;
+  if (zPecasPegas(maq) < ZD.pecas[maq]) return sendTo(p.id, { t: 'err', txt: 'Faltam peças' });
+  (Z.built ||= {})[maq] = true; broadcast({ t: 'zbuilt', k: maq });
+}
+function zBuiltVis() { // cliente: máquina ainda desmontada fica escondida, com uma bancada no lugar
+  const Wd = ZC.world; if (!Wd) return;
+  for (const maq of ['power', 'pap']) {
+    const g = maq === 'pap' ? Wd.pap?.g : Wd.power?.g, P = maq === 'pap' ? ZD.pap : ZD.power, pronta = zConstruida(maq); if (!g || !P) continue;
+    if (g.visible !== pronta) { g.visible = pronta; renderer.shadowMap.needsUpdate = true; }
+    if (!pronta && !Wd['banc_' + maq]) { const b = new THREE.Group(); b.position.set(P.x, 0, P.z); b.rotation.y = Math.atan2(P.n[0], P.n[1]); const mad = mc(0x5a4028); bx(b, 1.2, .08, .6, 0, .85, .3, mad); for (const sx of [-.5, .5]) bx(b, .08, .85, .5, sx, .42, .3, mad); bx(b, .3, .2, .2, -.25, .99, .3, mc(maq === 'pap' ? 0x6a3a8a : 0x8a7a2a)); mergeParts(b); world.add(b); Wd['banc_' + maq] = b; }
+    if (Wd['banc_' + maq] && Wd['banc_' + maq].visible === pronta) Wd['banc_' + maq].visible = !pronta;
+  }
+}
+function zPecasHud() { // HUD: peças pegas (sem dizer onde); no Fácil, marcador nas peças
+  let el = $('#zpecas'); if (!ZD?.pecas || !ZC.on || !inGame) { if (el) el.style.display = 'none'; return ''; }
+  if (!el) { el = document.createElement('div'); el.id = 'zpecas'; el.style.cssText = 'position:absolute;top:34px;left:12px;font:700 15px Rajdhani,sans-serif;color:#e8e8e8;text-shadow:0 1px 3px #000;line-height:1.35;pointer-events:none'; ($('#zhud') || document.body).appendChild(el); }
+  el.style.display = '';
+  const t = maq => `${maq === 'pap' ? 'Pack-a-Punch' : 'Energia'}: ${zConstruida(maq) ? 'montado' : `peças ${zPecasPegas(maq)}/${ZD.pecas[maq]}`}`;
+  setHTML('zpecas', `${t('power')}<br>${t('pap')}`);
+  zBuiltVis();
+  if (!ZBAL.dicas.dificuldades.includes(C.st?.zdiff ?? 1)) return '';
+  let ob = ''; (ZD.zint || []).forEach((o, i) => { if (o.t !== 'peca' || ZC.zint?.[i]?.st === 'pega') return; const v = visScr(o.x, .6, o.z); if (v.off) return; const d = Math.hypot(o.x - me.pos.x, o.z - me.pos.z); if (d < 3) return; ob += `<span style="left:${v.x}px;top:${v.y}px"><i>◆</i>PEÇA ${Math.round(d)}m</span>`; });
+  return ob;
+}
+// ===== FIM zumbi-v2 (Etapa 8) =====
+
 // ===== O3: campanha =====
 // Modo Campanha do modo zumbi (Onda 3, Frente D; projeto em docs/overhaul/campanha.md, história em docs/overhaul/lore.md).
 // Cada agente da Frente D escreve só no próprio bloco, logo abaixo da sua marca @@CAMP-…@@ (campanha.md §17). O clássico não muda:
@@ -30823,7 +30960,7 @@ function zTickObjects() {
   } else if (Bx.st === 'offer' && now >= Bx.t) { Bx.st = 'idle'; Bx.uses++; broadcast({ t: 'zbox', st: 'idle', loc: Bx.loc }); }
   else if (Bx.st === 'teddy' && now >= Bx.t) { Bx.st = 'gone'; Bx.t = now + 5; broadcast({ t: 'zbox', st: 'gone' }); }
   else if (Bx.st === 'gone' && now >= Bx.t) {
-    const act = zActive(), ok = []; ZD.boxes.forEach((L, i) => { if (i !== Bx.loc && act.has(zRoomAt(L.x + L.n[0], L.z + L.n[1]))) ok.push(i); }); // só para onde já abriram (mapa enorme: senão some atrás de porta fechada)
+    const act = zActive(), ok = []; ZD.boxes.forEach((L, i) => { if (i !== Bx.loc && (ZBAL.caixa.qualquerLugar || act.has(zRoomAt(L.x + L.n[0], L.z + L.n[1])))) ok.push(i); }); // zumbi-v2 (Etapa 7): depois do ursinho a caixa vai para qualquer lugar válido do mapa (os lugares da caixa são todos alcançáveis abrindo portas)
     const nl = ok.length ? ok[Math.floor(Math.random() * ok.length)] : Bx.loc; // sem outro lugar nas áreas abertas: volta no mesmo lugar
     Bx.loc = nl; Bx.st = 'idle'; Bx.uses = 0; broadcast({ t: 'zbox', st: 'idle', loc: nl }); zBuildWalk();
   }
@@ -30851,7 +30988,7 @@ function zSnap() {
 function zWorldState() {
   return { r: Z.round, ph: Z.phase, pw: Z.power ? 1 : 0, d: [...Z.doors], box: [Z.box.loc, Z.box.st, Z.box.user, Z.box.st === 'offer' ? Z.box.w : null], pap: [Z.pap.st, Z.pap.user, Z.pap.st === 'ready' ? Z.pap.w : null],
     dr: Z.drops.map(d => [d.id, d.type, r2(d.x), r2(d.z), r2(Math.max(0, 26 - (now - d.t0)))]), qr: Z.qrBuys, dog: Z.dogRound ? 1 : 0,
-    tr: Z.traps.map(T => [T.st, r2(Math.max(0, T.t - now))]), cm: Z.clays.map(zClayArr), zi: zintEstado(), ...(CAMP.on ? { cp: campCp() } : null) }; // O2-C04: zi; O3-D02: cp
+    tr: Z.traps.map(T => [T.st, r2(Math.max(0, T.t - now))]), cm: Z.clays.map(zClayArr), zi: zintEstado(), bt: Z.built ? [Z.built.power ? 1 : 0, Z.built.pap ? 1 : 0] : 0, ...(CAMP.on ? { cp: campCp() } : null) }; // O2-C04: zi; O3-D02: cp
 }
 function zExplode(pos, owner, r, dmgMax, w, insta) { // granada / macaco
   if (S.phase === 'over') return;
@@ -30961,6 +31098,7 @@ function onMsgInner(m) {
     case 'zscr': { const zc = ZC.zs.get(m.id); if (zc && !zc.dead) { const p = zc.pos.clone(); p.y += 1.9; play('scream', p); puff(p, 0xd8f0ff, 3, .5, 0); zc.spK = 1; zc.sp0 = now; p.y = zc.pos.y + .1; zShockRing(p, 0xbfe8ff, 9, .6); p.y += 1.8; zShockRing(p, 0xd8f0ff, 4, .4); } break; } // grito: cabeça para trás e onda de choque
     case 'zrend': if (me.alive && !me.downed) grantXP(25); ZC.phase = 'break'; play('zend'); centerMsg('Rodada ' + m.r + ' concluída', 'Próxima rodada em 10 segundos', 4); zFogDog(false); break;
     case 'zdoor': if (zDoorOpen(m.id)) { const d = ZD.doors.find(x => x.id === m.id); play(ZINT_PORTA[d?.kind]?.som || 'door', d ? new V3(d.x, 1.5, d.z) : null); } break; // O2-C08: som da cerca
+    case 'zbuilt': if (m.k === 'power' || m.k === 'pap') { (ZC.built ||= {})[m.k] = true; play('power'); centerMsg(m.k === 'pap' ? 'PACK-A-PUNCH MONTADO' : 'GERADOR MONTADO', m.k === 'pap' ? 'Ligue a energia para usar' : 'Agora dá para ligar a energia', 3); } break; // zumbi-v2 (Etapa 8)
     case 'zpower': zPowerOn(); play('power'); centerMsg('ENERGIA LIGADA', 'Bebidas e Pack-a-Punch funcionando', 3); break;
     case 'zperk':
       if (m.id === C.myId && typeof m.k === 'string' && Object.hasOwn(ZPERKS, m.k)) { if (!ZC.perks.includes(m.k)) ZC.perks.push(m.k); if (m.k === 'widow') ZC.widow = ZPK.widowN; play('perk'); centerMsg(ZPERKS[m.k].name, ZPERKS[m.k].desc, 2.5); }
@@ -31248,187 +31386,9 @@ function bombHud(dt) {
   const prog = C.actEnd > now ? clamp(1 - (C.actEnd - now) / C.actDur, 0, 1) : 0;
   setHTML('bombui', tip + (prog ? `<div class="bar"><i style="width:${(prog * 100) | 0}%"></i></div>` : ''));
   for (let i = MARKS.length - 1; i >= 0; i--) if (now > MARKS[i].end || !inGame) { scene.remove(MARKS[i].s); MARKS.splice(i, 1); }
-  drawMinimap(dt); zMinimap(dt);
-}
-// ---------- mini mapa do modo Zumbi ----------
-// Círculo no canto de cima à esquerda, 45 m de raio, que gira com o jogador (para cima é para onde você olha; o N marca o norte).
-// Fundo desenhado uma vez por mapa (e de novo quando abre uma porta): áreas liberadas em cinza, áreas ainda fechadas bem escuras,
-// paredes claras e obstáculos baixos mais escuros. Por cima, a cada quadro:
-//  - portas e entulhos ainda fechados (traço laranja); janelas: laranja com tábuas faltando, vermelha quando já não tem tábua;
-//  - bebidas (cor e letra da máquina; apagadas sem energia; anel verde nas que você já tem), armas de parede, armadilha;
-//  - Caixa Misteriosa onde ela está agora, Pack-a-Punch e alavanca da energia; power-ups no chão;
-//  - zumbis (vermelho; cães em laranja), aliados (seta na cor do jogador) e aliado caído (cruz piscando).
-// Caixa, Pack-a-Punch, energia desligada e aliado caído que estão fora do círculo ficam presos na borda, apontando a direção.
-// Embaixo: nome da área e distância até a caixa e a energia. Tecla M: mapa grande, norte para cima, com nomes das áreas, preço das
-// portas, nomes das bebidas e das armas de parede, e legenda ao lado. 1º M: 180 m em volta de você; 2º M: mapa inteiro; 3º M: fecha.
-// Os nomes pequenos (preços, armas de parede) só aparecem quando há espaço na tela para eles.
-const ZMM = { key: null, bg: null, S: 2, cw: 0, ch: 0, cen: null, big: 0, t: 0, tb: 0, labs: [] };
-function zmmRoomsOpen() { // áreas onde dá para ir: a inicial e as ligadas a ela por portas abertas; área sem porta conta como aberta
-  const open = new Set([ZD.start || 'A']), withDoor = new Set();
-  for (const d of ZD.doors) for (const r of d.rooms) withDoor.add(r);
-  for (let ch = true; ch;) { ch = false; for (const d of ZD.doors) if (ZC.doors.has(d.id)) { const [a, b] = d.rooms; if (open.has(a) !== open.has(b)) { open.add(a); open.add(b); ch = true; } } }
-  return r => !withDoor.has(r) || open.has(r);
-}
-function zmmBuild(key) {
-  const M = curMap, S = ZMM.S, cw = Math.ceil(M.w), ch = Math.ceil(M.d), W2 = M.w / 2, D2 = M.d / 2;
-  if (ZMM.cells?.map !== curMapId) { // em que área fica cada metro quadrado (uma vez por mapa)
-    const cells = new Array(cw * ch), cen = {};
-    for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
-      const r = ZD.zoneAt(-W2 + i + .5, -D2 + j + .5) || null; cells[j * cw + i] = r;
-      if (r) { const c = cen[r] ||= [0, 0, 0]; c[0] += i; c[1] += j; c[2]++; }
-    }
-    for (const r in cen) { const c = cen[r]; let x = c[0] / c[2] | 0, z = c[1] / c[2] | 0; // nome no meio da área (se o meio cair fora dela, no metro mais perto que é dela)
-      if (cells[z * cw + x] !== r) { let best = 1e9; for (let j = 0; j < ch; j += 2) for (let i = 0; i < cw; i += 2) if (cells[j * cw + i] === r) { const d = (i - x) ** 2 + (j - z) ** 2; if (d < best) { best = d; c[3] = i; c[4] = j; } } x = c[3]; z = c[4]; }
-      cen[r] = [x - W2 + .5, z - D2 + .5, c[2]]; }
-    ZMM.cells = { map: curMapId, a: cells }; ZMM.cen = cen;
-  }
-  const cells = ZMM.cells.a, isOpen = zmmRoomsOpen();
-  const t = document.createElement('canvas'); t.width = cw; t.height = ch; const tg = t.getContext('2d'), im = tg.createImageData(cw, ch), px = im.data;
-  for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
-    const r = cells[j * cw + i], o = (j * cw + i) * 4; if (!r) continue;
-    const edge = (i + 1 < cw && cells[j * cw + i + 1] !== r) || (j + 1 < ch && cells[(j + 1) * cw + i] !== r);
-    const c = edge ? [20, 22, 26, 255] : isOpen(r) ? [64, 74, 84, 235] : [30, 33, 38, 235];
-    px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = c[3];
-  }
-  tg.putImageData(im, 0, 0);
-  const b = ZMM.bg = document.createElement('canvas'); b.width = cw * S; b.height = ch * S; const g = b.getContext('2d');
-  g.imageSmoothingEnabled = false; g.drawImage(t, 0, 0, cw * S, ch * S);
-  for (const c of COL) { // paredes e obstáculos na altura do corpo
-    if (c.maxY < .45 || c.minY > 2.2) continue;
-    const w = (c.maxX - c.minX) * S, d = (c.maxZ - c.minZ) * S; if (w > 120 * S && d > 120 * S) continue;
-    g.fillStyle = c.maxY - c.minY > 1.6 ? '#b4bcc4' : '#737b83';
-    g.fillRect((c.minX + W2) * S, (c.minZ + D2) * S, Math.max(1.2, w), Math.max(1.2, d));
-  }
-  ZMM.key = key; ZMM.cw = cw; ZMM.ch = ch;
-}
-const zmmRoomName = (x, z) => { const r = ZD.zoneAt(x, z); return r ? ZD.roomNames?.[r] || '' : ''; };
-// ícones (em pixels da tela; f = tamanho)
-function zmmIcon(g, kind, x, y, f, o = {}) {
-  g.save(); g.globalAlpha = o.a ?? 1; g.lineWidth = Math.max(1.5, f * .18); g.textAlign = 'center'; g.textBaseline = 'middle';
-  const txt = (t, sz, col) => { g.font = `700 ${sz}px Rajdhani,sans-serif`; g.fillStyle = col; g.fillText(t, x, y + sz * .05); };
-  if (kind === 'perk') { g.beginPath(); g.arc(x, y, f, 0, 7); g.fillStyle = o.col; g.fill(); g.strokeStyle = o.own ? '#5dff7a' : 'rgba(0,0,0,.7)'; g.lineWidth = o.own ? f * .3 : f * .15; g.stroke(); txt(o.ab, f * (o.ab.length > 1 ? .95 : 1.25), '#fff'); }
-  else if (kind === 'box') { g.fillStyle = '#f2c230'; g.strokeStyle = '#5a3b00'; g.fillRect(x - f, y - f * .8, f * 2, f * 1.6); g.strokeRect(x - f, y - f * .8, f * 2, f * 1.6); txt('?', f * 1.5, '#3a2600'); }
-  else if (kind === 'pap') { g.fillStyle = '#9b4dff'; g.strokeStyle = '#e6d0ff'; g.beginPath(); g.moveTo(x, y - f * 1.1); g.lineTo(x + f, y); g.lineTo(x, y + f * 1.1); g.lineTo(x - f, y); g.closePath(); g.fill(); g.stroke(); txt('P', f * 1.1, '#fff'); }
-  else if (kind === 'power') { g.fillStyle = o.on ? '#6a6f75' : '#ffd23a'; g.beginPath(); g.moveTo(x + f * .2, y - f * 1.2); g.lineTo(x - f * .7, y + f * .15); g.lineTo(x - f * .05, y + f * .15); g.lineTo(x - f * .25, y + f * 1.2); g.lineTo(x + f * .75, y - f * .2); g.lineTo(x + f * .1, y - f * .2); g.closePath(); g.fill(); g.strokeStyle = 'rgba(0,0,0,.7)'; g.lineWidth = 1.5; g.stroke(); }
-  else if (kind === 'wall') { g.fillStyle = '#d8e2ea'; g.strokeStyle = 'rgba(0,0,0,.7)'; g.fillRect(x - f, y - f * .35, f * 2, f * .7); g.fillRect(x - f * .2, y, f * .45, f * .7); g.strokeRect(x - f, y - f * .35, f * 2, f * .7); }
-  else if (kind === 'trap') { g.strokeStyle = '#4fd0ff'; g.lineWidth = f * .3; g.beginPath(); g.moveTo(x - f, y - f * .4); g.lineTo(x - f * .2, y + f * .4); g.lineTo(x + f * .2, y - f * .4); g.lineTo(x + f, y + f * .4); g.stroke(); }
-  else if (kind === 'drop') { g.fillStyle = '#4dff6a'; g.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? f * .45 : f, a = i * Math.PI / 5 - Math.PI / 2; g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } g.closePath(); g.fill(); g.strokeStyle = '#063'; g.lineWidth = 1.5; g.stroke(); }
-  else if (kind === 'down') { const on = (now * 3 | 0) % 2; g.fillStyle = on ? '#ff3030' : '#ffffff'; g.fillRect(x - f * .3, y - f, f * .6, f * 2); g.fillRect(x - f, y - f * .3, f * 2, f * .6); g.strokeStyle = '#000'; g.lineWidth = 1; g.strokeRect(x - f * .3, y - f, f * .6, f * 2); }
-  g.restore();
-}
-function zmmScene(g, toS, k, big) { // desenha tudo por cima do fundo; toS(x, z) devolve [x, y, dentro]
-  const f = big ? Math.max(6, Math.min(11, k * 2.6)) : 11, W = ZMM.edge;
-  // portas fechadas
-  for (const d of ZD.doors) { if (ZC.doors.has(d.id)) continue;
-    const h = d.kind === 'debris' ? 1.8 : 1.6, a = d.axis === 'x' ? toS(d.x - h, d.z) : toS(d.x, d.z - h), b = d.axis === 'x' ? toS(d.x + h, d.z) : toS(d.x, d.z + h);
-    g.strokeStyle = d.kind === 'debris' ? '#c08850' : '#ff9a2a'; g.lineWidth = big ? Math.max(3, k * .9) : 6; g.lineCap = 'round'; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
-    if (big && k >= 2.2) { const c = toS(d.x, d.z); zmmLab(g, String(d.cost), c[0], c[1] - 9, '700 12px Rajdhani,sans-serif', '#ffc070'); } }
-  // janelas
-  ZD.windows.forEach((w, i) => { const n = ZC.boards[i] ?? 6, [x, y] = toS(w.x, w.z);
-    g.fillStyle = n >= 6 ? 'rgba(160,170,180,.55)' : n > 0 ? '#ff9a2a' : '#ff2a2a'; const r = n >= 6 ? (big ? 1.6 : 2.5) : (big ? 3 : 4.5); g.fillRect(x - r, y - r, r * 2, r * 2); });
-  for (const t of ZD.traps || []) { const [x, y] = toS(t.x, t.z); zmmIcon(g, 'trap', x, y, f * .8); }
-  for (const wb of ZD.wall) { const [x, y] = toS(wb.x, wb.z); zmmIcon(g, 'wall', x, y, f * .75);
-    if (big && k >= 3) { const nm = { he: 'Granadas', semtex: 'Semtex', clay: 'Claymores', bowie: 'Faca Bowie' }[wb.w] || W_NAME(wb.w); zmmLab(g, `${nm} ${wb.cost}`, x, y + 14, '600 11px Rajdhani,sans-serif', '#dfe8ef'); } }
-  for (const pk of ZD.perks) { const P = ZPERKS[pk.k]; if (!P) continue; const [x, y] = toS(pk.x, pk.z);
-    zmmIcon(g, 'perk', x, y, f, { col: P.css, ab: P.ab, own: ZC.perks.includes(pk.k), a: ZC.power ? 1 : .5 });
-    if (big && k >= 1.6) { zmmLab(g, P.name, x, y + f + 10, '700 12px Rajdhani,sans-serif', '#fff'); } }
-  for (const d of ZC.drops.values()) { const p = d.g?.position; if (!p) continue; const [x, y] = toS(p.x, p.z); zmmIcon(g, 'drop', x, y, f * .85); }
-  // zumbis
-  for (const z of ZC.zs.values()) { if (z.dead || !z.pos) continue; const [x, y, ins] = toS(z.pos.x, z.pos.z); if (!ins) continue;
-    g.fillStyle = z.dog ? '#ff9a2a' : '#ff3b30'; g.beginPath(); g.arc(x, y, big ? 2.6 : 4, 0, 7); g.fill(); }
-  // pontos importantes (presos na borda quando estão longe)
-  const L = ZD.boxes[ZC.box.loc]; if (L) W(toS(L.x, L.z), (x, y, a) => zmmIcon(g, 'box', x, y, f, { a }));
-  if (ZD.pap) W(toS(ZD.pap.x, ZD.pap.z), (x, y, a) => zmmIcon(g, 'pap', x, y, f, { a: ZC.power ? a : a * .55 }), !ZC.power);
-  if (ZD.power) W(toS(ZD.power.x, ZD.power.z), (x, y, a) => zmmIcon(g, 'power', x, y, f, { on: ZC.power, a }), !!ZC.power);
-  // aliados
-  for (const rp of R.values()) { if (!rp.alive || !rp.pos) continue;
-    if (rp.downed) { W(toS(rp.pos.x, rp.pos.z), (x, y) => zmmIcon(g, 'down', x, y, f * .9)); continue; }
-    const fx = -Math.sin(rp.yaw || 0), fz = -Math.cos(rp.yaw || 0), s0 = big ? 8 / k : 1.6; // seta com uns 8 px
-    const tip = toS(rp.pos.x + fx * s0 * 1.4, rp.pos.z + fz * s0 * 1.4), l = toS(rp.pos.x - fx * s0 * .7 - fz * s0 * .8, rp.pos.z - fz * s0 * .7 + fx * s0 * .8), r = toS(rp.pos.x - fx * s0 * .7 + fz * s0 * .8, rp.pos.z - fz * s0 * .7 - fx * s0 * .8);
-    if (!toS(rp.pos.x, rp.pos.z)[2]) continue;
-    g.fillStyle = colorOf(rp.id); g.strokeStyle = '#000'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(...tip); g.lineTo(l[0], l[1]); g.lineTo(r[0], r[1]); g.closePath(); g.fill(); g.stroke();
-    if (big) { g.font = '700 12px Rajdhani,sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = '#000'; const [x, y] = toS(rp.pos.x, rp.pos.z); g.strokeText(nameOf(rp.id), x, y - 12); g.fillStyle = colorOf(rp.id); g.fillText(nameOf(rp.id), x, y - 12); } }
+  drawMinimap(dt); // zumbi-v2 (Etapa 6): minimapa do modo Zumbi removido
 }
 const W_NAME = id => W[id]?.name || id;
-function zmmLab(g, t, x, y, font, col) { // escreve o nome só se não cobrir outro já escrito
-  g.font = font; const w = g.measureText(t).width + 4, hh = parseInt(font.match(/(\d+)px/)[1]) + 2, r = [x - w / 2, y - hh / 2, x + w / 2, y + hh / 2];
-  if (ZMM.labs.some(o => r[0] < o[2] && r[2] > o[0] && r[1] < o[3] && r[3] > o[1])) return; ZMM.labs.push(r);
-  g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.9)'; g.strokeText(t, x, y); g.fillStyle = col; g.fillText(t, x, y);
-}
-function zMinimap(dt) {
-  const cv = $('#zmm'), bigC = $('#zbig'), on = !!(ZC.on && inGame && ZC.world && ZD?.zoneAt && curMap?.z === ZD);
-  cv.style.display = on && !ZMM.big ? 'block' : 'none'; bigC.style.display = on && ZMM.big ? 'block' : 'none'; $('#zmmLbl').style.display = on && !ZMM.big ? '' : 'none';
-  if (!on) return;
-  const key = curMapId + ':' + ZC.doors.size; if (ZMM.key !== key) zmmBuild(key);
-  if ((ZMM.t -= dt) > 0) return; ZMM.t = 1 / 20;
-  const S = ZMM.S, W2 = curMap.w / 2, D2 = curMap.d / 2, mx = me.pos.x, mz = me.pos.z;
-  { // nome da área e distâncias
-    const L = ZD.boxes[ZC.box.loc], dist = (x, z) => Math.round(Math.hypot(x - mx, z - mz)), extra = [];
-    if (L) extra.push(`Caixa ${dist(L.x, L.z)} m`);
-    if (!ZC.power && ZD.power) extra.push(`Energia desligada · ${dist(ZD.power.x, ZD.power.z)} m`);
-    const dn = [...R.values()].filter(rp => rp.alive && rp.downed); if (dn.length) extra.push(`<span style="color:#ff6a6a">${dn.length > 1 ? dn.length + ' aliados caídos' : esc(nameOf(dn[0].id)) + ' caído'} · ${dist(dn[0].pos.x, dn[0].pos.z)} m</span>`);
-    setHTML('zmmLbl', `${esc(zmmRoomName(mx, mz))}<small>${extra.join(' · ')}</small><small style="opacity:.6">M — mapa inteiro</small>`);
-  }
-  // mini mapa (gira com o jogador)
-  const N = cv.width, c = N / 2, Rm = 45, k = c / Rm, th = me.yaw, cs = Math.cos(th), sn = Math.sin(th), g = cv.getContext('2d');
-  const toS = (x, z) => { const dx = (x - mx) * k, dz = (z - mz) * k, X = dx * cs - dz * sn, Y = dx * sn + dz * cs; return [c + X, c + Y, X * X + Y * Y < (c - 6) ** 2]; };
-  ZMM.edge = (p, draw, skip) => { // dentro do círculo: desenha no lugar; fora: na borda, um pouco apagado
-    if (p[2]) return draw(p[0], p[1], 1); if (skip) return;
-    const dx = p[0] - c, dy = p[1] - c, d = Math.hypot(dx, dy), r = c - 16; draw(c + dx / d * r, c + dy / d * r, .8);
-  };
-  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, N, N);
-  g.save(); g.beginPath(); g.arc(c, c, c - 1, 0, 7); g.clip();
-  g.fillStyle = 'rgba(10,12,14,.85)'; g.fillRect(0, 0, N, N);
-  g.save(); g.translate(c, c); g.rotate(th); g.scale(k / S, k / S); g.translate(-(mx + W2) * S, -(mz + D2) * S); g.drawImage(ZMM.bg, 0, 0); g.restore();
-  zmmScene(g, toS, k, false);
-  // você: seta no meio, apontando para cima, e o cone de visão
-  g.fillStyle = 'rgba(255,255,255,.08)'; g.beginPath(); g.moveTo(c, c); g.arc(c, c, c, -Math.PI / 2 - .6, -Math.PI / 2 + .6); g.closePath(); g.fill();
-  g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(c, c - 13); g.lineTo(c - 8, c + 8); g.lineTo(c, c + 3); g.lineTo(c + 8, c + 8); g.closePath(); g.fill(); g.stroke();
-  g.restore();
-  g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 3; g.beginPath(); g.arc(c, c, c - 2, 0, 7); g.stroke();
-  { const nx = c + sn * (c - 16), ny = c - cs * (c - 16); g.fillStyle = 'rgba(0,0,0,.7)'; g.beginPath(); g.arc(nx, ny, 12, 0, 7); g.fill(); g.font = '700 18px Rajdhani,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffd23a'; g.fillText('N', nx, ny + 1); }
-  if (ZMM.big && (ZMM.tb -= 1 / 20) <= 0) { ZMM.tb = .1; zmmBig(bigC); }
-}
-function zmmBig(cv) { // mapa grande (tecla M), norte para cima; legenda num painel à direita
-  const S = ZMM.S, M = curMap, W2 = M.w / 2, D2 = M.d / 2, span = 180, whole = ZMM.big === 2 || Math.max(M.w, M.d) <= span * 1.2;
-  const vw = whole ? M.w : span, vd = whole ? M.d : span;
-  const vx0 = whole ? -W2 : Math.max(-W2, Math.min(W2 - vw, me.pos.x - vw / 2)), vz0 = whole ? -D2 : Math.max(-D2, Math.min(D2 - vd, me.pos.z - vd / 2));
-  const pw = 250, sc = Math.min((innerWidth * .94 - pw) / vw, innerHeight * .88 / vd), dpr = Math.min(2, devicePixelRatio || 1);
-  const w = Math.round(vw * sc), h = Math.round(vd * sc), cw = w + pw;
-  if (cv.width !== cw * dpr || cv.height !== h * dpr) { cv.width = cw * dpr; cv.height = h * dpr; cv.style.width = cw + 'px'; cv.style.height = h + 'px'; }
-  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.fillStyle = 'rgba(8,10,12,.94)'; g.fillRect(0, 0, cw, h);
-  g.save(); g.beginPath(); g.rect(0, 0, w, h); g.clip();
-  g.drawImage(ZMM.bg, (vx0 + W2) * S, (vz0 + D2) * S, vw * S, vd * S, 0, 0, w, h);
-  const toS = (x, z) => [(x - vx0) * sc, (z - vz0) * sc, x >= vx0 && x <= vx0 + vw && z >= vz0 && z <= vz0 + vd];
-  ZMM.edge = (p, draw, skip) => { if (p[2]) return draw(p[0], p[1], 1); if (!skip) draw(Math.max(12, Math.min(w - 12, p[0])), Math.max(12, Math.min(h - 12, p[1])), .8); };
-  // nomes das áreas
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  const isOpen = zmmRoomsOpen(); ZMM.labs = [];
-  for (const r in ZMM.cen) { const nm = ZD.roomNames?.[r]; if (!nm) continue; const [x, z, n] = ZMM.cen[r], [sx, sy, ins] = toS(x, z); if (!ins) continue;
-    zmmLab(g, nm.toUpperCase(), sx, sy, `700 ${Math.round(Math.max(12, Math.min(22, Math.sqrt(n) * sc * .22)))}px Rajdhani,sans-serif`, isOpen(r) ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.45)'); }
-  zmmScene(g, toS, sc, true);
-  { const [x, y] = toS(me.pos.x, me.pos.z); g.save(); g.translate(x, y); g.rotate(-me.yaw); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -12); g.lineTo(-8, 8); g.lineTo(0, 3); g.lineTo(8, 8); g.closePath(); g.fill(); g.stroke(); g.restore(); }
-  g.restore();
-  g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 1; g.strokeRect(.5, .5, w - 1, h - 1);
-  // painel: título, área atual e legenda
-  const lx = w + 18; let y = 30; g.textAlign = 'left'; g.textBaseline = 'middle';
-  g.font = '700 20px Rajdhani,sans-serif'; g.fillStyle = '#ffd23a'; g.fillText(whole ? 'MAPA INTEIRO' : 'EM VOLTA DE VOCÊ', lx, y); y += 22;
-  g.font = '600 14px Rajdhani,sans-serif'; g.fillStyle = '#bbb'; g.fillText(whole ? 'M — fechar' : 'M — ver o mapa inteiro', lx, y); y += 26;
-  g.font = '700 16px Rajdhani,sans-serif'; g.fillStyle = '#fff'; g.fillText('Você está em: ' + (zmmRoomName(me.pos.x, me.pos.z) || '—'), lx, y); y += 30;
-  const leg = [['box', 'Caixa Misteriosa (agora)'], ['pap', 'Pack-a-Punch'], ['power', 'Energia (amarela: desligada)'], ['perk', 'Bebida · anel verde: você tem'], ['wall', 'Arma de parede'], ['trap', 'Armadilha elétrica'], ['drop', 'Power-up no chão'], ['door', 'Porta fechada (com preço)'], ['win2', 'Janela com tábuas faltando'], ['win', 'Janela aberta (zumbi entra)'], ['zed', 'Zumbi'], ['dog', 'Cão do inferno'], ['ally', 'Aliado'], ['down', 'Aliado caído: reanime!']];
-  leg.forEach(([kd, t]) => { const x = lx + 9;
-    if (kd === 'door') { g.strokeStyle = '#ff9a2a'; g.lineWidth = 4; g.lineCap = 'round'; g.beginPath(); g.moveTo(x - 7, y); g.lineTo(x + 7, y); g.stroke(); }
-    else if (kd === 'win' || kd === 'win2') { g.fillStyle = kd === 'win' ? '#ff2a2a' : '#ff9a2a'; g.fillRect(x - 3.5, y - 3.5, 7, 7); }
-    else if (kd === 'zed' || kd === 'dog') { g.fillStyle = kd === 'dog' ? '#ff9a2a' : '#ff3b30'; g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); }
-    else if (kd === 'ally') { g.fillStyle = '#4fb6e6'; g.strokeStyle = '#000'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y - 8); g.lineTo(x - 6, y + 6); g.lineTo(x + 6, y + 6); g.closePath(); g.fill(); g.stroke(); }
-    else zmmIcon(g, kd, x, y, 7, kd === 'perk' ? { col: '#c0201c', ab: 'J' } : {});
-    g.font = '600 14px Rajdhani,sans-serif'; g.fillStyle = '#e8e8e8'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(t, x + 16, y); y += 22; });
-  // bebidas do mapa e o que fazem (as que você tem em verde)
-  y += 8; g.font = '700 15px Rajdhani,sans-serif'; g.fillStyle = '#ffd23a'; g.fillText(ZC.power ? 'Bebidas' : 'Bebidas (ligue a energia)', lx, y); y += 20;
-  for (const pk of ZD.perks) { const P = ZPERKS[pk.k]; if (!P || y > h - 10) continue; zmmIcon(g, 'perk', lx + 9, y, 7, { col: P.css, ab: P.ab, own: ZC.perks.includes(pk.k) });
-    g.font = '600 13px Rajdhani,sans-serif'; g.fillStyle = ZC.perks.includes(pk.k) ? '#7dff95' : '#ddd'; g.textAlign = 'left'; g.fillText(`${P.name} ${pk.k === 'qr' ? '' : P.cost}`, lx + 25, y); y += 19; }
-}
 // ---------- radar do modo Rodadas (como o do CS2): redondo, centrado em você e girando com a visão; M abre o mapa inteiro ----------
 const RMM = { key: null, bg: null, S: 4, t: 0, tb: 0, big: false };
 function rmmBuild(M) { // fundo: chão, paredes, coberturas, passagens cobertas, bombs e bases (4 px por metro), pintado uma vez por mapa
@@ -31562,7 +31522,7 @@ addEventListener('keydown', e => {
   if (G.cur === 'dmach' && hasW('dmach') && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ'].includes(e.code)) return; // Máquina da Morte: não troca até acabar
   switch (e.code) {
     case 'KeyF': if (ZC.on) zUse(); else knifeInspect(); break;
-    case 'KeyM': if (ZC.on) { ZMM.big = (ZMM.big + 1) % 3; ZMM.tb = 0; } else if (C.st?.mode === 'rounds') { RMM.big = !RMM.big; RMM.tb = 0; } break; // mapa grande do modo Zumbi: 1 = em volta de você, 2 = inteiro, 0 = fecha
+    case 'KeyM': if (C.st?.mode === 'rounds') { RMM.big = !RMM.big; RMM.tb = 0; } break; // mapa grande do modo Zumbi: 1 = em volta de você, 2 = inteiro, 0 = fecha
     case 'KeyV': if (ZC.on && me.alive && !me.sprinting && !(ZC.revLocal > 0) && now >= G.nextFire && now >= G.switchEnd) knifeAttack(false); break;
     case 'Digit1': G.inv.primary && equip(G.inv.primary); break;
     case 'Digit2': G.inv.secondary && equip(G.inv.secondary); break;
@@ -31995,7 +31955,7 @@ function toMenu() {
   document.querySelector('#menu .tabs [data-tab="play"]')?.click();
 }
 function lobbyStart() {
-  const st = LB.getForm(); save('lastSt', st); S.st = C.st = st; S.lobby = false; LB.on = false; S.fromLobby = true;
+  const st = LB.getForm(); save('lastSt', st); if (st.mode === 'zombies' && !(DEBUG && window.__semSorteio)) st.seed = 1 + Math.floor(Math.random() * 2e9); /* zumbi-v2 (Etapa 7): semente da partida (lugares sorteados iguais em todos os PCs) */ S.st = C.st = st; S.lobby = false; LB.on = false; S.fromLobby = true;
   for (const c of NET.conns.values()) c.grace = performance.now() + GRACE_MAPA; // cada um monta o mapa no seu PC: quem demora não cai
   broadcast({ t: 'start', st }, C.myId); // os outros montam o mapa antes do primeiro "spawn"
   buildMap(st.map); enterGame(); srvStartMatch(); lobbyUI();
@@ -32611,12 +32571,13 @@ fpLoad('p:ak'); fpLoad('m:knife'); fpLoad('m:karambit'); FPC['k:pack'] = new GLT
 setTimeout(() => { let q = Promise.resolve(); for (const k of Object.keys(FPM)) q = q.then(() => fpLoad('m:' + k)); }, 8000); // modelos das armas aos poucos (mundo e mãos dos outros)
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos); só em desenvolvimento (DEBUG), nunca no site publicado
-if (DEBUG) window.__T = { get NOW() { return now; }, showPause, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, ZMM, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
+if (DEBUG) window.__T = { get NOW() { return now; }, showPause, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade, zKill, zDrop, zEndRound,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 // ===== O2-C01: ganchos de teste para a auditoria de itens (tools/itens/auditoria.mjs); só leitura e as funções do próprio jogo, nada de gameplay =====
 if (DEBUG) Object.assign(window.__T, { zBuildWalk, footFreeR, segClearR, zRoomAt, zActive, zDoorOpen, zBoxPlace, zHigh, colQuery, ffCell, ZPERKS, ZTRAP, ZMAXPERKS, ZWEAP, PR, STEP, ZVAULT, ZTOP });
 // ===== FIM O2-C01 =====
+if (DEBUG) Object.assign(window.__T, { scene, ZBAL, zSorteiaLugares, zRng, papProx, PAP_IDS, zConstruida, zPecasPegas, srvZBuild, zTamanho, zForaJanela, zCustoAreas, srvZUse, get ZDIFF() { return ZDIFF; } }); // zumbi-v2: cena, balanceamento e funções novas para os testes
 // ===== O2-C04: ganchos de teste dos interativos (tests/interativos-zumbi.test.mjs e tools/itens/auditoria.mjs) =====
 if (DEBUG) Object.assign(window.__T, { ZINT, ZINT_MAPA, ZINT_BARRIL, ZINT_FN, zintUsar, zintTiro, zintExplosao, zintBarrilBoom, zintEstado, zintAud, zintSync, zintMsg, zExplode, zWorldState });
 // ===== FIM O2-C04 =====
