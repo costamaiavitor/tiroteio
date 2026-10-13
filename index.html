@@ -24891,7 +24891,7 @@ function zTickZombies(dt) {
     if (!Z.zs.has(z.id)) continue; // morreu nesta volta (explosão de outro)
     if (now - (z.phT || -1) >= .05) { const P0 = z.body.pos; (z.ph ||= []).push({ t: now, p: [P0.x, P0.y, P0.z] }); if (z.ph.length > 9) z.ph.shift(); z.phT = now; } // posições recentes (linha de visão dos tiros com lag)
     if (z.frzT && now >= z.frzT) { z.frzT = 0; z.frz = 0; z.speed = z.spd0; z.sc = z.sc0; } // o gelo passou
-    if (z.nukeAt && now >= z.nukeAt) { if (ZKIND[z.kind].chefe) { z.nukeAt = 0; z.hp = Math.max(1, z.hp - z.maxHp * ZKIND[z.kind].capNuke); } else { zKill(z, null, 'body', 'nuke', false, true); continue; } } // Nuke não mata chefe: tira capNuke (Carniceiro 20%)
+    if (z.nukeAt && now >= z.nukeAt) { if (ZKIND[z.kind].chefe) { z.nukeAt = 0; z.hp = Math.max(1, z.hp - z.maxHp * ZKIND[z.kind].capNuke); } else { zKill(z, null, 'body', 'nuke', false, true, z.nukeBy && S.players.get(z.nukeBy)); continue; } } // Nuke não mata chefe: tira capNuke (Carniceiro 20%)
     const P = z.body.pos;
     if (z.tgt && (!z.tgt.alive || z.tgt.downed || !S.players.has(z.tgt.id) || z.tgt.zbEnd > now)) { if (z.tgt.zbEnd > now && z.atkQ === z.tgt) z.atkWind = 0; z.tgt = null; z.tgtT = 0; }
     if (now >= z.tgtT) { z.tgtT = now + ZBAL.alvo.reavalia + Math.random() * ZBAL.alvo.sorteio; zForaJanela(z, P); let best = null, bd = 1e9; for (let qi = 0; qi < tg.length; qi++) { const q = tg[qi], d = hyp(q.pos[0] - P.x, q.pos[2] - P.z); if (d < bd) { bd = d; best = q; } } z.tgt = best; }
@@ -25091,18 +25091,19 @@ function zChain(p, z0, wd, w) { // Wunderwaffe: o raio pula para o zumbi mais pe
   }
   if (pts.length > 1) broadcast({ t: 'zarc', p: pts, pap: wd.pap ? 1 : 0 });
 }
-function zKill(z, p, zone, w, splash, nuke) {
+function zKill(z, p, zone, w, splash, nuke, dono) { // dono: quem ligou a armadilha / pegou a Nuke (morte sem tiro que dá pontos)
   if (!Z.zs.has(z.id)) return; Z.zs.delete(z.id);
   const wi = z.win >= 0 && (z.st === 'out' || z.st === 'tear' || z.st === 'climb') ? ZD.windows[z.win] : null;
   const dx = wi ? wi.ix : z.body.pos.x, dz = wi ? wi.iz : z.body.pos.z;
   let pts = 0;
   if (p && !nuke) { pts = (w === 'knife' ? 130 : splash ? 50 : zone === 'head' ? 100 : zone === 'legs' ? 50 : 60) + (ZKIND[z.kind]?.pts || 0); zPts(p, zGain(pts)); p.kills++; if (zone === 'head' && !splash) p.hs++; }
+  else if (dono && S.players.has(dono.id)) { zPts(dono, zGain(ZBAL.pontos.semTiro + (ZKIND[z.kind]?.pts || 0))); dono.kills++; } // decisão do dono (13/10): quem ligou/pegou ganha
   const K = z.kind | 0, msg = { t: 'zdie', id: z.id, w: p && !nuke ? W[w]?.base || w : undefined, hs: zone === 'head' && !splash ? 1 : 0, fl: W[w]?.thunder ? 1 : 0 /* zv2-R3: Arma Trovão em qualquer nível do PaP (o _pap2/_pap3 não arremessava) */, by: p ? p.id : null };
   if (W[w]?.frost) msg.ic = 1; // Uivo do Inverno: o zumbi congelado se estilhaça
   const bx = z.body.pos.x, bz = z.body.pos.z; // dx/dz é o ponto de dentro da janela (para o power-up); estouro e nuvem ficam onde ele está
   if (K) msg.k = K; if (K === 2 && !nuke) msg.ex = [r2(bx), r2(Math.max(0, z.body.pos.y)), r2(bz)];
   broadcast(msg); campMorte(z, p, zone, w); // O3-D03: brasa, cal, chave, Pregador (no clássico não faz nada)
-  if (K === 6) { if (p) for (const q of S.players.values()) if (q !== p && q.alive) zPts(q, 300); zDrop(null, dx, dz, true); } // Carniceiro: pontos para o time e power-up garantido
+  if (K === 6) { const quem = p || dono; if (quem) for (const q of S.players.values()) if (q !== quem && q.alive) zPts(q, 300); zDrop(null, dx, dz, true); } // Carniceiro: pontos para o time e power-up garantido
   if (msg.ex) zBloatBoom(bx, Math.max(0, z.body.pos.y), bz, p);
   if (p && !nuke && !z.dog && p.perks.includes('vult') && Math.random() < ZPK.vultP) zVultDrop(p, dx, dz);
   if (K === 4 && !nuke) { const c = { id: Z.cloudId++, x: bx, y: Math.max(0, z.body.pos.y), z: bz, end: now + 7 }; Z.clouds.push(c); }
@@ -25182,7 +25183,7 @@ function zPower(type, p) {
       break;
     case 'insta': Z.insta = now + 30; break;
     case 'dbl': Z.dbl = now + 30; break;
-    case 'nuke': for (const z of Z.zs.values()) z.nukeAt = now + rand(.2, 1.6); for (const q of S.players.values()) zPts(q, 400); break;
+    case 'nuke': for (const z of Z.zs.values()) { z.nukeAt = now + rand(.2, 1.6); z.nukeBy = p.id; } for (const q of S.players.values()) zPts(q, 400); break; // nukeBy: quem pegou ganha os abates
     case 'carp': Z.boards = Z.boards.map(() => 6); for (const q of S.players.values()) zPts(q, 200); break;
   }
 }
@@ -25305,7 +25306,7 @@ function srvZFx(p, m) {
     broadcast({ t: 'zfx', k: 'phd', id: p.id });
   }
 }
-function zTickTraps(dt) { // armadilha ligada: mata zumbi que passa (sem pontos) e machuca jogador
+function zTickTraps(dt) { // armadilha ligada: mata zumbi que passa (pontos para quem ligou) e machuca jogador
   (ZD.traps || []).forEach((t, i) => {
     const T = Z.traps[i]; if (!T) return;
     if (T.st === 'on') {
@@ -25313,8 +25314,8 @@ function zTickTraps(dt) { // armadilha ligada: mata zumbi que passa (sem pontos)
       const x0 = t.x - t.w / 2 - .3, x1 = t.x + t.w / 2 + .3, z0 = t.z - t.d / 2 - .3, z1 = t.z + t.d / 2 + .3;
       for (const z of [...Z.zs.values()]) {
         const P = z.body.pos; if (z.st === 'rise' || P.x <= x0 || P.x >= x1 || P.z <= z0 || P.z >= z1 || P.y >= 2) continue;
-        if (ZKIND[z.kind].chefe) { if (now >= (z.trapT || 0)) { z.trapT = now + ZTRAP.every; z.hp -= z.maxHp * ZKIND[z.kind].capArmadilha; if (z.hp <= 0) zKill(z, null, 'body', 'trap', false, true); } continue; } // chefe: capArmadilha a cada choque (Carniceiro 6%), não morre de uma vez
-        zKill(z, null, 'body', 'trap', false, true);
+        if (ZKIND[z.kind].chefe) { if (now >= (z.trapT || 0)) { z.trapT = now + ZTRAP.every; z.hp -= z.maxHp * ZKIND[z.kind].capArmadilha; if (z.hp <= 0) zKill(z, null, 'body', 'trap', false, true, S.players.get(T.by)); } continue; } // chefe: capArmadilha a cada choque (Carniceiro 6%), não morre de uma vez
+        zKill(z, null, 'body', 'trap', false, true, S.players.get(T.by)); // pontos para quem ligou (decisão do dono, 13/10)
       }
       for (const q of S.players.values()) {
         if (!q.alive || q.downed || q.pos[0] < x0 || q.pos[0] > x1 || q.pos[2] < z0 || q.pos[2] > z1 || q.pos[1] > 2.4) continue;
@@ -25630,7 +25631,7 @@ ZINT_FN.fogo = {
       if (aceso && z.st !== 'rise' && P.x > x0 && P.x < x1 && P.z > z0 && P.z < z1 && P.y < 2) { z.fogoT = now + D.queima; z.fogoI = i; }
       if (z.fogoI !== i || !(z.fogoT > now) || !dt) continue;
       z.hp -= (ZKIND[z.kind].chefe ? z.maxHp * D.dpsBoss : dps) * dt; // chefe (Carniceiro): só uma fração por segundo
-      if (z.hp <= 0) zKill(z, null, 'body', 'fogo', false, true); // sem pontos, como a elétrica
+      if (z.hp <= 0) zKill(z, null, 'body', 'fogo', false, true, S.players.get(E.by)); // pontos para quem acendeu, como a elétrica
     }
     if (aceso) for (const q of S.players.values()) {
       if (!q.alive || q.downed || q.pos[0] < x0 || q.pos[0] > x1 || q.pos[2] < z0 || q.pos[2] > z1 || q.pos[1] > 2.4) continue;
@@ -30129,7 +30130,7 @@ ZINT_FN.valvula = {
         continue;
       }
       if (d > D.r + (z.rad || .3)) continue;
-      z.hp -= D.dpsZumbi * dt; if (z.hp <= 0) zKill(z, null, 'body', 'vapor', false, false);
+      z.hp -= D.dpsZumbi * dt; if (z.hp <= 0) zKill(z, null, 'body', 'vapor', false, false, S.players.get(E.by));
     }
     if (now >= E.t) zintPoe(i, 'recarga', D.recarga, null);
   },
@@ -32657,7 +32658,7 @@ if (DEBUG) window.__T = { get NOW() { return now; }, showPause, MARKS, startFire
 // ===== O2-C01: ganchos de teste para a auditoria de itens (tools/itens/auditoria.mjs); só leitura e as funções do próprio jogo, nada de gameplay =====
 if (DEBUG) Object.assign(window.__T, { zBuildWalk, footFreeR, segClearR, zRoomAt, zActive, zDoorOpen, zBoxPlace, zHigh, colQuery, ffCell, ZPERKS, ZTRAP, ZMAXPERKS, ZWEAP, PR, STEP, ZVAULT, ZTOP });
 // ===== FIM O2-C01 =====
-if (DEBUG) Object.assign(window.__T, { scene, ZBAL, zFalsaCamufla, armaInspect, VGRIP, VMC, zSorteiaLugares, zRng, papProx, PAP_IDS, zConstruida, zPecasPegas, srvZBuild, zTamanho, zForaJanela, zCustoAreas, srvZUse, get ZDIFF() { return ZDIFF; } }); // zumbi-v2: cena, balanceamento e funções novas para os testes
+if (DEBUG) Object.assign(window.__T, { scene, ZBAL, zFalsaCamufla, armaInspect, VGRIP, VMC, zPower, zSorteiaLugares, zRng, papProx, PAP_IDS, zConstruida, zPecasPegas, srvZBuild, zTamanho, zForaJanela, zCustoAreas, srvZUse, get ZDIFF() { return ZDIFF; } }); // zumbi-v2: cena, balanceamento e funções novas para os testes
 // ===== O2-C04: ganchos de teste dos interativos (tests/interativos-zumbi.test.mjs e tools/itens/auditoria.mjs) =====
 if (DEBUG) Object.assign(window.__T, { ZINT, ZINT_MAPA, ZINT_BARRIL, ZINT_FN, zintUsar, zintTiro, zintExplosao, zintBarrilBoom, zintEstado, zintAud, zintSync, zintMsg, zExplode, zWorldState });
 // ===== FIM O2-C04 =====

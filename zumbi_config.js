@@ -73,6 +73,9 @@ export const ZBAL = {
     4: { s: 1, estilo: 'cambaleante' }, // Tóxico
     5: { s: 1.04, marchaMin: 1, marchaMax: 1, estilo: 'cambaleante' }, // Gritador
   },
+  // Decisão do dono (13/10): zumbi morto sem tiro por algo que um jogador ligou ou pegou (armadilha, Nuke, fogo do interativo, vapor da
+  // válvula) dá pontos a quem ligou/pegou: os de um abate no corpo mais o bônus do tipo (o Carniceiro dá também os 300 do time).
+  pontos: { semTiro: 60 },
   // Decisão do dono (13/10): modo infinito. Depois dos créditos da campanha a partida segue em rodadas infinitas (no mapa abaixo, com as
   // armas, pontos e bebidas de cada um, da rodada em que parou). No infinito, a escalada (só no infinito; o clássico não muda):
   infinito: {
