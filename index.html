@@ -24434,7 +24434,7 @@ function zInteract(dt) {
     const dist = dd(t.sx, t.sz); if (dist > 2.2) return;
     const T = ZC.traps[i] || { st: 'idle' }; let txt, ok = true;
     if (!ZC.power) { txt = 'Armadilha elétrica — sem energia'; ok = false; }
-    else if (t.ala && !zintAlaCli(t.ala)) { txt = `Armadilha elétrica — ligue a ${ZINT_ALA[t.ala].nome}`; ok = false; } // O2-C08: interruptor da ala
+    else if (t.ala && !zintAlaCli(t.ala)) { txt = `Armadilha elétrica — ligue ${zintAlaNome(t.ala)}`; ok = false; } // O2-C08: interruptor da ala
     else if (T.st === 'on') { txt = 'Armadilha ligada'; ok = false; }
     else if (T.st === 'cool') { txt = `Armadilha recarregando · ${Math.max(0, Math.ceil(T.end - now))}s`; ok = false; }
     else txt = `Armadilha elétrica [${t.cost ?? ZTRAP.cost}]`; // O2-C06: custo opcional por armadilha
@@ -25280,7 +25280,7 @@ function srvZUse(p, m) {
     case 'zint': zintUsar(p, m); break; // O2-C04: interativos novos
     case 'trap': { // armadilha elétrica: perto da alavanca, com energia, pronta e com pontos
       const i = m.id, t = ZD.traps?.[i], T = Z.traps[i]; if (!Number.isInteger(i) || !t || !T || !near(t.sx, t.sz, 2.8)) return;
-      if (!Z.power) return err('Sem energia'); if (t.ala && !zintAla(t.ala)) return err(`Ligue a ${ZINT_ALA[t.ala].nome} antes (interruptor da ala)`); // O2-C08
+      if (!Z.power) return err('Sem energia'); if (t.ala && !zintAla(t.ala)) return err(`Ligue ${zintAlaNome(t.ala)} antes (interruptor da ala)`); // O2-C08
       if (T.st !== 'idle') return err(T.st === 'on' ? 'Armadilha já ligada' : 'Armadilha recarregando');
       if (!zPay(p, t.cost ?? ZTRAP.cost)) return; // O2-C06: custo opcional por armadilha
       T.st = 'on'; T.t = now + ZTRAP.on; T.by = p.id; T.hurt = {};
@@ -25856,8 +25856,9 @@ ZINT.atalho = { vao: 4, verga: 3.2 }; // largura do vão (a das portas de hoje) 
 const ZINT_ALA = { // alas do Sanatório: áreas cujas lâmpadas (e a armadilha da ala) dependem do interruptor
   oeste: { nome: 'Ala Oeste', salas: ['G', 'H', 'N'] },
   leste: { nome: 'Ala Leste', salas: ['K', 'L', 'M'] },
-  anel: { nome: 'Anel externo', salas: ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14'] },
+  anel: { nome: 'Anel externo', art: 'o', salas: ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14'] },
 };
+const zintAlaNome = a => `${ZINT_ALA[a].art || 'a'} ${ZINT_ALA[a].nome}`; // "a Ala Oeste", "o Anel externo"
 const ZINT_PORTA = { // tipos de porta nova: verbo do F, som ao abrir e se afunda no chão (senão sobe, como a porta de madeira)
   cortafogo: { verbo: 'Abrir a porta corta-fogo', som: 'door' },
   cerca: { verbo: 'Derrubar a cerca', som: 'crack', desce: 1 },
@@ -26063,7 +26064,7 @@ const ZINT_INT_MONTA = { // interruptor: frente +z, parede em z = 0; devolve { a
 };
 ZINT_FN.interruptor = {
   est: ['pronto', 'ligado'],
-  efeito: (o, D) => `${o.ala ? `liga a ${ZINT_ALA[o.ala].nome} (luzes, armadilha e porta corta-fogo)` : 'solta a tranca da porteira'}; ${o.custo ?? D.custo} pontos${o.energia ? '; precisa de energia' : ''}; uma vez por partida`,
+  efeito: (o, D) => `${o.ala ? `liga ${zintAlaNome(o.ala)} (luzes, armadilha e porta corta-fogo)` : 'solta a tranca da porteira'}; ${o.custo ?? D.custo} pontos${o.energia ? '; precisa de energia' : ''}; uma vez por partida`,
   monta(o, i) {
     const Wd = ZC.world; Wd.alas ||= new Set(); Wd.portaTrava ||= new Map();
     const n = o.n || [0, 1], g = new THREE.Group(); g.position.set(o.x, 0, o.z); g.rotation.y = Math.atan2(n[0], n[1]);
@@ -26081,11 +26082,11 @@ ZINT_FN.interruptor = {
     if (o.ala) { if (on) Wd.alas.add(o.ala); else Wd.alas.delete(o.ala); }
     for (const d of ZD.doors) if (d.trava === o.id) Wd.portaTrava?.get(d.id)?.(on);
     if (sync || !on || ant === 'ligado') return;
-    const p = new V3(o.x, 1.4, o.z); play('power', p); if (o.ala) { play('lightning', p); toast(`${ZINT_ALA[o.ala].nome} ligada: luzes, armadilha e porta corta-fogo`, 3); } else toast('Tranca solta: a porteira pode ser aberta', 3);
+    const p = new V3(o.x, 1.4, o.z); play('power', p); if (o.ala) { play('lightning', p); toast(`${ZINT_ALA[o.ala].nome} ligad${ZINT_ALA[o.ala].art || 'a'}: luzes, armadilha e porta corta-fogo`, 3); } else toast('Tranca solta: a porteira pode ser aberta', 3);
   },
   prompt(o, i, c, D) {
     if (c.st === 'ligado') return null;
-    const custo = o.custo ?? D.custo, verbo = o.ala ? `Ligar a ${ZINT_ALA[o.ala].nome}` : 'Soltar a tranca da porteira';
+    const custo = o.custo ?? D.custo, verbo = o.ala ? `Ligar ${zintAlaNome(o.ala)}` : 'Soltar a tranca da porteira';
     if (o.energia && !ZC.power) return { k: 'zint', id: i, ok: false, txt: `${verbo} — sem energia` };
     return { k: 'zint', id: i, cost: custo, txt: custo ? `${verbo} [${custo}]` : verbo };
   },
@@ -27266,7 +27267,7 @@ function campHud(dt) { // gancho no fim do zHud (cada quadro do cliente)
     for (const id of c.ordem) { if (c.obj[id].st !== 'ativo') continue; const P = campObjPos(id); if (!P) continue; const d = Math.hypot(P.x - me.pos.x, P.z - me.pos.z); if (d < bd) { bd = d; best = P; bid = id; } }
     if (best && bd > 2.5) { const v = visScr(best.x, (best.y || 0) + 1.6, best.z); let ar = '';
       if (v.off) { v.x = clamp(v.x, 60, innerWidth - 60); v.y = clamp(v.y, 50, innerHeight - 50); ar = `<u style="transform:rotate(${Math.atan2(v.y - innerHeight / 2, v.x - innerWidth / 2) + Math.PI / 2}rad)">▲</u>`; } else ar = '<u>▼</u>';
-      mk = `<span${v.off ? ' class="off"' : ''} style="left:${v.x}px;top:${v.y}px">${ar}${esc((CAMP_OBJ[bid].titulo || 'OBJETIVO').toUpperCase().slice(0, 28))} ${Math.round(bd)}m</span>`; } }
+      mk = `<span${v.off ? ' class="off"' : ''} style="left:${v.x}px;top:${v.y}px">${ar}${esc((CAMP_OBJ[bid].marca || CAMP_OBJ[bid].titulo || 'OBJETIVO').toUpperCase().slice(0, 28))} ${Math.round(bd)}m</span>`; } }
   campSet(E.mark, 'm', mk);
   // rádio e falas (fila)
   if (c.radio && now >= c.radio.fim) c.radio = null;
@@ -30320,7 +30321,11 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { matc
 //   IV.2 ligar as três alas (interruptores do O2-C08, pagos: 500/500/1000; abre a cadeia até N, K e r5; rádio a cada uma)
 //   IV.3 fechar o registro da Torre d'água (segurar F somando 12 s; quem segura chama os zumbis; abre K↔M)
 //   Portas da história: a cadeia de menor custo (grafo das portas, como o zActive) entre o lugar do objetivo anterior e o do seguinte.
-//   O fim do Ato IV (rodada 19, cena c4-forno) leva à etapa C2 (arena Casa do Forno); o do Ato III segue no mesmo mapa (rodada 16).
+//   Objetivos do mapa (13/10): o Sanatório começa no III.1 na rodada 1 (500 pontos, M1911, sem kit); a etapa acaba no fim da rodada em
+//   que tudo fica feito, ou já no intervalo se o último objetivo foi feito nele (campSanTick), e a seguinte (IV, depois C2 do Foguista)
+//   começa no mesmo mapa, sem cena nem rodada mínima. A Enfermeira-chefe nasce por campZNasce em qualquer rodada (não depende da
+//   estreia do Enfermeiro). A Energia fica no lugar e sem peças (o sorteio só mexe no PaP); ligada antes da hora, o IV.1 fecha ao
+//   começar, e as alas já ligadas contam no IV.2. O registro só mostra o F com o IV.3 ativo. 'marca' = texto curto da seta.
 // - Laboratório trancado no Ato III: as três portas da sala D (B↔D, F↔D, D↔I) usam a trava das portas do O2-C08 (atalho + trava +
 //   msg, por acessores só nessas três portas do MAPS.sanatorio) enquanto o III.2 não foi cumprido, no host e no cliente. Assim o F
 //   mostra "Trancada" (sem preço) e o host recusa. A chave abre a B↔D: o portador chega à porta (destino do III.2) e o III.3 a abre
@@ -30347,14 +30352,14 @@ const CAMP_SAN = {
   busca: [8, .5, 16], // chave fora do campo: raio máximo (m), passo do raio (m) e direções por anel
 };
 Object.assign(CAMP_OBJ, {
-  'III.1': { tipo: 'ler', titulo: 'Ler o livro de admissões da Recepção', alvo: { zint: 'san-recepcao' }, radio: { ok: 'r3-livro', lembra: 'r3-inicio' }, depois: ['III.2'] },
-  'III.2': { tipo: 'coletar', titulo: 'Tomar a chave da Enfermeira-chefe e levar ao Laboratório', abre: ['AB'], item: CAMP_SAN.chave, origem: 'elite', destino: CAMP_SAN.entrega,
+  'III.1': { tipo: 'ler', titulo: 'Ler o livro de admissões da Recepção', marca: 'Livro de admissões', alvo: { zint: 'san-recepcao' }, radio: { ok: 'r3-livro', lembra: 'r3-inicio' }, depois: ['III.2'] },
+  'III.2': { tipo: 'coletar', titulo: 'Tomar a chave da Enfermeira-chefe e levar ao Laboratório', marca: 'Chave do Laboratório', abre: ['AB'], item: CAMP_SAN.chave, origem: 'elite', destino: CAMP_SAN.entrega,
     radio: { ini: 'r3-chave', lembra: 'r3-chave' }, depois: ['III.3'] },
-  'III.3': { tipo: 'ler', titulo: 'Ler o relatório 31 no Laboratório', abre: ['BD'], alvo: { zint: 'san-laboratorio' }, radio: { ok: 'r3-laboratorio', lembra: 'r3-chave' }, depois: ['III.4'] },
-  'III.4': { tipo: 'segurar', titulo: 'Segurar o Laboratório', zona: CAMP_SAN.lab, dura: 75, radio: { lembra: 'r3-laboratorio' } },
-  'IV.1': { tipo: 'usar', titulo: 'Ligar a Energia nas Caldeiras', abre: ['DI', 'HI', 'HP'], alvo: { energia: 1 }, zona: CAMP_SAN.energia, radio: { lembra: 'r4-inicio' }, depois: ['IV.2'] },
-  'IV.2': { tipo: 'usar', titulo: 'Ligar as três alas', abre: ['GH', 'GN', 'AC', 'CK', 'Nr5'], alvo: { zint: CAMP_SAN.alas, st: ['ligado'], n: 3 }, radio: { lembra: 'r4-alas' }, depois: ['IV.3'] },
-  'IV.3': { tipo: 'usar', titulo: 'Fechar o registro da Torre d\'água', abre: ['KM'], alvo: { zint: CAMP_SAN.registro }, radio: { ok: 'r4-registro', lembra: 'r4-inicio' } },
+  'III.3': { tipo: 'ler', titulo: 'Ler o relatório 31 no Laboratório', marca: 'Relatório 31', abre: ['BD'], alvo: { zint: 'san-laboratorio' }, radio: { ok: 'r3-laboratorio', lembra: 'r3-chave' }, depois: ['III.4'] },
+  'III.4': { tipo: 'segurar', titulo: 'Segurar o Laboratório', marca: 'Laboratório', zona: CAMP_SAN.lab, dura: 75, radio: { lembra: 'r3-laboratorio' } },
+  'IV.1': { tipo: 'usar', titulo: 'Ligar a Energia nas Caldeiras', marca: 'Energia', abre: ['DI', 'HI', 'HP'], alvo: { energia: 1 }, zona: CAMP_SAN.energia, radio: { lembra: 'r4-inicio' }, depois: ['IV.2'] },
+  'IV.2': { tipo: 'usar', titulo: 'Ligar as três alas', marca: 'Interruptor da ala', abre: ['GH', 'GN', 'AC', 'CK', 'Nr5'], alvo: { zint: CAMP_SAN.alas, st: ['ligado'], n: 3 }, radio: { lembra: 'r4-alas' }, depois: ['IV.3'] },
+  'IV.3': { tipo: 'usar', titulo: 'Fechar o registro da Torre d\'água', marca: 'Registro da Torre', abre: ['KM'], alvo: { zint: CAMP_SAN.registro }, radio: { ok: 'r4-registro', lembra: 'r4-inicio' } },
 });
 Object.assign(CAMP_ATOS[3], { objs: ['III.1', 'III.2', 'III.3', 'III.4'], ini: ['III.1'] }); Object.assign(CAMP_ATOS[4], { objs: ['IV.1', 'IV.2', 'IV.3'], ini: ['IV.1'] });
 // sonda do O3-D12 (planta de cima) e auditoria.mjs/conferencia.mjs com --camp sem erro. Notas: (x, z) na face da parede (folha) ou no
@@ -30385,6 +30390,9 @@ function campSanTick() {
   if (o3?.st === 'feito' && !o3.apito) { o3.apito = 1; o3.apitoPend = !campSanApito(); } // o relatório 31 solta o apito
   const it = CAMP.itens[CAMP_SAN.chave];
   if (it?.st === 'chao' && (it.vx !== it.x || it.vz !== it.z)) campSanChaveAlcance(it);
+  // objetivos do mapa: a etapa que acaba no intervalo (Energia, alas e registro dão para fazer fora da rodada) já libera a seguinte, sem
+  // esperar o fim da próxima rodada inteira (o painel dizia "aguente até o fim da rodada" durante o intervalo)
+  const et = CAMP_ATOS[CAMP.et]?.id; if ((et === 'III' || et === 'IV') && (Z.phase === 'break' || Z.phase === 'pre') && campEtapaFeita()) campProxObjetivos();
 }
 function campSanApito() { // Estouro nesta rodada (true) ou fica pendente para a próxima rodada que puder ter evento
   const E = CAMP_EVS; if (Z.phase !== 'round' || E.id || !campEvPode(Z.round) || CAMP.obj['III.4']?.st === 'feito') return false;
@@ -30398,6 +30406,9 @@ function campSanChaveAlcance(it) { // a chave no chão precisa estar no campo do
   it.vx = it.x; it.vz = it.z; // conferida (não procura de novo até a chave mudar de lugar)
 }
 CAMP_GANCHOS.tick.push(campSanTick);
+// cliente: o registro da Torre só mostra o F com o objetivo dele ativo (antes do IV.3 o prompt aparecia e segurar F não fazia nada)
+const campSanObjCli = ref => { const o = CAMP.c?.obj || {}; for (const id in o) if (o[id].st === 'ativo' && campLista(CAMP_OBJ[id]?.alvo?.zint).includes(ref)) return true; return false; };
+{ const pr = ZINT_FN.registro.prompt; ZINT_FN.registro.prompt = (o, i, c, D) => campSanObjCli(o.id) ? pr(o, i, c, D) : null; }
 CAMP_GANCHOS.rodada.push(r => { // o apito que ficou pendente (a agenda do O3-D05 já rodou: só entra se a rodada ficou sem evento)
   const o3 = CAMP.obj['III.3']; if (!o3?.apitoPend) return;
   if (CAMP_EVS.id === CAMP_SAN.apito || CAMP.obj['III.4']?.st === 'feito') o3.apitoPend = false; else if (campSanApito()) o3.apitoPend = false;
