@@ -6,7 +6,7 @@
 // torre e sem o apagão, o ponto fraco, as telas do cliente fora da arena (marca, 3 tiros da rajada), a barra do chefe, quem entra no
 // meio, e a morte: recompensa, objetivo feito, "OBJETIVOS CONCLUÍDOS" e as rodadas infinitas com a escalada.
 // O que era só da arena Forte Velho (torre do holofote, apagão, cone, gerador 'curto', arame farpado, 16 comuns pelos portões, troca de
-// mapa com bagagem) saiu daqui: aqui só se confere que fica desligado fora dela sem erro. A arena sai do modo zumbi (outro agente).
+// mapa com bagagem) saiu do jogo na limpeza A8 (docs/zumbi-v2/limpeza.md): aqui só se confere que não existe mais.
 // Rodar: ZV2_OBJ=1 node --test --test-concurrency=1 tests/campanha-vigia.test.mjs (o arquivo liga o ZV2_OBJ sozinho)
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -58,7 +58,7 @@ test('Vila: I -> II -> C1; II.4 feito -> a etapa C1 começa no intervalo e o Vig
       o.nasce = { livre: livre(P.x, P.z), d: +d.toFixed(1) }; o.hp = z.maxHp; T.sim(3); o.nasce.y = +P.y.toFixed(2); o.nasce.st = z.st; }
     o.esp = Math.round(T.zHp(T.Z.round) * T.zHpK(T.Z.round) * 10); // vida da rodada em que ele entra (vidaAtual, 13/10)
     o.cli = T.CAMP.c.ch && [T.CAMP.c.ch.k, T.CAMP.c.ch.f, T.CAMP.c.ch.campo]; o.bar = document.getElementById('zboss').firstChild.nodeValue;
-    o.arena = [T.ZD.zint.some(x => x.t === 'curto'), T.forteEstado().anim, T.forteEstado().mapa];
+    o.arena = [T.ZD.zint.some(x => x.t === 'curto'), 'forte' in T.MAPS || 'curto' in T.ZINT || typeof T.FORTE !== 'undefined', T.S.st.map];
     return o;
   });
   assert.deepEqual(r.cadeia, ['I', 'II', 'C1']); assert.equal(r.et0, 'I'); assert.equal(r.modo, 'campanha'); assert.deepEqual(r.c1, ['vila', 'C1.1']);
@@ -110,11 +110,11 @@ test('fases sem a arena: 66% (sem torre: fica no chão), 33% (sem apagão; ×1,1
   const r = await rodar((T, arg, H) => {
     const { p, CH, agora, poe, quieto, atk, limpa, livre } = H; quieto(); limpa(); const z = CH.z; z.st = 'in'; CH.inv = 0; CH.fase = 0; z.hp = z.maxHp; p.dwEnd = 1e12; p.hp = p.maxHp = 1e6;
     const B = H.aberto([[0, 8]]); z.body.pos.set(B[0], 0, B[1]); poe(p, B[0], B[1] + 8);
-    const o = { hemi: T.forteEstado().hemi };
+    const o = { hemi: T.ZC.world.pool.some(P => P.L.intensity > 0) };
     T.zHit(p, z.id, z.maxHp * .5, 'body', 'm1911', false); z.hp = z.maxHp * .67; T.zHit(p, z.id, 5000, 'body', 'm1911', false);
-    o.f2 = [CH.fase, T.VGSRV.modo]; T.sim(4); o.chao2 = [T.VGSRV.modo, +z.body.pos.y.toFixed(2)]; o.cli2 = T.CAMP.c.ch.f;
+    o.f2 = [CH.fase, T.VGSRV.modo ?? 'chao']; T.sim(4); o.chao2 = ['chao', +z.body.pos.y.toFixed(2)]; o.cli2 = T.CAMP.c.ch.f; // a torre saiu com a arena (VGSRV sem modo)
     CH.inv = 0; z.hp = z.maxHp * .34; T.zHit(p, z.id, 5000, 'body', 'm1911', false);
-    o.f3 = [CH.fase, T.VGSRV.modo, z.speed]; T.sim(.3); o.hemi3 = T.forteEstado().hemi; o.cone = T.forteEstado().cone;
+    o.f3 = [CH.fase, T.VGSRV.modo ?? 'chao', z.speed]; T.sim(.3); o.hemi3 = T.ZC.world.pool.some(P => P.L.intensity > 0); o.cone = typeof T.FORTE_V !== 'undefined';
     CH.inv = 0; const h = z.hp; T.zHit(p, z.id, 100, 'body', 'm1911', false); o.k3 = h - z.hp;
     // baioneta no jogador: 55 (Normal)
     quieto(); limpa(); z.body.pos.set(B[0], 0, B[1]); z.st = 'in'; z.atord = 0; poe(p, B[0], B[1] + 6); p.dwEnd = 0; p.hp = p.maxHp = 1000;
@@ -159,22 +159,22 @@ test('pelotão na Vila: apito (1,5 s), 3 Soldados perto dos jogadores (alcançá
   assert.deepEqual(J.erros, []);
 });
 
-test('ponto fraco (a lente nas costas) na Vila; o que é da arena fica desligado: arame não fere, sem gerador do holofote', { timeout: 120000 }, async () => {
+test('ponto fraco (a lente nas costas) na Vila; o que era da arena não existe: sem arame farpado nem gerador do holofote', { timeout: 120000 }, async () => {
   const r = await rodar((T, arg, H) => {
-    const { p, CH, poe, quieto, limpa } = H; quieto(); limpa(); const z = CH.z; z.st = 'in'; CH.inv = 0; CH.fase = 0; z.atord = 0; z.fracoAte = 0; T.VGSRV.modo = 'chao';
+    const { p, CH, poe, quieto, limpa } = H; quieto(); limpa(); const z = CH.z; z.st = 'in'; CH.inv = 0; CH.fase = 0; z.atord = 0; z.fracoAte = 0;
     const B = H.aberto([[0, -6], [0, 6]]); if (!B) return { semLugar: 1 };
     z.body.pos.set(B[0], 0, B[1]); z.yaw = 0; z.tgt = null; z.tgtT = 1e12; p.campMarca = 0; z.hp = z.maxHp * .9; p.dwEnd = 1e12; p.inv.secondary = p.inv.primary = 'm1911';
     const o = { maxHp: z.maxHp }, tiro = (x, zz) => { poe(p, x, zz); T.sim(.6); const h = z.hp; T.sendToHost({ t: 'zhit', v: z.id, w: 'm1911', dmg: 1e6, z: 'fraco' }); T.sim(1 / 60); return +(h - z.hp).toFixed(2); };
     o.w = T.W.m1911.dmg; o.frente = tiro(B[0], B[1] - 6); o.tras = tiro(B[0], B[1] + 6); // yaw 0: frente para -z
-    // arame farpado (regra da arena): na Vila não fere
-    const A = T.FORTE.arame[0]; poe(p, (A[0] + A[1]) / 2, (A[2] + A[3]) / 2); p.dwEnd = 0; p.hp = p.maxHp = 1000; T.vgArameTick(1); T.vgArameTick(1); o.arame = 1000 - p.hp; poe(p, B[0], B[1] + 6);
+    // arame farpado (regra da arena): saiu do jogo com a arena
+    o.arame = typeof T.vgArameTick === 'undefined' && typeof T.FORTE === 'undefined' ? 0 : 1;
     o.curto = T.ZD.zint.filter(x => x.t === 'curto').length;
     return o;
   });
   assert.ok(!r.semLugar, 'achou um lugar aberto');
   assert.ok(Math.abs(r.frente - Math.min(r.w * 1.1, r.maxHp * .06)) < 1e-3, `de frente, fechado: vale corpo (${r.frente})`);
   assert.ok(Math.abs(r.tras - Math.min(r.w * 3 * 1.1, r.maxHp * .1)) < 1e-3, `por trás: ×3 (${r.tras}) ` + JSON.stringify(r));
-  assert.equal(r.arame, 0, 'sem arame fora da arena'); assert.equal(r.curto, 0);
+  assert.equal(r.arame, 0, 'sem arame farpado'); assert.equal(r.curto, 0);
   assert.deepEqual(J.erros, []);
 });
 
@@ -184,7 +184,7 @@ test('quem entra no meio recebe o chefe (versão de campo), a fase e o aviso no 
     const B = H.aberto([[0, 8]]); z.body.pos.set(B[0], 0, B[1]); poe(p, B[0], B[1] + 8);
     T.campChefeAtaca(z, atk('rajada'), p); T.sim(.1);
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 6, name: 'Meio' }); T.sim(.2);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Meio' }); T.sim(.2);
     const st = c.out.filter(m => m.t === 'state' && m.z).pop(), cp = st?.z?.cp;
     const o = { ch: cp?.ch?.slice(0, 3), campo: cp?.ch?.[6], tel: cp?.tel?.[0]?.a };
     T.srvDrop(c); T.campCliReset(); T.campSync(cp); T.sim(1 / 60); o.cli = T.CAMP.c.ch && [T.CAMP.c.ch.k, T.CAMP.c.ch.f, T.CAMP.c.ch.campo]; CH.fase = 0; limpa();

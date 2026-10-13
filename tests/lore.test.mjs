@@ -2,8 +2,8 @@
 // iguais aos da lore.md e dentro do limite; nenhum id repetido; todo id citado no campanha.md existe; o tipo ZINT 'nota' (só com a
 // campanha) abre e fecha como o terminal; os sons sintetizados (rádio, apito, coro, papel) saem com som e sem NaN.
 // Objetivos do mapa (13/10, o modo novo): rádio, falas e documentos continuam; cenas em tela cheia e créditos não aparecem mais
-// (as tabelas de cena continuam iguais às da lore.md, só não são mostradas); as notas seguem a etapa e, depois do último objetivo,
-// todas continuam no mapa.
+// (a tabela de cenas saiu do jogo e da lore.md junto com elas: os ids c*- citados no campanha.md, o projeto antigo, ficam de fora);
+// as notas seguem a etapa e, depois do último objetivo, todas continuam no mapa.
 // As notas de verdade são posicionadas pelos agentes dos atos (D10/D12/D14): aqui entram 3 notas de TESTE, empurradas no
 // ZINT_MAPA.sanatorio antes de criar a sala (fora dos dados do mapa) e tiradas no fim. O3-D12: as notas de teste têm teste: 1 (as de
 // verdade do Sanatório usam os mesmos ids): o teste conta e tira só as dele.
@@ -19,7 +19,7 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LORE = fs.readFileSync(path.join(RAIZ, 'docs/overhaul/lore.md'), 'utf8').replace(/\r\n/g, '\n'); // zumbi-v2: a cópia de trabalho pode vir com CRLF (core.autocrlf)
 const CAMPANHA = fs.readFileSync(path.join(RAIZ, 'docs/overhaul/campanha.md'), 'utf8');
 const HTML = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
-const TABELAS = ['ZINT_TERM_TXT', 'CAMP_NOTA_TXT', 'CAMP_RADIO_TXT', 'CAMP_FALA_TXT', 'CAMP_CENA_TXT'];
+const TABELAS = ['ZINT_TERM_TXT', 'CAMP_NOTA_TXT', 'CAMP_RADIO_TXT', 'CAMP_FALA_TXT'];
 // tabelas como estão na lore.md (blocos ```js prontos para colar)
 const daLore = Object.fromEntries([...LORE.matchAll(/```js\n(const (\w+) = \{[\s\S]*?\n\};)\n```/g)].map(m => [m[2], new Function(m[1] + `; return ${m[2]};`)()]));
 // chaves do literal no código (o objeto do JS esconde chave repetida: a última vence sem aviso)
@@ -32,7 +32,7 @@ let J, TAB;
 before(async () => { J = await abrirJogo(); TAB = await noJogo(J.page, (T, ns) => Object.fromEntries(ns.map(n => [n, T[n]])), TABELAS); }, { timeout: 120000 });
 after(async () => { await J?.fechar(); });
 
-test('lore: as 5 tabelas do jogo são as da lore.md (só a fala cabo-ferido a mais, com a frase do rádio)', () => {
+test('lore: as 4 tabelas do jogo são as da lore.md (só a fala cabo-ferido a mais, com a frase do rádio)', () => {
   assert.deepEqual(Object.keys(daLore).sort(), [...TABELAS].sort(), 'blocos js da lore.md');
   for (const n of TABELAS) {
     const extra = EXTRA[n] || [], jogo = Object.fromEntries(Object.entries(TAB[n]).filter(([k]) => !extra.includes(k)));
@@ -43,7 +43,7 @@ test('lore: as 5 tabelas do jogo são as da lore.md (só a fala cabo-ferido a ma
   assert.equal(TAB.CAMP_FALA_TXT['cabo-ferido'].quem, 'NOGUEIRA');
 });
 
-test('lore: limites (160 letras por painel, linha e cartão; até 3 cartões por cena) e campos preenchidos', async () => {
+test('lore: limites (160 letras por painel e linha) e campos preenchidos', async () => {
   const lim = await noJogo(J.page, T => [T.ZINT.terminal.maxTxt, T.ZINT.nota.maxTxt]);
   assert.deepEqual(lim, [160, 160]);
   for (const n of ['ZINT_TERM_TXT', 'CAMP_NOTA_TXT']) for (const [id, v] of Object.entries(TAB[n])) {
@@ -52,10 +52,7 @@ test('lore: limites (160 letras por painel, linha e cartão; até 3 cartões por
   for (const n of ['CAMP_RADIO_TXT', 'CAMP_FALA_TXT']) for (const [id, v] of Object.entries(TAB[n])) {
     assert.ok(v.quem?.length > 0 && v.txt?.length > 0, `${n}.${id} vazio`); assert.ok(v.txt.length <= 160, `${n}.${id}: ${v.txt.length} letras`);
   }
-  for (const [id, c] of Object.entries(TAB.CAMP_CENA_TXT)) {
-    assert.ok(Array.isArray(c) && c.length >= 1 && c.length <= 3, `cena ${id}: ${c.length} cartões`);
-    for (const s of c) assert.ok(typeof s === 'string' && s.length > 0 && s.length <= 160, `cena ${id}: cartão com ${s.length} letras`);
-  }
+  assert.equal(await noJogo(J.page, T => typeof T.CAMP_CENA_TXT), 'undefined', 'a tabela de cenas saiu do jogo');
   assert.equal(Object.keys(TAB.ZINT_TERM_TXT).length, 10); assert.equal(Object.keys(TAB.CAMP_NOTA_TXT).length, 12); // lore.md §10.3: 22 documentos
 });
 
@@ -67,10 +64,10 @@ test('lore: nenhum id repetido (no literal de cada tabela e entre terminais e no
 });
 
 test('lore: todo id de texto citado no campanha.md existe na tabela certa (terminais pelos ids do mapa)', async () => {
-  const qual = id => /^(r\d|ev)-/.test(id) ? 'CAMP_RADIO_TXT' : /^n-/.test(id) ? 'CAMP_NOTA_TXT' : /^c\d-/.test(id) ? 'CAMP_CENA_TXT'
+  const qual = id => /^(r\d|ev)-/.test(id) ? 'CAMP_RADIO_TXT' : /^n-/.test(id) ? 'CAMP_NOTA_TXT'
     : /^(cabo|ten|fog|dir|carn)-/.test(id) ? 'CAMP_FALA_TXT' : /^(san|vila)-/.test(id) ? 'ZINT_TERM_TXT' : null;
-  const ids = new Set([...CAMPANHA.matchAll(/[`']((?:r\d|ev|n|c\d|cabo|ten|fog|dir|carn)-[a-z0-9-]+|(?:san|vila)-[a-z]+)[`']/g)].map(m => m[1]));
-  assert.ok(ids.size >= 45, `poucos ids achados no campanha.md: ${ids.size}`);
+  const ids = new Set([...CAMPANHA.matchAll(/[`']((?:r\d|ev|n|cabo|ten|fog|dir|carn)-[a-z0-9-]+|(?:san|vila)-[a-z]+)[`']/g)].map(m => m[1])); // as cenas (c*-) saíram do jogo
+  assert.ok(ids.size >= 40, `poucos ids achados no campanha.md: ${ids.size}`); // 41 sem as cenas
   const faltam = [...ids].filter(id => !TAB[qual(id)]?.[id]);
   assert.deepEqual(faltam, [], 'citados no campanha.md sem texto');
   // os terminais da tabela são os 10 do mapa (Vila 4 + Sanatório 6), sem sobra nem falta
@@ -165,7 +162,7 @@ test('nota: ato da entrada (CAMP.on, CAMP.ato), outro jogador lê só para ele, 
     // o adaptador lê o CAMP do D02 quando ele existir; aqui a regra do ato é conferida com a forca desligada (sem CAMP: desligada)
     const semCamp = T.zintNotaLigada(o3); T.ZNOTA.forca = true;
     const i = nota[2], c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 6, name: 'Leitor' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
+    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Leitor' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
     T.sim(1.2); const zi = c.out.find(m => m.t === 'state' && Array.isArray(m.z?.zi))?.z.zi;
     q.alive = true; q.downed = false; poe(q, ...frente(i)); c.out.length = 0; T.zintLoreFecha(false);
     T.srvOnData(c, { t: 'use', k: 'zint', id: i });

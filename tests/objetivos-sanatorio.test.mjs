@@ -200,7 +200,7 @@ test('jogador de fora (cliente falso): lê o livro, não abre o Laboratório, pe
     const { p, poe, segura, idx, obj, comeca, rodada } = H;
     comeca(1); rodada();
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 6, name: 'Cliente' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
+    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Cliente' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
     q.alive = true; q.downed = false; q.dwEnd = 1e12; T.sim(.2); segura();
     const cli = () => { const h = T.NET.isHost; T.NET.isHost = false; try { return T.campSanTrancado(); } finally { T.NET.isHost = h; } }; // a regra do lado do cliente (CAMP.c)
     const t0 = [T.campSanTrancado(), cli()];

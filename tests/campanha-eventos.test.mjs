@@ -207,7 +207,7 @@ test('agenda do Sanatório pela rodada do mapa: 3 Apagão, 6 Silêncio, 8 cães 
     const passa = rr => { limpa(); T.Z.round = rr - 1; T.Z.phase = 'round'; T.Z.toSpawn = 0; T.zEndRound(); const nd = T.Z.nextDog, nb = T.Z.nextBoss; T.zStartRound(); return { r: T.Z.round, ev: ev(), dog: T.Z.dogRound, bo: T.Z.bossQ, nd, nb, nd2: T.Z.nextDog, nb2: T.Z.nextBoss, et: T.CAMP_ATOS[T.CAMP.et]?.id }; };
     const a = {}; for (const rr of [2, 3, 4, 5, 6]) a[rr] = passa(rr);
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 6, name: 'Meio' }); T.sim(.05);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Meio' }); T.sim(.05);
     const st = c.out.filter(m => m.t === 'state' && m.z).pop(); T.srvDrop(c);
     const cp = st?.z?.cp; T.CAMP_EVC.id = null; T.campSync(cp); const sync = T.CAMP_EVC.id;
     for (const rr of [7, 8, 9, 10, 11, 12, 13, 21, 22, 23, 24, 31, 32, 33]) a[rr] = passa(rr);

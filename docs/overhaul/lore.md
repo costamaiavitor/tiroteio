@@ -275,29 +275,13 @@ const CAMP_FALA_TXT = { // id -> { quem, txt } (docs/overhaul/lore.md §10.1)
 };
 ```
 
-### 10.2 Cenas (marcos)
+### 10.2 Cenas (marcos): saíram do jogo
 
-Até 3 cartões por cena, cada um com até 160 caracteres, sobre a câmera parada no lugar indicado. A cena dura a soma dos cartões (3 s cada, no máximo 8 s no total) e pode ser pulada só por quem pula. O host segue o próprio relógio e não espera ninguém.
-
-```js
-const CAMP_CENA_TXT = { // id -> [cartões] (docs/overhaul/lore.md §10.2)
-  'c0-abertura': ['SÃO LÁZARO DO VALE · 1958', 'Vocês passaram por baixo do arame do Exército. A vila está enfeitada para uma festa. Não há ninguém.', 'Ao longe, no alto do morro, um apito de vapor.'],
-  'c1-fim': ['O rádio da Pedreira acende.', 'NOGUEIRA: "Tem uma lista. Quatrocentas e doze famílias. Todas levadas pelo caminhão branco do Sanatório."', 'No Forte Velho, um holofote se acende sozinho e procura a vila.'],
-  'c2-forte': ['FORTE VELHO · CASAMATA', 'O pátio de armas da 3ª Cia. O holofote gira. Embaixo dele, alguém continua de vigia.'],
-  'c2-fim': ['O holofote se apaga.', 'No paiol: três cargas de demolição e as chaves da ambulância branca.', 'NOGUEIRA: "Para o morro. Do jeito que eles levaram todo mundo."'],
-  'c3-abertura': ['SANATÓRIO SANTA INÊS', 'A ambulância para na vaga da Portaria. A vaga ao lado tem um número pintado: 413.'],
-  'c3-fim': ['No Laboratório, a curva do despertar está riscada até o fim do quadro.', 'Do porão, o apito das Caldeiras responde a cada leva.', 'NOGUEIRA: "Enquanto aquilo apitar, eles vêm."'],
-  'c4-forno': ['CASA DO FORNO', 'Quatro fornos acesos. Uma esteira que não para. E o foguista, com a mão na corrente do apito.'],
-  'c4-fim': ['O apito se cala pela primeira vez desde agosto.', 'Atrás do forno 3, o cano-mestre desce o morro por dentro, cheio de água preta.', 'O Veio continua correndo. Para baixo.'],
-  'c5-abertura': ['GALERIA 7', 'Por dentro do cano, a água preta leva até a boca da galeria. Três pilares seguram o teto.', 'No meio da água, um homem de jaleco espera, com a pulseira de quem não tem número.'],
-  'c5-fuga': ['O primeiro pilar estoura.', 'A água preta começa a subir.', 'CORRAM PARA A GAIOLA.'],
-  'c5-final': ['A gaiola sobe. A Galeria 7 desaba atrás de vocês e a água preta fica embaixo da pedra.', 'Na vila, o sino não toca. No morro, o apito não sopra.', 'NOGUEIRA: "Família 413. Risco vocês da lista com gosto."'],
-  'c5-final-completo': ['Nas folhas molhadas do Diretor, a última linha da lista não é a 413.', 'É "chapa 17", com a letra de um mineiro: "lá embaixo tem lugar para todos".', 'A pedra fechou a ferida. Não fechou o lençol.'],
-  'c5-pos': ['Na grade da gaiola, arranhado a unha, por dentro: "ainda não acabou".'],
-};
-```
+Decisão do dono (13/10): o modo zumbi não tem mais cenas em tela cheia nem créditos; a história fica no rádio, nas falas e nos documentos (terminais e notas). A tabela `CAMP_CENA_TXT` (13 cenas, ids `c0-abertura` a `c5-pos`) saiu do jogo e deste documento na limpeza A8 (docs/zumbi-v2/limpeza.md); o texto antigo fica no histórico do git (commit e9f30c4). Os ids `c*-` que o `campanha.md` (o projeto antigo) cita não existem mais.
 
 ### 10.3 O final
+
+No modo de agora (objetivos do mapa, 13/10) o final é a fuga pela ambulância da Portaria do Sanatório, sem cena, créditos nem salvo; depois dele a partida segue em rodadas infinitas no mesmo mapa. O texto abaixo é o do projeto antigo (arena Galeria 7, gaiola e créditos).
 
 1. **Fim do chefe final**: o Diretor cai na água preta; o primeiro pilar (já com carga) estoura sozinho com o golpe final; começa a **fuga** (`campanha.md` §9).
 2. **Fuga com sucesso**: cena `c5-final`. Se a sala leu todos os documentos (22 = 10 terminais + 12 notas), vem também `c5-final-completo`. No fim, `c5-pos` e os créditos (lista de nomes do jogo; o último é "Família 413").

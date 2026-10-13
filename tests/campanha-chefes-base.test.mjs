@@ -67,8 +67,7 @@ test('campanha: o objetivo matar chama o chefe; vida pela rodada da tabela; teto
     T.ZINT_MAPA.sanatorio.push({ t: 'pilar', id: 'tp-1', v: 'sacos', x: 0, z: -5, n: [0, 1], hp: 600, h: 1.8 }, { t: 'juncao', id: 'tp-j', x: -8.4, z: -2, n: [1, 0], hp: 200 });
     Object.assign(T.CAMP_OBJ, { 'T.mat': { tipo: 'matar', titulo: 'Mate o chefe de teste', chefe: TK } });
     const A = T.CAMP_ATOS[3]; A.objs = ['T.mat']; A.ini = ['T.mat'];
-    T.campLibera(4, 3);
-    T.S.st = { ...T.S.st, zmode: 'campanha', ato: 2 }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1);
+    T.S.st = { ...T.S.st, zmode: 'campanha' }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1); // objetivos do mapa: o Sanatório começa na etapa III, na rodada 1
     T.sim(T.Z.phaseEnd - window.__simNow + .2); T.sim(2.2); // pré-rodada, depois o chefe sobe do chão
     const z = CH.z, K = T.ZKIND[TK];
     const o = { on: T.CAMP.on, round: T.Z.round, ph: T.Z.phase, k: CH.k, st: z?.st, hp: z?.hp, maxHp: z?.maxHp, esp: Math.round(T.zHp(10) * 10), lac: z?.lac ?? 0, ts: T.Z.toSpawn,
@@ -78,7 +77,7 @@ test('campanha: o objetivo matar chama o chefe; vida pela rodada da tabela; teto
     o.marcas = [...zb.querySelectorAll('.campMk')].map(e => e.style.left);
     return o;
   });
-  assert.equal(r.on, true); assert.equal(r.round, 11); assert.equal(r.ph, 'round'); assert.equal(r.k, r.k | 0);
+  assert.equal(r.on, true); assert.equal(r.round, 1); assert.equal(r.ph, 'round'); assert.equal(r.k, r.k | 0);
   assert.equal(r.st, 'in'); assert.equal(r.hp, r.esp, 'vida = zHp(10)·(6 + 4·1) (Normal, 1 jogador): 10 450'); assert.equal(r.maxHp, 10450);
   assert.deepEqual(r.caps, [.06, .1, .02, .05, .08], 'tetos que faltavam vêm da base (nunca NaN)'); assert.equal(r.chefe, 1); assert.ok(r.ia, 'IA do chefe registrada');
   assert.equal(r.enc, true, 'na campanha a morte encerra a rodada');
@@ -214,7 +213,7 @@ test('quem entra no meio: cp com o chefe, a fase e o aviso no ar; o cliente mont
     quieto(); const z = CH.z; CH.inv = 0; z.body.pos.set(0, 0, -4); poe(p, 0, 2); p.dwEnd = 1e12;
     T.campChefeAtaca(z, atk('setor'), p); T.sim(.1);
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 6, name: 'Meio' }); T.sim(.05);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Meio' }); T.sim(.05);
     T.sim(.15); const st = c.out.filter(m => m.t === 'state' && m.z).pop(), zs = c.out.filter(m => m.t === 'zs' && m.bo).pop();
     T.srvDrop(c);
     const cp = st?.z?.cp;
@@ -239,7 +238,7 @@ test('morte: evento chefe (objetivo matar), recompensa, lacaios e o resto caem s
   });
   assert.ok(r.vivos >= 3); assert.equal(r.zs, 0, 'todos caíram'); assert.equal(r.ts, 0); assert.equal(r.obj, 'feito', 'objetivo matar feito (campEvento)'); assert.equal(r.ch, null);
   assert.ok(r.drops >= 2); assert.ok(r.tipos.includes('max') && r.tipos.includes('perk'), 'drops garantidos: max e perk'); assert.equal(r.kills, 1, 'só o chefe conta abate');
-  assert.ok(r.ganho >= 500, `recompensa +500 (${r.ganho})`); assert.notEqual(r.ph, 'round', 'a rodada de chefe acabou'); assert.equal(r.cli, null, 'o cliente tira a barra');
+  assert.ok(r.ganho >= 500, `recompensa +500 (${r.ganho})`); assert.notEqual(r.ph, 'round', 'a rodada de chefe acabou'); assert.ok(r.cli == null, 'o cliente tira a barra'); // a etapa seguinte zera o estado do cliente (campCliReset): undefined
   assert.equal(J.erros.length, 0, J.erros.join('\n'));
 });
 

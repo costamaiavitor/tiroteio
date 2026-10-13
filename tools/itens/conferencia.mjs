@@ -151,9 +151,8 @@ async function main() {
   await pg.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: 'domcontentloaded', timeout: 180000 });
   await pg.waitForFunction(() => window.__T && window.__T.MAPS, null, { timeout: 240000 });
   await pg.evaluate(([mapa, camp]) => { const T = window.__T; T.CFG.gfx = 'baixo'; try { T.applyQuality(); } catch { }
-    const ato = mapa === 'sanatorio' ? 2 : 0; // O3-D12: no Sanatório a campanha começa no Ato III (o mapa do Ato I é a Vila)
-    if (camp) T.campLibera?.(Math.max(1, ato), 1); // O3-D10: Ato II liberado no Normal (a partida começa no Ato I do mesmo jeito)
-    T.startHost({ map: mapa, zmap: mapa, mode: 'zombies', rounds: 8, frags: 20, bots: 0, diff: 1, zdiff: 1, ...(camp ? { zmode: 'campanha', ato } : {}) });
+    // objetivos do mapa (13/10): a partida começa na primeira etapa do mapa (Vila: I; Sanatório: III); sem --camp, o clássico de antes
+    T.startHost({ map: mapa, zmap: mapa, mode: 'zombies', rounds: 8, frags: 20, bots: 0, diff: 1, zdiff: 1, zmode: camp ? 'campanha' : 'classico' });
     if (camp && T.ZNOTA) T.ZNOTA.forca = true; }, [MAPA, CAMPF]);
   await pg.waitForFunction(() => !document.getElementById('warmMsg') && window.__T.ZC.world && window.__T.S.players.get('h')?.alive, null, { timeout: 600000, polling: 250 });
   await pg.evaluate(() => { window.__T.sim(.1); });

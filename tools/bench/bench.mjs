@@ -30,7 +30,7 @@ const SEG = +arg('seg', 10), REP = +arg('repetir', 1);
 const SAIDA = arg('saida', 'bench-resultado.json');
 const ZUMBI = new Set(['vila', 'sanatorio']);
 const HORDA = +arg('horda', 0), ZDIFF = +arg('zdiff', 1), ESPERA = +arg('espera', 150), ARMA = arg('arma', 'mp40');
-const GPUHP = +arg('gpuDedicada', 0); // O3-D16: 1 = força a placa dedicada (notebook híbrido; sem isso o Chromium usa a integrada, como no bench-campanha)
+const GPUHP = +arg('gpuDedicada', 0); // O3-D16: 1 = força a placa dedicada (notebook híbrido; sem isso o Chromium usa a integrada)
 const TETO = [20, 24, 28, 30][ZDIFF] ?? 24; // zDf().max de cada dificuldade (ZDIFF do jogo)
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.png': 'image/png', '.jpg': 'image/jpeg', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav' };

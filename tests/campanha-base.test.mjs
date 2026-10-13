@@ -6,8 +6,9 @@
 // recebe o mesmo estado (etapa, objetivos, painel); o motor de objetivos com cada tipo (alvos de TESTE nos interativos, injetados
 // antes da partida); o painel do objetivo e o das peças do Pack-a-Punch não se sobrepõem (375/768/1280 px, Fácil com marcadores);
 // o clássico de antes (window.__semObjetivos, só nos testes) continua sem nada disto.
-// O que saiu (não existe mais): cartões dos atos com cadeado, "Continuar", salvo por dificuldade no menu, kit do ato, checkpoint e
-// "Repetir o Ato", troca de mapa com bagagem, fim da etapa na rodada mínima.
+// O que saiu (não existe mais; o código saiu na limpeza A8): cartões dos atos com cadeado, "Continuar", salvo por dificuldade no menu,
+// st.ato, kit do ato, checkpoint e "Repetir o Ato" (painel #campOver), troca de mapa com bagagem, cenas (#campCena), fim da etapa na
+// rodada mínima e as arenas (forte, forno, galeria7: o lastSt antigo que aponta para elas cai na Vila).
 // Rodar: node --test tests/campanha-base.test.mjs (liga ZV2_OBJ e ZV2_SORTEIO sozinho)
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,7 +32,7 @@ const PREP = `(T => {
     if (T.Z.phase !== 'round') { T.Z.phaseEnd = 0; T.sim(.1); }
     T.Z.toSpawn = 0; T.Z.spawnT = 1e12; for (const z of [...T.Z.zs.values()]) T.zKill(z, p, 'head', 'm1911', false, false); T.Z.zs.clear(); T.sim(.3);
   };
-  const cliente = nome => { const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null }; T.srvOnData(c, { t: 'join', v: 2, pv: 6, name: nome }); return c; };
+  const cliente = nome => { const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null }; T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: nome }); return c; };
   const ultimoCp = c => c.out.filter(m => m.t === 'state' && m.z?.cp).pop()?.z.cp;
   const ativos = () => Object.entries(T.CAMP.obj).filter(([, o]) => o.st === 'ativo').map(([k]) => k).sort();
   return { p, poe, segura, idx, zumbi, obj, forcaTudo, fimRodada, cliente, ultimoCp, ativos };
@@ -84,13 +85,13 @@ test('menu: um modo só (cartões Vila e Sanatório), dificuldade, sem Ato/Campa
     assert.deepEqual(x.mapas, ['sanatorio', 'vila'], `${i}: cartões do zumbi`); assert.equal(x.extra, false, `${i}: linha Modo, atos, Continuar ou recorde`);
     assert.ok(!/campanha|\bato\b|infinito|recorde|conclu[ií]da/i.test(x.txt), `${i}: texto proibido no menu: ${x.txt}`);
     assert.deepEqual(x.difs, ['Fácil', 'Normal', 'Difícil', 'Pesadelo']);
-    for (const o of [x.o2, x.o3, x.o4]) { assert.equal(o.zmode, 'campanha', `${i}: zmode interno`); assert.equal(o.ato, 0); assert.ok(['vila', 'sanatorio'].includes(o.map), `${i}: mapa ${o.map}`); assert.equal(o.map, o.zmap); }
+    for (const o of [x.o2, x.o3, x.o4]) { assert.equal(o.zmode, 'campanha', `${i}: zmode interno`); assert.equal(o.ato, undefined, `${i}: st.ato saiu`); assert.ok(['vila', 'sanatorio'].includes(o.map), `${i}: mapa ${o.map}`); assert.equal(o.map, o.zmap); }
     assert.ok(['vila', 'sanatorio'].includes(x.on), `${i}: nenhum cartão marcado`);
     assert.equal(x.o3.zdiff, 0); assert.equal(x.o4.map, 'sanatorio');
     if (x.o.mode !== 'zombies') assert.ok(!['forte', 'forno', 'galeria7'].includes(x.o.map), `${i}: arena no PvP`);
   }
   assert.equal(r.res[3].o.map, 'sanatorio', 'o mapa salvo continua'); assert.equal(r.res[3].o.zdiff, 3, 'a dificuldade salva continua');
-  assert.deepEqual([r.s1.zmode, r.s1.ato], ['classico', 4]); assert.deepEqual([r.s2.zmode, r.s2.ato], ['campanha', 1]); // saneSt do cliente: só formas válidas
+  assert.equal(r.s1.zmode, 'classico'); assert.equal(r.s2.zmode, 'campanha'); // saneSt do cliente: só formas válidas (o st.ato saiu: o jogo não lê mais)
   // localStorage de verdade: lastSt do infinito na arena, a página recarrega e a partida começa na Vila com os objetivos
   await J.page.evaluate(() => localStorage.setItem('tiroteio.lastSt', JSON.stringify({ map: 'forte', cmap: 'galeria7', zmap: 'forte', mode: 'zombies', zmode: 'infinito', ato: 3, zdiff: 1 })));
   await J.page.reload({ waitUntil: 'load' }); await J.page.waitForFunction(() => window.__T && !document.querySelector('#btnHost').disabled, null, { timeout: 60000 });
@@ -120,8 +121,8 @@ test('Vila: começa como o clássico (rodada 1, pontos, M1911) e a sequência I 
       T.sim(.3);
     } finally { E.fim(); }
     const pn = document.getElementById('campObj');
-    return { ini, passos, fim: { modo: T.CAMP.modo, et: T.CAMP.et, nd: T.Z.nextDog, nb: T.Z.nextBoss, painel: getComputedStyle(pn).display, over: getComputedStyle(document.getElementById('campOver')).display,
-      cena: getComputedStyle(document.getElementById('campCena') || document.body).display, cp: T.zWorldState().cp, ato: T.CAMP.ato },
+    return { ini, passos, fim: { modo: T.CAMP.modo, et: T.CAMP.et, nd: T.Z.nextDog, nb: T.Z.nextBoss, painel: getComputedStyle(pn).display, over: document.getElementById('campOver') ? 'existe' : 'none',
+      cena: document.getElementById('campCena') ? getComputedStyle(document.getElementById('campCena')).display : 'none', cp: T.zWorldState().cp, ato: T.CAMP.ato },
       msgs: E.msgs.filter(m => m.t === 'msg').map(m => m.txt + ' / ' + (m.sub || '')), cenas: E.msgs.filter(m => m.t === 'camp' && ['cena', 'creditos', 'fim', 'over', 'trans'].includes(m.k)).map(m => m.k) };
   }, { ESPIA });
   assert.deepEqual(r.ini.cadeia, ['I', 'II', 'C1']); assert.equal(r.ini.et, 'I');
@@ -198,7 +199,7 @@ test('time caído: fim de jogo do clássico (sem checkpoint, sem Repetir) e a pa
     T.srvStartMatch(); T.sim(.1); segura(); forcaTudo(); fimRodada(); const antes = T.CAMP_ATOS[T.CAMP.et]?.id; // na etapa II
     const E = (new Function('return ' + arg.ESPIA)())(T);
     T.Z.phaseEnd = 0; T.sim(.1); segura(); p.perks = []; p.dwEnd = 0; T.zHurt(p, 1e6, null); T.sim(.2);
-    const over = { ph: T.S.phase, s: Math.round(T.S.phaseEnd - window.__simNow), campOver: T.CAMP.over, txt: document.getElementById('campOver')?.innerText || '', vis: getComputedStyle(document.getElementById('campOver')).display };
+    const over = { ph: T.S.phase, s: Math.round(T.S.phaseEnd - window.__simNow), campOver: !!T.CAMP.over, txt: document.getElementById('campOver')?.innerText || '', vis: document.getElementById('campOver') ? 'existe' : 'none' };
     T.sim(12.3); E.fim();
     return { antes, over, depois: { ph: T.S.phase, zph: T.Z.phase, round: T.Z.round, et: T.CAMP_ATOS[T.CAMP.et]?.id, modo: T.CAMP.modo, lobby: T.S.lobby, money: p.money, alive: p.alive },
       camp: E.msgs.filter(m => m.t === 'camp').map(m => m.k), msgs: E.msgs.filter(m => m.t === 'msg' || m.t === 'zover').map(m => m.t + ':' + (m.txt || '')) };
@@ -245,9 +246,9 @@ test('HUD: painel do objetivo e peças do Pack-a-Punch sem sobreposição (375/7
 
 test('cliente: mensagens antigas (cena, créditos, checkpoint, "concluída") não aparecem; rádio e falas continuam', { timeout: 60000 }, async () => {
   const r = await noJogo(J.page, T => {
-    T.campMsg({ k: 'cena', ids: ['c0-abertura'] }); T.sim(.1); const cena = [!!T.CAMP.c.cena, getComputedStyle(document.getElementById('campCena') || document.body).display];
+    T.campMsg({ k: 'cena', ids: ['c0-abertura'] }); T.sim(.1); const cena = [!!T.CAMP.c.cena, document.getElementById('campCena') ? getComputedStyle(document.getElementById('campCena')).display : 'none'];
     T.campMsg({ k: 'fim', dif: 1 }); T.campMsg({ k: 'over', et: 0, s: 15 }); T.campMsg({ k: 'creditos', s: 30, dif: 1 }); T.sim(.1);
-    const over = getComputedStyle(document.getElementById('campOver')).display, cred = document.getElementById('campCred'), credVis = cred ? getComputedStyle(cred).display : 'none';
+    const over = document.getElementById('campOver') ? 'existe' : 'none', cred = document.getElementById('campCred'), credVis = cred ? getComputedStyle(cred).display : 'none';
     T.CAMP.c.radio = null; T.CAMP.c.radioQ.length = 0; T.campMsg({ k: 'radio', id: 'r1-sino' }); T.sim(.1); const radio = document.getElementById('campRadio'), rd = [radio.style.opacity, radio.innerText];
     T.CAMP.c.radio = null; T.campMsg({ k: 'fala', id: 'cabo-ferido' }); T.sim(.1); const fala = radio.innerText;
     return { cena, over, credVis, center: document.getElementById('center').innerText, radio: rd, esperado: T.CAMP_RADIO_TXT['r1-sino'].txt, fala, falaTxt: T.CAMP_FALA_TXT['cabo-ferido'].txt };

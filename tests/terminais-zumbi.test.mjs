@@ -80,7 +80,7 @@ test('terminal: outro jogador lê e só ele recebe o painel (sendTo); quem entra
   const r = await noJogo(J.page, (T, PREP) => {
     const { L, term, poe, frente } = (new Function('return ' + PREP)())(T), i = term[2];
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 6, name: 'Leitor' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
+    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Leitor' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
     T.sim(1.2); const zi = c.out.find(m => m.t === 'state' && Array.isArray(m.z?.zi))?.z.zi; // o mundo vai no 'state' (zWorldState)
     q.alive = true; q.downed = false; poe(q, ...frente(i)); c.out.length = 0; T.zintLoreFecha(false);
     T.srvOnData(c, { t: 'use', k: 'zint', id: i });

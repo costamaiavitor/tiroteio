@@ -39,7 +39,7 @@ test('Sanatório: a sequência termina no V; as 3 cargas estão no mapa, sem "Se
     o.fugaZona = [T.ZD.zoneAt(T.CAMP_V.fuga.zona.x, T.CAMP_V.fuga.zona.z), T.CAMP_OBJ['F.2'].zona === T.CAMP_V.fuga.zona, T.CAMP_OBJ['F.2'].alvo];
     o.radio = ['r5s-inicio', 'r5s-cargas', 'r5s-fuga'].map(id => /gaiola|galeria/i.test(T.CAMP_RADIO_TXT[id]?.txt ?? 'gaiola'));
     o.textos = [T.CAMP_OBJ['V.1'].titulo, T.CAMP_OBJ['V.2'].titulo, T.CAMP_OBJ['F.1'].titulo, T.CAMP_OBJ['F.2'].titulo].join(' | ');
-    o.arena = [T.gal7Estado().anim, T.drArena?.() ?? false];
+    o.arena = ['galeria7' in T.MAPS || typeof T.gal7Estado !== 'undefined' || typeof T.GAL7 !== 'undefined', typeof T.drArena !== 'undefined']; // a arena saiu do jogo (limpeza A8)
     return o;
   }, { CARGAS });
   assert.deepEqual(r.cadeia, ['III', 'IV', 'C2', 'V']); assert.equal(r.mapaV, 'sanatorio'); assert.equal(r.et, 'III');
@@ -66,7 +66,7 @@ test('V.1 (cargas, segurar F) -> V.2 (a rodada da Névoa) -> F.1: o Diretor entr
     o.v = [ob('V.1'), ob('V.2'), ob('F.1')];
     fim(); o.r2 = [T.CAMP_VS.v2 === T.Z.round, T.Z.phase, T.CAMP_EVS.id, ob('V.2')]; T.sim(1); o.v2p = T.campEstado().obj['V.2'].p;
     fim(); o.r3 = [ob('V.2'), ob('F.1')]; T.sim(.6);
-    const z = CH.z; o.dr = [z?.kind, CH.campo, T.DRSRV.modo, CH.tag ?? null, T.drProtecao(), T.ZKIND[16].sz, z ? Math.round(Math.hypot(z.body.pos.x - p.pos[0], z.body.pos.z - p.pos[2])) : -1, z?.body.pos.y];
+    const z = CH.z; o.dr = [z?.kind, CH.campo, T.DRSRV.modo ?? 'chao', CH.tag ?? null, T.drProtecao?.() ?? 1, T.ZKIND[16].sz, z ? Math.round(Math.hypot(z.body.pos.x - p.pos[0], z.body.pos.z - p.pos[2])) : -1, z?.body.pos.y];
     o.cli = [T.CAMP.c.ch?.k, T.CAMP.c.ch?.f];
     return o;
   }, { CARGAS });
@@ -83,7 +83,7 @@ test('V.1 (cargas, segurar F) -> V.2 (a rodada da Névoa) -> F.1: o Diretor entr
 test('Diretor de campo: dose, onda, abraço (o tiro no cano solta) e chamada; sem maré nem corrente; fases 2 e 3 sem mergulho; coro', { timeout: 180000 }, async () => {
   const r = await rodar((T, arg, H) => {
     const { p, CH, agora, poe, quieto, atk, limpa, tel, chao } = H; quieto(); limpa(); T.campEvDesliga(); /* sem o evento da agenda da rodada (o Apagão da 3 no Sanatório apagaria as luzes: aqui se mede o Diretor) */ chao(18, 4); const z = CH.z; p.dwEnd = 0; p.hp = p.maxHp = 1000; p.perks = []; p.crouch = 0; p.zkDose = null; T.CAMP.c.tel = [];
-    const o = { semCampo: ['mare', 'corrente'].map(id => [atk(id).campo, !!atk(id).ok?.()]) };
+    const o = { semCampo: ['mare', 'corrente'].map(id => [atk(id) ? atk(id).campo : 0, !!atk(id)?.ok?.()]) }; // os ataques da arena saíram do Diretor
     // dose: 3 seringas em leque; 20 + 1 dose do Enfermeiro, nada no aviso
     poe(p, 18, -3); z.yaw = 0; const h0 = p.hp; T.campChefeAtaca(z, atk('dose'), p); T.sim(1 / 60); o.td = [tel().s, tel().f, tel().p.length];
     T.sim(.55); o.dAntes = h0 - p.hp; T.sim(1.2); o.dose = h0 - p.hp; o.doses = (p.zkDose || []).filter(t => t > agora()).length; limpa(); T.sim(1);
@@ -97,8 +97,8 @@ test('Diretor de campo: dose, onda, abraço (o tiro no cano solta) e chamada; se
     o.lac = [lac.length, lac.filter(x => x.kind === 10).length]; for (const x of lac) T.Z.zs.delete(x.id); limpa();
     // fase 2: sem tanques (dano cheio), sem mergulho, tamanho 2,2; lacaios comuns (os Afogados eram da água da arena)
     poe(p, 18, -4); p.dwEnd = 1e12; CH.inv = 0; z.hp = z.maxHp; const h = z.hp, g = Math.round(z.maxHp * .05); T.zHit(p, z.id, g, 'body', 'm1911', false); o.semProt = [h - z.hp, g]; // 5% da vida: abaixo do limite da fase
-    CH.inv = 0; z.hp = z.maxHp * .71; T.zHit(p, z.id, 5000, 'body', 'm1911', false); T.sim(.1); o.f2 = [CH.fase, T.DRSRV.modo, T.ZKIND[16].sz, +z.body.pos.y.toFixed(2)];
-    T.DRSRV.nadaT = agora(); T.sim(.5); o.semNado = T.DRSRV.modo;
+    CH.inv = 0; z.hp = z.maxHp * .71; T.zHit(p, z.id, 5000, 'body', 'm1911', false); T.sim(.1); o.f2 = [CH.fase, T.DRSRV.modo ?? 'chao', T.ZKIND[16].sz, +z.body.pos.y.toFixed(2)];
+    T.sim(.5); o.semNado = T.DRSRV.modo ?? 'chao'; // o mergulho entre os poços saiu com a arena
     T.campChefeLacaios(CH.def.lacaios); const af = [...T.Z.zs.values()].filter(x => x.lac); o.lacF2 = [af.length, af.every(x => x.kind === 0)]; for (const x of af) T.Z.zs.delete(x.id);
     // fase 3: 2 Pregadores perto, coro cura 3%; nada de apagão nem das junções fora da arena
     CH.inv = 0; z.hp = z.maxHp * .36; T.zHit(p, z.id, 5000, 'body', 'm1911', false); T.sim(.2);
@@ -120,14 +120,13 @@ test('Diretor de campo: dose, onda, abraço (o tiro no cano solta) e chamada; se
 test('morte do Diretor: fuga na hora (sem cena), Estouro sem fim, quem entra no meio; segurar a zona da Portaria; fim -> rodadas infinitas', { timeout: 600000 }, async () => {
   const r = await rodar((T, arg, H) => {
     const { p, CH, poe, fim, ob, agora, limpa } = H; p.dwEnd = 1e12; limpa(); T.Z.spawnT = agora();
-    const salvo0 = JSON.stringify(T.campSalvo());
     const z = CH.z; z.hp = 10; CH.inv = 0; CH.fase = CH.def.fases.length - 1; T.zHit(p, z.id, 100, 'body', 'm1911', false); T.sim(.1);
-    const o = { morte: [CH.z, ob('F.1'), ob('F.2'), T.CAMP_VS.fase, T.CAMP_EVS.id, T.CAMP_EVS.fuga, T.Z.phase, T.Z.toSpawn > 0, T.CAMP.c.cena] };
+    const o = { morte: [CH.z, ob('F.1'), ob('F.2'), T.CAMP_VS.fase, T.CAMP_EVS.id, T.CAMP_EVS.fuga, T.Z.phase, T.Z.toSpawn > 0, T.CAMP.c.cena ?? null] };
     // quem entra no meio na fuga
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 6, name: 'Meio' }); T.sim(.2);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Meio' }); T.sim(.2);
     const st = c.out.filter(m => m.t === 'state' && m.z).pop(), cp = st?.z?.cp;
-    o.meio = [cp?.ob?.find(x => x[0] === 'F.2')?.[1], cp?.ev?.[0], cp?.fg?.[0]];
+    o.meio = [cp?.ob?.find(x => x[0] === 'F.2')?.[1], cp?.ev?.[0]];
     T.srvDrop(c); T.sim(.2);
     // a zona: segurar o embarque (quem sai recomeça)
     const Zn = T.CAMP_V.fuga.zona, O = () => T.campEstado().obj['F.2'];
@@ -136,7 +135,7 @@ test('morte do Diretor: fuga na hora (sem cena), Estouro sem fim, quem entra no 
     poe(p, Zn.x, Zn.z); for (let k = 0; k < 120 && ob('F.2') !== 'feito'; k++) T.sim(.1);
     o.fugiu = [ob('F.2'), T.CAMP_VS.fase, T.Z.zs.size, T.Z.toSpawn, T.CAMP_EVS.id];
     T.sim(.6);
-    o.fim = [T.CAMP.modo, T.CAMP.et, T.Z.phase, T.S.phase, T.CAMP.over, !!T.CAMP.fim, T.CAMP_VC.cred, !!document.getElementById('campCred'), T.CAMP.c.cena, JSON.stringify(T.campSalvo()) === salvo0];
+    o.fim = [T.CAMP.modo, T.CAMP.et, T.Z.phase, T.S.phase, !!document.getElementById('campCred'), !!document.getElementById('campCena'), localStorage.getItem('tiroteio.campanha')];
     o.tela = document.body.innerText.includes('OBJETIVOS CONCLUÍDOS');
     const hud = document.getElementById('campHud'); o.hudTxt = hud ? hud.innerText : '';
     // rodadas infinitas: a escalada (zInfRodada) e os chefes de campo continuam do jeito do infinito
@@ -144,10 +143,10 @@ test('morte do Diretor: fuga na hora (sem cena), Estouro sem fim, quem entra no 
     return o;
   });
   assert.deepEqual(r.morte, [null, 'feito', 'ativo', 'fuga', 'estouro', true, 'round', true, null], 'fuga na hora ' + JSON.stringify(r.morte));
-  assert.deepEqual(r.meio, ['ativo', 'estouro', 'fuga'], 'quem entra no meio recebe o F.2 e o Estouro da fuga');
+  assert.deepEqual(r.meio, ['ativo', 'estouro'], 'quem entra no meio recebe o F.2 e o Estouro da fuga');
   assert.ok(r.meia > .3 && r.meia < .7, 'metade do embarque ' + r.meia); assert.deepEqual(r.saiu, [0, 'ativo'], 'quem sai da zona recomeça');
   assert.deepEqual(r.fugiu, ['feito', 'fim', 0, 0, null], 'fugiram: os zumbis caem, o Estouro acaba');
-  assert.deepEqual(r.fim, ['infinito', -1, 'break', 'zombies', false, false, null, false, null, true], 'rodadas infinitas, sem créditos, cena nem salvo ' + JSON.stringify(r.fim));
+  assert.deepEqual(r.fim, ['infinito', -1, 'break', 'zombies', false, false, null], 'rodadas infinitas, sem créditos, cena nem salvo ' + JSON.stringify(r.fim));
   assert.ok(r.tela, 'OBJETIVOS CONCLUÍDOS na tela'); assert.doesNotMatch(r.hudTxt, /campanha|\bato\b/i);
   assert.deepEqual(r.inf, [true, 'round', 'infinito', true]); assert.deepEqual(J.erros, []);
 });
@@ -164,7 +163,7 @@ test('depois dos objetivos: estreias dos tipos, legenda do rádio, chefe de camp
     z.hp = 1; T.CAMP_CH.inv = 0; T.CAMP_CH.fase = T.CAMP_CH.def.fases.length - 1; T.zHit(p, z.id, 50, 'body', 'm1911', false); T.sim(.5); o.morto = [T.CAMP_CH.z, T.Z.phase];
     T.sim(Math.max(0, T.Z.phaseEnd - window.__simNow) + .2); T.Z.round = 29; fim(); o.r30 = T.Z.round; T.sim(5.5); o.foguista = [T.CAMP_CH.z?.kind, T.CAMP_CH.campo];
     for (const x of [...T.Z.zs.values()]) T.zKill(x, null, 'body', 'nuke', false, true); T.campChefeLimpa?.();
-    { T.Z.round = 40; T.Z.phase = 'round'; T.Z.toSpawn = Math.max(T.Z.toSpawn, 3); const d = T.campChefeNasce(16, { campo: 1, rodada: 40 }); T.CAMP_CH.prox = 0; T.sim(8); o.diretor = [d?.kind, T.CAMP_CH.campo, T.DRSRV.modo, !!T.CAMP_CH.z]; for (const x of [...T.Z.zs.values()]) T.zKill(x, null, 'body', 'nuke', false, true); }
+    { T.Z.round = 40; T.Z.phase = 'round'; T.Z.toSpawn = Math.max(T.Z.toSpawn, 3); const d = T.campChefeNasce(16, { campo: 1, rodada: 40 }); T.CAMP_CH.prox = 0; T.sim(8); o.diretor = [d?.kind, T.CAMP_CH.campo, T.DRSRV.modo ?? 'chao', !!T.CAMP_CH.z]; for (const x of [...T.Z.zs.values()]) T.zKill(x, null, 'body', 'nuke', false, true); }
     o.rod = [20, 30, 40, 50, 60, 70, 80, 25].map(r => { const c = T.campInfChefeDe(r); return c ? [c.k, c.vidaK] : null; });
     return o;
   });

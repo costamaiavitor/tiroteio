@@ -16,8 +16,8 @@ before(async () => {
   await J.page.evaluate(() => { // campanha no Ato III (Sanatório), sem objetivos, eventos nem agenda (só o que cada teste monta)
     const T = window.__T; for (const A of T.CAMP_ATOS) { A.rodMin = 99; if (A.mapa === 'sanatorio') { A.objs = []; A.ini = []; } }
     if (T.CAMP_AGENDA) for (let r = 1; r <= 30; r++) delete T.CAMP_AGENDA[r];
-    T.campLibera(2, 1); T.S.st = { ...T.S.st, zmode: 'campanha', ato: 2 }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1);
-    T.Z.phaseEnd = window.__simNow; T.sim(.2); T.Z.spawnT = 1e12; T.Z.toSpawn = 0; T.CAMP.c.cena = null; T.CAMP.c.radioQ.length = 0;
+    T.S.st = { ...T.S.st, zmode: 'campanha' }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1); // objetivos do mapa: o Sanatório começa na etapa III
+    T.Z.phaseEnd = window.__simNow; T.sim(.2); T.Z.spawnT = 1e12; T.Z.toSpawn = 0; T.CAMP.c.radioQ.length = 0;
   });
 }, { timeout: 240000 });
 after(async () => { await J?.fechar(); });

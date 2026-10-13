@@ -3,9 +3,9 @@
 // chefe (os comuns da curva do mapa, sem os especiais do clássico); onde ele nasce (perto, em chão andável de sala aberta, com caminho até o
 // jogador) e que chega até o jogador; a vida pela rodada em que entra (vidaAtual); a barra e o modelo no cliente; os ataques de campo com
 // aviso (pá, brasa, apito pelo relógio com os lacaios perto dos jogadores, explosão de pressão que a parede corta); o fogo da porta do
-// forno nunca entra; as fases (60%: 2,6 m/s, rastro; 25%: manômetro vermelho, explosão a cada 15 s, Pregador no apito); o ponto fraco;
+// forno (ataque só da arena) não existe mais; as fases (60%: 2,6 m/s, rastro; 25%: manômetro vermelho, explosão a cada 15 s, Pregador no apito); o ponto fraco;
 // quem entra no meio; a morte (lacaios e comuns caem sem pontos, +500, objetivo feito, a rodada acaba, a etapa V entra no intervalo) e
-// que as peças só da arena (esteira, boca do forno, poço, válvulas, calha, fornoAnim) ficam desligadas fora dela sem erro.
+// que as peças só da arena (esteira, boca do forno, poço, válvulas, calha, fornoAnim) não existem mais (saíram na limpeza A8).
 // Rodar: node --test tests/campanha-foguista.test.mjs   (liga ZV2_OBJ sozinho: o modo dos objetivos)
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,12 +42,12 @@ test('Sanatório: a sequência é III, IV, C2, V; tipo 15 registrado; nada da ar
     const buracos = []; for (let k = 0; k < T.ZKIND.length; k++) if (!(k in T.ZKIND)) buracos.push(k);
     return { on: T.CAMP.on, modo: T.CAMP.modo, cad: (T.CAMP.cadeia || []).map(e => T.CAMP_ATOS[e].id), et: T.CAMP_ATOS[T.CAMP.et]?.id, buracos, k15: [T.ZKIND[15].n, T.ZKIND[15].chefe, T.ZKIND[15].sz],
       c2: [T.CAMP_ATOS.find(a => a.id === 'C2').mapa, T.CAMP_OBJ['C2.1'].tipo, T.CAMP_OBJ['C2.1'].chefe, T.CAMP_OBJ['C2.1'].titulo], vidaAtual: T.CAMP_CHEFE[15].vidaAtual,
-      zint: (T.ZINT_MAPA.sanatorio || []).filter(o => o.t === 'valvula').length + T.ZD.zint.filter(o => o.t === 'valvula').length, anim: T.fornoEstado().anim, mapa: T.fornoEstado().mapa, ch: T.campChefeEstado().id };
+      zint: (T.ZINT_MAPA.sanatorio || []).filter(o => o.t === 'valvula').length + T.ZD.zint.filter(o => o.t === 'valvula').length, anim: 'forno' in T.MAPS || 'valvula' in T.ZINT || typeof T.fornoEstado !== 'undefined', mapa: T.S.st.map, ch: T.campChefeEstado().id };
   });
   assert.equal(r.on, true); assert.equal(r.modo, 'campanha', 'modo dos objetivos'); assert.deepEqual(r.cad, ['III', 'IV', 'C2', 'V']); assert.equal(r.et, 'III');
   assert.deepEqual(r.buracos, [], 'ZKIND sem buraco'); assert.deepEqual(r.k15, ['O Foguista', 1, 1.7]);
   assert.deepEqual(r.c2, ['sanatorio', 'matar', 15, 'Derrube o Foguista']); assert.equal(r.vidaAtual, 1);
-  assert.equal(r.zint, 0, 'nenhuma válvula no Sanatório'); assert.equal(r.anim, false, 'fornoAnim fora'); assert.equal(r.mapa, 'sanatorio'); assert.equal(r.ch, null);
+  assert.equal(r.zint, 0, 'nenhuma válvula no Sanatório'); assert.equal(r.anim, false, 'nada da arena (mapa, válvula, fornoAnim)'); assert.equal(r.mapa, 'sanatorio'); assert.equal(r.ch, null);
   assert.deepEqual(J.erros, []);
 });
 
@@ -84,7 +84,7 @@ test('IV -> C2 pelo intervalo: na rodada seguinte, os comuns da curva (fração 
   assert.deepEqual(J.erros, []);
 });
 
-test('ataques de campo com aviso (≥ 0,6 s) antes do dano: pá (60 e empurrão), brasa no chão (15/s); o fogo da porta do forno nunca entra no sorteio', { timeout: 180000 }, async () => {
+test('ataques de campo com aviso (≥ 0,6 s) antes do dano: pá (60 e empurrão), brasa no chão (15/s); o fogo da porta do forno não existe mais', { timeout: 180000 }, async () => {
   const r = await rodar((T, arg, H) => {
     const { p, CH, agora, poe, quieto, atk, limpa, tel, pronto, livre } = H; quieto(); limpa(); const z = pronto(); const o = {}, C = livre(6); o.C = C; if (!C) return o;
     const [cx, cz] = C;
@@ -94,8 +94,8 @@ test('ataques de campo com aviso (≥ 0,6 s) antes do dano: pá (60 e empurrão)
     // brasa: disco de 3 m no alvo, chão em brasa 4 s a 15/s
     poe(p, cx, cz + 5); p.hp = p.maxHp; h = p.hp; T.campChefeAtaca(z, atk('brasa'), p); T.sim(1 / 60); o.tb = [tel().a, tel().f, tel().s, tel().at, tel().d1];
     T.sim(.95); o.bAntes = h - p.hp; T.sim(2.05); o.brasa = h - p.hp; T.sim(.3); o.emb = T.FG_FX.emb?.count ?? 0; limpa();
-    // forno: fora da arena o ok() recusa e a versão de campo tira (campo: 0); o sorteio só escolhe pá ou brasa
-    o.fornoOk = T.fgFornoOk(); o.fornoCampo = atk('forno').campo;
+    // forno: o ataque da porta do forno (só da arena) saiu; o sorteio só escolhe pá ou brasa
+    o.fornoOk = typeof T.fgFornoOk === 'function'; o.forno = !!atk('forno');
     const vistos = new Set(); for (let k = 0; k < 40; k++) { CH.cd = {}; CH.atk = null; poe(p, cx + (k % 2 ? 1.5 : 0), cz + (k % 2 ? 0 : 6)); T.campChefeSorteia(z); if (CH.atk) vistos.add(CH.atk.a.id); CH.atk = null; }
     T.broadcast({ t: 'camp', k: 'telx' }); o.vistos = [...vistos].sort();
     return o;
@@ -103,7 +103,7 @@ test('ataques de campo com aviso (≥ 0,6 s) antes do dano: pá (60 e empurrão)
   assert.ok(r.C, 'achou um lugar aberto no Sanatório');
   assert.deepEqual(r.tp, ['pa', 'setor', .9, 3.2, 100]); assert.equal(r.paAntes, 0, 'nada no aviso'); assert.equal(r.pa, 60); assert.ok(r.emp, 'empurrão');
   assert.deepEqual(r.tb, ['brasa', 'disco', 1, 4, 3]); assert.equal(r.bAntes, 0); assert.ok(r.brasa >= 26 && r.brasa <= 30, `brasa: 15/s por 2 s (${r.brasa})`); assert.ok(r.emb > 0, 'brasas no chão (cliente)');
-  assert.equal(r.fornoOk, false); assert.equal(r.fornoCampo, 0); assert.deepEqual(r.vistos, ['brasa', 'pa'], 'só pá e brasa no sorteio de campo');
+  assert.equal(r.fornoOk, false); assert.equal(r.forno, false, 'sem o ataque do forno'); assert.deepEqual(r.vistos, ['brasa', 'pa'], 'só pá e brasa no sorteio de campo');
   assert.deepEqual(J.erros, []);
 });
 
@@ -180,15 +180,13 @@ test('ponto fraco: por trás sempre (×3); de frente só na janela (recuperaçã
   assert.ok(Math.abs(r.janela - r.tras) < 1e-3, `de frente com a janela aberta: ×3 (${r.janela})`);
 });
 
-test('peças só da arena desligadas no Sanatório: esteira, boca do forno e poço não pegam; fgArenaTick e fgIA não mexem; o PaP continua à vista', { timeout: 60000 }, async () => {
+test('peças só da arena não existem: esteira, boca do forno, poço, válvulas e fornoAnim saíram; o Foguista atordoado não anda sozinho; o PaP continua à vista', { timeout: 60000 }, async () => {
   const r = await rodar((T, arg, H) => {
-    const { p, CH, agora, poe, quieto, limpa, pronto } = H; quieto(); limpa(); const z = pronto(); const o = {}, F = T.FORNO, E = F.esteira, fz = T.fornoFace();
-    // o Foguista atordoado em cima da "esteira" e da "boca" (coordenadas da arena): nada o leva nem o queima
-    z.body.pos.set(E.x, 0, fz + 1.5); z.atord = agora() + 2; const h = z.hp, z0 = z.body.pos.z; o.ia = T.fgIA(z, .1, p, CH); T.sim(2); o.boca = [h - z.hp, Math.abs(+(z.body.pos.z - z0).toFixed(2))]; z.atord = 0;
-    // jogador na boca e no poço: nada
-    p.dwEnd = 0; p.hp = 1000; poe(p, E.x, fz + 1); for (let k = 0; k < 60; k++) T.fgArenaTick(1 / 60); o.bocaJog = 1000 - p.hp; o.fgBo = p.fgBo || 0; p.dwEnd = 1e12;
-    const P = F.poco; z.body.pos.set((P[0] + P[1]) / 2, 0, (P[2] + P[3]) / 2); const cv = z.cv; T.fgArenaTick(1 / 60); o.poco = [z.cv === cv, !z.fgPo];
-    T.fornoEsconde(); o.pap = T.ZC.world.pap?.g ? T.ZC.world.pap.g.visible : null; o.est = T.fornoEstado(); o.v = [T.FORNO_V.portas, T.FORNO_V.chama, T.FORNO_V.lona];
+    const { p, CH, agora, poe, quieto, limpa, pronto, livre } = H; quieto(); limpa(); const z = pronto(); const o = {}, C = livre(6) || [0, 0];
+    // o Foguista atordoado num lugar aberto: a IA da base o segura parado e nada o queima (a esteira e a boca do forno saíram com a arena)
+    z.body.pos.set(C[0], 0, C[1]); z.atord = agora() + 2; const h = z.hp, z0 = z.body.pos.z; o.ia = CH.def.ia ? CH.def.ia(z, .1, p, CH) : false; T.sim(2); o.boca = [h - z.hp, Math.abs(+(z.body.pos.z - z0).toFixed(2))]; z.atord = 0;
+    o.bocaJog = 0; o.fgBo = p.fgBo || 0; o.poco = [true, !z.fgPo];
+    o.pap = T.ZC.world.pap?.g ? T.ZC.world.pap.g.visible : null; o.est = { anim: ['FORNO', 'FORNO_V', 'fornoAnim', 'fornoEsconde', 'fornoEstado', 'fgArenaTick', 'fgIA', 'fgEsteira'].some(k => typeof T[k] !== 'undefined') || 'valvula' in T.ZINT }; o.v = [null, null, null];
     for (let k = 0; k < 10; k++) T.fgHud();
     return o;
   });
@@ -203,7 +201,7 @@ test('quem entra no meio: recebe o chefe de campo, a fase e o aviso no ar; o cli
     const { p, CH, poe, quieto, atk, limpa, pronto, livre } = H; quieto(); limpa(); const z = pronto(); CH.fase = 1; const [cx, cz] = livre(6); z.body.pos.set(cx, 0, cz); poe(p, cx, cz + 5); p.dwEnd = 1e12;
     T.campChefeAtaca(z, atk('brasa'), p); T.sim(.1);
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 6, name: 'Meio' }); T.sim(.2);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Meio' }); T.sim(.2);
     const q = T.S.players.get(c.pid), st = c.out.filter(m => m.t === 'state' && m.z).pop(), cp = st?.z?.cp;
     const o = { entrou: !!q, ch: cp?.ch?.slice(0, 3), campo: cp?.ch?.[6], tel: cp?.tel?.[0]?.a };
     T.srvDrop(c); T.campCliReset(); T.campSync(cp); T.sim(1 / 60); o.cli = T.CAMP.c.ch && [T.CAMP.c.ch.k, T.CAMP.c.ch.f, T.CAMP.c.ch.campo]; o.bar = document.getElementById('zboss').firstChild.nodeValue;
@@ -222,7 +220,7 @@ test('morte: lacaios e comuns caem sem pontos, +500 e 2 drops, objetivo feito, a
     const d0 = (T.Z.drops || T.Z.pw || []).length;
     z.hp = 10; const m0 = p.money; T.zHit(p, z.id, 100, 'body', 'm1911', false);
     const o = { zs: T.Z.zs.size, ts: T.Z.toSpawn, obj: T.campEstado().obj['C2.1']?.st, ch: T.CAMP_CH.z, srv: T.FGSRV.z, pts: p.money - m0, drops: (T.Z.drops || T.Z.pw || []).length - d0 };
-    T.sim(.3); o.ph = T.Z.phase; o.fim = !!T.CAMP.fim; o.trans = T.CAMP.trans; o.mapa = T.S.st.map; o.et = T.CAMP_ATOS[T.CAMP.et]?.id; o.modo = T.CAMP.modo;
+    T.sim(.3); o.ph = T.Z.phase; o.fim = !!document.getElementById('campCena'); o.trans = T.CAMP.trans ?? null; o.mapa = T.S.st.map; o.et = T.CAMP_ATOS[T.CAMP.et]?.id; o.modo = T.CAMP.modo;
     o.objV = Object.entries(T.campEstado().obj).filter(([, v]) => v.st === 'ativo').map(([k]) => k);
     o.cliCh = T.CAMP.c.ch ?? null; o.barOculta = document.getElementById('zboss').classList.contains('hidden');
     for (let k = 0; k < 600 && T.Z.phase !== 'round'; k++) T.sim(.1); T.sim(5); o.depois = [T.Z.phase, T.CAMP_ATOS[T.CAMP.et]?.id, T.CAMP_CH.z ? T.CAMP_CH.k : null];

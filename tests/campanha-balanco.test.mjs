@@ -133,7 +133,7 @@ test('partida de verdade na Vila (relógio do jogo, zumbis morrendo, uma etapa p
       for (let i = 0; i < 30; i++) {
         T.sim(1 / 30); t += 1 / 30; p.hp = p.maxHp; p.alive = true; p.downed = false;
         if (Z.phase === 'round') for (const z of [...Z.zs.values()]) {
-          if (z.st !== 'rise' && !(z.body.pos.y < -.5) && !z.sub) T.zHit(p, z.id, 1e9, 'body', 'm1911', false);
+          if (z.st !== 'rise' && !(z.body.pos.y < -.5) && !z.sub) T.zHit(p, z.id, 1e9, 'body', T.CAMP_EVS.id === 'silencio' ? 'knife' : 'm1911', false); // A8: na Hora do Silêncio (sorteada no infinito) só a faca fere
           else if (agora() - z.t0 > 25) { Z.zs.delete(z.id); T.broadcast({ t: 'zgone', id: z.id }); } // submerso ou preso no chão: some (o robô não chega na água)
         }
       }

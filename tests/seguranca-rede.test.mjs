@@ -12,7 +12,7 @@ after(async () => { await J?.fechar(); });
 const instalar = () => J.page.evaluate(() => {
   const T = window.__T;
   window.__conn = () => ({ open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; this.fechada = true; }, peerConnection: null });
-  window.__entrar = (name, extra = {}) => { const c = __conn(); T.srvOnData(c, { t: 'join', v: 2, pv: 6, name, ...extra }); return c; }; // pv: versão do protocolo (PROTO)
+  window.__entrar = (name, extra = {}) => { const c = __conn(); T.srvOnData(c, { t: 'join', v: 2, pv: 7, name, ...extra }); return c; }; // pv: versão do protocolo (PROTO)
   // zumbi à vista: a 2,5 m do jogador numa direção sem parede (tenta 8 direções)
   window.__zumbiPerto = (p, z) => {
     const V3 = T.camera.position.constructor, eye = new V3(p.pos[0], p.pos[1] + 1.62, p.pos[2]);
@@ -45,7 +45,7 @@ test('V05 join: jogador entra, recebe welcome; nome repetido vira "Nome (2)"; no
 });
 
 test('V05 ping: sem join não recebe pong; com join recebe', async () => {
-  const r = await noJogo(J.page, T => { const c = __conn(); T.srvOnData(c, { t: 'ping', c: 5 }); const antes = c.out.length; T.srvOnData(c, { t: 'join', v: 2, pv: 6, name: 'Ping' }); T.srvOnData(c, { t: 'ping', c: 5 }); return { antes, depois: c.out.filter(m => m.t === 'pong').length }; });
+  const r = await noJogo(J.page, T => { const c = __conn(); T.srvOnData(c, { t: 'ping', c: 5 }); const antes = c.out.length; T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Ping' }); T.srvOnData(c, { t: 'ping', c: 5 }); return { antes, depois: c.out.filter(m => m.t === 'pong').length }; });
   assert.equal(r.antes, 0); assert.equal(r.depois, 1);
 });
 
