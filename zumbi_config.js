@@ -52,6 +52,8 @@ export const ZBAL = {
   armas: {
     coice: { m1911: .8, cz75: .8, fiveseven: .7, b23r: .8, c96: 1.1, python: 1.6, olympia: 1.8, m14: 1.3, spas: 1.6, fal: 1.3, hk21: .8, rpk: .8, commando: .9,
       dragunov: 1.6, chinalake: 1.8, ppsh: .8, thompson: 1.1, spectre: .9, kiparis: .85, uzi: .9 },
+    // decisões do dono (13/10): valores da arma no modo zumbi que trocam os da tabela ZWEAP (o PaP é calculado a partir daqui)
+    ajuste: { kar98k: { dmg: 600 }, m16: { rate: .22 } },
   },
   // Etapa 9: Pack-a-Punch com 3 níveis. custo[n] = preço para ir do nível n ao n+1; niveis[1] e [2] = bônus do nível 2 e 3 sobre o nível 1
   pap: {

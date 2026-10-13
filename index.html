@@ -690,14 +690,14 @@ const ZWEAP = {
   raygun:     { name: 'Ray Gun', box: 4, wonder: 1, dmg: 1000, rate: .3, mag: 20, res: 160, reload: 2.7, spread: .008, head: 1, rm: 1, splash: { r: 2.2, dmg: 300, self: 25 }, tracer: 0x33ff55, model: 'raygun', snd: 'ray', papName: "Porter's X2 Ray Gun", papMag: 40, papRes: 200, papTracer: 0xff3355 }, // zv2-A10: PaP 40/200 como no CoD (a regra 1,5x dava 30/240); rm 1: raio sem queda de dano com a distância, como Mark II e Wunderwaffe
   thundergun: { name: 'Arma Trovão', box: 1.5, wonder: 1, thunder: 1, dmg: 0, rate: 1, mag: 2, res: 12, reload: 3.2, spread: 0, model: 'thunder', snd: 'thunder', papName: 'Canhão de Zeus', papMag: 4, papRes: 24 },
 };
-for (const [id, w] of Object.entries(ZWEAP)) {
+for (const [id, w0] of Object.entries(ZWEAP)) { const w = { ...w0, ...ZBAL.armas.ajuste?.[id] }; // ajuste por arma do zumbi_config.js (Kar98k, M16)
   const base = { slot: 'primary', speed: 1, move: .03, air: .12, rm: .95, pen: 1, zw: 1, ...w };
   W[id] = base;
   W[id + '_pap'] = { ...base, name: w.papName, pap: 1, base: id, dmg: w.dmg * 2, mag: w.papMag ?? Math.round(w.mag * 1.5), res: w.papRes ?? Math.round(w.res * 1.5), reload: w.reload * .9, ...(w.shellTime ? { shellTime: w.shellTime * .9 } : null) /* zumbi-v2 (Etapa 2): escopeta com PaP também recarrega 10% mais rápido */,
     splash: w.papSplash ?? (w.splash && { r: w.splash.r * 1.2, dmg: w.splash.dmg * 2, self: w.splash.self }), tracer: w.papTracer ?? w.tracer ?? 0xb070ff,
     chain: w.papChain ?? w.chain, frost: w.papFrost ?? w.frost };
   for (let n = 2; n <= 3; n++) { const B = W[id + '_pap'], L = ZBAL.pap.niveis[n - 1]; // zumbi-v2 (Etapa 9): Pack-a-Punch níveis 2 e 3 (mais dano, munição e cadência; traçante próprio)
-    W[id + '_pap' + n] = { ...B, name: `${w.papName} ${L.sufixo}`, pap: n, dmg: B.dmg * L.dano, mag: w.model === 'dbarrel' ? B.mag : Math.round(B.mag * L.pente) /* zv2-R2: dois canos, sempre 2 */, res: Math.round(B.res * L.pente), rate: B.rate * L.cadencia, brate: B.brate && B.brate * L.cadencia, tracer: L.tracer,
+    W[id + '_pap' + n] = { ...B, name: `${w.papName} ${L.sufixo}`, pap: n, dmg: B.dmg * L.dano, mag: w.model === 'dbarrel' ? B.mag : Math.round(B.mag * L.pente) /* zv2-R2: dois canos, sempre 2 */, res: Math.round(B.res * L.pente), rate: B.rate * L.cadencia, brate: B.brate && B.brate * L.cadencia, tracer: w.wonder ? B.tracer : L.tracer /* arma maravilha mantém o traçante do PaP dela */,
       splash: B.splash && { ...B.splash, dmg: B.splash.dmg * L.dano } }; }
 }
 const PAP_IDS = b => [b + '_pap3', b + '_pap2', b + '_pap']; // zumbi-v2 (Etapa 9): versões melhoradas de uma arma, da mais forte à mais fraca
