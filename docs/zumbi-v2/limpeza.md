@@ -6,8 +6,16 @@ Critério para apagar: o nome não aparece em mais nenhum lugar do `index.html`,
 |---|---|---|
 | Minimapa do modo Zumbi (Etapa 6): radar, mapa grande, rótulo, CSS, 2 canvas e 1 div, tecla M | `ZMM`, `zmmBuild`, `zmmScene`, `zmmIcon`, `zmmBig`, `zMinimap`, `zmmLab`, `zmmRoomName`, `zmmRoomsOpen`; `#zmm`, `#zmmLbl`, `#zbig` | 19 316 bytes de código + CSS e HTML |
 | `W_NAME` (só o minimapa usava) | | 40 B |
-| Funções nunca chamadas | `stairs`, `gridBoxes`, `sanpUni`, `karambitHand`, `knFist`, `knRetarget`, `fpTwoBone`, `w06Vai`, `zAtGoal`, `g2MtxBarra`, `tooFar`, `fgAng` | 7 096 B |
-| Total | | cerca de 27 KB a menos no `index.html` |
+| Funções nunca chamadas | `karambitHand`, `knFist`, `knRetarget`, `fpTwoBone`, `zAtGoal`, `g2MtxBarra`, `tooFar`, `fgAng` | 5 486 B |
+| Total | | cerca de 25 KB a menos no `index.html` |
+
+**Erro corrigido pelo revisor R2:**
+- A primeira passada também apagou `stairs`, `gridBoxes`, `sanpUni` e `w06Vai`, que ainda são usadas. Sem elas:
+  - a recarga de 28 armas dava erro;
+  - 8 mapas não montavam;
+  - o Sanatório ficava sem piso.
+- As quatro voltaram no commit c7abb69.
+- Daqui em diante, toda remoção passa pelo teste que monta os 13 mapas e pelo teste que recarrega todas as armas.
 
 **Mantidos:**
 - `assets/`: as 8 pastas de modelos (`fps/ak`, `knife`, `pistol`, `pump`, `rifle`, `smg`, `sniper`, `w/*`) e o `arms.glb` são todos carregados. As pastas de `fps/w/` são lidas pelo nome via `fpLoad('m:' + id)`, e a `fps/w/knife` pelo `fpLoad('m:knife')`.
