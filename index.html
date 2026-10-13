@@ -20036,12 +20036,12 @@ function reloadAnim(ud, t, o) {
     const tilt = seg(t, 0, .15) * (1 - seg(t, .82, 1)), out = seg(t, .1, .2) * (1 - seg(t, .72, .8)), C0 = ud.cylRest;
     o.rz -= .45 * tilt; o.rx += .15 * tilt + .55 * seg(t, .22, .3) * (1 - seg(t, .38, .48));
     ud.cyl.position.x = C0.x - .035 * out; ud.cyl.rotation.z = out * 2;
-    ev('open', .12, () => play('magout')); ev('eject', .3, () => { for (let i = 0; i < 6; i++) ejectShell(W[G.cur], true); }); ev('in', .62, () => play('magin')); ev('close', .76, () => play('slide'));
+    ev('open', .12, () => play('magout')); ev('eject', .3, () => { for (let i = 0; i < clamp(G.reloadVazias ?? 6, 1, 6); i++) ejectShell(W[G.cur], true); }); /* decisão do dono (13/10): só as disparadas */ ev('in', .62, () => play('magin')); ev('close', .76, () => play('slide'));
     if (ud.lhG) { const p = kf(t, [[0, L.x, L.y, L.z], [.36, L.x, L.y, L.z], [.46, C0.x - .06, C0.y - .13, C0.z + .03], [.6, C0.x - .04, C0.y - .03, C0.z + .005], [.64, C0.x - .04, C0.y - .03, C0.z + .005], [.74, L.x, L.y, L.z], [1, L.x, L.y, L.z]]); ud.lhG.position.set(p[0], p[1], p[2]); }
   } else if (ud.rig === 'break' && ud.brk) {
     const open = seg(t, .08, .2) * (1 - seg(t, SGA.fecha[0], SGA.fecha[1])); // 6-w07: fecha no fim da recarga (antes em .76–.86: a arma parecia pronta .38 s antes de poder atirar)
     ud.brk.rotation.x = -.5 * open; o.rx += .2 * open; o.rz -= .22 * open;
-    ev('open', .1, () => play('magout')); ev('ej', .22, () => { ejectShell(W[G.cur], true); ejectShell(W[G.cur], true); }); ev('in', .52, () => play('shellin')); ev('in2', .62, () => play('shellin')); ev('close', SGA.fecha[0] + .04, () => play('slide'));
+    ev('open', .1, () => play('magout')); ev('ej', .22, () => { for (let i = 0; i < clamp(G.reloadVazias ?? 2, 1, 2); i++) ejectShell(W[G.cur], true); }); /* só as disparadas */ ev('in', .52, () => play('shellin')); ev('in2', .62, () => { if ((G.reloadVazias ?? 2) > 1) play('shellin'); }); ev('close', SGA.fecha[0] + .04, () => play('slide'));
     if (ud.lhG) { kfTo(t, ud.sgBrk ||= sgBrkKF(ud), ud.lhG.position); sgBrkMao(ud, t); if (ud.handShell) ud.handShell.visible = t > .3 && t < .6; } // 6-w07
   } else if (ud.r8 && ud.mag) r8Reload(ud, t, o, ev); // (a8) armas maravilha, LAW e besta
   else { const s = Math.sin(t * Math.PI); o.rx -= s * .6; o.y -= s * .1; o.rz += s * .3; } // genérico
@@ -21137,7 +21137,7 @@ function startReload() {
   if (!a || G.reloadEnd || a.mag >= wMag(G.cur) || a.res <= 0) return;
   const sp = zPerk('speed') ? .5 : 1;
   if (zPerk('cherry') && !me.downed) sendToHost({ t: 'zfx', k: 'ch', f: r2(1 - a.mag / wMag(G.cur)) }); // Electric Cherry: o host confere a bebida e a recarga
-  G.burstN = 0; G.reloadStart = now; G.scope = 0; G.rezoom = 0; G.reloadEmpty = a.mag === 0; G.rEv = {};
+  G.burstN = 0; G.reloadStart = now; G.scope = 0; G.rezoom = 0; G.reloadEmpty = a.mag === 0; G.reloadVazias = wMag(G.cur) - a.mag; G.rEv = {}; // vazias: cápsulas disparadas (revólver e cano duplo ejetam só elas)
   if (w.shellTime) { // escopeta / lança-granadas: uma bala por vez (atirar interrompe)
     G.reload = { stage: 'start', t0: now, iv: w.shellTime * sp * attStat(G.cur, 'reloadX'), sp };
     G.reloadEnd = now + .35 * sp + Math.min(wMag(G.cur) - a.mag, a.res) * G.reload.iv + .45 * sp;
