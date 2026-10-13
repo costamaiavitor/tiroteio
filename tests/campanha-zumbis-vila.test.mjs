@@ -1,8 +1,11 @@
-// O3-D06: zumbis da Vila na campanha (docs/overhaul/campanha.md §6.2–§6.3): Penitente (7), Soldado (8) e Afogado do Veio (9).
-// Confere: os números da tabela (ZKIND e CAMP_ZK), que cada tipo nasce com a campanha ligada (estreia, cota, trio, água) e nunca no
-// clássico, a IA de cada um (cal no cone, nuvem que cega, capacete, preferência pelo NPC, submerso imune, aviso, agarrão, "longe da
-// água"), a foto de rede (o cliente lê o tipo 7–9), as caixas de acerto do submerso, o modelo e os sons.
-// Rodar: node --test tests/campanha-zumbis-vila.test.mjs
+// O3-D06: zumbis da Vila nos objetivos do mapa (docs/overhaul/campanha.md §6.2–§6.3; refeito em 13/10 para o modo de objetivos):
+// Penitente (7), Soldado (8) e Afogado do Veio (9). Confere: os números da tabela (ZKIND, CAMP_ZK, CAMP_RITMO), que cada tipo nasce nos
+// objetivos da Vila pela rodada do mapa (estreia, cota, trio, água aberta) e nunca no clássico, que os tipos do Sanatório nunca nascem na
+// Vila (nem no infinito depois dos objetivos) e que o Soldado não some quando o teto de especiais enche; a IA de cada um (cal no cone,
+// nuvem que cega, capacete, preferência pelo NPC, submerso imune, aviso, agarrão, "longe da água"), a foto de rede (o cliente lê o tipo
+// 7–9), as caixas de acerto do submerso, o modelo e os sons.
+// Rodar: node --test tests/campanha-zumbis-vila.test.mjs (liga sozinho o modo de objetivos, ZV2_OBJ)
+process.env.ZV2_OBJ ||= '1';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { abrirJogo, criarSala, noJogo } from './_jogo.mjs';
@@ -27,17 +30,18 @@ const rodar = (fn, a = {}) => J.page.evaluate(([src, arg]) => {
   return (new Function('T', 'H', 'arg', `return (${src})(T, H, arg)`))(T, H, arg);
 }, [fn.toString(), { PREP, ...a }]);
 
-// liga a campanha no Ato II (Vila) e abre a porta Praça -> Lago (água para o Afogado)
-async function campanhaAtoII() {
+// volta aos objetivos da Vila (partida nova, etapa I) e abre a porta Praça -> Lago (água para o Afogado)
+async function objetivosVila() {
   return rodar((T, H) => {
-    T.CAMP_ATOS[1].rodMin = T.CAMP_ATOS[1].rodMax = 99; // sem objetivos na tabela a etapa acabaria na rodada 9 e trocaria de mapa
-    if (T.CAMP_AGENDA) for (const r of [6, 7, 8, 9]) delete T.CAMP_AGENDA[r]; // sem os eventos e os cães da agenda (O3-D05) nas rodadas medidas
-    T.campLibera(1, 1); T.S.st = { ...T.S.st, zmode: 'campanha', ato: 1 }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1);
-    T.Z.doors.add('AE'); T.broadcast({ t: 'zdoor', id: 'AE' }); T.zBuildWalk(); T.Z.ffT = 0;
+    T.S.st = { ...T.S.st, zmode: 'campanha' }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1);
     H.vivo(); H.poe(0, 6); T.sim(.5);
-    return { on: T.CAMP.on, modo: T.CAMP.modo, et: T.CAMP.et, mapa: T.S.st.map, round: T.Z.round };
+    return { on: T.CAMP.on, modo: T.CAMP.modo, et: T.CAMP_ATOS[T.CAMP.et]?.id, mapa: T.S.st.map, round: T.Z.round };
   });
 }
+const abreLago = () => rodar(T => { T.Z.doors.add('AE'); T.broadcast({ t: 'zdoor', id: 'AE' }); T.zBuildWalk(); T.Z.ffT = 0; T.sim(.2); });
+// agenda da Vila fora das rodadas medidas (sem eventos nem cães nelas); devolve a original para restaurar
+const semAgenda = rr => rodar((T, H, a) => { const A = T.CAMP_AGENDA.vila, g = {}; for (const r of a.rr) { g[r] = A[r]; delete A[r]; } window.__agVila = g; }, { rr });
+const voltaAgenda = () => rodar(T => { Object.assign(T.CAMP_AGENDA.vila, window.__agVila || {}); });
 
 test('tabela: ZKIND 7–9 e CAMP_ZK com os números do §6.2, água da Vila em células andáveis', { timeout: 60000 }, async () => {
   const r = await noJogo(J.page, T => {
@@ -46,7 +50,7 @@ test('tabela: ZKIND 7–9 e CAMP_ZK com os números do §6.2, água da Vila em c
     return { k: [7, 8, 9].map(i => [K[i].n, K[i].hp, K[i].pts, K[i].xp, K[i].sz, K[i].rad, !!K[i].chefe]), len: K.length, buraco: [...K.keys()].filter(i => !(i in K)).length,
       pen: [Z[7].vel, Z[7].cal.alcance, Z[7].cal.aviso, Z[7].cal.cone, Z[7].cal.abre, Z[7].cal.dano, Z[7].cal.olhoS, Z[7].nuvem.r, Z[7].nuvem.s, Z[7].nuvem.lento],
       sol: [Z[8].vel, Z[8].trio], afo: [Z[9].vel, Z[9].sub.vel, Z[9].sub.y, Z[9].sub.aviso, Z[9].sub.avisoR, Z[9].sub.dano, Z[9].sub.lento, Z[9].sub.lentoS],
-      mix: [T.CAMP_MIX[7].estreia, T.CAMP_MIX[8].estreia, T.CAMP_MIX[9].estreia], agua: A.length, andavel,
+      mix: [T.CAMP_MIX[7].estreia, T.CAMP_MIX[8].estreia, T.CAMP_MIX[9].estreia], ritmo: T.CAMP_RITMO.vila.estreia, agua: A.length, andavel,
       fala: ['penitente-estreia', 'soldado-estreia', 'afogado-estreia'].every(id => T.CAMP_FALA_TXT[id]?.txt) };
   });
   assert.deepEqual(r.k, [['Penitente', 1.2, 50, 3, 1, .3, false], ['Soldado', 1.5, 60, 4, 1.02, .3, false], ['Afogado do Veio', .9, 50, 3, .95, .3, false]]);
@@ -54,13 +58,14 @@ test('tabela: ZKIND 7–9 e CAMP_ZK com os números do §6.2, água da Vila em c
   assert.deepEqual(r.pen, [[3.4, 3.8], 4, .6, 3.5, 50, 10, 2.5, 2.5, 4, .5]);
   assert.deepEqual(r.sol, [[3.6, 4.3], 3]);
   assert.deepEqual(r.afo, [[1.3, 1.8], 4.5, -1, .8, 4.5, 25, .5, 1.5]);
-  assert.deepEqual(r.mix, [6, 7, 8]);
+  assert.deepEqual(r.mix, [6, 7, 8], 'estreias do infinito antigo'); assert.deepEqual(r.ritmo, { 7: 6, 8: 7, 9: 8 }, 'estreias nos objetivos da Vila (rodada do mapa)');
   assert.ok(r.agua >= 20 && r.andavel === r.agua, `pontos de água fora do chão andável: ${r.andavel}/${r.agua}`);
   assert.ok(r.fala, 'legenda da estreia');
 });
 
 test('clássico: os tipos 7–9 nunca nascem (rodadas 6 a 12 inteiras), o campTipo devolve o mesmo', { timeout: 120000 }, async () => {
   const r = await rodar((T, H) => {
+    T.S.st = { ...T.S.st, zmode: 'classico' }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1);
     const { Z } = H; const vistos = new Set(); let n = 0;
     for (let r = 6; r <= 12; r++) {
       H.limpa(); Z.round = r - 1; Z.phase = 'break'; Z.nextDog = 99; T.zStartRound();
@@ -75,9 +80,10 @@ test('clássico: os tipos 7–9 nunca nascem (rodadas 6 a 12 inteiras), o campTi
   assert.deepEqual(r.tipo, [0, 1, 7, 9]);
 });
 
-test('campanha: estreia de cada tipo (só 1 / 1 trio), trio no mesmo ponto, Afogado na água, cota sem mexer na mistura do clássico, legenda', { timeout: 300000 }, async () => {
-  const c = await campanhaAtoII();
-  assert.deepEqual([c.on, c.modo, c.mapa], [true, 'campanha', 'vila']); assert.equal(c.et, 1);
+test('objetivos da Vila: estreia de cada tipo pela rodada do mapa (só 1 / 1 trio), trio no mesmo ponto, Afogado na água, cota sem mexer na mistura do clássico, legenda', { timeout: 300000 }, async () => {
+  const c = await objetivosVila();
+  assert.deepEqual([c.on, c.modo, c.mapa, c.et], [true, 'campanha', 'vila', 'I']); assert.ok(c.round <= 1, 'a Vila começa na rodada 1');
+  await abreLago(); await semAgenda([6, 7, 8, 9]);
   const r = await rodar((T, H) => {
     const { Z } = H, out = {};
     for (const r of [6, 7, 8, 9]) {
@@ -91,10 +97,12 @@ test('campanha: estreia de cada tipo (só 1 / 1 trio), trio no mesmo ponto, Afog
     // Névoa (O3-D05, campEvPeso): a cota do Afogado dobra; Estouro (só Veloz): nenhum tipo novo
     if (T.CAMP_EVS) { const S_ = T.CAMP_ZKS, cota = id => { T.CAMP_EVS.id = id; Z.round = 9; Z.toSpawn = 60; Z.mixN = 0; S_.r = -1; T.campZkCotas(); return { ...S_.rest }; };
       out.nevoa = [cota(null)[9], cota('nevoa')[9]]; out.estouro = cota('estouro'); T.CAMP_EVS.id = null; S_.r = Z.round; S_.rest = {}; Z.toSpawn = 0; }
-    out.vistos = [...T.CAMP_ZKS.vistos];
+    out.vistos = [...T.CAMP_ZKS.vistos]; out.et = T.CAMP_ATOS[T.CAMP.et]?.id;
     H.limpa();
     return out;
   });
+  await voltaAgenda();
+  assert.equal(r.et, 'I', 'os tipos estreiam pela rodada, mesmo com o time ainda na primeira etapa');
   // estreia: rodada 6 só 1 Penitente; 7: 1 trio de Soldados; 8: Afogados (na água); 9: todos
   assert.equal(r[6].cont[7], 1, 'Penitente na estreia: 1'); assert.ok(!r[6].cont[8] && !r[6].cont[9]);
   assert.equal(r[7].cont[8], 3, 'Soldado na estreia: 1 trio'); assert.ok(r[7].cont[7] >= 1);
@@ -105,7 +113,7 @@ test('campanha: estreia de cada tipo (só 1 / 1 trio), trio no mesmo ponto, Afog
   for (const rr of [6, 7, 8, 9]) { assert.equal(r[rr].mixN1, 0, `rodada ${rr}: os especiais do clássico saíram todos`); assert.equal(Object.values(r[rr].cont).reduce((a, b) => a + b, 0), r[rr].tot); }
   const esp = rr => Object.entries(r[rr].cont).filter(([k]) => +k > 0 && +k !== 6).reduce((a, [, v]) => a + v, 0);
   for (const rr of [6, 7, 8, 9]) assert.ok(esp(rr) <= Math.floor(r[rr].tot * .5), `teto de especiais na rodada ${rr}: ${esp(rr)} de ${r[rr].tot} ${JSON.stringify(r[rr].cont)} mixN0 ${r[rr].mixN0}`);
-  // números: vida = comum × vidaK (1 no Ato II) × ZKIND.hp; velocidade da tabela; Afogado submerso ('rise', y -1)
+  // números: vida = comum × vidaK (CAMP_CURVA.vila: 1 a partir da rodada 6) × ZKIND.hp; velocidade da tabela; Afogado submerso ('rise', y -1)
   for (const z of r[9].nasc) {
     const hp = Math.round(Math.round(r[9].hpComum) * { 7: 1.2, 8: 1.5, 9: .9 }[z.k]);
     assert.ok(Math.abs(z.hp - hp) <= 1, `vida do tipo ${z.k}: ${z.hp} x ${hp}`);
@@ -117,6 +125,35 @@ test('campanha: estreia de cada tipo (só 1 / 1 trio), trio no mesmo ponto, Afog
   assert.deepEqual(r.vistos.sort(), [7, 8, 9]);
   assert.ok(['penitente', 'soldado', 'afogado'].every(id => r.falas.includes(id)), `legendas: ${r.falas}`);
   if (r.nevoa) { assert.ok(r.nevoa[1] > r.nevoa[0] && r.nevoa[1] <= 2 * r.nevoa[0], `Névoa: Afogado com peso ×2, dentro do teto de especiais (${r.nevoa})`); assert.deepEqual(r.estouro, {}, 'Estouro: só Veloz'); }
+});
+
+test('Afogado só com água aberta (a cota não fica presa), tipos do Sanatório nunca na Vila, Soldado com 1 trio mesmo com o teto cheio (também no infinito)', { timeout: 300000 }, async () => {
+  await objetivosVila(); await semAgenda([9, 12, 20]);
+  const r = await rodar((T, H) => {
+    const { Z } = H, S_ = T.CAMP_ZKS, o = {};
+    const rodada = (r, nasce) => { H.limpa(); S_.r = -1; if (T.CAMP_ZK2S) T.CAMP_ZK2S.garR = -1; Z.round = r - 1; Z.phase = 'break'; Z.dogRound = false; Z.nextDog = Z.nextBoss = 1e9; T.zStartRound(); Z.dogRound = false; Z.spawnT = 1e12;
+      const cont = {}; let rest = null; for (let i = 0; i < 400 && Z.toSpawn > 0; i++) { const id = Z.nextId; if (!T.zSpawnOne()) continue; if (!rest) rest = { ...S_.rest }; const z = Z.zs.get(id); if (!nasce) { Z.zs.delete(id); } cont[z.kind] = (cont[z.kind] || 0) + 1; if (nasce) Z.zs.delete(id); }
+      return { cont, rest, n: Object.values(cont).reduce((a, b) => a + b, 0) }; };
+    o.fechado = rodada(9); // só a área inicial aberta: nenhuma água
+    T.Z.doors.add('AE'); T.broadcast({ t: 'zdoor', id: 'AE' }); T.zBuildWalk(); T.Z.ffT = 0;
+    o.aberto = rodada(9);
+    o.r20 = rodada(20);
+    const et = T.CAMP.et; T.CAMP.modo = 'infinito'; T.CAMP.et = -1; // o infinito depois dos objetivos (as regras de rodada; a troca é do teste de eventos)
+    o.inf12 = rodada(12); o.inf20 = rodada(20);
+    T.CAMP.modo = 'campanha'; T.CAMP.et = et; H.limpa();
+    return o;
+  });
+  await voltaAgenda();
+  assert.ok(!r.fechado.rest?.[9] && !r.fechado.cont[9], `sem água aberta: nenhum Afogado na cota (${JSON.stringify(r.fechado.rest)})`);
+  assert.ok(r.aberto.cont[9] >= 1, `com o Lago aberto: Afogado (${JSON.stringify(r.aberto.cont)})`);
+  for (const k of ['r20', 'inf12', 'inf20']) {
+    const c = r[k].cont;
+    assert.ok([10, 11, 12, 13].every(t => !c[t]), `${k}: tipo do Sanatório na Vila ${JSON.stringify(c)}`);
+    assert.ok(c[8] >= 3 && c[8] % 3 === 0, `${k}: Soldado em trio (${JSON.stringify(c)})`);
+    assert.ok(c[7] >= 1 && c[9] >= 1, `${k}: Penitente e Afogado (${JSON.stringify(c)})`);
+    const esp = Object.entries(c).filter(([t]) => +t > 0 && +t !== 6).reduce((a, [, v]) => a + v, 0);
+    assert.ok(esp <= Math.floor(r[k].n * .5) + 1, `${k}: teto de especiais (${esp} de ${r[k].n})`);
+  }
 });
 
 test('Penitente: aviso de 0,6 s (balde, sc 3), cal no cone (10 de dano + tela branca), fora do cone nada; nuvem da morte cega e atrasa', { timeout: 120000 }, async () => {

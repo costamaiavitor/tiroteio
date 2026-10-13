@@ -1,10 +1,13 @@
-// O3-D08: zumbis do Sanatório na campanha (docs/overhaul/campanha.md §6.2–§6.3 e §4.3 III.2): Enfermeiro (10), Contido (11),
-// Carvoeiro (12), Pregador do Veio (13) e a Enfermeira-chefe (elite da chave).
-// Confere: os números da tabela (ZKIND e CAMP_ZK), que cada tipo nasce na estreia com a campanha ligada e nunca no clássico, a cota do
-// Pregador no infinito, a IA e a contra-tática de cada um (seringa que desvia com passo lateral, dose e vinheta, investida que bate na
-// parede, crosta, fogo, brasa, canto que levanta e é cortado pelo tiro na cabeça, explosão que destrói os corpos), a elite com a chave,
-// a foto de rede (o cliente lê o tipo 10–13), quem entra no meio, o modelo (2 chamadas de desenho) e os sons.
-// Rodar: node --test tests/campanha-zumbis-sanatorio.test.mjs
+// O3-D08: zumbis do Sanatório nos objetivos do mapa (docs/overhaul/campanha.md §6.2–§6.3 e §4.3 III.2; refeito em 13/10 para o modo de
+// objetivos): Enfermeiro (10), Contido (11), Carvoeiro (12), Pregador do Veio (13) e a Enfermeira-chefe (elite da chave).
+// Confere: os números da tabela (ZKIND, CAMP_ZK, CAMP_RITMO), que cada tipo estreia nos objetivos do Sanatório pela rodada do mapa (o
+// Sanatório começa na rodada 1: antes a estreia era a da campanha de 25 rodadas e nada nascia até a 11) e nunca no clássico, a cota do
+// Pregador (nRod), os tipos da Vila nunca no Sanatório (nem no infinito depois dos objetivos), a IA e a contra-tática de cada um (seringa
+// que desvia com passo lateral, dose e vinheta, investida que bate na parede, crosta, fogo, brasa, canto que levanta e é cortado pelo tiro
+// na cabeça, explosão que destrói os corpos), a elite com a chave, a foto de rede (o cliente lê o tipo 10–13), quem entra no meio, o
+// modelo (2 chamadas de desenho) e os sons.
+// Rodar: node --test tests/campanha-zumbis-sanatorio.test.mjs (liga sozinho o modo de objetivos, ZV2_OBJ)
+process.env.ZV2_OBJ ||= '1';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { abrirJogo, criarSala, noJogo } from './_jogo.mjs';
@@ -32,17 +35,17 @@ const rodar = (fn, a = {}) => J.page.evaluate(([src, arg]) => {
   return (new Function('T', 'H', 'arg', `return (${src})(T, H, arg)`))(T, H, arg);
 }, [fn.toString(), { PREP, ...a }]);
 
-// liga a campanha no Ato III (Sanatório), sem eventos nem cães da agenda nas rodadas medidas, com as portas da Recepção abertas
-async function campanhaAtoIII() {
+// volta aos objetivos do Sanatório (partida nova, etapa III), sem eventos nem cães da agenda nas rodadas medidas, com as portas da Recepção abertas
+async function objetivosSanatorio() {
   return rodar((T, H) => {
-    for (const e of [3, 4]) T.CAMP_ATOS[e].rodMin = 99; // sem objetivos na tabela a etapa acabaria e trocaria de mapa (o rodMax fica: é a rampa da CAMP_MIX)
-    if (T.CAMP_AGENDA) for (let r = 11; r <= 25; r++) delete T.CAMP_AGENDA[r];
-    T.campLibera(2, 1); T.S.st = { ...T.S.st, zmode: 'campanha', ato: 2 }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1);
+    const A = T.CAMP_AGENDA.sanatorio; window.__agSan = { ...A }; for (let r = 1; r <= 30; r++) delete A[r];
+    T.S.st = { ...T.S.st, zmode: 'campanha' }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1);
     for (const d of ['AB', 'AC', 'AF', 'CK']) { T.Z.doors.add(d); T.broadcast({ t: 'zdoor', id: d }); } T.zBuildWalk(); T.Z.ffT = 0;
     H.vivo(); H.poe(0, -4); T.sim(.5);
-    return { on: T.CAMP.on, modo: T.CAMP.modo, et: T.CAMP.et, mapa: T.S.st.map };
+    return { on: T.CAMP.on, modo: T.CAMP.modo, et: T.CAMP_ATOS[T.CAMP.et]?.id, mapa: T.S.st.map, round: T.Z.round };
   });
 }
+const voltaAgenda = () => rodar(T => { Object.assign(T.CAMP_AGENDA.sanatorio, window.__agSan || {}); });
 
 test('tabela: ZKIND 10–13 e CAMP_ZK com os números do §6.2, estreias e legendas', { timeout: 60000 }, async () => {
   const r = await noJogo(J.page, T => {
@@ -52,7 +55,7 @@ test('tabela: ZKIND 10–13 e CAMP_ZK com os números do §6.2, estreias e legen
       con: [Z[11].vel, Z[11].inv.min, Z[11].inv.max, Z[11].inv.aviso, Z[11].inv.dist, Z[11].inv.vel, Z[11].inv.dano, Z[11].inv.empurra, Z[11].inv.atordoa, Z[11].inv.danoK],
       car: [Z[12].crosta.corpo, Z[12].crosta.cabeca, Z[12].crosta.explosao, Z[12].brasa.r, Z[12].brasa.s, Z[12].brasa.dps, Z[12].imuneFogo],
       pre: [Z[13].vel, Z[13].perto, Z[13].canto.cada, Z[13].canto.aviso, Z[13].canto.corpoS, Z[13].canto.r, Z[13].canto.vida, Z[13].canto.max, Z[13].canto.atordoa],
-      mix: [10, 11, 12, 13].map(i => T.CAMP_MIX[i].estreia), agua: T.CAMP_AGUA.sanatorio.length,
+      mix: [10, 11, 12, 13].map(i => T.CAMP_MIX[i].estreia), ritmo: T.CAMP_RITMO.sanatorio.estreia, agua: T.CAMP_AGUA.sanatorio.length,
       fala: ['enfermeiro-estreia', 'contido-estreia', 'carvoeiro-estreia', 'pregador-estreia'].every(id => T.CAMP_FALA_TXT[id]?.txt?.length <= 160) };
   });
   assert.deepEqual(r.k, [['Enfermeiro', 1, 50, 3, 1, .3, false], ['Contido', 2, 70, 4, 1.1, .35, false], ['Carvoeiro', 1.4, 60, 4, 1.05, .32, false], ['Pregador do Veio', 1.6, 100, 6, 1.05, .3, false]]);
@@ -61,13 +64,14 @@ test('tabela: ZKIND 10–13 e CAMP_ZK com os números do §6.2, estreias e legen
   assert.deepEqual(r.con, [[2.2, 2.2], 4, 14, .9, 14, 9, 45, 4, 2, 2]);
   assert.deepEqual(r.car, [.3, 1, .25, 2, 3, 15, 1]);
   assert.deepEqual(r.pre, [[1.3, 1.8], 12, 6, 1.2, 8, 10, .4, 4, 1.5]);
-  assert.deepEqual(r.mix, [11, 13, 16, 18]);
+  assert.deepEqual(r.mix, [11, 13, 16, 18], 'estreias do infinito antigo'); assert.deepEqual(r.ritmo, { 9: 8, 10: 5, 11: 7, 12: 10, 13: 12 }, 'estreias nos objetivos do Sanatório (rodada do mapa; o Afogado só com água)');
   assert.equal(r.agua, 0, 'o §6 não pede água no Sanatório (o Afogado é da Vila e do Ato V)');
   assert.ok(r.fala, 'legendas da estreia');
 });
 
 test('clássico: os tipos 10–13 nunca nascem (rodadas 11 a 20 inteiras), campTipo devolve o mesmo, nenhum zumbi com IA da campanha', { timeout: 120000 }, async () => {
   const r = await rodar((T, H) => {
+    T.S.st = { ...T.S.st, zmode: 'classico' }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1);
     const { Z } = H; const vistos = new Set(); let n = 0, ck = 0;
     for (let r = 11; r <= 20; r++) {
       H.limpa(); Z.round = r - 1; Z.phase = 'break'; Z.nextDog = 99; T.zStartRound(); Z.dogRound = false;
@@ -84,45 +88,50 @@ test('clássico: os tipos 10–13 nunca nascem (rodadas 11 a 20 inteiras), campT
   assert.deepEqual(r.tipo, [0, 1, 10, 13]);
 });
 
-test('campanha: estreia de cada tipo (só 1), quantidades da CAMP_MIX nos Atos III e IV, legenda; Pregador no infinito', { timeout: 300000 }, async () => {
-  const c = await campanhaAtoIII();
-  assert.deepEqual([c.on, c.modo, c.mapa, c.et], [true, 'campanha', 'sanatorio', 3]);
+test('objetivos do Sanatório: estreia de cada tipo pela rodada do mapa (só 1), quantidades da CAMP_MIX, legenda; Pregador pela nRod; infinito depois dos objetivos só com os tipos do mapa', { timeout: 300000 }, async () => {
+  const c = await objetivosSanatorio();
+  assert.deepEqual([c.on, c.modo, c.mapa, c.et], [true, 'campanha', 'sanatorio', 'III']); assert.ok(c.round <= 1, 'o Sanatório começa na rodada 1');
   const r = await rodar((T, H) => {
     const { Z } = H, out = {};
-    for (const r of [11, 12, 13, 16, 18, 19]) {
-      T.CAMP.et = r >= 16 ? 4 : 3; H.limpa(); Z.round = r - 1; Z.phase = 'break'; Z.dogRound = false; T.zStartRound(); Z.dogRound = false; Z.bossQ = 0;
+    const conta = r => { H.limpa(); T.CAMP_ZKS.r = -1; T.CAMP_ZK2S.garR = -1; Z.round = r - 1; Z.phase = 'break'; Z.dogRound = false; Z.nextDog = Z.nextBoss = 1e9; T.zStartRound(); Z.dogRound = false; Z.bossQ = 0;
       const tot = Z.toSpawn, cont = {};
-      for (let i = 0; i < 300 && Z.toSpawn > 0; i++) { const id = Z.nextId; if (T.zSpawnOne()) { const z = Z.zs.get(id); cont[z.kind] = (cont[z.kind] || 0) + 1; if (z.kind >= 10) out['hp' + z.kind] = [z.hp, Math.round(T.zHp(r) * T.zHpK(r)), z.speed, z.sc]; Z.zs.delete(id); } }
-      out[r] = { tot, cont };
-    }
-    out.falas = Object.keys(T.CAMP.falaT);
-    // quantidade do Pregador (CAMP_MIX[13].n): campanha (18, 19, Ato V) e infinito (o maior da tabela depois da 19)
-    const M = T.CAMP_MIX[13], q = (r, et, inf) => T.campZkQtd(M, 13, r, 80, T.CAMP_ATOS[et], inf);
-    out.preg = { camp: [q(17, 4, false), q(18, 4, false), q(19, 4, false), q(22, 6, false)], inf: [18, 19, 20, 25, 40].map(r => q(r, 0, true)) };
-    // infinito no Sanatório, com os tipos da Vila também na conta: estreia do Pregador (18) com 1, e 2 na 22
-    const m0 = T.CAMP.modo; T.CAMP.modo = 'infinito'; out.inf = {};
-    for (const r of [18, 22]) { H.limpa(); Z.round = r - 1; Z.phase = 'break'; Z.dogRound = false; T.zStartRound(); Z.dogRound = false; Z.bossQ = 0; T.campEvDesliga?.(); const cont = {};
-      for (let i = 0; i < 300 && Z.toSpawn > 0; i++) { const id = Z.nextId; if (T.zSpawnOne()) { const z = Z.zs.get(id); cont[z.kind] = (cont[z.kind] || 0) + 1; Z.zs.delete(id); } } out.inf[r] = cont; }
-    T.CAMP.modo = m0; T.CAMP_ZKS.rest = {}; T.CAMP_ZKS.r = Z.round; Z.toSpawn = 0; T.CAMP.et = 3; Z.round = 11;
+      for (let i = 0; i < 300 && Z.toSpawn > 0; i++) { const id = Z.nextId; if (T.zSpawnOne()) { const z = Z.zs.get(id); cont[z.kind] = (cont[z.kind] || 0) + 1; if (z.kind >= 10) out['hp' + z.kind] = [z.hp, Math.round(T.zHp(r) * T.zHpK(r)), z.speed, z.sc, T.campCurva(r).vidaK]; Z.zs.delete(id); } }
+      return { tot, cont }; };
+    for (const r of [4, 5, 6, 7, 10, 12, 13, 16]) out[r] = conta(r);
+    out.et = T.CAMP_ATOS[T.CAMP.et]?.id; out.falas = Object.keys(T.CAMP.falaT);
+    const M = T.CAMP_MIX[13], q = r => T.campZkQtd(M, 13, r, 80, T.CAMP_ATOS[T.CAMP.et], false);
+    out.preg = [11, 12, 13, 14, 15, 30].map(q);
+    // o infinito depois dos objetivos (as regras de rodada; a troca é do teste de eventos): os mesmos tipos, pela mesma estreia
+    const m0 = T.CAMP.modo, et0 = T.CAMP.et; T.CAMP.modo = 'infinito'; T.CAMP.et = -1; out.inf = {};
+    for (const r of [12, 22]) { T.campEvDesliga?.(); out.inf[r] = conta(r).cont; }
+    T.CAMP.modo = m0; T.CAMP.et = et0; T.CAMP_ZKS.rest = {}; T.CAMP_ZKS.r = Z.round; Z.toSpawn = 0; Z.round = 11;
     H.limpa(); return out;
   });
-  assert.equal(r[11].cont[10], 1, 'Enfermeiro na estreia (11): 1'); assert.ok(!r[11].cont[11] && !r[11].cont[12] && !r[11].cont[13]);
-  assert.ok(r[12].cont[10] >= 2, `Enfermeiro 8% na 12: ${JSON.stringify(r[12])}`);
-  assert.equal(r[13].cont[11], 1, 'Contido na estreia (13): 1');
-  assert.equal(r[16].cont[12], 1, 'Carvoeiro na estreia (16): 1'); assert.equal(r[16].cont[11], 2, 'Contido: 1 + ⌊(16 − 13)/3⌋');
-  assert.equal(r[18].cont[13], 1, 'Pregador na estreia (18): 1');
-  assert.equal(r[19].cont[13], 1); assert.equal(r[19].cont[11], 3, 'Contido: teto 3'); assert.equal(r[19].cont[12], Math.round(r[19].tot * .12), `Carvoeiro 12% no fim do Ato IV: ${r[19].cont[12]} de ${r[19].tot}`);
-  for (const rr of [11, 12, 13, 16, 18, 19]) { const esp = Object.entries(r[rr].cont).filter(([k]) => +k > 0 && +k !== 6).reduce((a, [, v]) => a + v, 0); assert.ok(esp <= Math.floor(r[rr].tot * .5), `teto de especiais na ${rr}`); assert.equal(Object.values(r[rr].cont).reduce((a, b) => a + b, 0), r[rr].tot); }
-  // vida = comum × vidaK do ato × ZKIND.hp; velocidade da tabela
-  assert.ok(Math.abs(r.hp10[0] - Math.round(r.hp10[1] * 1.05 * 1)) <= 2, `vida do Enfermeiro ${r.hp10}`); assert.ok(r.hp10[2] >= 3.6 && r.hp10[2] <= 4.3 && r.hp10[3] === 1);
-  assert.ok(Math.abs(r.hp11[0] - Math.round(r.hp11[1] * 1.05 * 2)) <= 2, `vida do Contido ${r.hp11}`); assert.ok(Math.abs(r.hp11[2] - 2.2) < 1e-6 && r.hp11[3] === 0);
-  assert.ok(Math.abs(r.hp12[0] - Math.round(r.hp12[1] * 1.05 * 1.4)) <= 2, `vida do Carvoeiro ${r.hp12}`); assert.ok((r.hp12[3] === 0 && r.hp12[2] <= 1.8) || (r.hp12[3] === 1 && r.hp12[2] >= 3.6));
-  assert.ok(Math.abs(r.hp13[0] - Math.round(r.hp13[1] * 1.05 * 1.6)) <= 2, `vida do Pregador ${r.hp13}`); assert.ok(r.hp13[2] >= 1.3 && r.hp13[2] <= 1.8);
+  await voltaAgenda();
+  assert.equal(r.et, 'III', 'os tipos estreiam pela rodada, mesmo com o time ainda na primeira etapa');
+  assert.ok([10, 11, 12, 13].every(k => !r[4].cont[k]), `nada antes da 5: ${JSON.stringify(r[4].cont)}`);
+  assert.equal(r[5].cont[10], 1, 'Enfermeiro na estreia (5): 1'); assert.ok(!r[5].cont[11] && !r[5].cont[12] && !r[5].cont[13]);
+  assert.ok(r[6].cont[10] >= 2, `Enfermeiro 8% na 6: ${JSON.stringify(r[6])}`);
+  assert.equal(r[7].cont[11], 1, 'Contido na estreia (7): 1');
+  assert.equal(r[10].cont[12], 1, 'Carvoeiro na estreia (10): 1'); assert.equal(r[10].cont[11], 2, 'Contido: 1 + ⌊(10 − 7)/3⌋');
+  assert.equal(r[12].cont[13], 1, 'Pregador na estreia (12): 1');
+  assert.equal(r[16].cont[11], 3, 'Contido: teto 3'); assert.equal(r[16].cont[13], 2, 'Pregador: 2 a partir da 4ª rodada depois da estreia');
+  assert.equal(r[16].cont[12], Math.round(r[16].tot * .12), `Carvoeiro 12% no fim da rampa: ${r[16].cont[12]} de ${r[16].tot}`);
+  for (const rr of [4, 5, 6, 7, 10, 12, 13, 16]) {
+    const c = r[rr].cont, esp = Object.entries(c).filter(([k]) => +k > 0 && +k !== 6).reduce((a, [, v]) => a + v, 0);
+    assert.ok(esp <= Math.floor(r[rr].tot * .5), `teto de especiais na ${rr}`); assert.equal(Object.values(c).reduce((a, b) => a + b, 0), r[rr].tot);
+    assert.ok(!c[7] && !c[8] && !c[9], `rodada ${rr}: tipo da Vila no Sanatório ${JSON.stringify(c)}`);
+  }
+  assert.ok(r[4].tot < r[16].tot && r[16].tot > 0, 'a quantidade sobe com a rodada');
+  // vida = comum × vidaK da curva do mapa (1 a partir da 8) × ZKIND.hp; velocidade da tabela
+  for (const [k, hp] of [[10, 1], [11, 2], [12, 1.4], [13, 1.6]]) { const h = r['hp' + k]; assert.ok(Math.abs(h[0] - Math.round(Math.round(h[1] * h[4]) * hp)) <= 2, `vida do tipo ${k}: ${h}`); }
+  assert.ok(r.hp10[2] >= 3.6 && r.hp10[2] <= 4.3 && r.hp10[3] === 1); assert.ok(Math.abs(r.hp11[2] - 2.2) < 1e-6 && r.hp11[3] === 0);
+  assert.ok((r.hp12[3] === 0 && r.hp12[2] <= 1.8) || (r.hp12[3] === 1 && r.hp12[2] >= 3.6)); assert.ok(r.hp13[2] >= 1.3 && r.hp13[2] <= 1.8);
   assert.ok(['enfermeiro', 'contido', 'carvoeiro', 'pregador'].every(id => r.falas.includes(id)), `legendas: ${r.falas}`);
-  assert.deepEqual(r.preg.camp, [0, 1, 1, 2], 'Pregador: 1 nas rodadas 18–19 e 2 no Ato V');
-  assert.deepEqual(r.preg.inf, [1, 1, 2, 2, 2], 'infinito: 1 na 18 e na 19, depois 2 (o maior da tabela = o do Ato V)');
-  assert.equal(r.inf[18][13], 1, `infinito: estreia do Pregador com 1 ${JSON.stringify(r.inf[18])}`); assert.equal(r.inf[22][13], 2, `infinito: 2 Pregadores na 22 ${JSON.stringify(r.inf[22])}`);
+  assert.deepEqual(r.preg, [0, 1, 1, 1, 2, 2], 'Pregador (nRod): 1 nas 3 primeiras rodadas, depois 2');
+  assert.equal(r.inf[12][13], 1, `infinito: estreia do Pregador com 1 ${JSON.stringify(r.inf[12])}`); assert.equal(r.inf[22][13], 2, `infinito: 2 Pregadores na 22 ${JSON.stringify(r.inf[22])}`);
   assert.ok(r.inf[22][10] >= 1 && r.inf[22][11] >= 1 && r.inf[22][12] >= 1, `infinito: os tipos do Sanatório nascem ${JSON.stringify(r.inf[22])}`);
+  assert.ok(!r.inf[22][7] && !r.inf[22][8] && !r.inf[22][9], `infinito: sem os tipos da Vila nem Afogado sem água ${JSON.stringify(r.inf[22])}`);
 });
 
 test('Enfermeiro: aviso de 0,5 s, seringa em arco (15 + dose), passo lateral desvia, fora da faixa não joga; doses acumulam, lentidão e vinheta', { timeout: 120000 }, async () => {

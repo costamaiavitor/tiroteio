@@ -26697,19 +26697,42 @@ const CAMP_KIT = {
   C2: { pts: 6500, armas: ['python_pap', 'galil_pap'], bebidas: ['jug', 'speed', 'qr'] }, // O3-D15: 2 armas com PaP e 3 bebidas (o estado esperado do §10)
   V: { pts: 7000, armas: ['python', 'stg44_pap'], bebidas: ['jug', 'speed', 'qr'] },
 };
-// Curva (§10) por etapa: vidaK (aplicada pelo campStatus do D03/D06), qtdK (aplicada aqui no toSpawn), maxK (vivos), fixos (rodada de chefe)
+// Curva dos objetivos do mapa (13/10): cada mapa começa na rodada 1 e a curva sobe com a rodada do mapa, nunca com a etapa (o time leva
+// quantas rodadas precisar em cada uma). pts: [rodada, vidaK, qtdK], linear entre os pontos e o último daí em diante (o infinito depois dos
+// objetivos segue com o último: 1 = o do clássico, sem degrau na troca); vidaK no campZkStatus, qtdK no campRodada. chefe: fração dos comuns
+// nas rodadas de uma etapa de chefe (a luta é o resto da rodada; Vigia na rodada 10 = 17 comuns, Foguista na 13 = 19, como os 16/20 de antes).
 const CAMP_CURVA = {
-  I: { vidaK: .9, qtdK: .9, maxK: 1 }, II: { vidaK: 1, qtdK: 1, maxK: 1 }, C1: { vidaK: 1, qtdK: 1, maxK: 1, fixos: 16 },
-  III: { vidaK: 1, qtdK: .9, maxK: 1 }, IV: { vidaK: 1.05, qtdK: 1, maxK: 1 }, C2: { vidaK: 1.05, qtdK: 1, maxK: 1, fixos: 20 },
-  V: { vidaK: 1.05, qtdK: .8, maxK: 1 },
+  vila: { pts: [[1, .9, .9], [6, 1, 1]], chefe: .5 },
+  sanatorio: { pts: [[1, .9, .9], [8, 1, 1]], chefe: .4 },
 };
-// Mistura dos tipos novos (§6.2; consumida pelo D06/D08): fração da rodada [do começo, do fim do ato], teto de vivos, estreia
+// Mistura dos tipos novos (§6.2; consumida pelo D06/D08): fração da rodada [na estreia, no fim da rampa], teto de vivos. estreia/desde/n são
+// do infinito antigo (zmode 'infinito', rodada da campanha de 25); nos objetivos do mapa vale a CAMP_RITMO (estreia por mapa, nRod).
 const CAMP_MIX = {
   7: { nome: 'Penitente', frac: [.06, .10], teto: 4, estreia: 6 }, 8: { nome: 'Soldado', trioCada: 12, tetoTrios: 2, estreia: 7 },
   9: { nome: 'Afogado', frac: [.08, .08], teto: 4, estreia: 8, agua: 1 }, 10: { nome: 'Enfermeiro', frac: [.08, .08], estreia: 11 },
   11: { nome: 'Contido', base: 1, cada: 3, desde: 13, teto: 3, estreia: 13 }, 12: { nome: 'Carvoeiro', frac: [.08, .12], estreia: 16 },
-  13: { nome: 'Pregador', n: { 18: 1, 19: 1, V: 2 }, estreia: 18 },
+  13: { nome: 'Pregador', n: { 18: 1, 19: 1, V: 2 }, nRod: [1, 1, 1, 2], estreia: 18 }, // nRod: quantos por rodada desde a estreia no mapa (o último repete)
 };
+// Ritmo dos objetivos do mapa (13/10): a rodada em que cada tipo novo estreia em cada mapa (tipo fora da lista não nasce no mapa, nem no
+// infinito depois dos objetivos: Penitente e Soldado são da Vila, Enfermeiro, Contido, Carvoeiro e Pregador do Sanatório; o Afogado só onde
+// há água, CAMP_AGUA). rampa: rodadas da estreia até o fim da fração (frac). inf: a troca para as rodadas infinitas (rodadas depois da
+// última etapa até os primeiros cães, Carniceiro e evento do infinito; entre*: espaço mínimo desde os da agenda).
+const CAMP_RITMO = {
+  rampa: 4,
+  vila: { estreia: { 7: 6, 8: 7, 9: 8 } },
+  sanatorio: { estreia: { 9: 8, 10: 5, 11: 7, 12: 10, 13: 12 } },
+  inf: { caes: [2, 4], carn: 2, ev: 2, entreCaes: 4, entreCarn: 6 },
+};
+const campRitmo = () => CAMP.on && S.st?.zmode === 'campanha' ? CAMP_RITMO[curMapId] || null : null; // host: objetivos do mapa (e o infinito depois deles)
+const CAMP_CURVA_C = { r: -1, mapa: null, vidaK: 1, qtdK: 1, chefe: 1 }; // a curva da última rodada pedida (sem alocar por nascimento)
+function campCurva(r) { // host: vidaK, qtdK e chefe da rodada r do mapa (CAMP_CURVA); null fora dos objetivos do mapa
+  const K = campRitmo() && CAMP_CURVA[curMapId]; if (!K) return null; const c = CAMP_CURVA_C;
+  if (c.r === r && c.mapa === curMapId) return c;
+  const P = K.pts; let a = P[0], b = P[0];
+  for (let i = 0; i < P.length; i++) { b = P[i]; if (r <= P[i][0]) break; a = P[i]; }
+  const u = b[0] > a[0] ? clamp((r - a[0]) / (b[0] - a[0]), 0, 1) : 1;
+  return Object.assign(c, { r, mapa: curMapId, vidaK: a[1] + (b[1] - a[1]) * u, qtdK: a[2] + (b[2] - a[2]) * u, chefe: K.chefe ?? 1 });
+}
 // NPC de escolta (§4.3, II.3): números do projeto; o D10 põe a rota no objetivo, o visual (monta/quadro) e a pistola.
 const CAMP_NPC = {
   cabo: { nome: 'Cabo Nogueira', skin: '#56603e', vel: 2.6, perto: 6, hp: 600, hpPorJog: .5, regen: 6, regenS: 5, feridoPct: .3, paraR: 2, tiroR: 9, tiroCd: 1.2, tiroDano: 60, atrai: .5, atraiR: 15, r: .4,
@@ -26840,8 +26863,13 @@ function campComeca() { // host: primeira etapa da sequência do mapa (depois do
 function campProxObjetivos() { // host: fim de uma etapa (no intervalo): a seguinte do mapa ou, sem mais, as rodadas infinitas
   const k = CAMP.cadeia ? CAMP.cadeia.indexOf(CAMP.et) : -1, prox = k >= 0 ? CAMP.cadeia[k + 1] : undefined;
   if (prox !== undefined) { CAMP.etR = Z.round; campEtapaPrepara(prox, false); return; }
-  CAMP.modo = 'infinito'; CAMP.objFim = true; CAMP.et = -1; CAMP.obj = {}; CAMP.alvos = []; CAMP.npc = null; CAMP.cadeia = null; // objFim: os documentos de todas as etapas continuam (getter ato)
-  Z.nextDog = Z.round + 2 + Math.floor(Math.random() * 3); Z.nextBoss = Z.round + 2; CAMP_EVS.inf.prox = Z.round + 2; CAMP_EVS.inf.vistoR = Z.round;
+  CAMP.modo = 'infinito'; CAMP.objFim = true; CAMP.et = -1; CAMP.obj = {}; CAMP.alvos = []; CAMP.npc = null; CAMP.cadeia = null;
+  // a troca para o infinito (CAMP_RITMO.inf): os cães e o Carniceiro do clássico voltam (o que a agenda deixou pendente numa etapa de chefe
+  // vem logo na rodada seguinte), sem colar nos da agenda; os eventos passam ao sorteio do infinito (campEvInf). A agenda não vale mais.
+  const I = CAMP_RITMO.inf, E = CAMP_EVS, r = Z.round;
+  Z.nextDog = E.pend.caes ? r + 1 : Math.max(r + I.caes[0] + Math.floor(Math.random() * (I.caes[1] - I.caes[0] + 1)), E.ultCaes + I.entreCaes);
+  Z.nextBoss = E.pend.carn ? r + 1 : Math.max(r + I.carn, E.ultCarn + I.entreCarn); E.pend.caes = E.pend.carn = 0;
+  E.inf.prox = r + I.ev; E.inf.vistoR = r; // E.inf.ult: os últimos eventos da agenda (não repetem logo)
   broadcast({ t: 'camp', k: 'est', ...campCp() });
   CAMP.fimMsg = now; // A5: o aviso sai no tick seguinte (no fim da rodada, o 'zrend' logo depois escrevia "Rodada N concluída" por cima dele)
 }
@@ -26891,10 +26919,16 @@ function campPorta(p, d, err) { // gancho no srvZUse 'door' (campanha): trava 'c
 }
 // ---------- host: rodadas, fim de etapa, troca de mapa ----------
 function campRodada() { // gancho no zStartRound (depois dos jogadores e dos barris)
-  if (CAMP.modo === 'infinito') return zInfRodada(); // decisão do dono (13/10): escalada do infinito
+  if (CAMP.modo === 'infinito') { // decisão do dono (13/10): escalada do infinito (depois dos objetivos, com o último ponto da curva do mapa)
+    const C_ = campCurva(Z.round); if (C_ && C_.qtdK !== 1 && !Z.dogRound) { const n = Math.max(1, Math.round((Z.toSpawn - Z.bossQ) * C_.qtdK)); Z.toSpawn = n + Z.bossQ; zMix(Z.round, n, Math.max(1, S.players.size)); }
+    return zInfRodada();
+  }
   if (CAMP.modo !== 'campanha' || CAMP.et < 0) return;
-  const A = CAMP_ATOS[CAMP.et], K = CAMP_CURVA[A.id];
-  if (K && !Z.dogRound) { const np = Math.max(1, S.players.size); Z.toSpawn = K.fixos ? Math.max(1, Math.round(K.fixos * zDf().cnt)) : Math.max(1, Math.round(zCount(Z.round, np) * zDf().cnt * K.qtdK)); zMix(Z.round, Z.toSpawn, np); }
+  const A = CAMP_ATOS[CAMP.et], K = campCurva(Z.round); // a curva sobe com a rodada do mapa (CAMP_CURVA), não com a etapa
+  if (K && !Z.dogRound) { // o +1 do Carniceiro da agenda (Z.bossQ) fica fora da curva
+    const np = Math.max(1, S.players.size), n = Math.max(1, Math.round(zCount(Z.round, np) * zDf().cnt * K.qtdK * (A.chefe ? K.chefe : 1)));
+    Z.toSpawn = n + Z.bossQ; zMix(Z.round, n, np); if (Z.bossQ) Z.bossAt = Math.max(1, Math.floor(Z.toSpawn * CAMP_EV_AG.carnAt));
+  }
   if (!CAMP.radioIni) { CAMP.radioIni = true; if (A.radioIni) campRadio(A.radioIni); }
   for (const p of S.players.values()) if (CAMP.kitPend.has(p.id) && p.alive) { CAMP.kitPend.delete(p.id); campKit(p, CAMP.et); p.money = Math.max(p.money, Math.round(campMediaPts() * CAMP.ptsEntrada)); srvSpawn(p, p.pos, true, p.yaw); p.hp = p.maxHp; }
   for (const f of CAMP_GANCHOS.rodada) f(Z.round);
@@ -27765,8 +27799,8 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP
 // @@CAMP-EV@@
 // ===== O3-D05: eventos especiais da campanha (docs/overhaul/campanha.md §5; textos do rádio em lore.md §9) =====
 // O que tem aqui (dono: O3-D05):
-// - CAMP_EV: os 7 eventos (regra no host, visual no cliente, banner, pontos). CAMP_AGENDA: rodadas da campanha com evento, cães e
-//   Carniceiro (§5.2, §6.4: os do clássico ficam desligados na campanha). CAMP_INF.ev: sorteio do infinito (§5.3; o resto do
+// - CAMP_EV: os 7 eventos (regra no host, visual no cliente, banner, pontos). CAMP_AGENDA: por mapa, as rodadas do mapa com evento, cães e
+//   Carniceiro (§5.2, §6.4: os do clássico ficam desligados enquanto há objetivos; depois deles, o infinito). CAMP_INF.ev: sorteio do infinito (§5.3; o resto do
 //   infinito é do D14, que chama campEvLiga/os ganchos daqui).
 // - Host: o evento vale a rodada inteira em que cai (nunca em rodada de cães nem de chefe; a fuga do D14 é exceção, campEvLiga(id,
 //   { fuga: 1 })). Entra pelos CAMP_GANCHOS do D02 (inicio, rodada, fimRodada, tick, cp) e pelos registros do D03 (CAMP_G.tipo,
@@ -27783,7 +27817,7 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP
 const CAMP_EV = { // §5.1 (nome = banner; sub = subtítulo; pts = multiplicador dos pontos por abate)
   apagao: { nome: 'APAGÃO', sub: 'A luz caiu de vez · lanterna: L', qtdK: .85, pts: 1.25,
     vis: { luzK: .35, bulbo: .1, farK: .6 } }, // pool de luz 0, bulbos e halos a 10%, hemisférica e preenchimento ×0,35, névoa far ×0,6
-  nevoa: { nome: 'NÉVOA DO VEIO', sub: 'Eles sobem da água', cv: .9, pesoAfogado: 2, pts: 1.15, afogado: 9,
+  nevoa: { nome: 'NÉVOA DO VEIO', sub: 'Eles sobem da água', cv: .9, pesoAfogado: 2, pts: 1.15, afogado: 9, agua: 1, // agua: a agenda e o sorteio dos objetivos do mapa só a põem em mapa com água (CAMP_AGUA)
     vis: { far: 16, perto: 1, cor: 0x0c140f, gemidoK: 1.41 } }, // +3 dB nos gemidos
   estouro: { nome: 'ESTOURO', sub: 'O apito não para: eles vêm correndo', qtdK: 1.3, atrasoK: .5, maxMais: 4, vidaK: .6, corre: [5, 5.5], especiais: [3],
     fuga: { repoe: 6, especiais: [9] }, // fuga do final (D14): reposição contínua, só Afogados e comuns correndo
@@ -27801,17 +27835,30 @@ const CAMP_EV = { // §5.1 (nome = banner; sub = subtítulo; pts = multiplicador
     chance: [.6, .25], perkDe: 5, tentativas: 40, tentaS: 2, livreR: 1.2, tetoY: 1.8, entre: 4, srvR: 2.8, usoR: 2.2,
     vis: { queda: 14, quedaS: 2.4, fumacaS: .35, fumacaR: 60 } },
 };
-const CAMP_AGENDA = { // §5.2 e §6.4 (rodada -> evento, cães, Carniceiro); fora da agenda a campanha não tem cães nem Carniceiro
-  3: { ev: 'nevoa' }, 6: { ev: 'suprimento' }, 8: { caes: 1 }, 9: { ev: 'apagao' }, 13: { ev: 'silencio', carn: 1 }, 14: { caes: 1 },
-  15: { ev: 'estouro' }, 17: { ev: 'inchados' }, 18: { carn: 1 }, 19: { ev: 'relogio' }, 22: { ev: 'nevoa' }, 23: { carn: 1 }, 24: { ev: 'nevoa' },
+// Agenda dos objetivos do mapa (§5.2 e §6.4, refeita em 13/10: cada mapa começa na rodada 1): mapa -> rodada do mapa -> evento, cães,
+// Carniceiro. Enquanto há objetivos, os cães e o Carniceiro do clássico ficam desligados: só os daqui. Depois da última rodada da tabela o
+// trecho repete ([de, até]: a rodada até + 1 volta a ser a de), então nunca falta cão nem Carniceiro por mais que o time demore. Numa
+// etapa de chefe não há evento, e os cães e o Carniceiro da agenda esperam a primeira rodada depois dela (CAMP_EVS.pend).
+const CAMP_AGENDA = {
+  vila: { 3: { ev: 'nevoa' }, 6: { ev: 'suprimento' }, 8: { caes: 1 }, 9: { ev: 'apagao' }, // as rodadas 1–9 da campanha antiga
+    12: { carn: 1 }, 13: { caes: 1 }, 14: { ev: 'suprimento' }, 16: { ev: 'apagao' }, 18: { caes: 1 }, 19: { ev: 'nevoa' }, repete: [11, 20] },
+  sanatorio: { 3: { ev: 'apagao' }, 6: { ev: 'silencio' }, 8: { caes: 1 }, 9: { ev: 'estouro' }, // sem Névoa: o Sanatório não tem água
+    11: { ev: 'inchados' }, 12: { carn: 1 }, 13: { caes: 1 }, 14: { ev: 'relogio' }, 16: { ev: 'suprimento' }, 18: { caes: 1 }, 19: { ev: 'estouro' }, repete: [11, 20] },
 };
+function campAgenda(r) { // a linha da agenda do mapa atual na rodada r (com a repetição); null sem nada
+  const A = CAMP_AGENDA[curMapId]; if (!A || !(r >= 1)) return null; const R = A.repete;
+  if (R && r > R[1]) r = R[0] + (r - R[0]) % (R[1] - R[0] + 1);
+  return A[r] || null;
+}
+const campEvCabe = id => !CAMP_EV[id]?.agua || !!CAMP_AGUA[curMapId]?.length; // a Névoa só em mapa com água
 const CAMP_EV_AG = { carnAt: .65 }; // o Carniceiro da agenda nasce a 65% da rodada, como no clássico (zStartRound)
 const CAMP_INF = { // §5.3 (só a parte dos eventos; o D14 acrescenta estreias, chefes de campo e recorde)
   ev: { de: 5, cada: 5, semRepetir: 2, relogioDe: 10, chefeDe: 20, chefeCada: 10, lista: ['apagao', 'nevoa', 'estouro', 'silencio', 'inchados', 'relogio', 'suprimento'] },
 };
 // ---------- host ----------
 const CAMP_EVS = { id: null, r: 0, t0: 0, fuga: false, fim: 0, estourou: false, premio: false, cx: [], cxId: 1, cxN: 0, cxT: 0, hit: null, hitSp: false, pernas: [],
-  inf: { vistoR: 0, prox: CAMP_INF.ev.de, ult: [] } };
+  inf: { vistoR: 0, prox: CAMP_INF.ev.de, ult: [] },
+  pend: { caes: 0, carn: 0 }, ultCaes: -99, ultCarn: -99 }; // agenda: cães/Carniceiro adiados por uma etapa de chefe; últimas rodadas com cães e com Carniceiro
 const campEvDef = () => CAMP_EVS.id ? CAMP_EV[CAMP_EVS.id] : null;
 const campEvPeso = k => CAMP_EVS.id === 'nevoa' && k === CAMP_EV.nevoa.afogado ? CAMP_EV.nevoa.pesoAfogado : 1; // D06: peso do Afogado na mistura
 function campEvEspeciais() { const E = CAMP_EVS, D = campEvDef(); return !D ? null : E.fuga && D.fuga ? D.fuga.especiais : D.especiais || null; }
@@ -27904,16 +27951,24 @@ const CAMP_EV_G = { tipo: campEvTipo, nasce: campEvNasce, status: campEvStatus, 
 function campEvUltimos() { for (const k in CAMP_EV_G) { const L = CAMP_G[k], f = CAMP_EV_G[k], i = L.indexOf(f); if (i >= 0 && i === L.length - 1) continue; if (i >= 0) L.splice(i, 1); L.push(f); } }
 campEvUltimos();
 // ganchos do D02
-CAMP_GANCHOS.inicio.push(e => { // começo da etapa (campanha): sem evento nem caixote; cães e Carniceiro da agenda para a primeira rodada
+CAMP_GANCHOS.inicio.push(e => { // começo da etapa: sem evento nem caixote; cães e Carniceiro da agenda para a próxima rodada (a do mapa, não a rod0 da campanha antiga)
   const E = CAMP_EVS; campEvDesliga(); E.cx = []; E.inf.vistoR = 0;
-  campEvAgendaProx(Math.max(Z.round, CAMP_ATOS[e].rod0 - 1) + 1);
+  if (Z.round === 0) { E.pend.caes = E.pend.carn = 0; E.ultCaes = E.ultCarn = -99; E.inf.ult = []; } // partida nova
+  campEvAgendaProx(Z.round + 1);
 });
-function campEvAgendaProx(r) { const ag = CAMP_AGENDA[r]; Z.nextDog = ag?.caes ? r : 1e9; Z.nextBoss = ag?.carn ? r : 1e9; } // o zStartRound do clássico faz o resto
+function campEvAgendaProx(r) { // cães e Carniceiro da rodada r pela agenda (e o que ficou pendente); numa etapa de chefe, nada (o zStartRound do clássico faz o resto)
+  const ag = campAgenda(r), P = CAMP_EVS.pend, ch = !!CAMP_ATOS[CAMP.et]?.chefe;
+  Z.nextDog = !ch && (ag?.caes || P.caes) ? r : 1e9; Z.nextBoss = !ch && (ag?.carn || P.carn) ? r : 1e9;
+}
 CAMP_GANCHOS.rodada.push(r => { // depois da curva do D02
-  Z.nextDog = Z.nextBoss = 1e9; // o zStartRound marcou os próximos pelo clássico: na campanha só vale a agenda
-  const ag = CAMP_AGENDA[r];
-  if (ag?.ev && campEvPode(r)) campEvLiga(ag.ev);
-  if (Z.bossQ && CAMP_CURVA[CAMP_ATOS[CAMP.et]?.id]) { Z.toSpawn++; Z.bossAt = Math.max(1, Math.floor(Z.toSpawn * CAMP_EV_AG.carnAt)); } // a curva tirou o +1 do Carniceiro
+  const ag = campAgenda(r), E = CAMP_EVS, P = E.pend;
+  if (CAMP_ATOS[CAMP.et]?.chefe) { if (ag?.caes) P.caes = 1; if (ag?.carn) P.carn = 1; } // etapa de chefe: ficam para depois dela
+  else { // o que não coube nesta rodada (cães e Carniceiro juntos: o Carniceiro) fica para a seguinte
+    if (Z.dogRound) { P.caes = 0; E.ultCaes = r; } else if (ag?.caes) P.caes = 1;
+    if (Z.bossQ) { P.carn = 0; E.ultCarn = r; } else if (ag?.carn) P.carn = 1;
+  }
+  Z.nextDog = Z.nextBoss = 1e9; // o zStartRound marcou os próximos pelo clássico: com objetivos só vale a agenda
+  if (ag?.ev && campEvPode(r) && campEvCabe(ag.ev) && campEvLiga(ag.ev)) { const U = E.inf.ult; U.push(ag.ev); while (U.length > CAMP_INF.ev.semRepetir) U.shift(); } // o infinito depois dos objetivos não repete os últimos da agenda
 });
 CAMP_GANCHOS.fimRodada.push(r => { campEvDesliga(); campEvAgendaProx(r + 1); });
 CAMP_GANCHOS.tick.push(campEvTick);
@@ -27942,7 +27997,7 @@ function campEvInf() { // infinito: um evento a cada 5 rodadas a partir da 5ª, 
   if (r < I.vistoR) { I.vistoR = 0; I.prox = D.de; I.ult = []; CAMP_EVS.cx = []; } // partida nova
   if (Z.phase !== 'round' || r === I.vistoR) return; I.vistoR = r;
   if (r < I.prox || !campEvPode(r)) return; // cães ou chefe: fica para a próxima
-  const L = D.lista.filter(id => !I.ult.includes(id) && (id !== 'relogio' || r >= D.relogioDe)); if (!L.length) return;
+  const L = D.lista.filter(id => !I.ult.includes(id) && (id !== 'relogio' || r >= D.relogioDe) && (!campRitmo() || campEvCabe(id))); if (!L.length) return; // depois dos objetivos do mapa: a Névoa só com água
   const id = L[Math.floor(Math.random() * L.length)]; I.ult.push(id); while (I.ult.length > D.semRepetir) I.ult.shift();
   I.prox = Math.max(I.prox + D.cada, r + 1);
   campEvLiga(id);
@@ -28109,7 +28164,7 @@ function campEvCxQuadro(o, e) { // caixotes no cliente: queda com paraquedas, fu
   }
   c.perto = best; if (best) { o.x = best.x; o.z = best.z; } else { o.x = o.x0; o.z = o.z0; }
 }
-if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_EV, CAMP_AGENDA, CAMP_INF, CAMP_EVS, CAMP_EVC, CAMP_EV_G, campEvLiga, campEvDesliga, campEvPode, campEvPeso, campEvAnim, campEvCxSolta, campEvCxAbre, campEvInf, campEvTipo, V3, ZDIFF, zHpK,
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_EV, CAMP_AGENDA, CAMP_INF, CAMP_EVS, CAMP_EVC, CAMP_EV_G, CAMP_RITMO, campAgenda, campEvCabe, campCurva, campRitmo, campEvAgendaProx, zInfRodada, campEvLiga, campEvDesliga, campEvPode, campEvPeso, campEvAnim, campEvCxSolta, campEvCxAbre, campEvInf, campEvTipo, V3, ZDIFF, zHpK,
   campEvVis: () => ({ far: scene.fog?.far, near: scene.fog?.near, cor: scene.fog?.color.getHex(), fundo: scene.background?.getHex?.(), hemi: hemi.intensity, fill: VIS.fill.intensity, pool: ZC.world?.pool?.map(P => P.L.intensity) || [],
     luz: LUZ ? LUZ.base[0] : null, anim: MAP_ANIM.includes(campEvAnim), cur: G.cur, man: !!CAMP_EVC.man?.isConnected && CAMP_EVC.man.style.display !== 'none', manTxt: CAMP_EVC.man?.querySelector('b')?.textContent || '', vis: CAMP_EVC.vis,
     molde: (() => { for (const [k, t] of ZTPL) if (k.startsWith('2,') && t.geo?.B) return Math.max(...t.geo.B.attributes.color.array); return null; })() }) }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
@@ -28199,8 +28254,18 @@ function campZkAgua() { // pontos de água das áreas abertas (lista nova: só n
   for (const a of L) if (act.has(a[2] ?? zRoomAt(a[0], a[1]))) out.push(a);
   return out.length ? out : null;
 }
+const campZkEst = k => { const R = campRitmo(); return R ? R.estreia[k] ?? Infinity : CAMP_MIX[k]?.estreia ?? Infinity; }; // estreia do tipo: a do mapa nos objetivos (fora da lista, nunca)
 function campZkQtd(M, k, r, n, A, inf) { // quantos deste tipo na rodada (a forma vem da CAMP_MIX)
   const pk = (CAMP_ZKV.peso[k] ?? 1) * (typeof campEvPeso === 'function' ? campEvPeso(k) : 1); // evento (D05: Afogado ×2 na Névoa)
+  const R = campRitmo();
+  if (R) { // objetivos do mapa (e o infinito depois deles): tudo conta da estreia no mapa, pela rodada (nunca pela etapa)
+    const e = R.estreia[k]; if (e == null || r < e) return 0; const d = r - e;
+    if (M.frac) { const [a, b] = M.frac, u = clamp(d / CAMP_RITMO.rampa, 0, 1); return Math.round(n * (a + (b - a) * u) * pk); }
+    if (M.trioCada) return Math.floor(n / M.trioCada * pk);
+    if (M.base != null) return Math.min(M.teto ?? 99, M.base + Math.floor(d / (M.cada || 1)));
+    if (M.nRod) return M.nRod[Math.min(d, M.nRod.length - 1)];
+    return 0;
+  }
   if (M.frac) { const [a, b] = M.frac, r0 = inf ? M.estreia : Math.max(A.rod0, M.estreia), u = inf ? clamp((r - r0) / CAMP_ZKV.infRampa, 0, 1) : clamp((r - r0) / Math.max(1, A.rodMax - r0), 0, 1); return Math.round(n * (a + (b - a) * u) * pk); }
   if (M.trioCada) return Math.floor(n / M.trioCada * pk);
   if (M.base != null) return Math.min(M.teto ?? 99, M.base + Math.floor((r - (M.desde ?? M.estreia)) / (M.cada || 1)));
@@ -28208,16 +28273,16 @@ function campZkQtd(M, k, r, n, A, inf) { // quantos deste tipo na rodada (a form
   return 0;
 }
 function campZkCotas() { // cotas da rodada (1ª vez que nasce alguém nela)
-  const S_ = CAMP_ZKS, r = Z.round, inf = CAMP.modo === 'infinito', A = CAMP_ATOS[CAMP.et], n = Z.toSpawn + Z.zs.size;
+  const S_ = CAMP_ZKS, r = Z.round, inf = CAMP.modo === 'infinito', A = CAMP_ATOS[CAMP.et], n = Z.toSpawn + Z.zs.size, R = campRitmo();
   S_.r = r; S_.rest = {}; S_.trio = 0; S_.trioPt = null;
   if (Z.dogRound || (!inf && (!A || A.chefe))) return; // rodada de cães; rodada de chefe (os lacaios são do D07)
   let livre = Math.floor(n * CAMP_ZKV.tetoEsp) - (Z.mixN || 0); const esp = typeof campEvEspeciais === 'function' ? campEvEspeciais() : null; // evento que só deixa alguns especiais (D05)
   for (const k of Object.keys(CAMP_MIX)) {
-    const kk = +k, M = CAMP_MIX[k], K = CAMP_ZK[kk]; if (!ZKIND[kk] || ZKIND[kk].chefe || r < M.estreia || livre <= 0 || (esp && !esp.includes(kk))) continue;
-    if (!inf && K?.mapas && !K.mapas.includes(curMapId)) continue;
-    if (M.agua && !CAMP_AGUA[curMapId]?.length) continue;
+    const kk = +k, M = CAMP_MIX[k], K = CAMP_ZK[kk], est = campZkEst(kk); if (!ZKIND[kk] || ZKIND[kk].chefe || r < est || livre <= 0 || (esp && !esp.includes(kk))) continue;
+    if (!inf && !R && K?.mapas && !K.mapas.includes(curMapId)) continue; // objetivos do mapa: quem decide é a lista de estreias do mapa
+    if (M.agua && !campZkAgua()) continue; // sem água aberta agora não ocupa a vaga dos outros (antes a cota ficava presa e sumia)
     const un = M.trioCada ? (K?.trio || 3) : 1; let q = campZkQtd(M, kk, r, n, A, inf);
-    if (r === M.estreia) q = Math.min(q, 1); // estreia: só 1 (o trio conta como 1)
+    if (r === est) q = Math.min(q, 1); // estreia: só 1 (o trio conta como 1)
     q = Math.max(0, Math.min(q, Math.floor(livre / un))); livre -= q * un;
     if (q) S_.rest[kk] = q;
   }
@@ -28257,7 +28322,7 @@ function campZkNasce(z, cands) { // CAMP_G.nasce: Afogado só na água; o trio s
 }
 function campZkStatus(z) { // CAMP_G.status (fim do zSpawnOne): curva do ato, cota, legenda, trio e os números do tipo
   const S_ = CAMP_ZKS, D = zDf();
-  if (CAMP.modo === 'campanha' && !z.dog && !ZKIND[z.kind].chefe) { const A = CAMP_ATOS[CAMP.et], C_ = A && CAMP_CURVA[A.id]; if (C_?.vidaK) z.hp = Math.round(z.hp * C_.vidaK); }
+  if (!z.dog && !ZKIND[z.kind].chefe) { const C_ = campCurva(Z.round); if (C_ && C_.vidaK !== 1) z.hp = Math.round(z.hp * C_.vidaK); } // curva do mapa pela rodada (CAMP_CURVA)
   const K = CAMP_ZK[z.kind];
   if (S_.novo && S_.novo === z.kind) { // comum que virou tipo novo: o zSpawnOne desconta da Z.mix do clássico, então soma antes (fica igual)
     if (Z.mix) Z.mix[z.kind] = (Z.mix[z.kind] || 0) + 1; Z.mixN = (Z.mixN || 0) + 1; S_.novo = 0;
@@ -29362,16 +29427,18 @@ function campZk2Garantia(k) { // CAMP_G.tipo, logo depois do sorteio do O3-D06 (
   // estreia. Aqui o que falta para a cota da CAMP_MIX (na estreia, 1) sai de um especial do clássico (o de maior conta); sem nenhum, a
   // estreia e a quantidade fixa (n) tiram do tipo novo de fração com mais cota. O total de especiais da rodada não muda (teto igual).
   const S_ = CAMP_ZKS, G = CAMP_ZK2S; if (S_.r !== Z.round || G.garR === Z.round) return k; G.garR = Z.round;
-  const r = Z.round, inf = CAMP.modo === 'infinito', A = CAMP_ATOS[CAMP.et], n = Z.toSpawn + Z.zs.size, esp = typeof campEvEspeciais === 'function' ? campEvEspeciais() : null;
+  const r = Z.round, inf = CAMP.modo === 'infinito', A = CAMP_ATOS[CAMP.et], n = Z.toSpawn + Z.zs.size, esp = typeof campEvEspeciais === 'function' ? campEvEspeciais() : null, R = campRitmo();
   if (Z.dogRound || (!inf && (!A || A.chefe))) return k;
   for (const kk in CAMP_MIX) {
-    const M = CAMP_MIX[kk], K = CAMP_ZK[kk], j = +kk; if (M.trioCada || !ZKIND[j] || ZKIND[j].chefe || r < M.estreia || (esp && !esp.includes(j))) continue;
-    if ((!inf && K?.mapas && !K.mapas.includes(curMapId)) || (M.agua && !CAMP_AGUA[curMapId]?.length)) continue;
-    const q = campZkQtd(M, j, r, n, A, inf), quer = r === M.estreia ? Math.min(1, q) : q, fixo = r === M.estreia || !!M.n;
+    const M = CAMP_MIX[kk], K = CAMP_ZK[kk], j = +kk, est = campZkEst(j); if ((M.trioCada && !R) || !ZKIND[j] || ZKIND[j].chefe || r < est || (esp && !esp.includes(j))) continue;
+    if ((!inf && !R && K?.mapas && !K.mapas.includes(curMapId)) || (M.agua && !campZkAgua())) continue;
+    // objetivos do mapa: o Soldado (trio) também tem 1 trio garantido por rodada (antes o Penitente e os especiais do clássico ocupavam o
+    // teto e ele sumia da Vila, inclusive no infinito); cada trio sai de 3 especiais do clássico, e sem 3 para trocar fica sem
+    const un = campZkUn(j), q = campZkQtd(M, j, r, n, A, inf), quer = r === est || un > 1 ? Math.min(1, q) : q, fixo = r === est || !!(R ? M.nRod : M.n);
     while ((S_.rest[j] || 0) < quer) {
-      let c = -1; for (let i = 1; i < Math.min(6, Z.mix?.length || 0); i++) if (Z.mix[i] > (c < 0 ? 0 : Z.mix[c])) c = i;
-      if (c >= 0) { Z.mix[c]--; Z.mixN--; }
-      else { if (!fixo) break; let d = -1; for (const o in S_.rest) if (+o !== j && CAMP_MIX[o]?.frac && S_.rest[o] > (d < 0 ? 0 : S_.rest[d])) d = +o; if (d < 0) break; S_.rest[d]--; }
+      let cl = 0; for (let i = 1; i < Math.min(6, Z.mix?.length || 0); i++) cl += Z.mix[i];
+      if (cl >= un) for (let u = 0; u < un; u++) { let c = 1; for (let i = 2; i < Math.min(6, Z.mix.length); i++) if (Z.mix[i] > Z.mix[c]) c = i; Z.mix[c]--; Z.mixN--; }
+      else { if (!fixo || un > 1) break; let d = -1; for (const o in S_.rest) if (+o !== j && CAMP_MIX[o]?.frac && S_.rest[o] > (d < 0 ? 0 : S_.rest[d])) d = +o; if (d < 0) break; S_.rest[d]--; }
       S_.rest[j] = (S_.rest[j] || 0) + 1;
     }
   }
