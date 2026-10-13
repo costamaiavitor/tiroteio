@@ -37,7 +37,7 @@ export const ZBAL = {
   secreta: { alcance: 1.6 }, // passagem secreta (parede falsa): o F só aparece a menos disso dela
   // Etapa 7: caixa misteriosa e lugares sorteados
   caixa: { qualquerLugar: true },
-  lugares: { sortear: true, papChance: .7, energiaChance: .7 }, // a cada partida: bebidas trocam entre si; PaP vai para o lugar de uma bebida e a energia troca com um giz (chances) // depois do ursinho, qualquer lugar da caixa do mapa (não só as áreas já abertas)
+  lugares: { sortear: true, papChance: .7, energiaCusto: [1500, 3500] }, // a cada partida: bebidas trocam entre si; PaP vai para o lugar de uma bebida (chance) e a energia fica sempre numa área média: custo das portas até ela entre energiaCusto[0] e [1] (no lugar dela ou trocando com um giz de parede) // depois do ursinho, qualquer lugar da caixa do mapa (não só as áreas já abertas)
   // Etapa 8: energia e Pack-a-Punch construídos com peças espalhadas pelo mapa
   construcao: {
     ligada: true,

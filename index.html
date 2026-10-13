@@ -23585,8 +23585,8 @@ function zClearDynamic() {
   for (const id of [...ZC.vult.keys()]) zVultRemove(id);
 }
 // zumbi-v2 (Etapa 7): a cada partida (semente st.seed, igual no host e nos clientes) as bebidas trocam de lugar entre si, o Pack-a-Punch
-// pode ir para o lugar de uma bebida que tenha espaço para ele (a bebida fica no lugar antigo do PaP) e a energia troca com um giz de arma
-// (os dois ficam na parede). Só lugares já auditados (sem sobreposição, sem bloquear passagem, alcançáveis abrindo portas). Sem semente: lugares fixos.
+// pode ir para o lugar de uma bebida que tenha espaço para ele (a bebida fica no lugar antigo do PaP) e a energia fica sempre numa área de custo
+// médio (no lugar dela ou trocando com um giz de parede). Só lugares já auditados (sem sobreposição, sem bloquear passagem, alcançáveis abrindo portas). Sem semente: lugares fixos.
 function zRng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 function zSorteiaLugares(D, seed) {
   const pos = o => ({ x: o.x, z: o.z, n: o.n }), put = (o, l) => { o.x = l.x; o.z = l.z; o.n = l.n; };
@@ -23604,7 +23604,11 @@ function zSorteiaLugares(D, seed) {
     L.papCabe ||= L.perks.map(cabe); // calculado uma vez, com o COL só do mapa (igual no host e nos clientes)
     const ks = D.perks.map((pk, i) => i).filter(i => L.papCabe[L.perks.findIndex(l => l.x === D.perks[i].x && l.z === D.perks[i].z)]); if (ks.length) { const i = ks[Math.floor(R() * ks.length)], l = pos(D.perks[i]); put(D.perks[i], L.pap); put(D.pap, { x: l.x + l.n[0] * .05, z: l.z + l.n[1] * .05, n: l.n }); } /* zv2-R3: o corpo do PaP tem 1 m de fundo e o da bebida 0,9: meio da diferença para fora, senão o PaP entrava 5 cm na parede */
   }
-  if (D.power && D.wall?.length && R() < ZBAL.lugares.energiaChance) { const ks = D.wall.map((w, i) => i).filter(i => !D.wall[i].post); /* zv2-R3: só giz pintado na parede (o de placa em pé deixava o quadro da energia flutuando sem parede atrás) */ if (ks.length) { const i = ks[Math.floor(R() * ks.length)], l = pos(D.wall[i]); put(D.wall[i], L.power); put(D.power, l); } }
+  if (D.power) { // decisão do dono (13/10): a energia cai sempre numa área de custo médio (ZBAL.lugares.energiaCusto), no lugar dela ou trocando com um giz
+    const [cMin, cMax] = ZBAL.lugares.energiaCusto, custo = zCustoAreas(D), medio = o => { const c = custo[D.zoneAt?.(o.x, o.z)]; return c !== undefined && c >= cMin && c <= cMax; };
+    const ks = [...(medio(D.power) ? [-1] : []), ...(D.wall || []).map((w, i) => i).filter(i => !D.wall[i].post && medio(D.wall[i]))]; /* zv2-R3: só giz pintado na parede (o de placa em pé deixava o quadro da energia flutuando sem parede atrás) */
+    if (ks.length) { const i = ks[Math.floor(R() * ks.length)]; if (i >= 0) { const l = pos(D.wall[i]); put(D.wall[i], L.power); put(D.power, l); } }
+  }
 }
 function zBuildWorld(M) {
   zSorteiaLugares(M.z || ZD, C.st?.seed); // zumbi-v2 (Etapa 7)
