@@ -137,15 +137,19 @@ Lista completa em `docs/zumbi-v2/bugs.md`. Os principais:
 | R3 | 6–9 | HUD limpo. 80 sementes por mapa: tudo alcançável e sem sobreposição. Peças: quantidade certa e nunca em área cara. Partida do início ao PaP nível 3 no Pesadelo sem travar. |
 | RF (final) | todas | 8 partidas completas (Vila e Sanatório × 4 dificuldades, até a rodada 30), com host e cliente: todas as portas, peças, montagem, energia, PaP 1→2→3, 13 bebidas e 84 usos da caixa por partida. 0 erros, 0 zumbis presos, host e cliente iguais. Campanha, infinito e PvP sem regressão (radar do PvP igual ao da main). Suíte 223/223. Um teste da Etapa 8 falhava às vezes (1 em 10) por defeito do próprio teste; corrigido e conferido 12/12. |
 
-## 8. Pendências (decisão sua)
+## 8. Pendências: decididas em 13/10 (branch `zumbi-v2-decisoes`)
 
-1. **Recuo de câmera:** hoje não existe em nenhuma arma, só o coice visual. Criar recuo muda o jeito de jogar.
-2. **Kar98k:** dano 400 → sugestão 600–700.
-3. **M16:** `rate` .32 → .22 (é o fuzil mais fraco).
-4. **Passagens secretas:** usar a textura do muro (hoje é um painel liso de cor fixa, que destoa na Vila).
-5. **Veloz no Pesadelo:** chega a 6,6–8,0 m/s, mais rápido que os cães.
-6. **Energia:** pode sair para o lugar de um giz em área cara. Opção: limitar ao custo médio, como as peças.
-7. **Traçante das armas maravilha:** o PaP II e III troca o traçante próprio delas (a Ray Gun fica laranja ou vermelha).
-8. **Sem animação:** inspeção de arma de fogo, ejeção parcial de cápsulas na Olympia e na Python, e a manga clara no canto da tela nas armas com empunhadura vertical.
-9. **Infinito:** hoje sorteia os lugares e pede as peças, como o clássico (só a campanha fica fixa). Confirmar se é isso que você quer.
-10. **Liquidação:** com ela ativa, qualquer nível do PaP custa 1000, inclusive o nível 3 (normalmente 20000).
+Detalhes, testes e fotos em `docs/zumbi-v2/decisoes_13-10.md`.
+
+1. **Recuo de câmera:** fica como está (sem recuo de câmera).
+2. **Kar98k:** 600 de dano, só no modo zumbi (`ZBAL.armas.ajuste`).
+3. **M16:** `rate` .22 (`ZBAL.armas.ajuste`).
+4. **Passagens secretas:** usam as camadas do muro vizinho (textura, faixa, sujeira), alinhadas à face do muro e cobrindo o batente.
+5. **Velocidade:** nenhum zumbi passa do cão mais rápido da dificuldade (`ZBAL.tamanho.velMax`).
+6. **Energia:** sempre numa área de custo médio (`ZBAL.lugares.energiaCusto`, 1500–3500).
+7. **Traçante das armas maravilha:** mantém o do PaP dela nos níveis II e III.
+8. **Animações:** inspeção de arma de fogo (F), Python/Olympia ejetam só as cápsulas disparadas, mão na empunhadura vertical sem a manga na tela.
+9. **Infinito:** depois dos créditos da campanha a partida segue em rodadas infinitas; escalada com mais zumbis, rodada mista (zumbis, cães e Carniceiro), mais Carniceiros e chefes de campo a cada 5 rodadas depois da 40 (`ZBAL.infinito`).
+10. **PaP em oferta:** 1000, 3000 e 5000 por nível (`ZBAL.pap.oferta`).
+
+Pedidos seguintes do mesmo dia: camuflagem do PaP por nível, pontos para quem liga armadilha/pega Nuke, clique na recarga sem tiro sozinho.

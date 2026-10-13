@@ -42,11 +42,14 @@ Todos corrigidos; detalhes no relatório final.
 - **Recarga automática do último tiro na arma errada:** se o jogador trocava de arma logo depois do último tiro, a recarga começava na arma nova. Agora a recarga só começa se a arma da mão for a mesma do tiro.
 - **Olympia com PaP II e III:** ficava com 3 no pente; agora fica com 2.
 
-## Pendentes (mudança grande; precisam de aprovação)
-- **Passagens secretas:** o painel é liso e numa cor fixa por mapa, sem a textura do muro. Na Vila ele destoa do muro escuro, e quem olha com atenção acha. Usar o material do tema da parede exige ler o material da parede da montagem do mapa.
-- **Recuo de câmera:** nenhuma arma tem recuo de câmera; `G.punchP`/`G.punchY` nunca recebem soma. Criar recuo de verdade muda o jeito de jogar de todas as armas.
-- **Kar98k:** 400 de dano para uma arma de ferrolho, menos que a Dragunov semiautomática. Sugestão: 600–700.
-- **M16:** é o fuzil mais fraco da caixa (DPS 633). Sugestão: `rate` .32 → .22.
-- **Olympia e Python:** a recarga sempre ejeta todas as cápsulas, mesmo depois de 1 tiro (estético).
-- **Inspeção de arma de fogo:** não existe animação de inspeção para armas de fogo, só para a faca.
-- **Mangas:** a manga clara aparece no canto da tela nas armas com empunhadura vertical (Thompson, MP5K, PM63).
+## Pendentes: decididos em 13/10
+- **Passagens secretas:** corrigido (camadas do muro vizinho).
+- **Recuo de câmera:** o dono decidiu deixar sem.
+- **Kar98k e M16:** ajustados (600 de dano; `rate` .22).
+- **Olympia e Python:** corrigido (só as cápsulas disparadas).
+- **Inspeção de arma de fogo:** criada (F sem nada para usar perto).
+- **Mangas:** corrigido (mão girada na empunhadura vertical).
+
+## Achados de 13/10 (pedidos do dono)
+- **Clique durante a recarga disparava sozinho no fim:** corrigido; teste `tests/gatilho-recarga.test.mjs`.
+- **Armadilha, Nuke, fogo e vapor não davam pontos:** agora quem ligou/pegou ganha; teste `tests/pontos-sem-tiro.test.mjs`.
