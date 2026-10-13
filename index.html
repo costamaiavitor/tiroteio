@@ -20421,6 +20421,23 @@ function knifeAnim(o, ud) {
   }
   if (kp) kp.quaternion.setFromAxisAngle(ud.spinAx, spin);
 }
+// Decisão do dono (13/10): inspeção das armas de fogo (F sem nada para usar perto). Só a raiz da arma na mão se mexe (braços juntos):
+// traz para o meio, mostra um lado, vira e mostra o outro, volta. Para na hora com tiro, recarga, mira, luneta, corrida, troca ou queda.
+// Quadros: [t (0–1), x, y, z, giro x, y, z] somados à pose do quadril, entre eles curva suave (sem passar do alvo).
+const GINSP = { dur: 2.6, fr: [[0, 0, 0, 0, 0, 0, 0], [.2, -.06, .03, .04, .1, .55, .35], [.45, -.065, .035, .045, .12, .6, .4], [.63, -.005, .04, 0, .2, .12, -.36], [.85, -.005, .045, 0, .22, .15, -.4], [1, 0, 0, 0, 0, 0, 0]] };
+function armaInspect() {
+  const w = W[G.cur]; if (!w) return;
+  if (['knife', 'karambit'].includes(w.model)) return knifeInspect();
+  if ((w.slot !== 'primary' && w.slot !== 'secondary') || G.gin || now < G.switchEnd || now < G.reloadEnd || now < G.nextFire || (G.ads || 0) > .02 || G.scope || me.sprinting || me.downed || !me.alive) return;
+  G.gin = { t0: now };
+}
+function armaInspectPose(o) {
+  const S = G.gin; if (!S) return;
+  if (now - S.t0 >= GINSP.dur || G.nextFire > S.t0 || now < G.reloadEnd || (G.ads || 0) > .02 || G.scope || me.sprinting || me.downed || !me.alive || now < G.switchEnd) { G.gin = null; return; }
+  const t = (now - S.t0) / GINSP.dur, fr = GINSP.fr; let i = 1; while (i < fr.length - 1 && t > fr[i][0]) i++;
+  const A = fr[i - 1], B = fr[i], k = smooth(clamp((t - A[0]) / (B[0] - A[0]), 0, 1)), v = j => lerp(A[j], B[j], k);
+  o.x += v(1); o.y += v(2); o.z += v(3); o.rx += v(4); o.ry += v(5); o.rz += v(6);
+}
 function knifeInspect() {
   if (vmGun?.userData.armsKnife) { if (ARMS.cur === 'idle') armsPlay('inspect'); return; }
   if (vmGun?.userData.fps2?.knife) { if (vmGun.userData.fps2.cur === 'idle') fpPlay(vmGun.userData, 'inspect', 1.6); return; } // o clipe do pacote é curto (0,8 s): mais devagar
@@ -20654,6 +20671,7 @@ function updateViewmodel(dt) {
   if (G.swing > 0) { G.swing = Math.max(0, G.swing - dt * 4); if (ud.toss) nadeToss(ud, o, 1 - G.swing); else { const s = Math.sin(G.swing * Math.PI); o.ry += s * 1.1; o.x -= s * .12; o.z -= s * .1; } } // (a8) arremesso/colocação
   if (ud.tossFim) nadeVolta(ud, o); // 6-w11: o próximo objeto sobe na mão
   if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model) && !ud.armsKnife && !ud.fps2) knifeAnim(o, ud);
+  armaInspectPose(o); // inspeção da arma de fogo (F)
   if (me.downed) { o.y -= .04; o.rz += .35; }
   // correndo: arma abaixada e de lado, balançando mais; deslize, pulo, pouso e agachar (a13, ver vmMove)
   w18Mola(me, 'sprintK', 'sprintV', me.sprinting ? 1 : 0, W18.corrida, dt, 0, 1); // 6-w18: mola (era lerp dt * 10)
@@ -20694,7 +20712,7 @@ function equip(id, force) {
   if (id !== G.cur) G.last = G.cur;
   G.ads = 0;
   G.swing = 0; // 6-w18: o balanço do arremesso/colocação (G.swing, só visual) ficava para a arma nova, que girava até 63° logo depois do saque
-  G.cur = id; G.reloadEnd = 0; G.reload = null; G.scope = 0; G.rezoom = 0; G.burstN = 0; G.switchDur = W[id]?.model === 'awp' ? .6 : id === 'knife' ? .55 : .35; G.kan = null; G.switchEnd = now + G.switchDur; G.shots = 0;
+  G.cur = id; G.reloadEnd = 0; G.reload = null; G.scope = 0; G.rezoom = 0; G.burstN = 0; G.switchDur = W[id]?.model === 'awp' ? .6 : id === 'knife' ? .55 : .35; G.kan = null; G.gin = null; G.switchEnd = now + G.switchDur; G.shots = 0;
   vmSetWeapon(id); play('draw');
 }
 function applyInv(inv, refill, got) {
@@ -31532,7 +31550,7 @@ addEventListener('keydown', e => {
   if (me.downed && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ', 'KeyV', 'KeyF'].includes(e.code)) return; // caído: só a pistola
   if (G.cur === 'dmach' && hasW('dmach') && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ'].includes(e.code)) return; // Máquina da Morte: não troca até acabar
   switch (e.code) {
-    case 'KeyF': if (ZC.on) zUse(); else knifeInspect(); break;
+    case 'KeyF': if (ZC.on && ZC.act) zUse(); else armaInspect(); break; // zumbi: F usa o que está perto; sem nada perto, inspeciona
     case 'KeyM': if (C.st?.mode === 'rounds') { RMM.big = !RMM.big; RMM.tb = 0; } break; // radar do modo Rodadas: M alterna o mapa inteiro (o minimapa do modo Zumbi saiu na zumbi-v2)
     case 'KeyV': if (ZC.on && me.alive && !me.sprinting && !(ZC.revLocal > 0) && now >= G.nextFire && now >= G.switchEnd) knifeAttack(false); break;
     case 'Digit1': G.inv.primary && equip(G.inv.primary); break;
@@ -32588,7 +32606,7 @@ if (DEBUG) window.__T = { get NOW() { return now; }, showPause, MARKS, startFire
 // ===== O2-C01: ganchos de teste para a auditoria de itens (tools/itens/auditoria.mjs); só leitura e as funções do próprio jogo, nada de gameplay =====
 if (DEBUG) Object.assign(window.__T, { zBuildWalk, footFreeR, segClearR, zRoomAt, zActive, zDoorOpen, zBoxPlace, zHigh, colQuery, ffCell, ZPERKS, ZTRAP, ZMAXPERKS, ZWEAP, PR, STEP, ZVAULT, ZTOP });
 // ===== FIM O2-C01 =====
-if (DEBUG) Object.assign(window.__T, { scene, ZBAL, zFalsaCamufla, zSorteiaLugares, zRng, papProx, PAP_IDS, zConstruida, zPecasPegas, srvZBuild, zTamanho, zForaJanela, zCustoAreas, srvZUse, get ZDIFF() { return ZDIFF; } }); // zumbi-v2: cena, balanceamento e funções novas para os testes
+if (DEBUG) Object.assign(window.__T, { scene, ZBAL, zFalsaCamufla, armaInspect, zSorteiaLugares, zRng, papProx, PAP_IDS, zConstruida, zPecasPegas, srvZBuild, zTamanho, zForaJanela, zCustoAreas, srvZUse, get ZDIFF() { return ZDIFF; } }); // zumbi-v2: cena, balanceamento e funções novas para os testes
 // ===== O2-C04: ganchos de teste dos interativos (tests/interativos-zumbi.test.mjs e tools/itens/auditoria.mjs) =====
 if (DEBUG) Object.assign(window.__T, { ZINT, ZINT_MAPA, ZINT_BARRIL, ZINT_FN, zintUsar, zintTiro, zintExplosao, zintBarrilBoom, zintEstado, zintAud, zintSync, zintMsg, zExplode, zWorldState });
 // ===== FIM O2-C04 =====
