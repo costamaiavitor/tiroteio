@@ -25060,7 +25060,7 @@ function zTickClouds() { // nuvem do Tóxico (7 s, 2,8 m): tira vida de quem fic
     for (const c of Z.clouds) if (Math.hypot(p.pos[0] - c.x, p.pos[2] - c.z) < 2.8 && Math.abs(p.pos[1] - c.y) < 2.5) { p.toxT = now + .5; zHurt(p, dmg, null); break; }
   }
 }
-function zRecycle(z) { Z.zs.delete(z.id); Z.toSpawn++; if (z.kind) Z.reQ.push([z.kind, ZKIND[z.kind].chefe ? z.hp : 0, z.maxHp]); broadcast({ t: 'zgone', id: z.id }); } // especial volta para a fila com o mesmo tipo
+function zRecycle(z) { Z.zs.delete(z.id); Z.toSpawn++; if (z.dog && !Z.dogRound) Z.mistaCaes++; /* cão da rodada mista volta como cão (revisor) */ else if (z.kind) Z.reQ.push([z.kind, ZKIND[z.kind].chefe ? z.hp : 0, z.maxHp]); broadcast({ t: 'zgone', id: z.id }); } // especial volta para a fila com o mesmo tipo
 const ZSEE_R = 45, ZSEE_MAX = 60, _zsA = new V3(), _zsB = new V3();
 function zSeen(z) { const P = z.body.pos; _zsB.set(P.x, P.y + 1.1, P.z); for (const q of S.players.values()) { if (!q.alive) continue; const d = hyp(q.pos[0] - P.x, q.pos[2] - P.z); if (d > ZSEE_R) continue; _zsA.set(q.pos[0], q.pos[1] + 1.6, q.pos[2]); if (losClear(_zsA, _zsB) || losClear(_zsA, _zsB.set(P.x, P.y + 1.7, P.z))) return true; _zsB.set(P.x, P.y + 1.1, P.z); } return false; }
 function zSeenHold(z) { if (!zSeen(z)) { z.hold0 = 0; return false; } if (!z.hold0) z.hold0 = now; return now - z.hold0 < ZSEE_MAX; } // visto: adia (o jogador pode matar)
