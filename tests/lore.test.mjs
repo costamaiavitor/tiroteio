@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { abrirJogo, criarSala, noJogo } from './_jogo.mjs';
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const LORE = fs.readFileSync(path.join(RAIZ, 'docs/overhaul/lore.md'), 'utf8');
+const LORE = fs.readFileSync(path.join(RAIZ, 'docs/overhaul/lore.md'), 'utf8').replace(/\r\n/g, '\n'); // zumbi-v2: a cópia de trabalho pode vir com CRLF (core.autocrlf)
 const CAMPANHA = fs.readFileSync(path.join(RAIZ, 'docs/overhaul/campanha.md'), 'utf8');
 const HTML = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
 const TABELAS = ['ZINT_TERM_TXT', 'CAMP_NOTA_TXT', 'CAMP_RADIO_TXT', 'CAMP_FALA_TXT', 'CAMP_CENA_TXT'];
@@ -162,7 +162,7 @@ test('nota: ato da entrada (CAMP.on, CAMP.ato), outro jogador lê só para ele, 
     // o adaptador lê o CAMP do D02 quando ele existir; aqui a regra do ato é conferida com a forca desligada (sem CAMP: desligada)
     const semCamp = T.zintNotaLigada(o3); T.ZNOTA.forca = true;
     const i = nota[2], c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 4, name: 'Leitor' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
+    T.srvOnData(c, { t: 'join', v: 2, pv: 5, name: 'Leitor' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
     T.sim(1.2); const zi = c.out.find(m => m.t === 'state' && Array.isArray(m.z?.zi))?.z.zi;
     q.alive = true; q.downed = false; poe(q, ...frente(i)); c.out.length = 0; T.zintLoreFecha(false);
     T.srvOnData(c, { t: 'use', k: 'zint', id: i });

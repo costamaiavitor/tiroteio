@@ -144,6 +144,7 @@ async function main() {
   const args = SEMGPU ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--use-angle=d3d11', '--enable-gpu-rasterization', '--ignore-gpu-blocklist'];
   const br = await chromium.launch({ args: [...args, '--autoplay-policy=no-user-gesture-required'] });
   const pg = await br.newPage({ viewport: { width: 960, height: 540 } });
+  if (!process.env.ZV2_SORTEIO) await pg.addInitScript(() => { window.__semSorteio = true; }); // zumbi-v2: lugares fixos e sem peças
   const erros = []; pg.on('pageerror', e => erros.push(String(e.stack || e).slice(0, 300)));
   pg.on('console', m => { if (m.type() === 'warning' && /O2-C0/.test(m.text())) erros.push('console: ' + m.text()); });
   await pg.route(u => !/^http:\/\/(localhost|127\.0\.0\.1)/.test(String(u)), r => r.abort());

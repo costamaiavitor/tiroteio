@@ -23,6 +23,7 @@ export async function abrirJogo({ console: log = false } = {}) {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
   await ctx.route(/peerjs/, r => r.abort());
+  if (!process.env.ZV2_SORTEIO) await ctx.addInitScript(() => { window.__semSorteio = true; }); // zumbi-v2: lugares fixos e sem peças nos testes antigos (os do sorteio ligam ZV2_SORTEIO ou chamam o sorteio direto)
   const page = await ctx.newPage(), erros = [];
   page.on('pageerror', e => erros.push(String(e.stack || e).slice(0, 400)));
   if (log) page.on('console', m => console.log('[pág]', m.text()));

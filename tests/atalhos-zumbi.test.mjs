@@ -34,7 +34,7 @@ test('atalho: Sanatório monta 3 portas corta-fogo (vão furado, colisor no COL)
   await criarSala(J.page, { mode: 'zombies', map: 'sanatorio', zdiff: 1 });
   const r = await noJogo(J.page, (T, VAO) => {
     if (T.Z.phase !== 'round') T.zStartRound(); T.sim(.2);
-    const vao = new Function('return ' + VAO)(), D = T.ZD.doors.filter(d => d.atalho), L = T.ZD.zint, I = L.map((o, i) => i).filter(i => L[i].t === 'interruptor'), COL = T.COL();
+    const vao = new Function('return ' + VAO)(), D = T.ZD.doors.filter(d => d.atalho && !d.secreta), L = T.ZD.zint, I = L.map((o, i) => i).filter(i => L[i].t === 'interruptor'), COL = T.COL();
     return { ids: D.map(d => d.id), kinds: [...new Set(D.map(d => d.kind))], col: D.every(d => COL.includes(T.ZC.world.doors.get(d.id)?.col)), vao: D.map(d => vao(T, d)),
       ints: I.map(i => L[i].id), st: I.every(i => T.Z.zint[i].st === 'pronto' && T.ZC.zint[i].st === 'pronto'), icol: I.every(i => COL.includes(T.ZC.world.zint[i].col) && T.ZC.world.zint[i].col.maxY === T.ZC.world.zint[i].h),
       travas: D.filter(d => d.trava).map(d => d.trava), aud: T.zintAud().filter(a => a.tipo === 'interruptor').every(a => a.forca0 === 2 && a.corpo) };
@@ -103,7 +103,7 @@ test('atalho: destravado, só abre com as duas áreas ativas; aberto, cobra, tir
 test('atalho: quem entra no meio recebe a porta aberta e o interruptor ligado (e o mundo do cliente aplica sem efeito)', { timeout: 120000 }, async () => {
   const r = await noJogo(J.page, T => {
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 4, name: 'Novo' }); if (!T.S.players.get(c.pid)) return { semJogador: true };
+    T.srvOnData(c, { t: 'join', v: 2, pv: 5, name: 'Novo' }); if (!T.S.players.get(c.pid)) return { semJogador: true };
     T.sim(1.2); const z = c.out.filter(m => m.t === 'state' && m.z).pop()?.z; T.srvDrop?.(c);
     const L = T.ZD.zint, i = L.findIndex(o => o.id === 'ala-oeste');
     const st = T.zWorldState(); T.buildMap('sanatorio'); // cliente novo: mundo montado do zero (portas fechadas, interruptores desligados)
@@ -137,7 +137,7 @@ test('atalho: Vila monta 3 cercas e a porteira; a tranca é grátis e sem energi
   const r = await noJogo(J.page, (T, a) => {
     if (T.Z.phase !== 'round') T.zStartRound(); T.sim(.2);
     const { p, L, poe, abre, porta, ii, frente, lado, prompt } = (new Function('return ' + a.PREP)())(T), vao = new Function('return ' + a.VAO)(), out = {};
-    const D = T.ZD.doors.filter(d => d.atalho); out.kinds = D.map(d => d.id + ':' + d.kind); out.vao = D.map(d => vao(T, d));
+    const D = T.ZD.doors.filter(d => d.atalho && !d.secreta); out.kinds = D.map(d => d.id + ':' + d.kind); out.vao = D.map(d => vao(T, d));
     const d = porta('atalho-CG'), i = ii('porteira-estacao'), o = L[i]; p.money = 5000;
     abre('AC'); abre('BC'); abre('BF'); abre('FG'); // Fazenda e Estação ativas pelo caminho longo
     poe(...lado(d, -1)); out.trancada = prompt()?.txt; T.srvZUse(p, { k: 'door', id: d.id }); out.trancadaSrv = T.Z.doors.has(d.id);

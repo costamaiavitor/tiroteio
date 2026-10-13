@@ -370,6 +370,7 @@ function auditar(cfg) {
 // ---------------------------------------------------------------------------------------------------------------
 async function abrir(br, port) {
   const pg = await br.newPage({ viewport: { width: 960, height: 540 } });
+  if (!process.env.ZV2_SORTEIO) await pg.addInitScript(() => { window.__semSorteio = true; }); // zumbi-v2: lugares fixos (ZV2_SORTEIO=1 audita uma partida sorteada)
   const erros = []; pg.on('pageerror', e => erros.push(String(e.stack || e).slice(0, 300)));
   await pg.route(u => !/^http:\/\/(localhost|127\.0\.0\.1)/.test(String(u)), r => r.abort()); // sem rede externa
   await pg.goto(`http://127.0.0.1:${port}/${path.basename(PAGINA)}`, { waitUntil: 'domcontentloaded', timeout: 180000 });

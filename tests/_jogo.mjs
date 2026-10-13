@@ -15,6 +15,7 @@ export async function abrirJogo({ bloquearPeer = true, console: log = false } = 
   // Bloqueia o próprio script do PeerJS (./vendor/peerjs…): sem window.Peer o jogo cria a sala "offline" e nunca fala com o
   // servidor público de pareamento (o Playwright não intercepta WebSocket, então bloquear só o domínio não bastaria).
   if (bloquearPeer) await ctx.route(/peerjs/, r => r.abort());
+  if (!process.env.ZV2_SORTEIO) await ctx.addInitScript(() => { window.__semSorteio = true; }); // zumbi-v2: lugares fixos e sem peças nos testes antigos (os do sorteio ligam ZV2_SORTEIO ou chamam o sorteio direto)
   const page = await ctx.newPage();
   const erros = [];
   page.on('pageerror', e => erros.push(String(e)));

@@ -93,7 +93,7 @@ test('campanha: começa no Ato III com o kit, cena e objetivos de teste; quem en
     T.sim(T.Z.phaseEnd - window.__simNow + .2); // a cena de abertura (cartões do O3-D04) segura a pré-rodada
     const zi = T.ZD.zint.filter(o => o.id?.startsWith('tz-')).map(o => [o.id, !T.ZC.world.zint[T.ZD.zint.indexOf(o)].off]);
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 4, name: 'Meio' }); T.sim(.05);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 5, name: 'Meio' }); T.sim(.05);
     const st = c.out.filter(m => m.t === 'state' && m.z).pop(), q = T.S.players.get(c.pid);
     T.srvDrop(c);
     return { on: e0.on, et: e0.et, ph0, round0, round: T.Z.round, ph: T.Z.phase, cena, inv: p.inv, perks: p.perks, mh: p.maxHp, money: p.money, zi,
@@ -179,7 +179,7 @@ test('objetivo coletar: chave no chão, portador cai e deixa o item, entrega; tr
   const r = await rodar((T, arg, p, poe, segura, idx, zumbi, obj) => {
     segura(); T.campObjAtiva('T.col'); const ik = idx('tz-chv'); const st0 = [T.Z.zint[ik].st, T.ZC.zint[ik].st, T.ZC.world.zint[ik].g.visible];
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 4, name: 'Portador' }); const q = T.S.players.get(c.pid); q.alive = true; q.downed = false; T.sim(.1);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 5, name: 'Portador' }); const q = T.S.players.get(c.pid); q.alive = true; q.downed = false; T.sim(.1);
     q.alive = true; q.downed = false; poe(q, 2, 5.5); T.srvZUse(q, { k: 'zint', id: ik }); T.sim(.1); const lev = [T.Z.zint[ik].st, obj('T.col').q === q.id];
     poe(q, 4, 1); T.sim(.1); q.downed = true; T.sim(.1); const caiu = [T.Z.zint[ik].st, T.ZD.zint[ik].x, T.ZD.zint[ik].z, obj('T.col').q];
     poe(p, 4, 1.2); T.srvZUse(p, { k: 'zint', id: ik }); T.sim(.1); poe(p, -6, 5); T.sim(.1);
@@ -235,7 +235,7 @@ test('4 trocas de mapa seguidas: bagagem (pontos, PaP, bebidas), caído levanta 
     const t = await rodar((T, arg, p) => {
       const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
       const c2 = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-      T.srvOnData(c, { t: 'join', v: 2, pv: 4, name: 'Caido' + arg.k }); T.srvOnData(c2, { t: 'join', v: 2, pv: 4, name: 'Morto' + arg.k });
+      T.srvOnData(c, { t: 'join', v: 2, pv: 5, name: 'Caido' + arg.k }); T.srvOnData(c2, { t: 'join', v: 2, pv: 5, name: 'Morto' + arg.k });
       const q = T.S.players.get(c.pid), m = T.S.players.get(c2.pid); T.sim(.1);
       const dbg = [T.Z.phase, q.alive, q.money, T.CAMP.kitPend.has(q.id)];
       T.Z.zs.clear(); T.Z.toSpawn = 0;
