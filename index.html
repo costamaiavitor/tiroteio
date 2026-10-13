@@ -29664,6 +29664,7 @@ const vgAng = (P, q) => Math.atan2(-(q.pos[0] - P.x), -(q.pos[2] - P.z));
 const VG_LAC = { n: 3, max: [6, 6, 9], onde: 'portoes', get tipo() { return ZKIND[8] ? 8 : 0; } }; // Soldado do O3-D06 (sem ele, comum)
 const VG_PEL = { aviso: 1.5, ativo: 0, rec: 0, forma: null, lacaios: VG_LAC, fala: 'ten-pelotao', som: 'vgapito', ok: () => false, peso: 0 }; // fora do sorteio: o relógio (vgTick) chama
 CAMP_CHEFE[14] = {
+  vidaAtual: 1, // objetivos do mapa (13/10): a vida é a da rodada em que ele entra (a da tabela só vale na arena), como o Foguista
   nome: 'O Vigia', rodada: 10, base: 6, porJog: 4, vel: 2.2, dm: 1.5, aw: .7, ac: 1.4,
   nasce: CAMP_VIGIA.nasce, entrada: 'ten-entrada', primeiroS: 3,
   fases: [{ de: 1, vel: 2.2 }, { de: .66, vel: 2.2, fala: 'ten-fase2' }, { de: .33, vel: 3, fala: 'ten-fase3', danoK: 1.15, baixa: 1 }],
@@ -30571,6 +30572,7 @@ const GAL7_RODADAS = { abre: { 21: ['g7-oeste'], 22: ['g7-norte'], 23: ['g7-lest
 const DR_LAC = { n: 2, cada: 0, get max() { return CAMP_DIRETOR.afogados.max; }, get tipo() { return !CAMP_CH.campo && curMapId === 'galeria7' && ZKIND[9] ? 9 : 0; }, get onde() { return drAguaOnde(); } }; // Afogados (fases 2 e 3)
 CAMP_CH_EF.drDose = q => { if (typeof campZk2Dose === 'function') campZk2Dose(q); else sendTo(q.id, { t: 'camp', k: 'zk', e: 'agarra', s: 4, v: .85 }); }; // a dose do Enfermeiro (O3-D08)
 CAMP_CHEFE[16] = {
+  vidaAtual: 1, // objetivos do mapa (13/10): a vida é a da rodada em que ele entra (a 25 da tabela só vale na arena), como o Foguista
   nome: 'O Diretor', rodada: 25, base: 12, porJog: 8.5, vel: 1.8, dm: 1.6, aw: .8, ac: 1.5, // O3-D15: vida ×1,7 (era base 7 e porJog 5: derrubando os tanques a luta durava ~2,5 min; meta 6–9)
   nasce: CAMP_DIRETOR.nasce, entrada: 'dir-entrada', primeiroS: 3,
   fases: [{ de: 1, vel: 1.8, danoK: drProtecao }, { de: .7, vel: 2.4, fala: 'dir-fase2', lacCada: CAMP_DIRETOR.afogados.cada[1] }, { de: .35, vel: 2.8, fala: 'dir-fase3', avisoK: .8, lacCada: CAMP_DIRETOR.afogados.cada[2], baixa: 1 }],

@@ -56,7 +56,7 @@ test('Vila: I -> II -> C1; II.4 feito -> a etapa C1 começa no intervalo e o Vig
     T.sim(1); const z = CH.z; o.k = z?.kind; o.campo = CH.campo; o.encerra = CH.encerra;
     if (z) { const P = z.body.pos, d = Math.min(...[...T.S.players.values()].map(q => Math.hypot(q.pos[0] - P.x, q.pos[2] - P.z)));
       o.nasce = { livre: livre(P.x, P.z), d: +d.toFixed(1) }; o.hp = z.maxHp; T.sim(3); o.nasce.y = +P.y.toFixed(2); o.nasce.st = z.st; }
-    o.esp = Math.round(T.zHp(10) * 10);
+    o.esp = Math.round(T.zHp(T.Z.round) * T.zHpK(T.Z.round) * 10); // vida da rodada em que ele entra (vidaAtual, 13/10)
     o.cli = T.CAMP.c.ch && [T.CAMP.c.ch.k, T.CAMP.c.ch.f, T.CAMP.c.ch.campo]; o.bar = document.getElementById('zboss').firstChild.nodeValue;
     o.arena = [T.ZD.zint.some(x => x.t === 'curto'), T.forteEstado().anim, T.forteEstado().mapa];
     return o;
@@ -69,7 +69,7 @@ test('Vila: I -> II -> C1; II.4 feito -> a etapa C1 começa no intervalo e o Vig
   assert.equal(r.k, 14); assert.equal(r.campo, true, 'versão de campo'); assert.equal(r.encerra, true, 'a rodada acaba quando ele morre');
   assert.ok(r.nasce.livre, 'nasce em chão andável, alcançável, numa sala aberta ' + JSON.stringify(r.nasce)); assert.ok(Math.abs(r.nasce.y) < .3, JSON.stringify(r));
   assert.ok(r.nasce.d >= 8 && r.nasce.d <= 17, 'perto de um jogador (9 a 16 m) ' + JSON.stringify(r.nasce));
-  assert.equal(r.hp, r.esp, 'vida = zHp(10)·(6 + 4·1) (rodada da tabela, chegue quando chegar)');
+  assert.equal(r.hp, r.esp, 'vida = zHp(rodada em que entra)·(6 + 4·1)');
   assert.deepEqual(r.cli, [14, 1, true]); assert.equal(r.bar, 'O VIGIA · FASE 1', 'barra do chefe no cliente');
   assert.deepEqual(r.arena, [false, false, 'vila'], 'nada da arena na Vila');
   assert.deepEqual(J.erros, []);

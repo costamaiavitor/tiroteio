@@ -96,7 +96,7 @@ test('Diretor de campo: dose, onda, abraço (o tiro no cano solta) e chamada; se
     chao(18, 4); poe(p, 18, -2); T.campChefeAtaca(z, atk('chamada'), p); T.sim(2); const lac = [...T.Z.zs.values()].filter(x => x.lac);
     o.lac = [lac.length, lac.filter(x => x.kind === 10).length]; for (const x of lac) T.Z.zs.delete(x.id); limpa();
     // fase 2: sem tanques (dano cheio), sem mergulho, tamanho 2,2; lacaios comuns (os Afogados eram da água da arena)
-    poe(p, 18, -4); p.dwEnd = 1e12; CH.inv = 0; z.hp = z.maxHp; const h = z.hp; T.zHit(p, z.id, 1000, 'body', 'm1911', false); o.semProt = h - z.hp;
+    poe(p, 18, -4); p.dwEnd = 1e12; CH.inv = 0; z.hp = z.maxHp; const h = z.hp, g = Math.round(z.maxHp * .05); T.zHit(p, z.id, g, 'body', 'm1911', false); o.semProt = [h - z.hp, g]; // 5% da vida: abaixo do limite da fase
     CH.inv = 0; z.hp = z.maxHp * .71; T.zHit(p, z.id, 5000, 'body', 'm1911', false); T.sim(.1); o.f2 = [CH.fase, T.DRSRV.modo, T.ZKIND[16].sz, +z.body.pos.y.toFixed(2)];
     T.DRSRV.nadaT = agora(); T.sim(.5); o.semNado = T.DRSRV.modo;
     T.campChefeLacaios(CH.def.lacaios); const af = [...T.Z.zs.values()].filter(x => x.lac); o.lacF2 = [af.length, af.every(x => x.kind === 0)]; for (const x of af) T.Z.zs.delete(x.id);
@@ -111,7 +111,7 @@ test('Diretor de campo: dose, onda, abraço (o tiro no cano solta) e chamada; se
   assert.equal(r.oAntes, 0); assert.equal(r.onda, 45); assert.ok(r.emp, 'empurrão');
   assert.deepEqual(r.preso, [true, true, true]); assert.deepEqual(r.solto, [0, false], 'o tiro no cano soltou');
   assert.deepEqual(r.lac, [6, 2], 'chamada perto dos jogadores');
-  assert.equal(r.semProt, 1000, 'sem tanques: dano cheio'); assert.deepEqual(r.f2, [1, 'chao', 2.2, 0], 'fase 2 no chão, grande');
+  assert.equal(r.semProt[0], r.semProt[1], 'sem tanques: dano cheio'); assert.deepEqual(r.f2, [1, 'chao', 2.2, 0], 'fase 2 no chão, grande');
   assert.equal(r.semNado, 'chao', 'não nada entre poços fora da arena'); assert.deepEqual(r.lacF2, [2, true]);
   assert.deepEqual(r.f3, [2, 2, '13,13', true], 'fase 3: Pregadores, sem apagão'); assert.equal(r.cura, .03);
   assert.deepEqual(J.erros, []);
