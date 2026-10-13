@@ -26835,8 +26835,9 @@ function campProxObjetivos() { // host: fim de uma etapa (no intervalo): a segui
   CAMP.modo = 'infinito'; CAMP.et = -1; CAMP.obj = {}; CAMP.alvos = []; CAMP.npc = null; CAMP.cadeia = null;
   Z.nextDog = Z.round + 2 + Math.floor(Math.random() * 3); Z.nextBoss = Z.round + 2; CAMP_EVS.inf.prox = Z.round + 2; CAMP_EVS.inf.vistoR = Z.round;
   broadcast({ t: 'camp', k: 'est', ...campCp() });
-  broadcast({ t: 'msg', txt: 'OBJETIVOS CONCLUÍDOS', sub: 'Agora é sobreviver: as rodadas não acabam', dur: 5 });
+  CAMP.fimMsg = now; // A5: o aviso sai no tick seguinte (no fim da rodada, o 'zrend' logo depois escrevia "Rodada N concluída" por cima dele)
 }
+CAMP_GANCHOS.tick.push(() => { if (CAMP.fimMsg != null && now > CAMP.fimMsg) { CAMP.fimMsg = null; broadcast({ t: 'msg', txt: 'OBJETIVOS CONCLUÍDOS', sub: 'Agora é sobreviver: as rodadas não acabam', dur: 5 }); } });
 function campDocsSala() { // host: documentos lidos pela sala na campanha inteira (soma os do mapa atual, O3-D04 campDocs)
   if (typeof campDocs === 'function') for (const id of campDocs().lidos) CAMP.docs.add(id);
   return [...CAMP.docs].sort();
@@ -27030,6 +27031,7 @@ function campObjTick(dt) {
       case 'coletar': campItemTick(id, D, O); break;
       case 'fugir': {
         const Zn = campZonaDe(D), dentro = campVivos().filter(q => campNaZona(q, Zn)), gi = O.zi[0];
+        if (O.emb && !dentro.length && !(gi >= 0)) O.emb = 0; // objetivos do mapa (A5): zona sem gaiola = segurar o embarque (quem sai, recomeça)
         if (!O.emb && dentro.length) { O.emb = now + (D.embarque ?? ZINT.gaiola.embarque); if (gi >= 0) zintPoe(gi, 'embarque', O.emb - now); }
         if (O.emb && now >= O.emb) { CAMP.fugiram = dentro.map(q => q.id); if (gi >= 0) zintPoe(gi, 'subiu', 0); campObjFeito(id); break; }
         if (!O.emb) { O.resta -= dt; if (O.resta <= 0) { O.resta = D.tempo || 75; if (D.radio?.lembra) campRadio(D.radio.lembra); } } // ninguém embarcou: a fuga recomeça
@@ -30785,16 +30787,21 @@ if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP
 //   dificuldade, no salvo 'tiroteio.campanha' (inf) de cada jogador, mostrado no cartão do mapa. A legenda do rádio e das falas
 //   (estreias, eventos, chefes) aparece também no infinito (painel próprio; o do D02 só existe na campanha).
 // Ganchos: nenhum fora do bloco. O formulário ganha o recorde e o aviso de conclusão envolvendo o campFormRender do O3-D02 aqui mesmo.
+// Objetivos do mapa (13/10, A5): a etapa V é a última do Sanatório, no próprio mapa. V.1 = 3 cargas no Sanatório (Torre d'água, Caldeiras,
+//   Crematório; o "Segure F" só aparece com o V.1 ativo); V.2 = a primeira rodada com ele ativo, sempre com a Névoa; F.1 = o Diretor na
+//   versão de campo (o 'depois' do V.2: entra na rodada seguinte); F.2 = segurar a zona atrás da ambulância da Portaria (sem gaiola nem
+//   cena), com o Estouro sem fim; fugiram = campVFim: os zumbis caem e, no fim da rodada, campProxObjetivos (rodadas infinitas). O
+//   caminho antigo (cena c5-fuga, campVFinal, créditos, salvo, campInfContinua) ficou no código, mas nada o chama neste modo.
 const CAMP_V = { // Ato V e final (o D15 ajusta os números)
-  cargas: ['g7-carga-1', 'g7-carga-2', 'g7-carga-3'], gaiola: 'g7-gaiola',
-  v2De: 24, v2Ev: 'nevoa', // V.2: a primeira rodada a partir da 24 que começa com o V.2 ativo; o evento dela
-  chefeMin: 25, // o Diretor vem na rodada seguinte à do V.2, nunca antes desta
-  fuga: { cenaS: 4, tempo: 75, embarque: 10, ev: 'estouro' }, // cena c5-fuga antes de a fuga começar; tempo e embarque do F.2
+  cargas: ['san-carga-torre', 'san-carga-caldeiras', 'san-carga-crematorio'], gaiola: 'g7-gaiola', // objetivos do mapa (13/10): as cargas ficam no Sanatório (ZINT_MAPA.sanatorio, abaixo)
+  v2Ev: 'nevoa', // V.2: a primeira rodada que começa com o V.2 ativo (objetivos do mapa: sem rodada mínima); a Névoa entra nela por cima do evento da agenda
+  chefeMin: 25, // (arena antiga) o Diretor vinha na rodada seguinte à do V.2, nunca antes desta
+  fuga: { cenaS: 4, tempo: 75, embarque: 10, ev: 'estouro', zona: { x: -16, z: -66, r: 3 } }, // F.2: tempo (a cada volta sem ninguém na zona, o rádio lembra), embarque (segurar a zona) e o Estouro sem fim; zona: atrás da ambulância da Portaria (r2)
   creditosS: 34, credFixoS: 5, // créditos: duração; os últimos segundos parados no fim ("Família 413")
   gaiolaY: 9, gaiolaDesceS: 4, // a gaiola fica no alto do poço (acima do teto) e desce na cena da fuga
   cenas: { fuga: 'c5-fuga', final: 'c5-final', completo: 'c5-final-completo', pos: 'c5-pos' },
-  radio: { cargas: 'r5-cargas', fuga: 'r5-fuga' },
-  txt: { cargas: 'Plantar as 3 cargas nos pilares da boca', nevoa: 'Sobreviver à Névoa do Veio', fuga: 'Fugir pela gaiola da mina',
+  radio: { cargas: 'r5s-cargas', fuga: 'r5s-fuga', inicio: 'r5s-inicio' }, // objetivos do mapa: as falas do Sanatório (as da Galeria 7, r5-*, ficam na tabela)
+  txt: { cargas: 'Plantar as 3 cargas (Torre d\'água, Caldeiras, Crematório)', nevoa: 'Sobreviver à Névoa do Veio', fuga: 'Fugir na ambulância da Portaria',
     concluida: 'CAMPANHA CONCLUÍDA', infLib: 'Infinito liberado', pular: 'Enter ou clique: pular', lobby: 'Volta ao lobby em', agora: 'Enter: voltar agora',
     infCartao: 'O VALE AINDA CHAMA. Sobreviva o quanto puder, com tudo o que a campanha acordou.', recorde: 'Recorde: rodada', semRecorde: 'Sem recorde',
     infCont: 'Rodadas infinitas em', infAgora: 'Enter: começar agora', infTitulo: 'RODADAS INFINITAS', infSub: 'O vale ainda chama · da rodada' },
@@ -30818,26 +30825,42 @@ Object.assign(CAMP_INF, {
 // ---------- objetivos do Ato V e do final ----------
 Object.assign(CAMP_OBJ, {
   'V.1': { tipo: 'usar', titulo: CAMP_V.txt.cargas, alvo: { zint: CAMP_V.cargas, n: CAMP_V.cargas.length }, radio: { lembra: CAMP_V.radio.cargas }, depois: ['V.2'] },
-  'V.2': { tipo: 'sobreviver', titulo: CAMP_V.txt.nevoa }, // tipo próprio: o motor do D02 não mexe; quem fecha é o fimRodada daqui
-  'F.2': { tipo: 'fugir', titulo: CAMP_V.txt.fuga, alvo: { zint: CAMP_V.gaiola }, tempo: CAMP_V.fuga.tempo, embarque: CAMP_V.fuga.embarque, radio: { ini: CAMP_V.radio.fuga, lembra: CAMP_V.radio.fuga } },
+  'V.2': { tipo: 'sobreviver', titulo: CAMP_V.txt.nevoa, depois: ['F.1'] }, // tipo próprio: o motor do D02 não mexe; quem fecha é o fimRodada daqui (e o Diretor entra na rodada seguinte)
+  'F.2': { tipo: 'fugir', titulo: CAMP_V.txt.fuga, zona: CAMP_V.fuga.zona, tempo: CAMP_V.fuga.tempo, embarque: CAMP_V.fuga.embarque, radio: { ini: CAMP_V.radio.fuga, lembra: CAMP_V.radio.fuga } }, // zona sem gaiola: segurar o embarque nela
 });
-CAMP_OBJ['F.1'] = { ...CAMP_OBJ['F.1'], tipo: 'matar', chefe: 16 }; // o do D13 (a fuga entra pela morte do Diretor, depois da cena)
-Object.assign(CAMP_ATOS.find(a => a.id === 'V'), { objs: ['V.1', 'V.2', 'F.1', 'F.2'], ini: ['V.1'] }); // a etapa V (índice 6)
+CAMP_OBJ['F.1'] = { ...CAMP_OBJ['F.1'], tipo: 'matar', chefe: 16 }; // o do D13 (a fuga entra pela morte do Diretor); no Sanatório ele nasce na versão de campo (campChefeBusca)
+Object.assign(CAMP_ATOS.find(a => a.id === 'V'), { objs: ['V.1', 'V.2', 'F.1', 'F.2'], ini: ['V.1'], radioIni: CAMP_V.radio.inicio }); // a etapa V (índice 6)
+Object.assign(CAMP_RADIO_TXT, { // lore.md §9, versão do Sanatório (objetivos do mapa, 13/10): as cargas derrubam o Sanatório em cima do Veio; a fuga é pela ambulância
+  'r5s-inicio': { quem: 'NOGUEIRA', txt: '(estática) ...o cano desce até o Veio, embaixo de vocês. Três cargas do paiol: Torre d\'água, Caldeiras, chaminé do Crematório. Derrubem tudo em cima dele.' },
+  'r5s-cargas': { quem: 'NOGUEIRA', txt: '(estática) ...três cargas, três lugares: a perna da Torre d\'água, a caldeira grande e a chaminé do Crematório... segurem até armar...' },
+  'r5s-fuga': { quem: 'NOGUEIRA', txt: 'A ambulância está ligada na Portaria! Corram e subam todos! Não olhem para trás!' },
+});
+// as três cargas no Sanatório (sonda do A5 e auditoria.mjs/conferencia.mjs com --camp): face de estruturas altas, longe umas das outras,
+// atrás de portas comuns (áreas médias e caras). (x, z) na face; n para fora.
+ZINT_MAPA.sanatorio.push(
+  { t: 'carga', id: CAMP_V.cargas[0], x: 49, z: -26.4, n: [0, -1] }, // M Torre d'água: perna nordeste da torre, face norte (o registro e a nota ficam nas pernas do sul)
+  { t: 'carga', id: CAMP_V.cargas[1], x: -37.85, z: 57, n: [-1, 0] }, // P Caldeiras: a caldeira do leste, face oeste (a do oeste tem a caderneta do foguista)
+  { t: 'carga', id: CAMP_V.cargas[2], x: -79.55, z: 109, n: [-1, 0] }, // r7 Crematório: a chaminé do leste, face oeste
+);
+function campZintVez(o) { // cliente: o interativo é alvo de um objetivo ativo agora (fora dele, a carga não mostra o "Segure F")
+  const c = CAMP.c; if (!c?.obj || typeof o?.id !== 'string') return false;
+  for (const id in c.obj) if (c.obj[id]?.st === 'ativo' && campLista(CAMP_OBJ[id]?.alvo?.zint).includes(o.id)) return true;
+  return false;
+}
+{ const p0 = ZINT_FN.carga.prompt; ZINT_FN.carga.prompt = function (o, i, c, D) { return campZintVez(o) ? p0.call(this, o, i, c, D) : null; }; }
 // ---------- host: Ato V, fuga e final ----------
 const CAMP_VS = { v2: 0, n0: 0, fase: null, t: 0, fim: 0, completo: false, docs: 0, cargasR: false }; // fase: null | 'cena' (c5-fuga) | 'fuga' | 'final' | 'cred'
 function campVLimpa() { Object.assign(CAMP_VS, { v2: 0, n0: 0, fase: null, t: 0, fim: 0, completo: false, docs: 0, cargasR: false }); }
 const campVOn = () => CAMP.on && CAMP.modo === 'campanha' && CAMP_ATOS[CAMP.et]?.id === 'V';
 const campVGal = () => typeof GAL7_RODADAS !== 'undefined' ? GAL7_RODADAS : null;
-CAMP_GANCHOS.inicio.push(e => { // etapa nova: Ato V do zero; o Diretor espera o V.2
-  campVLimpa(); const G = campVGal(); if (G) G.chefe = CAMP_ATOS[e]?.id === 'V' ? Infinity : CAMP_V.chefeMin;
-});
+CAMP_GANCHOS.inicio.push(() => campVLimpa()); // etapa nova: Ato V do zero (o Diretor espera o V.2 pelo 'depois' do V.2)
 CAMP_GANCHOS.rodada.push(r => { // depois da agenda (D05) e do Diretor (D13)
   if (!campVOn()) return;
   if (!CAMP_VS.cargasR && CAMP.obj['V.1']?.st === 'ativo') { CAMP_VS.cargasR = true; campRadio(CAMP_V.radio.cargas); } // depois do r5-inicio
   const O = CAMP.obj['V.2'];
-  if (O?.st === 'ativo' && !CAMP_VS.v2 && r >= CAMP_V.v2De && !Z.dogRound) {
+  if (O?.st === 'ativo' && !CAMP_VS.v2 && !Z.dogRound) {
+    if (CAMP_EVS.id !== CAMP_V.v2Ev && campEvPode(r)) campEvLiga(CAMP_V.v2Ev); // a Névoa por cima do evento da agenda (a rodada é a dela)
     CAMP_VS.v2 = r; CAMP_VS.n0 = Math.max(1, Z.toSpawn);
-    if (!CAMP_EVS.id && campEvPode(r)) campEvLiga(CAMP_V.v2Ev);
   }
 });
 CAMP_GANCHOS.fimRodada.push(r => { if (campVOn() && CAMP.obj['V.2']?.st === 'ativo' && CAMP_VS.v2 === r) campObjFeito('V.2'); });
@@ -30851,21 +30874,21 @@ function campVTick() {
     let n = Z.toSpawn; for (const z of Z.zs.values()) if (!z.lac && !ZKIND[z.kind]?.chefe) n++;
     const p = clamp(1 - n / CAMP_VS.n0, 0, 1); if (p !== v2.p) { v2.p = p; campObjEnvia('V.2'); }
   }
-  if (G && G.chefe === Infinity && v2?.st === 'feito') G.chefe = Math.max(CAMP_V.chefeMin, Z.round + 1); // o Diretor na rodada seguinte
   if (!CAMP_VS.fase && O['F.1']?.st === 'feito') campVFuga(); // F.1 forçado (testes, atalho)
-  if (CAMP_VS.fase === 'cena' && now >= CAMP_VS.t) {
-    CAMP_VS.fase = 'fuga';
-    if (Z.phase === 'round') { campEvLiga(CAMP_V.fuga.ev, { fuga: 1 }); Z.spawnT = Math.min(Z.spawnT, now); }
-  }
   if (CAMP_VS.fase === 'fuga' && Z.phase === 'round' && !CAMP_EVS.id) campEvLiga(CAMP_V.fuga.ev, { fuga: 1 }); // a fuga começou num intervalo (atalho)
-  if (CAMP_VS.fase === 'fuga' && O['F.2']?.st === 'feito') campVFinal();
+  if (CAMP_VS.fase === 'fuga' && O['F.2']?.st === 'feito') campVFim();
 }
-function campVFuga() { // o Diretor caiu: cena c5-fuga, o pilar da 1ª carga estoura, a gaiola desce; a rodada segue (a fuga repõe zumbis)
-  const F = CAMP_V.fuga, P = GAL7.gal.G1.pilar;
-  CAMP_VS.fase = 'cena'; CAMP_VS.t = now + F.cenaS;
-  if (Z.phase === 'round') { Z.toSpawn = Math.max(Z.toSpawn, CAMP_EV.estouro.fuga.repoe); Z.reQ = []; Z.spawnT = now + F.cenaS; }
-  broadcast({ t: 'camp', k: 'fuga', e: 'ini', s: F.cenaS, x: P[0], z: P[1] });
-  const O = CAMP.obj['F.2']; if (O && O.st !== 'ativo' && O.st !== 'feito') { O.st = 'oculto'; campObjAtiva('F.2'); } // o objetivo já no HUD (a gaiola desce na cena; o Estouro começa depois dela)
+function campVFuga() { // o Diretor caiu: a fuga começa na hora (sem cena), com o Estouro sem fim; a rodada segue (a fuga repõe zumbis)
+  CAMP_VS.fase = 'fuga';
+  if (Z.phase === 'round') { Z.toSpawn = Math.max(Z.toSpawn, CAMP_EV.estouro.fuga.repoe); Z.reQ = []; campEvLiga(CAMP_V.fuga.ev, { fuga: 1 }); Z.spawnT = Math.min(Z.spawnT, now); }
+  const O = CAMP.obj['F.2']; if (O && O.st !== 'ativo' && O.st !== 'feito') { O.st = 'oculto'; campObjAtiva('F.2'); }
+}
+function campVFim() { // objetivos do mapa (13/10): fugiram. Os zumbis caem sem pontos e a rodada acaba; no fim dela (ou já, no intervalo) a
+  // sequência termina (campProxObjetivos: "OBJETIVOS CONCLUÍDOS" e as rodadas infinitas). Sem cena, créditos nem salvo.
+  CAMP_VS.fase = 'fim'; campEvDesliga();
+  for (const z of [...Z.zs.values()]) zKill(z, null, 'body', 'nuke', false, true);
+  Z.toSpawn = 0; Z.reQ = [];
+  if (Z.phase !== 'round' && campEtapaFeita()) campProxObjetivos();
 }
 function campVDocs() { // documentos lidos pela sala na campanha inteira (só os ids da lore: 10 terminais + 12 notas)
   const L = campDocsSala(), D = campDocs(), ok = id => Object.hasOwn(ZINT_TERM_TXT, id) || Object.hasOwn(CAMP_NOTA_TXT, id);
@@ -31035,7 +31058,7 @@ function campInfForm(el, st) {
   for (const b of el.querySelectorAll('[data-map]')) { const m = b.dataset.map; if (!CAMP_INF.mapas.includes(m)) continue; const r = inf[m]?.[dz], s = document.createElement('small'); s.className = 'rec'; s.textContent = r ? `${V.recorde} ${r}` : V.semRecorde; b.appendChild(s); }
 }
 { const f0 = campFormRender; campFormRender = function (el, st) { f0(el, st); campInfForm(el, st); }; } // envolve o do O3-D02 (o matchForm chama pelo nome)
-if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_V, CAMP_VS, CAMP_VC, CAMP_INFS, CAMP_CREDITOS, campVFuga, campVFinal, campVDocs, campVTick, campInfChefeDe, campInfTick, campInfForm, campCredPula, campVLobbyJa, zintPoe, campFala, campRadio, campInfLiberado, campChefeLimpa,
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP_V, CAMP_VS, CAMP_VC, CAMP_INFS, CAMP_CREDITOS, campVFuga, campVFinal, campVFim, campZintVez, campEtapaPrepara, campEtapaFeita, CAMP_RADIO_TXT, campVDocs, campVTick, campInfChefeDe, campInfTick, campInfForm, campCredPula, campVLobbyJa, zintPoe, campFala, campRadio, campInfLiberado, campChefeLimpa,
   campVEstado: () => ({ fase: CAMP_VS.fase, v2: CAMP_VS.v2, chefeR: campVGal()?.chefe ?? null, completo: CAMP_VS.completo, docs: CAMP_VS.docs, ev: CAMP_EVS.id, fuga: CAMP_EVS.fuga, cred: !!CAMP_VC.cred, credVis: CAMP_VC.el?.root.style.display === 'block', pulou: !!CAMP_VC.cred?.pulou,
     gaiolaY: (() => { const i = campZintIdx(CAMP_V.gaiola), e = ZC.world?.zint?.[i]; return e?.g ? +e.g.position.y.toFixed(2) : null; })(), radioInf: CAMP_VC.radio?.isConnected ? [CAMP_VC.radio.style.opacity, CAMP_VC.radio.textContent] : null }) }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
 // ===== FIM O3-D14 =====

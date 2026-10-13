@@ -213,6 +213,9 @@ const CAMP_RADIO_TXT = { // id -> { quem, txt } (docs/overhaul/lore.md §9)
   'r5-inicio': { quem: 'NOGUEIRA', txt: '(estática) ...o cano desce até a Galeria 7. As três cargas do paiol... nos pilares da boca... o rádio não passa na pedra...' },
   'r5-cargas': { quem: 'NOGUEIRA', txt: '(estática) ...três cargas, três pilares... depois corram para a gaiola... eu puxo vocês...' },
   'r5-fuga': { quem: 'NOGUEIRA', txt: 'Estou na manivela da gaiola! Corram! Não olhem a água!' },
+  'r5s-inicio': { quem: 'NOGUEIRA', txt: '(estática) ...o cano desce até o Veio, embaixo de vocês. Três cargas do paiol: Torre d\'água, Caldeiras, chaminé do Crematório. Derrubem tudo em cima dele.' }, // objetivos do mapa (13/10): o Ato V no Sanatório (as cargas e a fuga pela ambulância)
+  'r5s-cargas': { quem: 'NOGUEIRA', txt: '(estática) ...três cargas, três lugares: a perna da Torre d\'água, a caldeira grande e a chaminé do Crematório... segurem até armar...' },
+  'r5s-fuga': { quem: 'NOGUEIRA', txt: 'A ambulância está ligada na Portaria! Corram e subam todos! Não olhem para trás!' },
   // eventos (qualquer ato)
   'ev-apagao': { quem: 'NOGUEIRA', txt: 'A luz caiu de vez. Usem a lanterna e não se separem.' },
   'ev-nevoa': { quem: 'NOGUEIRA', txt: 'Está subindo uma névoa da água. Eu não vejo nada daqui. Vocês também não vão ver.' },
