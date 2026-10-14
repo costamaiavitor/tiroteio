@@ -23950,7 +23950,7 @@ function zInteract(dt) {
       else if (ZC.pap.st === 'idle') { const w = W[G.cur], n = w?.pap | 0, c = (ZC.bf > now ? ZBAL.pap.oferta : ZBAL.pap.custo)[n]; if (papProx(G.cur)) cand(dist, { k: 'pap', cost: c, txt: `Pack-a-Punch nível ${n + 1} na ${w.name} [${c}]${ZC.bf > now ? ' — EM OFERTA' : ''}` }); else cand(dist, { k: 'pap', ok: false, txt: n >= 3 ? `${w.name}: nível máximo` : 'Segure uma arma que dá pra melhorar' }); } // zumbi-v2 (Etapa 9)
       else if (ZC.pap.st === 'ready' && ZC.pap.user === C.myId && ZC.pap.w) cand(dist, { k: 'paptake', txt: `Pegar ${W[ZC.pap.w].name}` });
     } }
-  if (!ZC.power) { const P = ZD.power, dist = dd(P.x, P.z); if (dist < 2.2) cand(dist, zConstruida('power') ? { k: 'power', txt: 'Ligar a energia' } : zPecasPegas('power') >= ZD.pecas.power ? { k: 'zbuild', maq: 'power', txt: 'Montar o gerador de energia' } : { k: 'power', ok: false, txt: `Gerador desmontado — peças ${zPecasPegas('power')}/${ZD.pecas.power}` }); } // zumbi-v2 (Etapa 8)
+  if (!ZC.power) { const P = ZD.power, dist = dd(P.x, P.z); if (dist < 2.2) cand(dist, zEnergiaTravada() ? { k: 'power', ok: false, txt: 'Sem força: ligue o gerador da Pedreira' } : zConstruida('power') ? { k: 'power', txt: 'Ligar a energia' } : zPecasPegas('power') >= ZD.pecas.power ? { k: 'zbuild', maq: 'power', txt: 'Montar o gerador de energia' } : { k: 'power', ok: false, txt: `Gerador desmontado — peças ${zPecasPegas('power')}/${ZD.pecas.power}` }); } // zumbi-v2 (Etapa 8)
   (ZD.traps || []).forEach((t, i) => { // armadilha elétrica
     const dist = dd(t.sx, t.sz); if (dist > 2.2) return;
     const T = ZC.traps[i] || { st: 'idle' }; let txt, ok = true;
@@ -24796,7 +24796,7 @@ function srvZUse(p, m) {
       zGive(p, Z.pap.w, m.cur, Z.pap.slot); Z.pap.st = 'idle'; broadcast({ t: 'zpap', st: 'idle' }); break;
     }
     case 'zbuild': srvZBuild(p, m.maq === 'pap' ? 'pap' : 'power', near); break; // zumbi-v2 (Etapa 8)
-    case 'power': { const P = ZD.power; if (Z.power || !near(P.x, P.z, 3) || !zConstruida('power')) return; Z.power = true; broadcast({ t: 'zpower' }); break; }
+    case 'power': { const P = ZD.power; if (Z.power || !near(P.x, P.z, 3) || !zConstruida('power')) return; if (zEnergiaTravada()) return err('Ligue o gerador da Pedreira primeiro'); Z.power = true; broadcast({ t: 'zpower' }); break; }
     case 'zint': zintUsar(p, m); break; // O2-C04: interativos novos
     case 'trap': { // armadilha elétrica: perto da alavanca, com energia, pronta e com pontos
       const i = m.id, t = ZD.traps?.[i], T = Z.traps[i]; if (!Number.isInteger(i) || !t || !T || !near(t.sx, t.sz, 2.8)) return;
@@ -26069,6 +26069,9 @@ function zSorteiaPecas(D, R) {
   D.pecas = Object.fromEntries(maqs.map(m => [m, n]));
 }
 const zPecasPegas = maq => { const L = ZD?.zint || [], E = NET.isHost ? Z.zint : null; let k = 0; L.forEach((o, i) => { if (o.t === 'peca' && o.maq === maq && (E ? E[i]?.st : ZC.zint?.[i]?.st) === 'pega') k++; }); return k; };
+// decisão minha (13/10, o dono deixou): na Vila com objetivos, a energia só liga pelo gerador da Pedreira (objetivo I.2); antes o interruptor
+// ao lado ligava a luz e o objetivo perdia o sentido. Host e cliente olham o próprio estado do objetivo.
+const zEnergiaTravada = () => curMapId === 'vila' && (NET.isHost ? CAMP.on && CAMP.modo === 'campanha' && CAMP_ATOS[CAMP.et]?.id === 'I' && CAMP.obj['I.2']?.st !== 'feito' : campCliOn() && CAMP_ATOS[CAMP.c?.et]?.id === 'I' && CAMP.c.obj['I.2']?.st !== 'feito');
 const zConstruida = maq => !ZD?.pecas?.[maq] || !!(NET.isHost ? Z.built?.[maq] : ZC.built?.[maq]); // máquina sem peças na partida: pronta
 ZINT.peca = { nome: 'Peça', custo: 0, usoR: 1.8, srvR: 2.6, forca: 0 };
 ZINT_FN.peca = {
@@ -29106,7 +29109,7 @@ Object.assign(CAMP_OBJ, {
     aoFeito: 'energia', radio: { ini: 'r1-energia', ok: 'r1-gerador-pegou', falha: 'r1-gerador-caiu' } },
   'II.1': { tipo: 'ler', titulo: 'Achar a lista do Hospital de campanha', abre: ['IF', 'IK'], alvo: { zint: 'vila-hospital' }, radio: { ok: 'r2-lista', lembra: 'r2-inicio' }, depois: ['II.2'] },
   'II.2': { tipo: 'chegar', titulo: 'Achar Nogueira na Estação', abre: ['FG'], zona: { x: 64.5, z: 41, r: 3 }, radio: { ok: 'r2-escolta', lembra: 'r2-lista' }, depois: ['II.3'] },
-  'II.3': { tipo: 'escoltar', titulo: 'Levar Nogueira ao Forte Velho', npc: 'cabo', rota: CAMP_VILA.rota, radio: { falha: 'r2-escolta-caiu', lembra: 'r2-escolta' }, depois: ['II.4'] },
+  'II.3': { tipo: 'escoltar', titulo: 'Levar Nogueira ao Castelo', npc: 'cabo', rota: CAMP_VILA.rota, radio: { falha: 'r2-escolta-caiu', lembra: 'r2-escolta' }, depois: ['II.4'] },
   'II.4': { tipo: 'usar', titulo: 'Abrir o alçapão da casamata', alvo: { zint: 'alcapao-casamata' }, radio: { ini: 'r2-forte', lembra: 'r2-forte' } },
 });
 Object.assign(CAMP_ATOS[0], { objs: ['I.1', 'I.2'], ini: ['I.1'] }); Object.assign(CAMP_ATOS[1], { objs: ['II.1', 'II.2', 'II.3', 'II.4'], ini: ['II.1'] });
