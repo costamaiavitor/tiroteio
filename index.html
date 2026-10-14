@@ -324,6 +324,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 .sbt{margin-top:10px}.sbh{display:flex;justify-content:space-between;align-items:center;border-left:4px solid var(--c);padding:2px 10px;background:rgba(255,255,255,.04)}.sbh b{color:var(--c);letter-spacing:2px}.sbh span{font-size:26px;font-weight:700;color:var(--c)}
 .sbhist{display:flex;flex-wrap:wrap;gap:3px;margin-top:12px;align-items:center}.sbhist i{font-style:normal;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:var(--c);color:#111;border-radius:3px;font-size:13px}.sbsep{width:2px;height:22px;background:#fff6;margin:0 5px}
 #flashov{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:5}
+#msum{position:absolute;right:18px;top:26%;background:rgba(10,12,16,.9);border:1px solid var(--line);border-radius:10px;padding:12px 16px;font-size:15px;min-width:270px}#msum td{padding:2px 12px 2px 0}#msum .dl{margin-top:8px;opacity:.7;font-size:13px}
 #drep{position:absolute;left:18px;top:42%;background:rgba(10,12,16,.85);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:15px;min-width:230px}
 #drep .dl{color:#8b94a0;font-size:12px;letter-spacing:1px;text-transform:uppercase;margin:6px 0 2px}#drep table{width:100%;border-collapse:collapse}#drep td{padding:1px 6px 1px 0}
 #chat{position:absolute;left:18px;bottom:150px;width:min(420px,60vw);font-size:17px}
@@ -432,6 +433,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
   <canvas id="rbig"></canvas>
   <div id="mmLbl"></div>
   <div id="drep" class="hidden"></div>
+  <div id="msum" class="hidden"></div>
   <div id="flashov"></div>
   <div id="bombui"></div>
   <div id="top"><div id="score"></div><div id="timer"></div></div>
@@ -550,6 +552,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
     <div id="pRoom" class="box" style="margin-bottom:12px"></div>
     <button id="btnResume" class="big">Continuar</button>
     <button id="btnTeam" class="big" style="margin-top:8px;display:none"></button>
+    <div id="voteRow" class="row" style="margin-top:8px;gap:8px;display:none"><button id="btnGG" style="flex:1">Votar para render-se</button><button id="btnTout" style="flex:1">Pausa tática (+30 s de compra)</button></div>
     <div class="box" id="pMusic" style="margin-top:12px"><h3>Música da sala (todos ouvem juntos)</h3>
       <div style="display:flex;gap:8px"><input id="musIn" maxlength="400" placeholder="Link do Spotify, do YouTube ou de um .mp3" style="flex:1"><button id="musGo">Tocar</button></div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button id="musPP">Pausar</button><button id="musX">Parar</button><small id="musNow" style="opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></small></div></div>
@@ -589,6 +592,9 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 const r3 = v => Math.round(v * 1000) / 1000;
 const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
+// patente (como as do CS): sobe 25 ao vencer uma partida de Rodadas, desce 20 ao perder; fica salva na conta
+const PATENTES = ['Prata I', 'Prata II', 'Prata III', 'Prata IV', 'Prata Elite', 'Prata Elite Mestre', 'Ouro I', 'Ouro II', 'Ouro III', 'Ouro Mestre', 'Mestre Guardião I', 'Mestre Guardião II', 'Mestre Guardião Elite', 'Mestre Guardião Distinto', 'Águia Lendária', 'Águia Lendária Mestre', 'Mestre Supremo', 'Global Elite'];
+const patente = elo => PATENTES[clamp(Math.floor(((elo ?? 1000) - 500) / 100), 0, PATENTES.length - 1)];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function save(k, v) { try { localStorage.setItem('tiroteio.' + k, JSON.stringify(v)); } catch (e) { } }
 function load(k, d) { try { const v = localStorage.getItem('tiroteio.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
@@ -17118,11 +17124,19 @@ function audioInit() {
   const len = AC.sampleRate * 2; NOISE = AC.createBuffer(1, len, AC.sampleRate);
   const d = NOISE.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
 }
+const _ocA = new THREE.Vector3(), _ocD = new THREE.Vector3();
+function abafado(pos) { // tem parede entre você e o som? (modos CS: dá para saber se o passo/tiro está do outro lado)
+  if (ZC.on || !inGame || !COL.length) return false;
+  const a = camera.position, dist = _ocD.set(pos.x, pos.y + 1, pos.z).sub(a).length(); if (dist < 2 || dist > 90) return false;
+  _ocD.divideScalar(dist); return rayBlocked(_ocA.copy(a), _ocD, dist, dist - .4);
+}
 function sdest(pos) {
   if (!pos) return MASTER;
   const p = AC.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = 3; p.rolloffFactor = 1; p.maxDistance = 300;
   if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = pos.y; p.positionZ.value = pos.z; } else p.setPosition(pos.x, pos.y, pos.z);
-  p.connect(MASTER); return p;
+  p.connect(MASTER);
+  try { if (abafado(pos)) { const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 650; const g = AC.createGain(); g.gain.value = .6; lp.connect(g); g.connect(p); return lp; } } catch (e) { }
+  return p;
 }
 function nz(out, dur, f1, f2, vol, type = 'lowpass', q = .8, delay = 0) {
   const t = AC.currentTime + delay, s = AC.createBufferSource(); s.buffer = NOISE;
@@ -20309,7 +20323,7 @@ function updateViewmodel(dt) {
   mouseDX *= Math.exp(-dt * 12);
   const x = o.x, y = o.y, z = o.z, rx = o.rx, ry = o.ry, rz = o.rz;
   vmRoot.position.set(x, y, z); vmRoot.rotation.set(rx, ry, rz);
-  vmRoot.visible = me.alive && !C.bombAct && !(w?.scope && G.scope > 0 && G.scR >= SCOPE.some); // dentro da luneta a arma não aparece
+  vmRoot.visible = me.alive && !C.bombAct && !C.bombHand && !(w?.scope && G.scope > 0 && G.scR >= SCOPE.some); // dentro da luneta a arma não aparece
   vmRoot.updateMatrixWorld();
   if (ud.fps2 && ak > 0) { // mirando: a animação parada balança o corpo da arma; a mira (medida agora) volta para o centro da tela
     const F = ud.fps2, e = _adsV.copy(F.sl).applyMatrix4(F.body.matrixWorld); vmGun.position.x -= e.x * ak; vmGun.position.y -= e.y * ak; vmRoot.updateMatrixWorld();
@@ -20324,6 +20338,7 @@ function updateViewmodel(dt) {
 const hasW = id => id === 'knife' || G.inv.primary === id || G.inv.secondary === id || (!!id && G.inv.third === id) || ((id === 'he' || id === 'smoke' || id === 'flash' || id === 'molotov' || id === 'inc' || id === 'decoy' || id === 'monkey' || id === 'semtex' || id === 'clay') && G.inv[id] > 0) || (id === 'm1911_ls' && me.downed) || (id === 'dmach' && ZC.dmEnd > now && !me.downed);
 const bestW = () => G.inv.primary || G.inv.secondary || 'knife';
 function equip(id, force) {
+  if (C.bombHand) { C.bombHand = false; G.switchEnd = Math.max(G.switchEnd, now + .35); } // trocou de arma: guarda a bomba
   if (!hasW(id) || (id === G.cur && !force)) return;
   if (id !== G.cur) G.last = G.cur;
   G.ads = 0;
@@ -20827,6 +20842,7 @@ function shoot() {
       if (h.zone === 'head' && !h.sp) hs = true;
     }
     if (dmgBy.size) { showHitmarker(hs); play(hs ? 'hs' : 'hit'); }
+    if (C.ms && !ZC.on) { C.ms.s++; if (dmgBy.size) C.ms.h++; if (hs) C.ms.hh = (C.ms.hh || 0) + 1; }
     sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: ends, sup: attHas(G.cur, 'sup') ? 1 : undefined });
   }
   if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); muzzleFlash(mz); vmFlashUntil = now + .05; } // supressor: sem clarão, tiro abafado
@@ -20890,7 +20906,7 @@ function updateWeapon(dt) {
   const since = now - G.lastShot;
   if (since > .08) { const k = Math.exp(-dt * (since > .3 ? 9 : 4)); G.punchP *= k; G.punchY *= k; }
   if (since > .35) G.shots = 0;
-  if (!me.alive || C.bombAct || C.chatOpen || C.buyOpen || !locked() || C.phase === 'freeze') { G.trigger = false; return; }
+  if (!me.alive || C.bombAct || C.bombHand || C.chatOpen || C.buyOpen || !locked() || C.phase === 'freeze') { G.trigger = false; return; }
   if (ZC.on && keys.KeyF && ZC.act?.k === 'rev') { G.trigger = false; return; } // reanimando: mãos ocupadas
   if (me.sprinting) { // correndo a arma fica abaixada; apertar o gatilho interrompe a corrida (como no CoD)
     G.burstN = 0;
@@ -20906,7 +20922,7 @@ function updateWeapon(dt) {
   }
 }
 function altFire() {
-  const w = W[G.cur]; if (!me.alive || C.bombAct || now < G.switchEnd) return;
+  const w = W[G.cur]; if (!me.alive || C.bombAct || C.bombHand || now < G.switchEnd) return;
   if (w.scope && !G.reloadEnd) { G.scope = (G.scope + 1) % (w.scope.length + 1); G.rezoom = 0; play('empty'); }
   else if (w.slot === 'knife' && now >= G.nextFire && C.phase !== 'freeze') knifeAttack(true);
   else if (w.slot === 'nade' && now >= G.nextFire && C.phase !== 'freeze') throwNade(false);
@@ -21722,6 +21738,7 @@ function srvHandle(pid, m) {
       break;
     }
     case 'team': srvSwitchTeam(p, m.tm); break;
+    case 'vote': srvVote(p, m.k); break;
     case 'suicide': if (p.alive && !p.downed && S.phase !== 'over') srvKill(p, null, 'world', false); break; // caído nos zumbis não pula o sangramento
   }
 }
@@ -21790,7 +21807,7 @@ function srvSpawnDM(p) {
 }
 function syncBots() {
   const bots = [...S.players.values()].filter(p => p.isBot);
-  const want = clamp(S.st.bots | 0, 0, 7);
+  const hum = [...S.players.values()].filter(p => !p.isBot).length, want = S.st.mode === 'rounds' && S.st.wing ? clamp(4 - hum, 0, 4) : clamp(S.st.bots | 0, 0, 7); // Wingman: completa 2x2 com bots
   for (let i = bots.length; i < want; i++) { const used = new Set([...S.players.values()].map(p => p.name)); const nm = 'Bot ' + (BOT_NAMES.find(n => !used.has('Bot ' + n)) || i); srvAddPlayer('b' + (S.nextId++), nm, true); }
   for (let i = want; i < bots.length; i++) { S.players.delete(bots[i].id); broadcast({ t: 'bye', id: bots[i].id }); }
 }
@@ -21798,19 +21815,19 @@ function srvStartMatch() {
   if (S.st.mode === 'zombies') { S.st.bots = 0; syncBots(); zStartGame(); return; }
   Z.on = false;
   syncBots();
-  S.round = 0; S.winner = null; S.pre = 0; S.half = false; S.ot = 0; S.hist = []; S.score = { t: 0, ct: 0 }; S.loss = { t: 0, ct: 0 }; S.bomb = null;
+  S.round = 0; S.winner = null; S.pre = 0; S.half = false; S.ot = 0; S.touts = {}; S.pauseNext = 0; S.hist = []; S.score = { t: 0, ct: 0 }; S.loss = { t: 0, ct: 0 }; S.bomb = null;
   if (teamMode()) for (const p of [...S.players.values()].sort((a, b) => a.isBot - b.isBot)) setTeam(p, p.team === 't' || p.team === 'ct' ? p.team : teamPick()); // mantém os times do lobby
   else for (const p of S.players.values()) if (p.team) { p.team = undefined; p.color = COLORS[S.colorI++ % COLORS.length]; }
   for (const p of S.players.values()) p.gg = 0;
   for (const p of S.players.values()) { p.kills = p.deaths = p.rw = p.as = p.mvp = 0; p.money = 800; p.lossStreak = 0; p.downed = false; p.perks = []; p.maxHp = 100; p.bowie = false; p.inv = defInv(); p.armor = 0; p.helmet = false; p.alive = false; p.respawnAt = now + .3; p.pref = {}; }
-  if (S.st.mode === 'dm') { S.phase = 'live'; S.phaseEnd = now + 10 * 60; for (const p of S.players.values()) srvSpawnDM(p); broadcast({ t: 'msg', txt: dmv() ? 'MATA-MATA · ' + DMV_N[dmv()].toUpperCase() : 'MATA-MATA', sub: dmv() === 1 ? `Primeiro time a ${S.st.frags * 2} abates vence` : dmv() === 2 ? `Cada abate troca a sua arma · ${GG.length} níveis, o último é a faca` : dmv() === 3 ? `Só tiro na cabeça conta · primeiro a ${S.st.frags}` : `Primeiro a ${S.st.frags} abates vence`, dur: 4 }); }
+  if (S.st.mode === 'dm') { S.phase = 'live'; S.phaseEnd = now + 10 * 60; for (const p of S.players.values()) srvSpawnDM(p); broadcast({ t: 'msg', txt: dmv() ? 'MATA-MATA · ' + DMV_N[dmv()].toUpperCase() : 'MATA-MATA', sub: dmv() === 1 ? `Primeiro time a ${S.st.frags * 2} abates vence` : dmv() === 2 ? `Cada abate troca a sua arma · ${GG.length} níveis, o último é a faca` : dmv() === 3 ? `Só tiro na cabeça conta · primeiro a ${S.st.frags}` : dmv() === 4 ? 'Os bots não atiram: treine a mira (precisão e cabeça no placar de cima)' : `Primeiro a ${S.st.frags} abates vence`, dur: 4 }); }
   else if (S.players.size >= 2) srvStartRound();
   else { S.phase = 'warmup'; S.phaseEnd = 0; broadcast({ t: 'msg', txt: 'AQUECIMENTO', sub: 'Esperando outro jogador (ou adicione bots)', dur: 4 }); }
   srvState();
 }
 function srvTarget() { const R1 = S.st.rounds - 1; return S.ot ? R1 + 3 * (S.ot - 1) + 4 : R1 + 1; } // vitórias para fechar (prorrogação: 4 de 6)
 function srvStartRound() {
-  S.round++; S.phase = 'freeze'; S.phaseEnd = now + RC.freeze;
+  S.round++; S.phase = 'freeze'; S.phaseEnd = now + (S.st.wing ? 10 : RC.freeze) + (S.pauseNext || 0); if (S.pauseNext) { S.pauseNext = 0; }
   let txt = 'RODADA ' + S.round, sub = 'Compre com B';
   if (S.half) { // intervalo (troca de lado, $800) e prorrogação (MR3, $10.000; troca de lado a cada 3 rodadas)
     const k = S.half; S.half = false;
@@ -21834,7 +21851,7 @@ function srvStartRound() {
   }
   const ts = [...S.players.values()].filter(p => p.team === 't'), c = ts[Math.floor(Math.random() * ts.length)];
   S.bomb = c ? { st: 'carried', by: c.id, pos: c.pos.slice(), end: 0, pl: false } : null;
-  S.bSite = Math.random() < .5 ? 'A' : 'B'; // bomb escolhido pelos bots do ataque
+  S.bSite = S.st.wing || Math.random() < .5 ? 'A' : 'B'; // bomb escolhido pelos bots do ataque (Wingman: só o A)
   for (const p of S.players.values()) if (p.isBot) botBuy(p);
   broadcast({ t: 'msg', txt, sub, dur: 3.5, snd: 'round' });
   if (c) sendTo(c.id, { t: 'info', txt: 'Você está com a bomba: plante no bomb A ou B segurando E' });
@@ -21907,13 +21924,27 @@ function isR() { return S.st?.mode === 'rounds'; }
 function csMode() { return S.st?.mode === 'rounds' || S.st?.mode === 'dm'; }
 // Mata-mata: variantes (st.dmv) 0 todos contra todos, 1 times, 2 corrida armada, 3 só cabeça
 const dmv = () => S.st?.mode === 'dm' ? S.st.dmv | 0 : -1, isTDM = () => dmv() === 1, teamMode = () => isR() || isTDM();
-const DMV_N = ['Todos contra todos', 'Times', 'Corrida armada', 'Só cabeça'], TDMN = { t: 'Laranja', ct: 'Azul' };
+const DMV_N = ['Todos contra todos', 'Times', 'Corrida armada', 'Só cabeça', 'Treino'], TDMN = { t: 'Laranja', ct: 'Azul' };
 const GG = ['ak47', 'm4', 'famas2', 'galilar', 'aug2', 'sg553', 'p90', 'mp5', 'ump45', 'mac10', 'nova', 'xm1014', 'awp', 'scout', 'deagle', 'five7', 'tec9', 'glock', 'knife']; // corrida armada: um abate = próxima arma; a última é a faca
 const ggInv = p => { const w = GG[clamp(p.gg | 0, 0, GG.length - 1)]; return w === 'knife' ? { primary: null, secondary: null, he: 0, smoke: 0 } : { primary: W[w].slot === 'primary' ? w : null, secondary: W[w].slot === 'secondary' ? w : null, he: 0, smoke: 0 }; }; // modos estilo CS: armas no chão
 function teamPick() { let t = 0, ct = 0; for (const q of S.players.values()) if (q.team === 't') t++; else if (q.team === 'ct') ct++; return t <= ct ? 't' : 'ct'; }
 function setTeam(p, tm) { p.team = tm; p.color = TEAMC[tm]; }
 // troca de time no meio da partida (como o "trocar de time" do CS): vivo na rodada = morre e volta no próximo round; no aquecimento e no
 // congelamento nasce já no lado novo. Equilíbrio: um bot do time novo passa para o antigo; sem bot, não deixa um time com 2 a mais.
+function srvVote(p, k) { // Rodadas: render-se (todos os humanos do time concordam em 30 s) e pausa tática (+30 s de compra, 1 por time em cada metade)
+  if (!isR() || (p.team !== 't' && p.team !== 'ct') || S.phase === 'over' || S.phase === 'warmup') return;
+  const tn = TEAMN[p.team], hum = [...S.players.values()].filter(q => !q.isBot && q.team === p.team);
+  if (k === 'gg') {
+    p.ggAt = now; const ok = hum.filter(q => now - (q.ggAt ?? -99) < 30).length;
+    for (const q of hum) sendTo(q.id, { t: 'info', txt: `${p.name} votou para render-se (${ok}/${hum.length})` });
+    if (ok >= hum.length) { const win = p.team === 't' ? 'ct' : 't'; S.phase = 'over'; S.phaseEnd = now + 10; S.winner = win; for (const q of S.players.values()) { q.ggAt = -99; sendTo(q.id, { t: 'mend', w: q.team === win ? q.id : null }); } broadcast({ t: 'msg', txt: tn.toUpperCase() + ' SE RENDEU', sub: `${TEAMN[win]} vence · ${S.score.t} x ${S.score.ct}`, dur: 9, snd: 'win' }); srvState(); }
+  } else if (k === 'pause') {
+    const used = (S.touts ||= {}), key = p.team + (S.ot ? 'o' + S.ot : (S.score.t + S.score.ct) >= S.st.rounds - 1 ? 2 : 1);
+    if (used[key]) return sendTo(p.id, { t: 'info', txt: 'Seu time já usou a pausa tática nesta metade' }); used[key] = 1;
+    if (S.phase === 'freeze') S.phaseEnd += 30; else S.pauseNext = 30;
+    broadcast({ t: 'msg', txt: 'PAUSA TÁTICA', sub: `${tn}: +30 s de compra ${S.phase === 'freeze' ? 'agora' : 'na próxima rodada'}`, dur: 3 }); srvState();
+  }
+}
 function srvSwitchTeam(p, tm) {
   if (!isR() || (tm !== 't' && tm !== 'ct') || p.team === tm || S.phase === 'over') return;
   const tell = txt => { if (!p.isBot) sendTo(p.id, { t: 'info', txt }); };
@@ -21936,7 +21967,7 @@ function srvMoveTeam(p, tm) {
   if (p.alive) { srvKill(p, null, 'world', false); p.deaths--; } // rodada valendo: sai dela (como no CS), sem contar morte
   setTeam(p, tm); p.alive = false; p.inv = defInv(); if (tm === 'ct') p.inv.secondary = 'usp'; p.armor = 0; p.helmet = false; p.kit = false;
 }
-function inSite(x, z) { const st = curMap?.sites; if (st) for (const k in st) { const r = st[k]; if (x > r[0] && x < r[1] && z > r[2] && z < r[3]) return k; } return null; }
+function inSite(x, z) { const st = curMap?.sites, wing = (NET.isHost ? S.st : C.st)?.wing; if (st) for (const k in st) { if (wing && k !== 'A') continue; const r = st[k]; if (x > r[0] && x < r[1] && z > r[2] && z < r[3]) return k; } return null; }
 function bombDrop(p) { const B = S.bomb; if (p && B?.st === 'carried' && B.by === p.id) { B.st = 'dropped'; B.pos = p.pos.slice(); } }
 function bombTick() {
   const B = S.bomb, ps = [...S.players.values()];
@@ -22061,6 +22092,7 @@ function srvTick(dt) {
         if (win) { S.phase = 'over'; S.phaseEnd = now + 10; S.winner = win; for (const p of S.players.values()) sendTo(p.id, { t: 'mend', w: p.team === win ? p.id : null }); broadcast({ t: 'msg', txt: 'TIME ' + TDMN[win].toUpperCase() + ' VENCEU!', sub: `${sc.t} x ${sc.ct} — nova partida em 10s`, dur: 9, snd: 'win' }); srvState(); }
         lead = null; }
       if (dmv() === 2) { lead = null; for (const p of S.players.values()) if (!lead || (p.gg | 0) > (lead.gg | 0)) lead = p; if (lead && (lead.gg | 0) < GG.length && now < S.phaseEnd) lead = null; }
+      if (dmv() === 4) { lead = null; S.phaseEnd = now + 600; } // treino não acaba
       if (lead && (dmv() === 2 || lead.kills >= st.frags || now >= S.phaseEnd)) { S.phase = 'over'; S.phaseEnd = now + 10; S.winner = lead.id; broadcast({ t: 'mend', w: lead.id }); broadcast({ t: 'msg', txt: lead.name + ' VENCEU!', sub: (dmv() === 2 ? 'Completou a corrida armada' : `${lead.kills} abates`) + ' — nova partida em 10s', dur: 9, snd: 'win' }); srvState(); }
     } else if (S.phase === 'over' && now >= S.phaseEnd) srvAfterMatch();
   } else {
@@ -22071,7 +22103,7 @@ function srvTick(dt) {
         if (n < 2) S.pre = 0;
         if (S.pre && now >= S.pre) { S.pre = 0; S.score = { t: 0, ct: 0 }; S.loss = { t: 0, ct: 0 }; S.round = 0; S.half = false; S.ot = 0; S.hist = []; for (const p of S.players.values()) { p.kills = p.deaths = p.rw = p.as = p.mvp = 0; p.money = 800; p.lossStreak = 0; } srvStartRound(); }
         break;
-      case 'freeze': if (now >= S.phaseEnd) { S.phase = 'live'; S.liveStart = now; S.phaseEnd = now + RC.round; broadcast({ t: 'msg', txt: 'VAI!', sub: '', dur: 1.2 }); srvState(); } break;
+      case 'freeze': if (now >= S.phaseEnd) { S.phase = 'live'; S.liveStart = now; S.phaseEnd = now + (S.st.wing ? 90 : RC.round); broadcast({ t: 'msg', txt: 'VAI!', sub: '', dur: 1.2 }); srvState(); } break;
       case 'live': {
         if (n < 2) { S.phase = 'warmup'; S.pre = 0; broadcast({ t: 'msg', txt: 'AQUECIMENTO', sub: 'Esperando outro jogador', dur: 3 }); break; }
         bombTick();
@@ -22113,7 +22145,7 @@ function botThink(p, dt) {
     b.lastSeen = [tgt.pos[0], tgt.pos[2]]; b.lastSeenT = now;
     if (wid === 'knife') { wish.set(dx / hd, 0, dz / hd); }
     else if (D.strafe) { b.strafeT -= dt; if (b.strafeT <= 0) { b.strafeT = rand(.3, .9); b.strafeDir = Math.random() < .5 ? -1 : 1; } wish.set(Math.cos(b.yaw), 0, -Math.sin(b.yaw)).multiplyScalar(b.strafeDir * .6); }
-    if (!frozen && !p.act && now >= b.reactAt && Math.abs(ty) < .12 && now >= b.nextFire && now >= b.reloadEnd) botShoot(p, tgt, D, wid, eye, td);
+    if (!frozen && !p.act && dmv() !== 4 && now >= b.reactAt && Math.abs(ty) < .12 && now >= b.nextFire && now >= b.reloadEnd) botShoot(p, tgt, D, wid, eye, td);
   } else {
     b.target = null;
     if (b.alertYaw != null) { b.yaw += clamp(angDiff(b.yaw, b.alertYaw), -6 * dt, 6 * dt); if (Math.abs(angDiff(b.yaw, b.alertYaw)) < .1) b.alertYaw = null; }
@@ -22147,7 +22179,16 @@ function botThink(p, dt) {
 function botObj(p) { // para onde o bot vai quando não vê ninguém (modo Rodadas)
   const B = S.bomb, st = curMap.sites, area = k => { const r = st[k]; return [rand(r[0] + 2, r[1] - 2), rand(r[2] + 2, r[3] - 2)]; };
   if (B.st === 'planted') return p.team === 'ct' ? [B.pos[0], B.pos[2]] : [B.pos[0] + rand(-7, 7), B.pos[2] + rand(-7, 7)];
-  if (p.team === 't') return B.st === 'dropped' ? [B.pos[0], B.pos[2]] : area(S.bSite);
+  const mid = k => { const r = st[k]; return [(r[0] + r[1]) / 2, (r[2] + r[3]) / 2]; }, near = (q, c, d) => Math.hypot(q.pos[0] - c[0], q.pos[2] - c[1]) < d;
+  if (p.team === 't') {
+    if (B.st === 'dropped') return [B.pos[0], B.pos[2]];
+    const c = mid(S.bSite), ts = [...S.players.values()].filter(q => q.alive && q.team === 't'); // junta o time perto do bomb e entra junto (não pinga um por um)
+    if (near(p, c, 30) && !near(p, c, 14) && now - S.liveStart < 50 && ts.filter(q => near(q, c, 32)).length < Math.ceil(ts.length * .6)) return [p.pos[0], p.pos[2]];
+    return area(S.bSite);
+  }
+  if (S.st.wing) return area('A');
+  let seen = null; for (const q of S.players.values()) if (q.isBot && q.alive && q.team === 'ct' && q.bot.lastSeen && now - q.bot.lastSeenT < 8 && (!seen || q.bot.lastSeenT > seen[2])) seen = [q.bot.lastSeen[0], q.bot.lastSeen[1], q.bot.lastSeenT];
+  if (seen) { let bk = null, bd = 1e9; for (const k in st) { const m = mid(k), d = Math.hypot(m[0] - seen[0], m[1] - seen[1]); if (d < bd) { bd = d; bk = k; } } if (bd < 40) return area(bk); } // viu o ataque perto de um bomb: a defesa gira para lá
   return area((p.id.charCodeAt(p.id.length - 1) + S.round) % 2 ? 'A' : 'B');
 }
 function botBombAct(p) {
@@ -30009,7 +30050,7 @@ function zExplode(pos, owner, r, dmgMax, w, insta) { // granada / macaco
 // Cliente: mensagens
 // ================================================================
 // o que chega do host é entrada não confiável (o host é outro jogador): forma conferida aqui, e uma mensagem malformada não derruba o cliente
-const saneSt = st => { st = st && typeof st === 'object' ? st : {}; return { ...st, map: Object.hasOwn(MAPS, st.map) ? st.map : 'arena', mode: ['rounds', 'dm', 'zombies'].includes(st.mode) ? st.mode : 'rounds', rounds: st.rounds | 0, frags: st.frags | 0, dmv: clamp(st.dmv | 0, 0, 3), bots: clamp(st.bots | 0, 0, 7), diff: st.diff | 0, zdiff: clamp(st.zdiff | 0, 0, ZDIFF.length - 1), ...campSaneSt(st) }; }; // O3-D02: zmode e ato
+const saneSt = st => { st = st && typeof st === 'object' ? st : {}; return { ...st, map: Object.hasOwn(MAPS, st.map) ? st.map : 'arena', mode: ['rounds', 'dm', 'zombies'].includes(st.mode) ? st.mode : 'rounds', rounds: st.rounds | 0, frags: st.frags | 0, dmv: clamp(st.dmv | 0, 0, 4), wing: st.wing ? 1 : 0, bots: clamp(st.bots | 0, 0, 7), diff: st.diff | 0, zdiff: clamp(st.zdiff | 0, 0, ZDIFF.length - 1), ...campSaneSt(st) }; }; // O3-D02: zmode e ato
 function sanePl(pl) {
   pl.id = String(pl.id); pl.n = String(pl.n ?? '').slice(0, 20); pl.c = /^#[0-9a-f]{3,8}$/i.test(pl.c) ? pl.c : '#cccccc';
   for (const k of ['hp', 'ar', 'm', 'rw', 'mh', 'bl', 'rv']) pl[k] = +pl[k] || 0;
@@ -30159,6 +30200,7 @@ function onMsgInner(m) {
     case 'inv': if (!m.inv || typeof m.inv !== 'object') break; applyInv(m.inv, false, m.got); me.money = +m.m || 0; me.armor = +m.ar || 0; me.helmet = !!m.hm; if (m.got) play('buy'); renderBuy(); break;
     case 'dmg': {
       const info = C.players.get(m.v); if (info) { info.hp = m.hp; info.ar = m.ar; }
+      if (m.a === C.myId && m.v !== C.myId && C.ms && finN(m.d)) C.ms.dmg += m.d;
       if (m.v === C.myId) {
         me.hp = m.hp; me.armor = m.ar; play('hurt'); me.tagEnd = now + .35; ZC.hpS = m.hp; ZC.hpUp = 0; // golpe: a vida mostrada cai na hora
         const f = $('#dmgflash'); f.style.transition = 'none'; f.style.opacity = Math.min(1, .35 + m.d / 60); requestAnimationFrame(() => { f.style.transition = 'opacity .8s'; f.style.opacity = 0; });
@@ -30166,10 +30208,10 @@ function onMsgInner(m) {
       }
       break;
     }
-    case 'mend': grantXP(m.w === C.myId ? 150 : 40); stat('m'); if (m.w === C.myId) stat('w'); break;
+    case 'mend': grantXP(m.w === C.myId ? 150 : 40); stat('m'); if (m.w === C.myId) stat('w'); fimPartida(m.w === C.myId); break;
     case 'kill': {
       feedAdd(m.k, m.v, m.w, m.hs, m.as, m.tk);
-      if (C.st?.mode !== 'zombies') { if (m.k === C.myId && m.v !== C.myId) { stat('k'); if (m.hs) stat('hs'); } if (m.v === C.myId) stat('d'); }
+      if (C.st?.mode !== 'zombies') { if (m.k === C.myId && m.v !== C.myId) { stat('k'); if (m.hs) stat('hs'); if (C.ms) { C.ms.k++; if (m.hs) C.ms.hk++; if (isW(m.w)) C.ms.byW[m.w] = (C.ms.byW[m.w] || 0) + 1; } } if (m.v === C.myId) { stat('d'); if (C.ms) C.ms.d++; } }
       if (m.v === C.myId) { me.alive = false; C.deadAt = now; C.killer = m.k; C.killW = isW(m.w) ? m.w : null; C.killHS = !!m.hs; G.scope = 0; G.reloadEnd = 0; C.spec = null; C.buyOpen = false; renderBuy(); }
       else { const rp = R.get(m.v); if (rp) { rp.alive = false; rp.dead = true; rp.deadT = now; } }
       if (m.k === C.myId && m.v !== C.myId) { play('kill'); grantXP((m.hs ? 15 : 10) * (C.players.get(m.v)?.b ? .5 : 1)); } // XP: abate (metade contra bot)
@@ -30268,6 +30310,7 @@ function updateHud(dt) {
     const lead = ps.slice().sort((a, b) => b.k - a.k)[0], v = st.dmv | 0;
     if (v === 1) { const sc = C.sc || { t: 0, ct: 0 }, my = C.players.get(C.myId)?.tm; score = `Times até ${st.frags * 2} · <span style="color:${TEAMC.t}">LARANJA ${sc.t}</span> x <span style="color:${TEAMC.ct}">${sc.ct} AZUL</span>` + (my ? ` · você é <b style="color:${TEAMC[my]}">${my === 't' ? 'Laranja' : 'Azul'}</b>` : ''); }
     else if (v === 2) { const gl = ps.slice().sort((a, b) => (b.gg | 0) - (a.gg | 0))[0], mine = C.players.get(C.myId); score = `Corrida armada · você: nível ${(mine?.gg | 0) + 1}/${GG.length}` + (gl ? ` · líder: <span style="color:${esc(gl.c)}">${esc(gl.n)}</span> nível ${(gl.gg | 0) + 1}` : ''); }
+    else if (v === 4) { const m = C.ms || {}; score = `Treino · precisão ${m.s ? Math.round(100 * m.h / m.s) : 0}% · tiros na cabeça ${m.h ? Math.round(100 * (m.hh || 0) / m.h) : 0}% · abates ${m.k || 0}`; }
     else score = (v === 3 ? 'Só cabeça' : 'Mata-mata') + ` até ${st.frags}` + (lead ? ` · líder: <span style="color:${esc(lead.c)}">${esc(lead.n)}</span> ${lead.k}` : '');
   }
   setHTML('score', score);
@@ -30300,7 +30343,7 @@ function updateHud(dt) {
     const wname = G.cur === 'knife' && ZC.bowie ? 'Faca Bowie' : (w?.name || '');
     setHTML('ammo', `<span class="wn">${esc(wname)}</span>` + (G.cur === 'dmach' ? `${Math.max(0, Math.ceil(ZC.dmEnd - now))}<small> s</small>` : a ? `${a.mag}<small> / ${a.res}</small>` : (w?.slot === 'nade' ? `${G.inv[G.cur] || 0}` : '')));
     const sl = [['1', G.inv.primary], ['2', G.inv.secondary], ['5', G.inv.third], ['', hasW('dmach') ? 'dmach' : null], ['3', 'knife'], ['4', G.inv.he ? 'he' : null], ['4', G.inv.semtex ? 'semtex' : null], ['4', G.inv.smoke ? 'smoke' : null], ['4', G.inv.flash ? 'flash' : null], ['4', G.inv.molotov ? 'molotov' : null], ['4', G.inv.inc ? 'inc' : null], ['4', G.inv.decoy ? 'decoy' : null], ['4', G.inv.monkey ? 'monkey' : null], ['4', G.inv.clay ? 'clay' : null]].filter(s => s[1]);
-    setHTML('slots', sl.map(([k, id]) => `<div class="${id === G.cur ? 'on' : ''}">${k} ${esc(W[id].name)}${(id === 'he' || id === 'monkey' || id === 'semtex' || id === 'clay') && ZM ? ' x' + G.inv[id] : ''}</div>`).join(''));
+    setHTML('slots', sl.map(([k, id]) => `<div class="${id === G.cur ? 'on' : ''}">${k} ${esc(W[id].name)}${(id === 'he' || id === 'monkey' || id === 'semtex' || id === 'clay') && ZM ? ' x' + G.inv[id] : ''}</div>`).join('') + (C.carry ? `<div class="${C.bombHand ? 'on' : ''}">5 Bomba (C4)</div>` : ''));
   } else { setHTML('hp', ''); setHTML('ammo', ''); setHTML('slots', ''); hpBar(0); }
   setHTML('money', st.mode === 'rounds' && C.phase !== 'warmup' ? '$' + me.money : '');
   // recarga
@@ -30340,7 +30383,7 @@ function updateHud(dt) {
   if ($('#net').textContent !== net) $('#net').textContent = net;
 }
 // ---------- modo Rodadas no cliente: bomba (modelo, bipe, aviso e barra) e mini mapa ----------
-let BMESH = null, beepT = 0, mmT = 0;
+let BHAND = null, BMESH = null, beepT = 0, mmT = 0;
 const DROPM = new Map(), MARKS = [];
 function dropsDraw() { // armas e kits no chão (modelo realista deitado)
   const list = C.st?.mode !== 'zombies' && inGame ? C.drops || [] : [], ids = new Set(list.map(d => d[0]));
@@ -30379,7 +30422,7 @@ function bombHud(dt) {
   const mine = C.players.get(C.myId); let tip = '';
   if (B && me.alive && C.phase === 'live') {
     const site = inSite(me.pos.x, me.pos.z);
-    if (B.s === 'carried' && B.by === C.myId) tip = site ? `Segure <b>E</b> para plantar no bomb ${site}` : 'Você está com a bomba · leve ao bomb A ou B';
+    if (B.s === 'carried' && B.by === C.myId) tip = site ? `Segure <b>E</b> para plantar no bomb ${site}` : `Você está com a bomba · leve ao bomb ${C.st?.wing ? 'A' : 'A ou B'} · <b>5</b> pega na mão, <b>G</b> larga`;
     else if (B.s === 'planted' && mine?.tm === 'ct' && Math.hypot(me.pos.x - B.p[0], me.pos.z - B.p[2]) < 2) tip = `Segure <b>E</b> para desarmar (${mine.kt ? 5 : 10} s)`;
     if (keys.KeyE && tip && C.actEnd <= now && now > (C.eT || 0)) { C.eT = now + .4; sendToHost({ t: 'bomb', on: 1 }); }
   }
@@ -30387,6 +30430,11 @@ function bombHud(dt) {
   if (acting && !C.bombAct) { G.trigger = false; G.scope = 0; G.rezoom = 0; G.burstN = 0; G.reload = null; G.reloadEnd = 0; }
   if (!acting && C.bombAct) G.switchEnd = Math.max(G.switchEnd, now + .35); // larga a bomba/o alicate e saca a arma de novo
   C.bombAct = acting;
+  const carry = !!(B && me.alive && B.s === 'carried' && B.by === C.myId); if (!carry) C.bombHand = false;
+  if (!BHAND) { BHAND = new THREE.Group(); bx(BHAND, .26, .1, .17, 0, 0, 0, new THREE.MeshLambertMaterial({ color: 0x4a3a28 })); bx(BHAND, .2, .02, .12, 0, .06, 0, new THREE.MeshLambertMaterial({ color: 0x1a1a1a })); BHAND.userData.led = bx(BHAND, .03, .02, .03, .07, .075, .04, new THREE.MeshBasicMaterial({ color: 0xff2020 })); scene.add(BHAND); }
+  BHAND.visible = carry && (C.bombHand || C.bombAct);
+  if (BHAND.visible) { BHAND.position.set(.16, -.24, -.5).applyQuaternion(camera.quaternion).add(camera.position); BHAND.quaternion.copy(camera.quaternion); BHAND.rotateX(-.35); BHAND.userData.led.visible = (now * 2 | 0) % 2 === 0; }
+  C.carry = carry;
   C.eTip = !!tip;
   if (!tip && me.alive && C.st?.mode !== 'zombies') { let best = null, bd = 2.2; for (const d of C.drops || []) { const dd = Math.hypot(me.pos.x - d[2], me.pos.z - d[4]); if (d[1] !== 'kit' && dd < bd) { bd = dd; best = d; } }
     if (best) { const sl = W[best[1]].slot; tip = G.inv[sl] ? `<b>E</b>: trocar ${esc(W[G.inv[sl]].name)} por ${esc(W[best[1]].name)}` : `Ande por cima para pegar ${esc(W[best[1]].name)}`; } }
@@ -30533,7 +30581,7 @@ addEventListener('keydown', e => {
     case 'KeyV': if (ZC.on && me.alive && !me.sprinting && !(ZC.revLocal > 0) && now >= G.nextFire && now >= G.switchEnd) knifeAttack(false); break;
     case 'Digit1': G.inv.primary && equip(G.inv.primary); break;
     case 'Digit2': G.inv.secondary && equip(G.inv.secondary); break;
-    case 'Digit5': G.inv.third && equip(G.inv.third); break; // terceira arma (Mule Kick)
+    case 'Digit5': if (C.st?.mode === 'rounds' && C.bomb?.s === 'carried' && C.bomb.by === C.myId) { C.bombHand = !C.bombHand; G.trigger = false; G.scope = 0; G.rezoom = 0; if (!C.bombHand) G.switchEnd = Math.max(G.switchEnd, now + .35); } else G.inv.third && equip(G.inv.third); break; // Rodadas: bomba na mão; senão a terceira arma (Mule Kick)
     case 'Digit3': equip('knife'); break;
     case 'Digit4': { const opts = ['he', 'flash', 'smoke', 'molotov', 'inc', 'decoy', 'semtex', 'monkey', 'clay'].filter(hasW); if (opts.length) equip(opts[(opts.indexOf(G.cur) + 1) % opts.length]); break; }
     case 'KeyQ': hasW(G.last) && equip(G.last); break;
@@ -30541,7 +30589,8 @@ addEventListener('keydown', e => {
     case 'KeyB': openBuy(); break;
     case 'KeyY': case 'Enter': openChat(); e.preventDefault(); break;
     case 'KeyU': openChat(true); e.preventDefault(); break;
-    case 'KeyG': if (C.st?.mode !== 'zombies' && me.alive) { if (G.cur === 'knife' && !(C.bomb?.s === 'carried' && C.bomb.by === C.myId)) toast('Não dá para largar a faca', 1.5); else if (W[G.cur]?.slot === 'nade') toast('Granada não se larga: jogue com o clique', 1.5); else sendToHost({ t: 'drop', w: G.cur }); } break;
+    case 'KeyG': if (C.bombHand && me.alive) { sendToHost({ t: 'drop', w: 'knife' }); C.bombHand = false; G.switchEnd = Math.max(G.switchEnd, now + .35); }
+      else if (C.st?.mode !== 'zombies' && me.alive) { if (G.cur === 'knife' && !(C.bomb?.s === 'carried' && C.bomb.by === C.myId)) toast('Não dá para largar a faca', 1.5); else if (W[G.cur]?.slot === 'nade') toast('Granada não se larga: jogue com o clique', 1.5); else sendToHost({ t: 'drop', w: G.cur }); } break;
     case 'KeyE': if (C.st?.mode !== 'zombies' && me.alive && !C.eTip) sendToHost({ t: 'pick' }); break;
     case 'KeyZ': sendMark(); break;
     case 'KeyK': if (C.st?.mode === 'rounds') switchTeam(); break;
@@ -30626,7 +30675,7 @@ const MICON = { // ícones dos modos
   zombies: '<svg viewBox="0 0 48 48"><path d="M14 40V22a10 10 0 0 1 20 0v18" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="20" cy="22" r="2.5" fill="currentColor"/><circle cx="28" cy="22" r="2.5" fill="currentColor"/><path d="M18 31l3 2 3-2 3 2 3-2" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M8 14l6 4M40 14l-6 4" stroke="currentColor" stroke-width="3"/></svg>' };
 function matchForm(el, st0) {
   // escolha por cartões (modo e mapa) e botões segmentados; o modo Zumbis lembra o próprio mapa
-  const st = { map: 'arena', zmap: 'vila', mode: 'rounds', rounds: 13, ff: 1, frags: 20, dmv: 0, bots: 0, diff: 1, zdiff: 1, ...st0 };
+  const st = { map: 'arena', zmap: 'vila', mode: 'rounds', rounds: 13, ff: 1, frags: 20, dmv: 0, wing: 0, bots: 0, diff: 1, zdiff: 1, ...st0 };
   if (st.mode === 'zombies' && MAPS[st.map]?.zonly) st.zmap = st.map;
   st.map = st0.cmap ?? st.map;
   if (!MAPS[st.map] || MAPS[st.map].zonly) st.map = 'arena';
@@ -30647,7 +30696,7 @@ function matchForm(el, st0) {
     const maps = Object.entries(MAPS).filter(([, m]) => !!m.zonly === z && (z || (st.mode === 'rounds') === !!m.bomb));
     const opts = z
       ? `<div class="lbl">Dificuldade</div>${seg('zdiff', ZDIFF.map((d, i) => [i, d.name]))}<div class="zdesc"><b>${ZDIFF[st.zdiff].name}:</b> ${ZDIFF[st.zdiff].desc}</div>`
-      : `<div class="optrow">${st.mode === 'rounds' ? `<div><div class="lbl">Rodadas para vencer</div>${seg('rounds', [3, 5, 8, 10, 13, 16].map(n => [n, n]))}</div><div><div class="lbl">Fogo amigo</div>${seg('ff', [[1, 'Ligado'], [0, 'Desligado']])}</div>` : `<div><div class="lbl">Variante</div>${seg('dmv', DMV_N.map((t, i) => [i, t]))}</div><div><div class="lbl">Abates para vencer</div>${seg('frags', [10, 15, 20, 30, 50].map(n => [n, n]))}</div>`}
+      : `<div class="optrow">${st.mode === 'rounds' ? `<div><div class="lbl">Formato</div>${seg('wing', [[0, 'Competitivo'], [1, 'Wingman 2x2 (só o bomb A)']])}</div><div><div class="lbl">Rodadas para vencer</div>${seg('rounds', [3, 5, 8, 10, 13, 16].map(n => [n, n]))}</div><div><div class="lbl">Fogo amigo</div>${seg('ff', [[1, 'Ligado'], [0, 'Desligado']])}</div>` : `<div><div class="lbl">Variante</div>${seg('dmv', DMV_N.map((t, i) => [i, t]))}</div><div><div class="lbl">Abates para vencer</div>${seg('frags', [10, 15, 20, 30, 50].map(n => [n, n]))}</div>`}
         <div><div class="lbl">Bots</div>${seg('bots', [0, 1, 2, 3, 4, 5, 6, 7].map(n => [n, n]))}</div>
         <div><div class="lbl">Nível dos bots</div>${seg('diff', [[0, 'Fácil'], [1, 'Normal'], [2, 'Difícil']])}</div></div>`;
     el.innerHTML = `<div class="lbl" style="margin-top:4px">Modo</div>
@@ -30666,7 +30715,7 @@ function matchForm(el, st0) {
   render();
   return () => {
     const z = st.mode === 'zombies';
-    return { map: z ? st.zmap : st.map, cmap: st.map, zmap: st.zmap, mode: st.mode, rounds: st.rounds, ff: st.ff ?? 1, frags: st.frags, dmv: st.dmv | 0, bots: z ? 0 : st.bots, diff: st.diff, zdiff: st.zdiff, ...campFormOut(st) }; // O3-D02: zmode
+    return { map: z ? st.zmap : st.map, cmap: st.map, zmap: st.zmap, mode: st.mode, rounds: st.rounds, ff: st.ff ?? 1, frags: st.frags, dmv: st.dmv | 0, wing: st.wing ? 1 : 0, bots: z ? 0 : st.bots, diff: st.diff, zdiff: st.zdiff, ...campFormOut(st) }; // O3-D02: zmode
   };
 }
 // ---------- mira: formatos e cores (SVG com contorno escuro para aparecer em qualquer fundo) ----------
@@ -30830,7 +30879,7 @@ const normUser = v => { v = String(v || '').trim().toLowerCase(); return /^[a-z0
 function mpUI() { // cartão do jogador: inicial, nome, usuário/caixas e barra de XP até a próxima caixa
   const d = PROF.data; if (!$('#mAv')) return;
   $('#mAv').textContent = (CFG.name || '?').trim()[0]?.toUpperCase() || '?';
-  setHTMLm('mpSub', (PROF.user ? '@' + esc(PROF.user) : PROF.uid ? 'Conta sem usuário' : 'Convidado') + (d ? ` · <b>${d.cases}</b> caixa${d.cases === 1 ? '' : 's'}` : ''));
+  setHTMLm('mpSub', (PROF.user ? '@' + esc(PROF.user) : PROF.uid ? 'Conta sem usuário' : 'Convidado') + (d ? ` · <b>${patente(d.elo)}</b> · <b>${d.cases}</b> caixa${d.cases === 1 ? '' : 's'}` : ''));
   if (d) $('#mpXp').style.width = (d.xp / XP_CASE * 100).toFixed(1) + '%';
 }
 function nameSync() { // logado com usuário: o nome no jogo é o usuário (fixo)
@@ -31407,9 +31456,19 @@ $('#btnJoin').onclick = () => { audioInit(); joinRoom($('#inCode').value); };
 $('#inCode').addEventListener('keydown', e => { if (e.code === 'Enter') $('#btnJoin').click(); });
 $('#btnResume').onclick = () => requestLock();
 const myTm = () => C.players.get(C.myId)?.tm;
-function teamBtn() { const b = $('#btnTeam'), tm = myTm(), ok = C.st?.mode === 'rounds' && (tm === 't' || tm === 'ct'); b.style.display = ok ? '' : 'none'; if (ok) b.textContent = 'Trocar para ' + TEAMN[tm === 't' ? 'ct' : 't'] + ' (K)'; }
+function fimPartida(win) { // resumo da partida + patente
+  const s = C.ms, mode = C.st?.mode; if (!s || mode === 'zombies') return;
+  let rk = '';
+  const d = PROF.data; if (d && mode === 'rounds') { const old = d.elo ?? 1000, n = clamp(old + (win ? 25 : -20), 0, 2300); d.elo = n; profSave(); const a = patente(old), b = patente(n); rk = `<div class="dl">Patente</div><b>${b}</b> (${win ? '+25' : '-20'})${a !== b ? (n > old ? ' · <b style="color:#5f5">subiu!</b>' : ' · caiu') : ''}`; }
+  const best = Object.entries(s.byW).sort((a, b) => b[1] - a[1])[0], rounds = mode === 'rounds' ? Math.max(1, C.round | 0) : 0, pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
+  setHTML('msum', `<b>RESUMO DA PARTIDA</b><table><tr><td>Abates / mortes</td><td>${s.k} / ${s.d}</td></tr><tr><td>Precisão</td><td>${pct(s.h, s.s)} (${s.h}/${s.s} tiros)</td></tr><tr><td>Abates na cabeça</td><td>${pct(s.hk, s.k)}</td></tr><tr><td>Dano total</td><td>${Math.round(s.dmg)}</td></tr>${rounds ? `<tr><td>Dano por rodada</td><td>${Math.round(s.dmg / rounds)}</td></tr>` : ''}${best ? `<tr><td>Melhor arma</td><td>${esc(W[best[0]].name)} (${best[1]})</td></tr>` : ''}</table>${rk}`);
+  $('#msum').classList.remove('hidden'); clearTimeout(C.msumT); C.msumT = setTimeout(() => $('#msum').classList.add('hidden'), 11000);
+}
+function teamBtn() { const b = $('#btnTeam'), tm = myTm(), ok = C.st?.mode === 'rounds' && (tm === 't' || tm === 'ct'); $('#voteRow').style.display = ok && C.phase !== 'warmup' && C.phase !== 'over' ? 'flex' : 'none'; b.style.display = ok ? '' : 'none'; if (ok) b.textContent = 'Trocar para ' + TEAMN[tm === 't' ? 'ct' : 't'] + ' (K)'; }
 function switchTeam() { const tm = myTm(); if (C.st?.mode !== 'rounds' || !tm) return; sendToHost({ t: 'team', tm: tm === 't' ? 'ct' : 't' }); }
 $('#btnTeam').onclick = () => { switchTeam(); setTimeout(teamBtn, 400); };
+$('#btnGG').onclick = () => sendToHost({ t: 'vote', k: 'gg' });
+$('#btnTout').onclick = () => sendToHost({ t: 'vote', k: 'pause' });
 $('#click').onclick = () => requestLock();
 $('#btnLeave').onclick = () => leaveGame();
 $('#btnFull').onclick = async () => {
@@ -31443,7 +31502,7 @@ function srvKick(pid) { // tira da sala e não deixa voltar (pelo nome + token d
   srvDrop(c); toast(p.name + ' foi removido da sala', 3);
 }
 function enterGame() {
-  inGame = true;
+  inGame = true; C.ms = { s: 0, h: 0, k: 0, hk: 0, d: 0, dmg: 0, byW: {} }; // estatísticas da partida (resumo no fim e treino)
   $('#menu').classList.add('hidden'); $('#hud').classList.remove('hidden'); $('#click').classList.remove('hidden');
   vmSetWeapon('knife'); updateRoomInfo();
   window.onbeforeunload = e => { releaseInput(); document.exitPointerLock?.(); e.preventDefault(); return ''; }; // se a pessoa cancelar, volta parada e na pausa
