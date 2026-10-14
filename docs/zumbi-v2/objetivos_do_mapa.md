@@ -37,9 +37,10 @@ seletor Clássico/Campanha/Infinito. PROTO 7. Detalhes em `limpeza.md`.
   quase impossível em rodada alta, lacaios nascendo longe, mensagens malformadas, prompts de F fora de hora, notas sumindo, painel sobre as
   peças, etc. (ver o histórico de commits da branch).
 
-## Para o dono decidir
-- O interruptor da energia da Pedreira (ao lado do gerador) liga a luz antes do objetivo do gerador.
-- "Hospital de campanha" aparece como nome do lugar; "Levar Nogueira ao Forte Velho" cita o Forte (é o Castelo da Vila).
-- No infinito depois dos objetivos só aparecem os tipos novos do próprio mapa.
-- A carga do Crematório custa ~6000 em portas (caro de propósito); no Difícil/Pesadelo atrasa 2–3 rodadas.
-- Munição de parede cobrada com o pente cheio (o servidor não recusa; só o cliente avisa).
+## Decidido por mim (o dono deixou; ele corrige se ficar ruim)
+- Vila: o interruptor da energia só liga depois do objetivo do gerador da Pedreira (antes ligava a luz e esvaziava o objetivo).
+- II.3 agora diz "Levar Nogueira ao Castelo" (o Forte Velho era a arena; o rádio continua chamando o lugar de Forte Velho, como na história).
+- "Hospital de campanha" fica: é o nome do lugar no mapa.
+- No infinito depois dos objetivos ficam só os tipos novos do próprio mapa.
+- A carga do Crematório continua cara (~6000 em portas): é a carga difícil de propósito.
+- Munição de parede com o pente cheio: o cliente já não deixa comprar (o servidor não conhece a munição de cada um; o caso visto era um robô chamando o servidor direto).
