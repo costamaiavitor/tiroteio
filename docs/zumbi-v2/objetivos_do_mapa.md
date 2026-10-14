@@ -44,3 +44,10 @@ seletor Clássico/Campanha/Infinito. PROTO 7. Detalhes em `limpeza.md`.
 - No infinito depois dos objetivos ficam só os tipos novos do próprio mapa.
 - A carga do Crematório continua cara (~6000 em portas): é a carga difícil de propósito.
 - Munição de parede com o pente cheio: o cliente já não deixa comprar (o servidor não conhece a munição de cada um; o caso visto era um robô chamando o servidor direto).
+
+## Revisão da madrugada (13→14/10)
+- Passagem secreta só aparece com os requisitos ok: muro igual ao vizinho até as duas áreas estarem abertas (e o interruptor); então surgem rachaduras finas e o F. Teste `passagem-secreta`.
+- Revisão de código (R1): Nogueira ficava congelado na cena depois da escolta (corrigido); chefe de campo pendente e o aviso de fim passavam para a partida seguinte (corrigido); teste `objetivos-reinicio`.
+- Balanceamento medido com robô (R2): Normal bem mais leve (Sanatório r10: de 6,7 para 0,3 queda/min do jogador médio); chefes dos objetivos ×2,8 (lutas de ~1,5–3 min). Detalhes em `balanceamento.md`, seção "Balanceamento final 13/10".
+- Bateria inteira: 236/236.
+- Fica para o dono (fora do modo zumbi, não mexi): em `w18Mola` (arma em primeira pessoa, igual no PvP) um comentário `//` antigo engole a mola do pulo da arma; existe desde antes da main.
