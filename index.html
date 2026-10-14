@@ -324,6 +324,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 .sbt{margin-top:10px}.sbh{display:flex;justify-content:space-between;align-items:center;border-left:4px solid var(--c);padding:2px 10px;background:rgba(255,255,255,.04)}.sbh b{color:var(--c);letter-spacing:2px}.sbh span{font-size:26px;font-weight:700;color:var(--c)}
 .sbhist{display:flex;flex-wrap:wrap;gap:3px;margin-top:12px;align-items:center}.sbhist i{font-style:normal;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:var(--c);color:#111;border-radius:3px;font-size:13px}.sbsep{width:2px;height:22px;background:#fff6;margin:0 5px}
 #flashov{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:5}
+.planta{display:block;max-width:100%;border-radius:8px;border:1px solid var(--line);margin-bottom:6px}
 #msum{position:absolute;right:18px;top:26%;background:rgba(10,12,16,.9);border:1px solid var(--line);border-radius:10px;padding:12px 16px;font-size:15px;min-width:270px}#msum td{padding:2px 12px 2px 0}#msum .dl{margin-top:8px;opacity:.7;font-size:13px}
 #drep{position:absolute;left:18px;top:42%;background:rgba(10,12,16,.85);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:15px;min-width:230px}
 #drep .dl{color:#8b94a0;font-size:12px;letter-spacing:1px;text-transform:uppercase;margin:6px 0 2px}#drep table{width:100%;border-collapse:collapse}#drep td{padding:1px 6px 1px 0}
@@ -802,146 +803,76 @@ function gridMap(rows, cell, meta) {
   for (const s of Object.values(sites)) { s[0] -= cell / 2; s[1] += cell / 2; s[2] -= cell / 2; s[3] += cell / 2; }
   return { w, d, bomb: 1, sites, spawns: sp.T, spawnsB: sp.C, build: siteDeco, areas: (meta.areasC || []).map(([n, c0, c1, r0, r1]) => [n, x0 + c0 * cell, x0 + (c1 + 1) * cell, z0 + r0 * cell, z0 + (r1 + 1) * cell]), boxes: () => [floor(w, d), ...gridBoxes(rows, cell, x0, z0), ...xs], ...meta };
 }
-// ---------- mapas do Mata-mata: planta em grade (2 ou 3 m), girada 180° (justo para todo lado) ----------
-// '#' parede, 'h' casa (cores variadas), 'o' contêiner, 'c' caixa grande/rocha, 'k' mureta (dá pra pular), 'x' caixa, 'b' barris, 'p' pilar,
-// 'v' carro, 'r' passagem com teto, 'S' nascimento. Nenhuma reta livre passa de ~30 m (45 m na Neve, que é de AWP).
-function gridDM(rows, cell, meta) {
-  const n = rows.length, m = rows[0].length, w = m * cell, d = n * cell, x0 = -w / 2, z0 = -d / 2, sp = [], xs = [];
-  rows.forEach((row, r) => [...row].forEach((ch, c) => { const x = x0 + (c + .5) * cell, z = z0 + (r + .5) * cell; if (ch === 'S') sp.push([x, z]); else gridProp(ch, x, z, c, r, xs); }));
-  const PAL = { house: [0xe8a33d, 0x4fa3d1, 0xd95f5f, 0x7bbf5a, 0xf0e0c0, 0xb07ad0], container: [0x2d6fa8, 0x3a8a3a, 0xc9a227, 0xa83a2d, 0x6a6f75] };
-  const boxes = () => { const g = gridBoxes(rows, cell, x0, z0, { h: [4.8, 0, 'house'], o: [2.6, 0, 'container'], ...(meta.H || {}) }); let i = 0;
-    for (const b of g) if (PAL[b.mat]) { b.c = PAL[b.mat][i++ % PAL[b.mat].length]; if (b.mat === 'house') b.h = [4.8, 6.2, 3.6, 5.4][i % 4]; }
-    return [floor(w, d), ...g, ...xs, ...(meta.extra ? meta.extra() : [])]; };
-  return { w, d, spawns: sp, boxes, ...meta };
+// ---------- mapas do Mata-mata: arquitetura de verdade (casas com portas e janelas, alturas variadas, pátios) ----------
+// casa(x, z, largura, fundo, altura, { n, s, e, w: [[posição ao longo da parede, 'p' porta | 'j' janela, largura]], mat, c, roofMat, rc, roof })
+// As janelas têm parapeito de 1,05 m e verga a 2,1 m: dá para ver e atirar por elas, não para passar. Portas com 2,4 m de vão.
+function casa(x, z, w, d, h, o = {}) {
+  const t = .3, mat = o.mat || 'house', c = o.c, out = [];
+  const lado = (centro, len, fixo, horiz, ab) => {
+    const seg = (a, b, y0, y1) => { if (b - a < .05 || y1 - y0 < .05) return; const m = centro + (a + b) / 2, L = b - a; out.push(horiz ? B(m, fixo, L, t, y1 - y0, mat, y0, c) : B(fixo, m, t, L, y1 - y0, mat, y0, c)); };
+    let s0 = -len / 2;
+    for (const [p, k, wd] of (ab || []).slice().sort((a, b) => a[0] - b[0])) { const a = p - wd / 2, b = p + wd / 2; seg(s0, a, 0, h); if (k === 'j') { seg(a, b, 0, 1.05); seg(a, b, 2.1, h); } else seg(a, b, 2.4, h); s0 = b; }
+    seg(s0, len / 2, 0, h);
+  };
+  lado(x, w, z - d / 2 + t / 2, true, o.n); lado(x, w, z + d / 2 - t / 2, true, o.s); lado(z, d - 2 * t, x - w / 2 + t / 2, false, o.w); lado(z, d - 2 * t, x + w / 2 - t / 2, false, o.e);
+  if (o.roof !== false) out.push(B(x, z, w + .5, d + .5, .3, o.roofMat || 'roof', h, o.rc));
+  return out;
 }
-MAPS.arena = gridDM([
-    '########################',
-    '#S...k.......#....x...S#',
-    '#....k..cc...#.........#',
-    '#S..........##..k..##..#',
-    '#x..##..........k..##.S#',
-    '#...##..x..b...#.......#',
-    '#cc.......###....k.....#',
-    '#..k......#p.....k...x.#',
-    '#.x...k.....p#......k..#',
-    '#.....k....###.......cc#',
-    '#.......#...b..x..##...#',
-    '#S.##..k..........##..x#',
-    '#..##..k..##..........S#',
-    '#.........#...cc..k....#',
-    '#S...x....#.......k...S#',
-    '########################'], 2, { name: 'Arena', desc: 'pequeno e rápido, três corredores e um pilar no meio', sky: 0x9cc4e4, skyTop: 0x3a78c0, fog: [50, 150],
-    theme: { floor: ['tile', 0x9da3a8], wall: ['concrete', 0xd8cfbd], crate: ['crate', 0xc08a4a], metal: ['metal', 0x7d8b96], stone: ['concrete', 0xb8b0a0], roof: ['metal', 0x6d7880] } });
-MAPS.dust = gridDM([
-    '################################',
-    '#S......#.........S#.........S.#',
-    '#.......#..........#...........#',
-    '#..###..#..####....#...####....#',
-    '#..###.....####........####..x.#',
-    '#..###.....####..k.....####....#',
-    '#.......b...##.....x....##.....#',
-    '####..#######....#######...#####',
-    '#.....#######....#######.......#',
-    '#.x...##........##..........k..#',
-    '#.....##..c.......k.....##.....#',
-    '#S....##..c.............##..S..#',
-    '#.....##..######...####.##.....#',
-    '#.........######...####........#',
-    '####..k...##.............###..##',
-    '#....##...x...........##...v...#',
-    '#...v...##...........x...##....#',
-    '##..###.............##...k..####',
-    '#........####...######.........#',
-    '#.....##.####...######..##.....#',
-    '#..S..##.............c..##....S#',
-    '#.....##.....k.......c..##.....#',
-    '#..k..........##........##...x.#',
-    '#.......#######....#######.....#',
-    '#####...#######....#######..####',
-    '#.....##....x.....##...b.......#',
-    '#....####.....k..####.....###..#',
-    '#.x..####........####.....###..#',
-    '#....####...#....####..#..###..#',
-    '#...........#..........#.......#',
-    '#.S.........#S.........#......S#',
-    '################################'], 2, { name: 'Deserto', desc: 'vielas, casas e uma torre na praça do meio', sky: 0xbcd4e6, skyTop: 0x4a86c8, fogC: 0xe6d6b4, fog: [60, 190],
-    theme: { floor: ['sand', 0xd9c08c], wall: ['brick', 0xd8bb8c], crate: ['crate', 0xb07d45], stone: ['concrete', 0xcbb48a], roof: ['wood', 0x6b4a2e], metal: ['metal', 0x7d7466] },
-    extra: () => [B(0, 0, 6, 6, 2.4, 'stone'), ...mir(stairs(-6.3, 0, 1, 0, 6, 2.4, .6, 2, 'stone'))] });
-MAPS.armazem = gridDM([
-    '##########################',
-    '#S.......c...............#',
-    '#..ooooo...ooo...........#',
-    '#......c.........c.....S.#',
-    '#..x...oo....x...oo......#',
-    '#S.....oo.c......oo..ooo.#',
-    '#..ooo.oo....bb..oo......#',
-    '#c...#.......##.......#..#',
-    '#.x..ooooo....p....ooo...#',
-    '#...ooo....p....ooooo..x.#',
-    '#..#.......##.......#...c#',
-    '#......oo..bb....oo.ooo..#',
-    '#.ooo..oo......c.oo.....S#',
-    '#......oo...x....oo...x..#',
-    '#.S.....c.........c......#',
-    '#...........ooo...ooooo..#',
-    '#...............c.......S#',
-    '##########################'], 2, { name: 'Armazém', desc: 'fileiras de contêineres, caixas e passarelas', sky: 0x4d5663, skyTop: 0x262d38, cloudC: 0x8a93a0, fog: [30, 100], sun: [20, 45, -12], hemi: 1.7,
-    theme: { floor: ['concrete', 0x8c8c88], wall: ['metal', 0x6f7a82], crate: ['crate', 0xb58450], container: ['container', 0x2d6fa8], metal: ['metal', 0x5a646c], cat: ['metal', 0x4a5258], stone: ['concrete', 0x8c8c88], roof: ['metal', 0x4a5258] },
-    extra: () => mir([B(0, -14, 20, 3, .3, 'cat', 3.2), ...stairs(16, -14.5, -1, 0, 9, 3.5, .7, 2, 'cat')]) });
-MAPS.favela = gridDM([
-    '##############################',
-    '#S..hhhh.hhhhh....hhhh.hhh..S#',
-    '#...hhhh.hhhhh.x..hhhh.hhh...#',
-    '#.k.......h.......hh.........#',
-    '#hhh..hh.hhh.hhhhh..hh.hhhhh.#',
-    '#hhh..hh.hhh.hhhhh..hh.hhhhhh#',
-    '#........hhh.......b...hh....#',
-    '#.hhhhh.......hh.hhhhh.hh.hh.#',
-    '#.hhhhh.hh.x..hh.hhhhh.hh.hh.#',
-    '#S......hh.......hhhhh.......#',
-    '#hhh.hh....hhhh..........hh..#',
-    '#.hh.hh.k..hhhh..v..hhh..hh.S#',
-    '#S.hh..hhh..v..hhhh..k.hh.hh.#',
-    '#..hh..........hhhh....hh.hhh#',
-    '#.......hhhhh.......hh......S#',
-    '#.hh.hh.hhhhh.hh..x.hh.hhhhh.#',
-    '#.hh.hh.hhhhh.hh.......hhhhh.#',
-    '#....hh...b.......hhh........#',
-    '#hhhhhh.hh..hhhhh.hhh.hh..hhh#',
-    '#.hhhhh.hh..hhhhh.hhh.hh..hhh#',
-    '#.........hh.......h.......k.#',
-    '#...hhh.hhhh..x.hhhhh.hhhh...#',
-    '#S..hhh.hhhh....hhhhh.hhhh..S#',
-    '##############################'], 2, { name: 'Favela', desc: 'vielas estreitas, becos e pracinhas', sky: 0x8ec5f0, skyTop: 0x2c74c4, fog: [50, 160],
-    theme: { floor: ['asphalt', 0x6f6f6f], wall: ['brick', 0xb5553c], house: ['plaster', 0xffffff], brick: ['brick', 0xa8543a], metal: ['metal', 0x7a7f86], stone: ['concrete', 0xaaaaaa], crate: ['crate', 0xb07d45], roof: ['metal', 0x7a7f86] } });
-MAPS.neve = gridDM([
-    '########################',
-    '#S.....x.....S..c..x..S#',
-    '#..rrrr.......k.....c..#',
-    '#..rrrr..c.......####..#',
-    '#.......k...c.....##...#',
-    '#..x.......##..........#',
-    '#S..c.....###...k...x..#',
-    '#....k...c.#........S..#',
-    '#.....c.....c...x.....c#',
-    '#.c..####k..........k..#',
-    '#....####....c...x....c#',
-    '#...c.....x....#....c.S#',
-    '#S.c....#....x.....c...#',
-    '#c....x...c....####....#',
-    '#..k..........k####..c.#',
-    '#c.....x...c.....c.....#',
-    '#..S........#.c...k....#',
-    '#..x...k...###.....c..S#',
-    '#..........##.......x..#',
-    '#...##.....c...k.......#',
-    '#..####.......c..rrrr..#',
-    '#..c.....k.......rrrr..#',
-    '#S..x..c..S.....x.....S#',
-    '########################'], 3, { name: 'Posto de Neve', desc: 'aberto, torre, bunkers e rochas (bom pra AWP)', sky: 0xcfdbe6, skyTop: 0x7c9cc0, fog: [40, 170], hemi: 1.2, sunI: 1.8,
-    theme: { floor: ['snow', 0xf4f7fa], wall: ['rock', 0x8c939b], rock: ['rock', 0x9aa2aa], concrete: ['concrete', 0xa7abad], sand: ['plaster', 0xb8a57a], wood: ['wood', 0x8a6a45], crate: ['wood', 0x8a6a45], metal: ['metal', 0x6a7078], roof: ['concrete', 0xa7abad], stone: ['plaster', 0xb8a57a] },
-    trees: [[7.5, -19.5], [-28.5, -13.5], [19.5, -10.5]], H: { c: [2.4, 0, 'rock'] },
-    extra: () => [B(0, 0, 4, 4, 4, 'wood'), ...mir(stairs(0, -7.225, 0, 1, 10, 4, .55, 1.6, 'wood'))] });
+const carro = (x, z, col, vira) => vira ? [B(x, z, 4.4, 2, 1.05, 'metal', .15, col), B(x + .2, z, 2.2, 1.8, .7, 'metal', 1.2, col)] : [B(x, z, 2, 4.4, 1.05, 'metal', .15, col), B(x, z + .2, 1.8, 2.2, .7, 'metal', 1.2, col)];
+MAPS.arena = { name: 'Arena', desc: 'duas casas frente a frente, quintal com ônibus e becos atrás', w: 48, d: 40, sky: 0x9cc4e4, skyTop: 0x3a78c0, fog: [50, 150],
+  theme: { floor: ['grass', 0x6f8f4a], wall: ['concrete', 0xc8c0b0], house: ['plaster', 0xe8c890], roof: ['wood', 0x6a3a2a], fence: ['wood', 0x8a6a45], crate: ['crate', 0xc08a4a], metal: ['metal', 0x7d8b96], stone: ['concrete', 0xb8b0a0] },
+  boxes: () => [floor(48, 40), ...border(48, 40, 4), B(0, 0, 10, 2.6, 2.9, 'metal', .3, 0xd8a020), B(0, 0, 10.05, 2.65, .6, 'metal', 2, 0x30353a), ...mir([
+    ...casa(-7, -13, 14, 8, 3.4, { n: [[-3, 'p', 1.8], [3, 'j', 1.6]], s: [[-4.5, 'j', 1.8], [0, 'p', 2], [4.5, 'j', 1.8]], w: [[0, 'j', 1.6]], e: [[0, 'p', 1.8]], c: 0xe8c890 }),
+    B(-7, -15.6, .3, 2.8, 3.4, 'house', 0, 0xd8b880), B(-7, -10.4, .3, 2.8, 3.4, 'house', 0, 0xd8b880),
+    ...casa(10, -14, 8, 6, 3, { s: [[0, 'p', 4]], w: [[0, 'j', 1.6]], c: 0xa8b4c0, rc: 0x50565c }),
+    B(-19, -8, 10, .2, 1, 'fence'), B(19, -8, 10, .2, 1, 'fence'), ...carro(-9, -4.5, 0x8a2a20, true),
+    B(18, -2, 1.5, 1.5, 1.4, 'crate'), B(-20.5, -3, 1.2, 1.2, 1.2, 'crate'), B(3, -6, 1.4, 1.4, 1.3, 'crate')])],
+  trees: [[17.5, -11]],
+  spawns: [[-20, -18], [-11, -7], [2.5, -18], [20, -18], [20, -5], [-21, -11]] };
+MAPS.dust = { name: 'Deserto', desc: 'casarões, arco de pedra, mercado e a torre na praça', w: 64, d: 64, sky: 0xbcd4e6, skyTop: 0x4a86c8, fogC: 0xe6d6b4, fog: [60, 190],
+  theme: { floor: ['sand', 0xd9c08c], wall: ['plaster', 0xd8bb8c], house: ['plaster', 0xd9b98a], crate: ['crate', 0xb07d45], stone: ['concrete', 0xcbb48a], roof: ['wood', 0x6b4a2e], metal: ['metal', 0x7d7466] },
+  boxes: () => [floor(64, 64), ...border(64, 64, 5), B(0, 0, 6, 6, 2.4, 'stone'), ...mir([
+    ...stairs(-6.3, 0, 1, 0, 6, 2.4, .6, 2, 'stone'),
+    ...casa(-18, -22, 16, 10, 4.5, { s: [[-4, 'p', 2], [4, 'j', 2]], e: [[0, 'p', 2]], n: [[0, 'j', 2]], w: [[2, 'j', 1.6]] }),
+    B(-18, -22, .3, 10, 4.5, 'house', 0, 0xc9a97a),
+    ...casa(20, -20, 12, 12, 4, { w: [[-3, 'p', 2], [3, 'j', 2]], s: [[0, 'p', 2]], n: [[2, 'j', 1.6]], c: 0xcfae7a }),
+    B(-1.75, -10, 8.5, .6, 3.5, 'wall'), B(9.75, -10, 8.5, .6, 3.5, 'wall'), B(4, -10, 3, .6, .9, 'wall', 2.6),
+    B(-24, -6, .6, 10, 3.5, 'wall'), B(-8, -4, 4, .4, 1.1, 'stone'), B(10, -4, .4, 4, 1.1, 'stone'),
+    B(14, -6, 2, 2, 2, 'crate'), B(15.6, -6.6, 1.2, 1.2, 1.2, 'crate'), B(-14, -6, 1.5, 1.5, 1.4, 'crate'), ...carro(-4, -22, 0x8a2a20)])],
+  spawns: [[-29, -29], [-18, -14], [0, -28], [28, -29], [29, -10], [-29, -4]] };
+MAPS.armazem = { name: 'Armazém', desc: 'contêineres empilhados, estantes, escritório e passarelas', w: 52, d: 36, sky: 0x4d5663, skyTop: 0x262d38, cloudC: 0x8a93a0, fog: [30, 100], sun: [20, 45, -12], hemi: 1.7,
+  theme: { floor: ['concrete', 0x8c8c88], wall: ['metal', 0x6f7a82], house: ['plaster', 0xd8d4c8], crate: ['crate', 0xb58450], container: ['container', 0x2d6fa8], metal: ['metal', 0x5a646c], cat: ['metal', 0x4a5258], roof: ['metal', 0x4a5258], stone: ['concrete', 0x8c8c88] },
+  boxes: () => [floor(52, 36), ...border(52, 36, 9), B(0, 0, 2.5, 6, 2.6, 'container', 0, 0xc9a227), ...mir([
+    B(0, -14, 20, 3, .3, 'cat', 3.2), ...stairs(16, -14.5, -1, 0, 9, 3.5, .7, 2, 'cat'),
+    B(-17, -10, 6, 2.5, 2.6, 'container', 0, 0x2d6fa8), B(-17, -10, 6, 2.5, 2.6, 'container', 2.6, 0xa83a2d),
+    B(-6, -6, 2.5, 6, 2.6, 'container', 0, 0x3a8a3a), B(6, -8, 6, 2.5, 2.6, 'container', 0, 0xc9a227), B(19, -5, 2.5, 6, 2.6, 'container', 0, 0x6a6f75),
+    B(-22, -4, 1.2, 8, 3.2, 'metal'), ...casa(-19, -15.5, 8, 5, 3, { s: [[1.5, 'p', 1.8], [-2, 'j', 2]], e: [[0, 'j', 1.4]], roofMat: 'cat' }),
+    B(0, -5, 1.6, 1.6, 1.6, 'crate'), B(1.7, -5.3, 1.2, 1.2, 1.2, 'crate'), B(12, -2, 1.5, 1.5, 1.5, 'crate'), B(-12, -1, 2, 1, 1.1, 'metal')])],
+  spawns: [[-24, -8], [-12, -16], [4, -16.5], [24, -16], [24, -1], [-8.5, -1.5]] };
+MAPS.favela = { name: 'Favela', desc: 'casas coloridas, becos, laje com escada e a pracinha', w: 60, d: 48, sky: 0x8ec5f0, skyTop: 0x2c74c4, fog: [50, 160],
+  theme: { floor: ['asphalt', 0x6f6f6f], wall: ['brick', 0xb5553c], house: ['plaster', 0xffffff], brick: ['brick', 0xa8543a], metal: ['metal', 0x7a7f86], stone: ['concrete', 0xaaaaaa], crate: ['crate', 0xb07d45], roof: ['metal', 0x8a8f96] },
+  boxes: () => [floor(60, 48), ...border(60, 48, 6), B(0, 0, 3, 3, .9, 'brick'), ...mir([
+    ...casa(-22, -19, 10, 8, 3.2, { s: [[-2, 'p', 1.8], [3, 'j', 1.6]], e: [[0, 'j', 1.4]], c: 0xe8a33d }),
+    ...casa(-10.5, -20, 8, 6, 5.6, { s: [[0, 'p', 1.8]], w: [[0, 'j', 1.4]], e: [[0, 'j', 1.4]], c: 0x4fa3d1 }),
+    ...casa(0, -18, 8, 10, 3.2, { s: [[-2, 'p', 1.8]], w: [[2, 'j', 1.4]], n: [[0, 'j', 1.4]], c: 0xd95f5f }), ...stairs(5.2, -13.4, 0, -1, 8, 3.5, .7, 1.6, 'stone'), // escada para a laje
+    ...casa(14, -19, 8, 8, 4.4, { s: [[2, 'p', 1.8]], w: [[0, 'j', 1.4]], c: 0x7bbf5a }),
+    ...casa(25, -18, 8, 10, 3.6, { w: [[2, 'p', 1.8]], s: [[0, 'j', 1.4]], c: 0xf0e0c0 }),
+    ...casa(-20, -6, 8, 6, 4.8, { n: [[0, 'p', 1.8]], e: [[0, 'j', 1.4]], s: [[2, 'j', 1.4]], c: 0xb07ad0 }),
+    ...casa(-6, -6, 6, 6, 3.2, { n: [[1, 'p', 1.8]], s: [[-1, 'p', 1.8]], c: 0xe8c070 }),
+    ...casa(16, -7, 10, 6, 5, { s: [[-2, 'p', 1.8], [3, 'j', 1.4]], w: [[0, 'j', 1.4]], c: 0x5fb0a0 }),
+    B(-27, -11, 1.2, 1.2, 1.2, 'crate'), B(6, -4, .9, .9, 1.1, 'metal', 0, 0x2f6f4f), B(7, -4.4, .9, .9, 1.1, 'metal', 0, 0x8a3a24), ...carro(24, -6, 0x2a5a8a)])],
+  spawns: [[-28, -21], [-12, -12], [2, -11], [20, -12], [28.5, -1], [-28, -6]] };
+MAPS.neve = { name: 'Posto de Neve', desc: 'torre de vigia, bunkers com seteiras, sacos de areia e rochas (bom pra AWP)', w: 72, d: 72, sky: 0xcfdbe6, skyTop: 0x7c9cc0, fog: [40, 170], hemi: 1.2, sunI: 1.8,
+  theme: { floor: ['snow', 0xf4f7fa], wall: ['rock', 0x8c939b], rock: ['rock', 0x9aa2aa], concrete: ['concrete', 0xa7abad], sand: ['plaster', 0xb8a57a], wood: ['wood', 0x8a6a45], crate: ['wood', 0x8a6a45], metal: ['metal', 0x6a7078], roof: ['concrete', 0xa7abad], house: ['concrete', 0xa7abad] },
+  boxes: () => [floor(72, 72), ...border(72, 72, 5), B(0, 0, 4, 4, 4, 'wood'), ...mir([
+    ...stairs(0, -7.225, 0, 1, 10, 4, .55, 1.6, 'wood'),
+    ...casa(-18, -22, 10, 6, 2.6, { s: [[0, 'p', 2]], n: [[-2.5, 'j', 3], [2.5, 'j', 3]], e: [[0, 'j', 2]], w: [[0, 'j', 2]] }),
+    ...casa(20, -14, 8, 8, 3, { w: [[0, 'p', 2]], s: [[0, 'j', 3]], n: [[0, 'j', 2]], mat: 'wood', roofMat: 'wood' }),
+    B(-4, -14, 8, .8, 1.1, 'sand'), B(8, -26, .8, 6, 1.1, 'sand'), B(-26, -8, 6, .8, 1.1, 'sand'),
+    B(-8, -28, 5, 3, 2.5, 'rock'), B(28, -26, 4, 4, 2, 'rock'), B(-30, -30, 3, 3, 1.6, 'rock'), B(10, -8, 3, 2, 1.6, 'rock'), B(-14, -6, 3, 3, 2.4, 'rock'),
+    B(26, -4, 2, 2, 2.2, 'metal', 0, 0x5a6a5a), B(28.5, -4, 2, 2, 2.2, 'metal', 0, 0x5a6a5a)])],
+  trees: [[-28, -16], [14, -30], [31, -10], [-6, -21]],
+  spawns: [[-24, -32], [-18, -15], [0, -30], [18, -24], [32, -20], [-32, -4]] };
 MAPS.duna = gridMap([
     '############################################',
     '############################################',
@@ -30673,6 +30604,25 @@ const MICON = { // ícones dos modos
   rounds: '<svg viewBox="0 0 48 48"><rect x="10" y="16" width="28" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 22h6M16 28h10" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="25" r="3" fill="currentColor"/><path d="M24 16V9h8" fill="none" stroke="currentColor" stroke-width="3"/></svg>',
   dm: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 5v11M24 32v11M5 24h11M32 24h11" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="2.5" fill="currentColor"/></svg>',
   zombies: '<svg viewBox="0 0 48 48"><path d="M14 40V22a10 10 0 0 1 20 0v18" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="20" cy="22" r="2.5" fill="currentColor"/><circle cx="28" cy="22" r="2.5" fill="currentColor"/><path d="M18 31l3 2 3-2 3 2 3-2" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M8 14l6 4M40 14l-6 4" stroke="currentColor" stroke-width="3"/></svg>' };
+function drawPlanta(cv, id) { // planta do mapa vista de cima, na hora de montar a partida
+  const M = MAPS[id]; if (!cv || !M || M.zonly) return;
+  let bx; try { bx = M.boxes(); } catch (e) { return; }
+  const S = Math.min(420 / (M.w + 2), 300 / (M.d + 2)); cv.width = Math.round((M.w + 2) * S); cv.height = Math.round((M.d + 2) * S);
+  const g = cv.getContext('2d'), X = x => (x + M.w / 2 + 1) * S, Z = z => (z + M.d / 2 + 1) * S, th = M.theme || {};
+  const col = (c, k) => { const r = (c >> 16) & 255, gg = (c >> 8) & 255, b = c & 255; return `rgb(${r * k | 0},${gg * k | 0},${b * k | 0})`; };
+  g.fillStyle = '#0c0e10'; g.fillRect(0, 0, cv.width, cv.height);
+  g.fillStyle = col(th.floor?.[1] ?? 0x666666, .3); g.fillRect(X(-M.w / 2), Z(-M.d / 2), M.w * S, M.d * S);
+  for (const [k, r] of Object.entries(M.sites || {})) { g.fillStyle = 'rgba(200,60,50,.45)'; g.fillRect(X(r[0]), Z(r[2]), (r[1] - r[0]) * S, (r[3] - r[2]) * S); }
+  const list = bx.filter(b => b.y > -.5 && b.y < 2).sort((a, b) => a.h - b.h); // chão e telhados ficam de fora: aparecem paredes, portas e janelas
+  for (const b of list) { const c = b.c ?? th[b.mat]?.[1] ?? 0x999999, hh = b.y + b.h; g.fillStyle = hh > 2.5 ? col(c, 1) : hh > 1.3 ? col(c, .7) : col(c, .5); const w = Math.max(2, b.w * S), d = Math.max(2, b.d * S); g.fillRect(X(b.x) - w / 2, Z(b.z) - d / 2, w, d); }
+  for (const b of bx) if (b.mat === 'cat') { g.fillStyle = 'rgba(120,160,220,.35)'; g.fillRect(X(b.x - b.w / 2), Z(b.z - b.d / 2), b.w * S, b.d * S); }
+  g.fillStyle = '#3a6a2a'; for (const [x, z] of (M.trees || []).flatMap(([x, z]) => [[x, z], [-x, -z]])) { g.beginPath(); g.arc(X(x), Z(z), 1.2 * S, 0, 7); g.fill(); }
+  const sa = M.spawns || [], sb = M.spawnsB || sa.map(([x, z]) => [-x, -z]);
+  for (const [lst, c] of [[sa, TEAMC.t], [sb, M.bomb ? TEAMC.ct : TEAMC.t]]) { g.fillStyle = c; for (const [x, z] of lst) { g.beginPath(); g.arc(X(x), Z(z), Math.max(2, .7 * S), 0, 7); g.fill(); } }
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  if (M.areas) { g.font = '600 10px Rajdhani,sans-serif'; g.fillStyle = 'rgba(255,255,255,.75)'; const done = new Set(); for (const a of M.areas) { if (done.has(a[0]) || /^Bomb /.test(a[0])) continue; done.add(a[0]); g.fillText(a[0], X((a[1] + a[2]) / 2), Z((a[3] + a[4]) / 2)); } }
+  g.font = '800 18px Rajdhani,sans-serif'; for (const [k, r] of Object.entries(M.sites || {})) { g.fillStyle = '#ff6a5a'; g.fillText(k, X((r[0] + r[1]) / 2), Z((r[2] + r[3]) / 2)); }
+}
 function matchForm(el, st0) {
   // escolha por cartões (modo e mapa) e botões segmentados; o modo Zumbis lembra o próprio mapa
   const st = { map: 'arena', zmap: 'vila', mode: 'rounds', rounds: 13, ff: 1, frags: 20, dmv: 0, wing: 0, bots: 0, diff: 1, zdiff: 1, ...st0 };
@@ -30703,7 +30653,9 @@ function matchForm(el, st0) {
       <div class="cards">${MODES.map(([k, t, d]) => `<button type="button" class="card${st.mode === k ? ' on' : ''}" data-mode="${k}"><span class="micon">${MICON[k]}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div>
       <div class="lbl">Mapa</div>
       <div class="cards">${maps.map(([k, m]) => `<button type="button" class="card${cur === k ? ' on' : ''}" data-map="${k}"><div class="thumb" style="background:linear-gradient(180deg,${hex(m.skyTop ?? m.sky)},${hex(m.fogC ?? m.sky)} 56%,${hex(m.theme.floor?.[1] ?? 0x555555)} 58%,#0c0d0b)"></div><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}</div>
+      ${z ? '' : `<div class="lbl">Planta do mapa</div><canvas class="planta" width="420" height="300"></canvas>`}
       <div class="lbl">Opções</div>${opts}`;
+    if (!z) drawPlanta(el.querySelector('canvas.planta'), cur);
   };
   el.onclick = e => {
     const b = e.target.closest('button'); if (!b || !el.contains(b)) return;
