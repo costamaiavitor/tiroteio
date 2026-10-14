@@ -60,3 +60,36 @@ test('Vila: Nogueira não passa da porta F↔G fechada; anda depois de comprada'
   assert.equal(r.f0, 0, 'parado com o caminho fechado');
   assert.ok(r.f1 > 3, 'anda depois de comprar: ' + r.f1);
 });
+
+test('Vila: gerador só depois das 3 peças do motor (achar, pegar com F, levar ao gerador)', { timeout: 300000 }, async () => {
+  await J?.fechar(); J = await abrirJogo();
+  await criarSala(J.page, { mode: 'zombies', map: 'vila', zdiff: 1 });
+  const r = await noJogo(J.page, T => {
+    const p = T.S.players.get('h'); p.dwEnd = 1e12;
+    const poe = (x, z) => { p.pos = [x, 0, z]; T.me.pos.set(x, 0, z); T.me.vel.set(0, 0, 0); };
+    T.S.st = { ...T.S.st, zmode: 'campanha', zdiff: 1 }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1);
+    T.Z.phaseEnd = window.__simNow; T.sim(.05); T.Z.toSpawn = 50; T.Z.spawnT = 1e12;
+    const st = id => T.CAMP.obj[id]?.st, gi = T.ZD.zint.findIndex(o => o.id === 'gerador-pedreira');
+    T.campForca('I.1'); T.sim(.3);
+    const seta = document.querySelector('#campMark')?.innerHTML ?? T.CAMP.c.el?.mark?.innerHTML ?? '?';
+    const zd0 = T.C.st.zdiff; T.C.st.zdiff = 0; T.sim(.3); const setaFacil = T.CAMP.c.el?.mark?.innerHTML ?? ''; T.C.st.zdiff = zd0;
+    const depoisSino = { pecas: ['I.P1', 'I.P2', 'I.P3'].map(st), ger: st('I.2') };
+    poe(47.7, -62); T.sim(.05); T.zInteract(0); const promptGer = T.ZC.act ? T.ZC.act.txt : null;
+    T.srvZUse(p, { k: 'zint', id: gi }); T.sim(.1); const gerAntes = T.Z.zint[gi].st;
+    const pecas = T.CAMP_VILA.pecas, txt = [], livres = [];
+    for (const [k, pc] of pecas.entries()) {
+      const i = T.ZD.zint.findIndex(o => o.id === pc.id), o = T.ZD.zint[i]; livres.push([T.zRoomAt(o.x, o.z), T.footFreeR(o.x, o.z, .5), o.x !== pc.x || o.z !== pc.z]);
+      poe(o.x, o.z + .6); T.sim(.05); T.zInteract(0); txt.push(T.ZC.act ? T.ZC.act.txt : null);
+      T.srvZUse(p, { k: 'zint', id: i }); T.sim(.1);
+      txt.push(T.Z.zint[i].st);
+      poe(47.6, -61.5); T.sim(.2); txt.push(T.CAMP.obj[pc.obj].st);
+    }
+    return { seta, setaFacil, depoisSino, promptGer, gerAntes, txt, livres, pecasFim: ['I.P1', 'I.P2', 'I.P3'].map(st), ger: st('I.2') };
+  });
+  assert.deepEqual(r.depoisSino, { pecas: ['ativo', 'ativo', 'ativo'], ger: 'oculto' }, 'depois do sino: as 3 peças, gerador ainda não');
+  assert.equal(r.promptGer, null, 'sem F no gerador antes das peças'); assert.equal(r.gerAntes, 'pronto');
+  for (const [sala, livre, sorteada] of r.livres) { assert.ok(['A', 'B', 'C', 'D', 'E'].includes(sala), 'peça na zona barata: ' + sala); assert.equal(livre, true, 'peça em chão livre'); assert.equal(sorteada, true, 'lugar sorteado'); }
+  assert.equal(r.seta, '', 'Normal: sem seta nem distância'); assert.ok(r.setaFacil.length > 0, 'Fácil: com seta'); 
+  assert.deepEqual(r.txt, ['Pegar a vela', 'levada', 'feito', 'Pegar a correia', 'levada', 'feito', 'Pegar o carburador', 'levada', 'feito']);
+  assert.deepEqual(r.pecasFim, ['feito', 'feito', 'feito']); assert.equal(r.ger, 'ativo', 'com as 3 peças o gerador pode ser ligado');
+});

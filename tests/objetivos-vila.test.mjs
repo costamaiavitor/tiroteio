@@ -127,7 +127,7 @@ test('II: lista, Estação, escolta (para sem ninguém, cai e volta, pistola, So
     // fim dos objetivos do mapa (a etapa seguinte forçada): rodadas infinitas; as notas continuam no host e no cliente (inclusive quem entra no meio)
     for (const id in T.CAMP.obj) T.campForca(id); rodada(); segura(); acaba();
     const c3 = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-    T.srvOnData(c3, { t: 'join', v: 2, pv: 7, name: 'Terceiro' }); T.sim(1.2); T.S.stateT = 0; T.sim(1 / 60);
+    T.srvOnData(c3, { t: 'join', v: 2, pv: 8, name: 'Terceiro' }); T.sim(1.2); T.S.stateT = 0; T.sim(1 / 60);
     const cp = c3.out.filter(x => x.t === 'state' && x.z?.cp).pop()?.z.cp; T.srvDrop?.(c3); T.sim(.1);
     const inf = [T.CAMP.modo, T.CAMP.et, T.CAMP.c.et, notas().every(Boolean), cp?.et, cp?.eu];
     return { ii1, npc0, longe, ii2, hpN, parado, R0: R[0], andou, caiu, some, volta, tiro, sold, esc, minY, maxY, npc1, pa4, ii4, hud, depois, inf, ouvidos: ouvidos(), tela: tela() };
@@ -185,7 +185,7 @@ test('cliente pela rede: toca o sino de graça, liga o gerador, vê os objetivos
   const r = await rodar((T, arg, { p, poe, segura, idx, obj, rodada, acaba, partida }) => {
     partida(1); segura();
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Cliente' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
+    T.srvOnData(c, { t: 'join', v: 2, pv: 8, name: 'Cliente' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
     q.alive = true; q.downed = false; q.dwEnd = 1e12; T.sim(.3);
     const visto = () => { const o = {}; for (const m of c.out) { if (m.t === 'camp' && m.k === 'est') { for (const k in o) delete o[k]; for (const x of m.ob || []) o[x[0]] = x[1]; } if (m.t === 'camp' && m.k === 'obj') o[m.id] = m.st; } return JSON.stringify(o); };
     const host = () => JSON.stringify(Object.fromEntries(Object.entries(T.CAMP.obj).map(([k, v]) => [k, v.st])));
@@ -200,7 +200,7 @@ test('cliente pela rede: toca o sino de graça, liga o gerador, vê os objetivos
     acaba(); ck('II'); rodada(); segura(); T.campForca('II.1'); T.sim(1.2); ck('II.1');
     const npc = c.out.filter(m => m.t === 'camp' && m.k === 'npc' && m.id === 'cabo').length;
     const c3 = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-    T.srvOnData(c3, { t: 'join', v: 2, pv: 7, name: 'Terceiro' }); T.sim(1.2); T.S.stateT = 0; T.sim(1 / 60);
+    T.srvOnData(c3, { t: 'join', v: 2, pv: 8, name: 'Terceiro' }); T.sim(1.2); T.S.stateT = 0; T.sim(1 / 60);
     const cp = c3.out.filter(x => x.t === 'state' && x.z?.cp).pop()?.z.cp;
     T.srvDrop?.(c); T.srvDrop?.(c3); T.sim(.2);
     return { passos, gratis, zint, pw, npc, meio: cp ? [cp.et, cp.eu, JSON.stringify(cp.ob.map(o => [o[0], o[1]]))] : null };

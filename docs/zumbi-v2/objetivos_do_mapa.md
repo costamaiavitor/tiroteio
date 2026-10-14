@@ -63,3 +63,9 @@ seletor Clássico/Campanha/Infinito. PROTO 7. Detalhes em `limpeza.md`.
 
 - Etapas novas: ler o terminal do lugar (a leitura de antes do objetivo não conta) e segurar a sala diante dele (45–60 s, só durante a rodada). Aviso "NOVO OBJETIVO" / "CHEFE À VISTA" no começo de cada etapa.
 - Teste: `tests/objetivos-rodadas.test.mjs`.
+
+## Pedido de 14/10 (tarde): peças do motor e objetivos sem dica
+- **Gerador da Pedreira:** depois do sino, o motor está desmontado. É preciso achar 3 peças (vela de ignição, correia, carburador), pegar com F e levar até o gerador; só com as 3 entregues o gerador pode ser ligado (e defendido). Quem cai carregando uma peça deixa a peça no chão.
+- **Lugares sorteados:** cada partida sorteia o lugar de cada peça num chão livre da zona barata (salas A–E, portas de 750 e 1000), longe de interativos, portas, janelas e das outras peças (`campLugarSorteado`, `CAMP_VILA.pecaSalas`).
+- **Sem dica fora do Fácil:** seta e distância dos objetivos, brilho e giro dos itens no chão só no Fácil (`campDica`). Nas outras dificuldades o item fica parado no chão, em metal escuro, e o painel só diz o que fazer.
+- Teste: `tests/objetivos-rodadas.test.mjs` (peças, zona barata, seta só no Fácil).

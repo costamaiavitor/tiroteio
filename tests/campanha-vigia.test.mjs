@@ -184,7 +184,7 @@ test('quem entra no meio recebe o chefe (versão de campo), a fase e o aviso no 
     const B = H.aberto([[0, 8]]); z.body.pos.set(B[0], 0, B[1]); poe(p, B[0], B[1] + 8);
     T.campChefeAtaca(z, atk('rajada'), p); T.sim(.1);
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Meio' }); T.sim(.2);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 8, name: 'Meio' }); T.sim(.2);
     const st = c.out.filter(m => m.t === 'state' && m.z).pop(), cp = st?.z?.cp;
     const o = { ch: cp?.ch?.slice(0, 3), campo: cp?.ch?.[6], tel: cp?.tel?.[0]?.a };
     T.srvDrop(c); T.campCliReset(); T.campSync(cp); T.sim(1 / 60); o.cli = T.CAMP.c.ch && [T.CAMP.c.ch.k, T.CAMP.c.ch.f, T.CAMP.c.ch.campo]; CH.fase = 0; limpa();

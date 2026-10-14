@@ -103,7 +103,7 @@ test('atalho: destravado, só abre com as duas áreas ativas; aberto, cobra, tir
 test('atalho: quem entra no meio recebe a porta aberta e o interruptor ligado (e o mundo do cliente aplica sem efeito)', { timeout: 120000 }, async () => {
   const r = await noJogo(J.page, T => {
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Novo' }); if (!T.S.players.get(c.pid)) return { semJogador: true };
+    T.srvOnData(c, { t: 'join', v: 2, pv: 8, name: 'Novo' }); if (!T.S.players.get(c.pid)) return { semJogador: true };
     T.sim(1.2); const z = c.out.filter(m => m.t === 'state' && m.z).pop()?.z; T.srvDrop?.(c);
     const L = T.ZD.zint, i = L.findIndex(o => o.id === 'ala-oeste');
     const st = T.zWorldState(); T.buildMap('sanatorio'); // cliente novo: mundo montado do zero (portas fechadas, interruptores desligados)

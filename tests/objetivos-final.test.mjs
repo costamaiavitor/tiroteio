@@ -124,7 +124,7 @@ test('morte do Diretor: fuga na hora (sem cena), Estouro sem fim, quem entra no 
     const o = { morte: [CH.z, ob('F.1'), ob('F.2'), T.CAMP_VS.fase, T.CAMP_EVS.id, T.CAMP_EVS.fuga, T.Z.phase, T.Z.toSpawn > 0, T.CAMP.c.cena ?? null] };
     // quem entra no meio na fuga
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Meio' }); T.sim(.2);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 8, name: 'Meio' }); T.sim(.2);
     const st = c.out.filter(m => m.t === 'state' && m.z).pop(), cp = st?.z?.cp;
     o.meio = [cp?.ob?.find(x => x[0] === 'F.2')?.[1], cp?.ev?.[0]];
     T.srvDrop(c); T.sim(.2);

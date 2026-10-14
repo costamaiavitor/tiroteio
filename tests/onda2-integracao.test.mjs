@@ -111,7 +111,7 @@ const RECOMECO = async (T, A) => {
 const MULTI = async (T, A) => {
   const { p, L, de, poe, frente, prob } = (new Function('return ' + A.AJ)())(T);
   const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-  T.srvOnData(c, { t: 'join', v: 2, pv: 7, name: 'Cliente' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
+  T.srvOnData(c, { t: 'join', v: 2, pv: 8, name: 'Cliente' }); const q = T.S.players.get(c.pid); if (!q) return { semJogador: true };
   q.alive = true; q.downed = false; q.dwEnd = 1e12; q.money = 1e6; T.Z.power = true; T.broadcast({ t: 'zpower' }); T.sim(.1);
   const res = {}, pess = { municao: 'usado', bau: 'meu', terminal: 'lido' };
   for (const t of ['interruptor', 'fogo', 'barril', 'municao', 'wunderfizz', 'bau', 'sino', 'terminal', 'barricada']) for (const i of de(t).slice(0, 1)) {
@@ -131,7 +131,7 @@ const MULTI = async (T, A) => {
   }
   // quem entra no meio (terceiro jogador) recebe o mesmo estado global
   const c3 = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null };
-  T.srvOnData(c3, { t: 'join', v: 2, pv: 7, name: 'Terceiro' }); T.sim(1.2);
+  T.srvOnData(c3, { t: 'join', v: 2, pv: 8, name: 'Terceiro' }); T.sim(1.2);
   T.S.stateT = 0; T.sim(1 / 60); // O3-D16: a foto do mundo sai no fim deste passo; comparada logo depois (um interativo que mudou no último passo antes dela não conta como diferença)
   const zi = c3.out.filter(x => x.t === 'state' && Array.isArray(x.z?.zi)).pop()?.z.zi, est = T.zintEstado();
   res.meio = { tem: !!zi, igual: !!zi && zi.every((s, k) => s[0] === est[k][0]), pessoalVazou: !!zi && zi.some(s => ['usado', 'meu', 'lido'].includes(s[0])) };
