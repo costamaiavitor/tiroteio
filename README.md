@@ -1,4 +1,4 @@
-# Dan of Duty
+# Dan Gun
 
 FPS multiplayer que roda direto no navegador: x1 estilo Counter-Strike e um modo Zumbis cooperativo estilo Call of Duty. Cada um joga no seu computador!
 
@@ -17,7 +17,7 @@ Como a conexão funciona: posições (30 por segundo), bots e zumbis (20 por seg
 ## Modos
 
 - **Rodadas:** competitivo do CS2, Ataque x Defesa com bomba. Detalhes abaixo.
-- **Mata-mata:** renasce, tudo grátis. Mapas: Arena (pequeno, três corredores), Deserto (vielas e torre na praça), Armazém (contêineres e passarelas), Favela (labirinto de vielas) e Posto de Neve (aberto, bom pra AWP). Todos são em planta de grade girada 180° (justos para todo lado), sem reta livre acima de ~30 m (45 m na Neve).
+- **Mata-mata:** renasce, tudo grátis (B escolhe as armas, que ficam para as próximas vidas). Nasce 2 s protegido (atirar tira a proteção). Variantes: **Todos contra todos**, **Times** (Laranja x Azul, sem fogo amigo, vence o time que somar o dobro dos abates), **Corrida armada** (cada abate troca a arma, 19 níveis, o último é a faca; facada rebaixa a vítima) e **Só cabeça**. Ao morrer, a kill cam vira para quem te matou e mostra a arma, se foi na cabeça e a vida que ele ficou. Mapas: Arena (pequeno, três corredores), Deserto (vielas e torre na praça), Armazém (contêineres e passarelas), Favela (labirinto de vielas) e Posto de Neve (aberto, bom pra AWP). Todos são em planta de grade girada 180° (justos para todo lado), sem reta livre acima de ~30 m (45 m na Neve).
 - **Nos modos estilo CS:** rajada longa abre a dispersão (tiro a tiro e rajada curta acertam; a mira continua fixa) e todo mundo nasce olhando para o lado mais aberto, não para a parede.
 - **Zumbis:** cooperativo (até 4), inspirado no CoD Zombies. Veja abaixo.
 

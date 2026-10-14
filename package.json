@@ -2,7 +2,7 @@
   "name": "tiroteio",
   "private": true,
   "version": "0.0.0",
-  "description": "Dan of Duty: FPS no navegador (um único index.html). Este package.json existe só para os testes automáticos.",
+  "description": "Dan Gun: FPS no navegador (um único index.html). Este package.json existe só para os testes automáticos.",
   "type": "module",
   "scripts": {
     "serve": "node tests/servidor.mjs",

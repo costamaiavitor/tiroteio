@@ -9,7 +9,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com https://cdn.jsdelivr.net https://unpkg.com; worker-src blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: https:; connect-src 'self' blob: https://www.gstatic.com https://cdn.jsdelivr.net https://0.peerjs.com wss://0.peerjs.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com wss://firestore.googleapis.com https://www.googleapis.com https://tiroteio-237ee.firebaseapp.com; frame-src https://tiroteio-237ee.firebaseapp.com https://accounts.google.com https://www.youtube-nocookie.com https://open.spotify.com">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dan of Duty</title>
+<title>Dan Gun</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='none' stroke='%23ffb020' stroke-width='10'/><circle cx='50' cy='50' r='8' fill='%23ffb020'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
@@ -456,7 +456,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 <div id="menu" class="overlay">
   <div class="mshell">
     <header class="mtop">
-      <div class="mlogo">DAN <i>OF</i> DUTY</div>
+      <div class="mlogo">DAN <i>GUN</i></div>
       <nav class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="friends">Amigos</button><button data-tab="skins">Skins</button><button data-tab="armory">Armeiro</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></nav>
       <div class="mplayer"><div class="mav" id="mAv">J</div><div class="mpinfo"><input id="inName" maxlength="16" autocomplete="off" title="Seu nome"><div class="mpsub" id="mpSub"></div><div class="mpxp"><i id="mpXp"></i></div></div></div>
     </header>
@@ -20795,7 +20795,7 @@ function shoot() {
   if (!a) return;
   if (a.mag <= 0) { play('empty'); G.nextFire = now + .25; G.burstN = 0; if (a.res > 0) startReload(); return; }
   if (w.burst) G.burstN = G.burstN > 0 && G.burstW === G.cur ? G.burstN - 1 : w.burst - 1, G.burstW = G.cur; // rajada: os tiros seguintes saem sozinhos (frameWeapon)
-  a.mag--; if (!a.mag) G.burstN = 0;
+  a.mag--; if (!a.mag) G.burstN = 0; C.protEnd = 0; // atirou: perde a proteção de quem acabou de nascer
   G.nextFire = now + (G.burstN > 0 ? w.brate : w.rate) * (zPerk('dt') ? .75 : 1); G.lastShot = now; G.lastShotW = G.cur; G.shots++;
   const mz = muzzleWorld();
   if (w.thunder) thunderBlast(w, mz);
@@ -21445,7 +21445,7 @@ function srvAddPlayer(id, name, isBot) {
     // modo zumbis
     perks: [], maxHp: 100, downed: false, hs: 0, downs: 0, revives: 0, bowie: false, selfRev: 0, bleedAt: 0, revBy: null, revProg: 0, revLast: 0, lastHurt: 0 };
   if (isBot) p.bot = { body: { pos: new V3(0, -50, 0), vel: new V3(), onGround: false, h: H_STAND, stepUp: 0 }, path: [], repathAt: 0, target: null, reactAt: 0, nextFire: 0, mag: 0, magW: null, reloadEnd: 0, strafeDir: 1, strafeT: 0, lastPos: new V3(), stuckT: 0, sendT: 0, yaw: 0, pitch: 0, lastSeen: null, lastSeenT: -99, burst: 0, aimHead: false };
-  if (isR()) setTeam(p, teamPick());
+  if (teamMode()) setTeam(p, teamPick());
   S.players.set(id, p);
   return p;
 }
@@ -21620,6 +21620,7 @@ function srvHandle(pid, m) {
       // só efeitos (rastro, som, clarão) nos outros clientes, mas repassado a todos: confere arma, origem perto do jogador e cadência
       // (antes, 'shot' com 12 explosões de arma que o jogador não tinha, de qualquer ponto do mapa, a centenas por segundo, travava todo mundo)
       if (!vec3(m.o) || !isW(m.w) || p.act) return;
+      p.prot = 0;
       if (!p.alive && now - p.diedAt > .6) return;
       const wd = W[m.w]; if (!temArmaZ(p, m.w)) return srvAnom(p, 'shot:arma');
       if (Math.hypot(m.o[0] - p.pos[0], m.o[1] - p.pos[1] - (p.crouch ? EYE_CROUCH : EYE_STAND), m.o[2] - p.pos[2]) > 3) return srvAnom(p, 'shot:origem'); // boca do cano fica a ~0,8 m da câmera
@@ -21726,8 +21727,10 @@ function srvHandle(pid, m) {
 }
 function srvDamage(vid, aid, raw, zone, w) {
   const v = S.players.get(vid); if (!v || !v.alive) return;
-  const a0 = S.players.get(aid), ff = isR() && a0 && a0 !== v && a0.team === v.team;
-  if (ff && !S.st.ff) return; // fogo amigo desligado
+  const a0 = S.players.get(aid), ff = teamMode() && a0 && a0 !== v && a0.team === v.team;
+  if (ff && (!S.st.ff || isTDM())) return; // fogo amigo desligado (no Mata-mata em times, sempre)
+  if (S.st.mode === 'dm' && v.prot > now && a0 !== v) return; // acabou de nascer: protegido até atirar ou passar 2 s
+  if (dmv() === 3 && zone !== 'head' && W[w]?.slot !== 'knife' && W[w]?.slot !== 'nade' && w !== 'fire') return; // só cabeça: tiro no corpo não conta
   const wd = W[w] || {}; let dmg = raw * (ff ? (wd.slot === 'nade' || w === 'fire' ? .85 : w === 'knife' ? .4 : .33) : 1); // CS2: aliado leva 33% das balas, 85% das granadas
   if (v.armor > 0 && zone !== 'legs' && (zone !== 'head' || v.helmet)) { const nd = dmg * (wd.pen ?? .5); v.armor = Math.max(0, Math.round(v.armor - (dmg - nd) * .5)); dmg = nd; }
   dmg = Math.max(1, Math.round(dmg)); const hp0 = v.hp; v.hp = Math.max(0, v.hp - dmg); srvTrack(aid, v, hp0 - v.hp);
@@ -21747,15 +21750,19 @@ function srvKill(v, a, w, hs) {
   if (isR() && v.dmgBy) { let best = 40; for (const [id, d] of Object.entries(v.dmgBy)) { const q = S.players.get(id); if (q && q !== a && q.team !== v.team && d > best) { best = d; as = q; } } }
   if (as) as.as = (as.as || 0) + 1;
   v.dmgBy = null;
+  if (dmv() === 2 && a && a !== v && S.phase === 'live') { // corrida armada
+    if (w === 'knife' && v.gg > 0) { v.gg--; sendTo(v.id, { t: 'info', txt: 'Faca! Você voltou um nível' }); }
+    if (GG[a.gg | 0] === 'knife' ? w === 'knife' : true) { a.gg = (a.gg | 0) + 1; if (a.gg < GG.length) { a.inv = ggInv(a); srvInvSync(a, GG[a.gg] === 'knife' ? null : GG[a.gg]); if (!a.isBot) sendTo(a.id, { t: 'info', txt: `Nível ${a.gg + 1}/${GG.length}: ${W[GG[a.gg]].name}` }); } }
+  }
   broadcast({ t: 'kill', k: a ? a.id : null, v: v.id, w, hs: !!hs, as: as?.id, tk: tk ? 1 : 0 });
 }
-function pickSpawn(side, taken) {
+function pickSpawn(side, taken, who) {
   const list = side ? SPAWNS[side] : SPAWNS.a.concat(SPAWNS.b);
   if (side) { for (const s of list) if (!taken.some(t => Math.hypot(t[0] - s[0], t[2] - s[2]) < 1.5)) return s; return list[Math.floor(Math.random() * list.length)]; }
   // DM: longe dos inimigos vivos
   let best = list[0], bd = -1;
   for (const s of list) {
-    let md = 1e9; for (const q of S.players.values()) if (q.alive) md = Math.min(md, Math.hypot(q.pos[0] - s[0], q.pos[2] - s[2]));
+    let md = 1e9; for (const q of S.players.values()) if (q.alive && q !== who && !(isTDM() && who && q.team === who.team)) md = Math.min(md, Math.hypot(q.pos[0] - s[0], q.pos[2] - s[2]));
     md += Math.random() * 6; if (md > bd) { bd = md; best = s; }
   }
   return best;
@@ -21773,13 +21780,13 @@ function srvSpawn(p, s, refill, yawSet) {
   p.alive = true; p.hp = 100; p.dmgBy = null; p.pos = [s[0], s[1], s[2]]; p.sq = (p.sq | 0) + 1; p.posTs = 0; p.posAt = now; p.pb = null; p.ph = []; // renasceu: o balde de movimento e o histórico recomeçam
   const yaw = yawSet ?? spawnYaw(s); p.yaw = yaw;
   if (p.isBot) { const b = p.bot; b.body.pos.set(s[0], s[1], s[2]); b.body.vel.set(0, 0, 0); b.yaw = yaw; b.pitch = 0; b.path = []; b.target = null; b.lastSeen = null; b.mag = 0; b.magW = null; b.reloadEnd = 0; }
-  broadcast({ t: 'spawn', id: p.id, p: p.pos, y: yaw, inv: p.inv, ar: p.armor, hm: p.helmet ? 1 : 0, refill: refill ? 1 : 0, sq: p.sq });
+  broadcast({ t: 'spawn', id: p.id, p: p.pos, y: yaw, inv: p.inv, ar: p.armor, hm: p.helmet ? 1 : 0, refill: refill ? 1 : 0, sq: p.sq, pt: p.prot > now ? r2(p.prot - now) : 0 });
 }
 function srvSpawnDM(p) {
   const pr = p.pref;
-  p.inv = { primary: pr.primary || (p.isBot ? ['ak47', 'm4', 'p90', 'awp', 'nova', 'mp5'][Math.floor(Math.random() * 6)] : 'ak47'), secondary: pr.secondary || 'deagle', he: 1, smoke: 0 };
-  p.armor = 100; p.helmet = true;
-  srvSpawn(p, pickSpawn(null, []), true);
+  p.inv = dmv() === 2 ? ggInv(p) : { primary: pr.primary || (p.isBot ? ['ak47', 'm4', 'p90', 'awp', 'nova', 'mp5'][Math.floor(Math.random() * 6)] : 'ak47'), secondary: pr.secondary || 'deagle', he: dmv() === 3 ? 0 : 1, smoke: 0 };
+  p.armor = 100; p.helmet = dmv() !== 3; p.prot = now + 2;
+  srvSpawn(p, pickSpawn(null, [], p), true);
 }
 function syncBots() {
   const bots = [...S.players.values()].filter(p => p.isBot);
@@ -21792,9 +21799,11 @@ function srvStartMatch() {
   Z.on = false;
   syncBots();
   S.round = 0; S.winner = null; S.pre = 0; S.half = false; S.ot = 0; S.hist = []; S.score = { t: 0, ct: 0 }; S.loss = { t: 0, ct: 0 }; S.bomb = null;
-  if (isR()) for (const p of [...S.players.values()].sort((a, b) => a.isBot - b.isBot)) setTeam(p, p.team === 't' || p.team === 'ct' ? p.team : teamPick()); // mantém os times do lobby
+  if (teamMode()) for (const p of [...S.players.values()].sort((a, b) => a.isBot - b.isBot)) setTeam(p, p.team === 't' || p.team === 'ct' ? p.team : teamPick()); // mantém os times do lobby
+  else for (const p of S.players.values()) if (p.team) { p.team = undefined; p.color = COLORS[S.colorI++ % COLORS.length]; }
+  for (const p of S.players.values()) p.gg = 0;
   for (const p of S.players.values()) { p.kills = p.deaths = p.rw = p.as = p.mvp = 0; p.money = 800; p.lossStreak = 0; p.downed = false; p.perks = []; p.maxHp = 100; p.bowie = false; p.inv = defInv(); p.armor = 0; p.helmet = false; p.alive = false; p.respawnAt = now + .3; p.pref = {}; }
-  if (S.st.mode === 'dm') { S.phase = 'live'; S.phaseEnd = now + 10 * 60; for (const p of S.players.values()) srvSpawnDM(p); broadcast({ t: 'msg', txt: 'MATA-MATA', sub: `Primeiro a ${S.st.frags} abates vence`, dur: 3 }); }
+  if (S.st.mode === 'dm') { S.phase = 'live'; S.phaseEnd = now + 10 * 60; for (const p of S.players.values()) srvSpawnDM(p); broadcast({ t: 'msg', txt: dmv() ? 'MATA-MATA · ' + DMV_N[dmv()].toUpperCase() : 'MATA-MATA', sub: dmv() === 1 ? `Primeiro time a ${S.st.frags * 2} abates vence` : dmv() === 2 ? `Cada abate troca a sua arma · ${GG.length} níveis, o último é a faca` : dmv() === 3 ? `Só tiro na cabeça conta · primeiro a ${S.st.frags}` : `Primeiro a ${S.st.frags} abates vence`, dur: 4 }); }
   else if (S.players.size >= 2) srvStartRound();
   else { S.phase = 'warmup'; S.phaseEnd = 0; broadcast({ t: 'msg', txt: 'AQUECIMENTO', sub: 'Esperando outro jogador (ou adicione bots)', dur: 4 }); }
   srvState();
@@ -21895,7 +21904,12 @@ const RC = { freeze: 15, buy: 20, round: 115, end: 7, otMoney: 10000 }; // tempo
 const TEAMC = { t: '#e0a030', ct: '#4a90e2' }, TEAMN = { t: 'Ataque', ct: 'Defesa' };
 const BOMB = { plant: 3.2, defuse: 10, kit: 5, timer: 40, r: 22 };
 function isR() { return S.st?.mode === 'rounds'; }
-function csMode() { return S.st?.mode === 'rounds' || S.st?.mode === 'dm'; } // modos estilo CS: armas no chão
+function csMode() { return S.st?.mode === 'rounds' || S.st?.mode === 'dm'; }
+// Mata-mata: variantes (st.dmv) 0 todos contra todos, 1 times, 2 corrida armada, 3 só cabeça
+const dmv = () => S.st?.mode === 'dm' ? S.st.dmv | 0 : -1, isTDM = () => dmv() === 1, teamMode = () => isR() || isTDM();
+const DMV_N = ['Todos contra todos', 'Times', 'Corrida armada', 'Só cabeça'], TDMN = { t: 'Laranja', ct: 'Azul' };
+const GG = ['ak47', 'm4', 'famas2', 'galilar', 'aug2', 'sg553', 'p90', 'mp5', 'ump45', 'mac10', 'nova', 'xm1014', 'awp', 'scout', 'deagle', 'five7', 'tec9', 'glock', 'knife']; // corrida armada: um abate = próxima arma; a última é a faca
+const ggInv = p => { const w = GG[clamp(p.gg | 0, 0, GG.length - 1)]; return w === 'knife' ? { primary: null, secondary: null, he: 0, smoke: 0 } : { primary: W[w].slot === 'primary' ? w : null, secondary: W[w].slot === 'secondary' ? w : null, he: 0, smoke: 0 }; }; // modos estilo CS: armas no chão
 function teamPick() { let t = 0, ct = 0; for (const q of S.players.values()) if (q.team === 't') t++; else if (q.team === 'ct') ct++; return t <= ct ? 't' : 'ct'; }
 function setTeam(p, tm) { p.team = tm; p.color = TEAMC[tm]; }
 // troca de time no meio da partida (como o "trocar de time" do CS): vivo na rodada = morre e volta no próximo round; no aquecimento e no
@@ -21955,6 +21969,7 @@ function srvBuy(p, item) {
   const it = isW(item) ? W[item] : null, err = txt => sendTo(p.id, { t: 'err', txt });
   if (!it || !(it.price || it.equip)) return;
   if (!p.alive) return err('Você está morto');
+  if (dmv() === 2) return err('Na corrida armada a arma vem de cada abate');
   const free = S.st.mode === 'dm' || S.phase === 'warmup';
   if (!(free || S.phase === 'freeze' || (S.phase === 'live' && now < S.liveStart + RC.buy))) return err('Tempo de compra acabou');
   if (isR() && TEAMW[item] && TEAMW[item] !== p.team) return err(it.slot === 'nade' ? 'Essa granada é do outro time' : 'Essa arma é do outro time');
@@ -22004,12 +22019,14 @@ function srvState() {
     const o = { id: p.id, n: p.name, c: p.color, b: p.isBot ? 1 : 0, hp: Math.round(p.hp), ar: p.armor, hm: p.helmet ? 1 : 0, al: p.alive ? 1 : 0, k: p.kills, d: p.deaths, m: p.money, rw: p.rw, sk: p.skins || {} };
     if (zmode) Object.assign(o, { hs: p.hs, dw: p.downs, rvs: p.revives, pk: p.perks, dn: p.downed ? 1 : 0, bl: p.downed && !p.selfRev ? r2(Math.max(0, p.bleedAt - now)) : 0,
       rv: p.downed && p.revBy && now - p.revLast < 1.3 ? r2(p.revProg / (S.players.get(p.revBy)?.perks.includes('qr') ? 2 : 4)) : 0, mh: p.maxHp, bw: p.bowie ? 1 : 0 });
+    if (isTDM()) o.tm = p.team; if (dmv() === 2) o.gg = p.gg | 0;
     if (isR()) Object.assign(o, { as: p.as || 0, mvp: p.mvp || 0, tm: p.team, kt: p.kit ? 1 : 0, ac: p.act ? [r2(p.act.end - now), p.act.k === 'p' ? BOMB.plant : p.kit ? BOMB.kit : BOMB.defuse] : 0 });
     pl.push(o);
   }
   const full = (S.stN = (S.stN || 0) + 1) % 8 === 1;
   const msg = { t: 'state', ph: S.phase, tl: r2(Math.max(0, S.phaseEnd - now)), r: S.round, pl, win: S.winner, pre: S.pre ? r2(Math.max(0, S.pre - now)) : 0, st: full ? S.st : undefined };
   if (csMode()) msg.drops = S.drops ? [...S.drops.values()].map(d => [d.id, d.w, r2(d.pos[0]), r2(d.pos[1]), r2(d.pos[2])]) : [];
+  if (isTDM()) msg.sc = S.score;
   if (isR()) { const B = S.bomb; msg.sc = S.score; msg.hist = S.hist; msg.ot = S.ot; msg.bomb = B ? { s: B.st, p: B.pos.map(r2), by: B.by, site: B.site } : null; }
   if (zmode && Z.on) { // mundo dos zumbis: só quando muda algo (ou 1 vez por segundo, por garantia); portas e compras já vão como evento
     const z = zWorldState(), k = [z.r, z.ph, z.pw, z.d.length, z.box[0], z.box[1], z.box[2], z.pap[0], z.pap[1], z.qr, z.dog, z.dr.map(d => d[0]).join(), z.tr.map(t => t[0]).join(), z.cm.map(c => c[0]).join(), z.zi.map(t => t[0]).join()].join('|'); // O2-C04: zi
@@ -22039,7 +22056,12 @@ function srvTick(dt) {
     if (S.phase === 'live') {
       for (const p of S.players.values()) if (!p.alive && now >= p.respawnAt) srvSpawnDM(p);
       let lead = null; for (const p of S.players.values()) if (!lead || p.kills > lead.kills) lead = p;
-      if (lead && (lead.kills >= st.frags || now >= S.phaseEnd)) { S.phase = 'over'; S.phaseEnd = now + 10; S.winner = lead.id; broadcast({ t: 'mend', w: lead.id }); broadcast({ t: 'msg', txt: lead.name + ' VENCEU!', sub: `${lead.kills} abates — nova partida em 10s`, dur: 9, snd: 'win' }); srvState(); }
+      if (isTDM()) { const sc = { t: 0, ct: 0 }; for (const p of S.players.values()) if (sc[p.team] !== undefined) sc[p.team] += p.kills; S.score = sc;
+        const win = sc.t >= st.frags * 2 ? 't' : sc.ct >= st.frags * 2 ? 'ct' : now >= S.phaseEnd && sc.t !== sc.ct ? (sc.t > sc.ct ? 't' : 'ct') : null;
+        if (win) { S.phase = 'over'; S.phaseEnd = now + 10; S.winner = win; for (const p of S.players.values()) sendTo(p.id, { t: 'mend', w: p.team === win ? p.id : null }); broadcast({ t: 'msg', txt: 'TIME ' + TDMN[win].toUpperCase() + ' VENCEU!', sub: `${sc.t} x ${sc.ct} — nova partida em 10s`, dur: 9, snd: 'win' }); srvState(); }
+        lead = null; }
+      if (dmv() === 2) { lead = null; for (const p of S.players.values()) if (!lead || (p.gg | 0) > (lead.gg | 0)) lead = p; if (lead && (lead.gg | 0) < GG.length && now < S.phaseEnd) lead = null; }
+      if (lead && (dmv() === 2 || lead.kills >= st.frags || now >= S.phaseEnd)) { S.phase = 'over'; S.phaseEnd = now + 10; S.winner = lead.id; broadcast({ t: 'mend', w: lead.id }); broadcast({ t: 'msg', txt: lead.name + ' VENCEU!', sub: (dmv() === 2 ? 'Completou a corrida armada' : `${lead.kills} abates`) + ' — nova partida em 10s', dur: 9, snd: 'win' }); srvState(); }
     } else if (S.phase === 'over' && now >= S.phaseEnd) srvAfterMatch();
   } else {
     switch (S.phase) {
@@ -22071,7 +22093,7 @@ function botThink(p, dt) {
   const eye = new V3(pos.x, pos.y + EYE_STAND, pos.z);
   let tgt = null, td = 1e9;
   for (const q of S.players.values()) {
-    if (q === p || !q.alive || (isR() && q.team === p.team) || b.blindEnd > now) continue;
+    if (q === p || !q.alive || (teamMode() && q.team === p.team) || q.prot > now || b.blindEnd > now) continue;
     const qp = new V3(q.pos[0], q.pos[1] + 1.3, q.pos[2]), d = eye.distanceTo(qp);
     if (d > 80 || d >= td) continue;
     const yawTo = Math.atan2(-(qp.x - eye.x), -(qp.z - eye.z));
@@ -22134,6 +22156,7 @@ function botBombAct(p) {
   else if (B.st === 'planted' && p.team === 'ct' && Math.hypot(x - B.pos[0], z - B.pos[2]) < 1.6) p.act = { k: 'd', x, z, end: now + (p.kit ? BOMB.kit : BOMB.defuse) };
 }
 function botShoot(p, tgt, D, wid, eye, dist) {
+  p.prot = 0;
   const w = W[wid], b = p.bot;
   if (wid === 'knife') { if (dist < 2.2) { b.nextFire = now + .5; srvDamage(tgt.id, p.id, 40, 'body', 'knife'); } return; }
   if (b.mag <= 0) { b.reloadEnd = now + w.reload; b.mag = w.mag; return; }
@@ -29986,11 +30009,11 @@ function zExplode(pos, owner, r, dmgMax, w, insta) { // granada / macaco
 // Cliente: mensagens
 // ================================================================
 // o que chega do host é entrada não confiável (o host é outro jogador): forma conferida aqui, e uma mensagem malformada não derruba o cliente
-const saneSt = st => { st = st && typeof st === 'object' ? st : {}; return { ...st, map: Object.hasOwn(MAPS, st.map) ? st.map : 'arena', mode: ['rounds', 'dm', 'zombies'].includes(st.mode) ? st.mode : 'rounds', rounds: st.rounds | 0, frags: st.frags | 0, bots: clamp(st.bots | 0, 0, 7), diff: st.diff | 0, zdiff: clamp(st.zdiff | 0, 0, ZDIFF.length - 1), ...campSaneSt(st) }; }; // O3-D02: zmode e ato
+const saneSt = st => { st = st && typeof st === 'object' ? st : {}; return { ...st, map: Object.hasOwn(MAPS, st.map) ? st.map : 'arena', mode: ['rounds', 'dm', 'zombies'].includes(st.mode) ? st.mode : 'rounds', rounds: st.rounds | 0, frags: st.frags | 0, dmv: clamp(st.dmv | 0, 0, 3), bots: clamp(st.bots | 0, 0, 7), diff: st.diff | 0, zdiff: clamp(st.zdiff | 0, 0, ZDIFF.length - 1), ...campSaneSt(st) }; }; // O3-D02: zmode e ato
 function sanePl(pl) {
   pl.id = String(pl.id); pl.n = String(pl.n ?? '').slice(0, 20); pl.c = /^#[0-9a-f]{3,8}$/i.test(pl.c) ? pl.c : '#cccccc';
   for (const k of ['hp', 'ar', 'm', 'rw', 'mh', 'bl', 'rv']) pl[k] = +pl[k] || 0;
-  for (const k of ['k', 'd', 'hs', 'dw', 'rvs']) pl[k] = pl[k] | 0;
+  for (const k of ['k', 'd', 'hs', 'dw', 'rvs', 'gg']) pl[k] = pl[k] | 0;
   pl.tm = pl.tm === 't' || pl.tm === 'ct' ? pl.tm : undefined; pl.pk = Array.isArray(pl.pk) ? pl.pk.filter(k => Object.hasOwn(ZPERKS, k)) : [];
   pl.ac = Array.isArray(pl.ac) && finN(pl.ac[0]) && finN(pl.ac[1]) ? pl.ac : 0; pl.sk = pl.sk && typeof pl.sk === 'object' ? cleanSk(pl.sk) : pl.sk;
   return pl;
@@ -30041,7 +30064,7 @@ function onMsgInner(m) {
       break;
     }
     case 'spawn':
-      if (m.id === C.myId) localSpawn(m);
+      if (m.id === C.myId) { localSpawn(m); C.protEnd = finN(m.pt) && m.pt > 0 ? now + Math.min(m.pt, 5) : 0; }
       else { const rp = getRemote(m.id); rp.sq = m.sq; rp.alive = true; rp.dead = false; rp.downed = false; rp.buf = [{ t: now - .2, p: m.p, y: m.y, pi: 0, c: 0 }]; rp.pos.set(m.p[0], m.p[1], m.p[2]); rp.xt = false; rp.eo?.set(0, 0, 0); rp.last.copy(rp.pos); }
       break;
     // ----- modo zumbis -----
@@ -30147,7 +30170,7 @@ function onMsgInner(m) {
     case 'kill': {
       feedAdd(m.k, m.v, m.w, m.hs, m.as, m.tk);
       if (C.st?.mode !== 'zombies') { if (m.k === C.myId && m.v !== C.myId) { stat('k'); if (m.hs) stat('hs'); } if (m.v === C.myId) stat('d'); }
-      if (m.v === C.myId) { me.alive = false; C.deadAt = now; C.killer = m.k; G.scope = 0; G.reloadEnd = 0; C.spec = null; C.buyOpen = false; renderBuy(); }
+      if (m.v === C.myId) { me.alive = false; C.deadAt = now; C.killer = m.k; C.killW = isW(m.w) ? m.w : null; C.killHS = !!m.hs; G.scope = 0; G.reloadEnd = 0; C.spec = null; C.buyOpen = false; renderBuy(); }
       else { const rp = R.get(m.v); if (rp) { rp.alive = false; rp.dead = true; rp.deadT = now; } }
       if (m.k === C.myId && m.v !== C.myId) { play('kill'); grantXP((m.hs ? 15 : 10) * (C.players.get(m.v)?.b ? .5 : 1)); } // XP: abate (metade contra bot)
       const info = C.players.get(m.v); if (info) info.al = 0;
@@ -30242,7 +30265,10 @@ function updateHud(dt) {
     const sc = C.sc || { t: 0, ct: 0 }, my = C.players.get(C.myId)?.tm;
     score = `<span style="color:${TEAMC.t}">ATAQUE ${sc.t}</span> x <span style="color:${TEAMC.ct}">${sc.ct} DEFESA</span> · Rodada ${C.round}` + (my ? ` · <b style="color:${TEAMC[my]}">${my === 't' ? 'Você ataca' : 'Você defende'}</b>` : '');
   } else if (st.mode === 'dm') {
-    const lead = ps.slice().sort((a, b) => b.k - a.k)[0]; score = `Mata-mata até ${st.frags}` + (lead ? ` · líder: <span style="color:${esc(lead.c)}">${esc(lead.n)}</span> ${lead.k}` : '');
+    const lead = ps.slice().sort((a, b) => b.k - a.k)[0], v = st.dmv | 0;
+    if (v === 1) { const sc = C.sc || { t: 0, ct: 0 }, my = C.players.get(C.myId)?.tm; score = `Times até ${st.frags * 2} · <span style="color:${TEAMC.t}">LARANJA ${sc.t}</span> x <span style="color:${TEAMC.ct}">${sc.ct} AZUL</span>` + (my ? ` · você é <b style="color:${TEAMC[my]}">${my === 't' ? 'Laranja' : 'Azul'}</b>` : ''); }
+    else if (v === 2) { const gl = ps.slice().sort((a, b) => (b.gg | 0) - (a.gg | 0))[0], mine = C.players.get(C.myId); score = `Corrida armada · você: nível ${(mine?.gg | 0) + 1}/${GG.length}` + (gl ? ` · líder: <span style="color:${esc(gl.c)}">${esc(gl.n)}</span> nível ${(gl.gg | 0) + 1}` : ''); }
+    else score = (v === 3 ? 'Só cabeça' : 'Mata-mata') + ` até ${st.frags}` + (lead ? ` · líder: <span style="color:${esc(lead.c)}">${esc(lead.n)}</span> ${lead.k}` : '');
   }
   setHTML('score', score);
   C.timeLeft = Math.max(0, C.timeLeft - dt);
@@ -30284,11 +30310,12 @@ function updateHud(dt) {
   let spec = '';
   if (!me.alive && inGame) {
     if (C.spec && R.get(C.spec)?.alive) spec = `Assistindo <b>${esc(nameOf(C.spec))}</b> · Espaço troca`;
-    if (C.killer && now - C.deadAt < 4) spec = `Morto por <b>${esc(nameOf(C.killer))}</b>` + (spec ? '<br>' + spec : '');
+    if (C.killer && now - C.deadAt < 4) { const ki = C.players.get(C.killer); spec = `Morto por <b>${esc(nameOf(C.killer))}</b>` + (C.killW ? ` · ${esc(W[C.killW].name)}` : '') + (C.killHS ? ' · <b style="color:#ff6050">na cabeça</b>' : '') + (ki && C.killer !== C.myId ? ` · ficou com ${Math.max(0, ki.hp | 0)} de vida` : '') + (spec ? '<br>' + spec : ''); }
     if (ZM) spec = (C.spec && R.get(C.spec)?.alive ? `Assistindo <b>${esc(nameOf(C.spec))}</b> · Espaço troca<br>` : '') + (ZC.over ? '' : 'Você volta na próxima rodada');
     else if (st.mode === 'dm') spec += `<br>Renascendo...`;
     else if (C.phase === 'live' || C.phase === 'end') spec += spec ? '' : 'Aguardando a próxima rodada';
   }
+  if (me.alive && inGame && C.protEnd > now) spec = `<b>PROTEGIDO</b> · ${Math.ceil(C.protEnd - now)} s (atirar tira a proteção)`;
   setHTML('spec', spec);
   if (now > toastT) $('#toast').style.opacity = 0;
   // placar
@@ -30599,7 +30626,7 @@ const MICON = { // ícones dos modos
   zombies: '<svg viewBox="0 0 48 48"><path d="M14 40V22a10 10 0 0 1 20 0v18" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="20" cy="22" r="2.5" fill="currentColor"/><circle cx="28" cy="22" r="2.5" fill="currentColor"/><path d="M18 31l3 2 3-2 3 2 3-2" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M8 14l6 4M40 14l-6 4" stroke="currentColor" stroke-width="3"/></svg>' };
 function matchForm(el, st0) {
   // escolha por cartões (modo e mapa) e botões segmentados; o modo Zumbis lembra o próprio mapa
-  const st = { map: 'arena', zmap: 'vila', mode: 'rounds', rounds: 13, ff: 1, frags: 20, bots: 0, diff: 1, zdiff: 1, ...st0 };
+  const st = { map: 'arena', zmap: 'vila', mode: 'rounds', rounds: 13, ff: 1, frags: 20, dmv: 0, bots: 0, diff: 1, zdiff: 1, ...st0 };
   if (st.mode === 'zombies' && MAPS[st.map]?.zonly) st.zmap = st.map;
   st.map = st0.cmap ?? st.map;
   if (!MAPS[st.map] || MAPS[st.map].zonly) st.map = 'arena';
@@ -30620,7 +30647,7 @@ function matchForm(el, st0) {
     const maps = Object.entries(MAPS).filter(([, m]) => !!m.zonly === z && (z || (st.mode === 'rounds') === !!m.bomb));
     const opts = z
       ? `<div class="lbl">Dificuldade</div>${seg('zdiff', ZDIFF.map((d, i) => [i, d.name]))}<div class="zdesc"><b>${ZDIFF[st.zdiff].name}:</b> ${ZDIFF[st.zdiff].desc}</div>`
-      : `<div class="optrow">${st.mode === 'rounds' ? `<div><div class="lbl">Rodadas para vencer</div>${seg('rounds', [3, 5, 8, 10, 13, 16].map(n => [n, n]))}</div><div><div class="lbl">Fogo amigo</div>${seg('ff', [[1, 'Ligado'], [0, 'Desligado']])}</div>` : `<div><div class="lbl">Abates para vencer</div>${seg('frags', [10, 15, 20, 30, 50].map(n => [n, n]))}</div>`}
+      : `<div class="optrow">${st.mode === 'rounds' ? `<div><div class="lbl">Rodadas para vencer</div>${seg('rounds', [3, 5, 8, 10, 13, 16].map(n => [n, n]))}</div><div><div class="lbl">Fogo amigo</div>${seg('ff', [[1, 'Ligado'], [0, 'Desligado']])}</div>` : `<div><div class="lbl">Variante</div>${seg('dmv', DMV_N.map((t, i) => [i, t]))}</div><div><div class="lbl">Abates para vencer</div>${seg('frags', [10, 15, 20, 30, 50].map(n => [n, n]))}</div>`}
         <div><div class="lbl">Bots</div>${seg('bots', [0, 1, 2, 3, 4, 5, 6, 7].map(n => [n, n]))}</div>
         <div><div class="lbl">Nível dos bots</div>${seg('diff', [[0, 'Fácil'], [1, 'Normal'], [2, 'Difícil']])}</div></div>`;
     el.innerHTML = `<div class="lbl" style="margin-top:4px">Modo</div>
@@ -30639,7 +30666,7 @@ function matchForm(el, st0) {
   render();
   return () => {
     const z = st.mode === 'zombies';
-    return { map: z ? st.zmap : st.map, cmap: st.map, zmap: st.zmap, mode: st.mode, rounds: st.rounds, ff: st.ff ?? 1, frags: st.frags, bots: z ? 0 : st.bots, diff: st.diff, zdiff: st.zdiff, ...campFormOut(st) }; // O3-D02: zmode
+    return { map: z ? st.zmap : st.map, cmap: st.map, zmap: st.zmap, mode: st.mode, rounds: st.rounds, ff: st.ff ?? 1, frags: st.frags, dmv: st.dmv | 0, bots: z ? 0 : st.bots, diff: st.diff, zdiff: st.zdiff, ...campFormOut(st) }; // O3-D02: zmode
   };
 }
 // ---------- mira: formatos e cores (SVG com contorno escuro para aparecer em qualquer fundo) ----------
@@ -31532,9 +31559,16 @@ function tick(dt) {
     const rp = C.spec && R.get(C.spec);
     if (rp && rp.alive) { camera.position.set(rp.pos.x, rp.pos.y + (rp.downed ? .55 : rp.crouch ? EYE_CROUCH : EYE_STAND), rp.pos.z); camera.rotation.set(rp.pitch, rp.yaw, 0); }
     else {
+      const kr = C.killer && C.killer !== C.myId && !ZC.on && deadFor < 3 ? R.get(C.killer) : null; // kill cam: mostra quem te matou
+      if (kr && kr.pos.distanceTo(me.pos) > 1) {
+        const k = clamp(deadFor / .6, 0, 1), cy = me.pos.y + lerp(me.eye, me.eye + 1.4, k), dx = kr.pos.x - me.pos.x, dz = kr.pos.z - me.pos.z, ty = Math.atan2(-dx, -dz), tp = Math.atan2(kr.pos.y + 1.2 - cy, Math.hypot(dx, dz));
+        camera.position.set(me.pos.x, cy, me.pos.z); camera.rotation.set(lerp(me.pitch, tp, k), me.yaw + angDiff(me.yaw, ty) * k, 0);
+        const fk = Math.max(30, CFG.fov - 25 * k); if (camera.fov !== fk) { camera.fov = fk; camera.updateProjectionMatrix(); }
+      } else {
       const k = clamp(deadFor / 1.5, 0, 1);
       camera.position.set(me.pos.x, me.pos.y + lerp(me.eye, 3.2, k), me.pos.z);
       camera.rotation.set(lerp(me.pitch, -1.2, k), me.yaw, 0);
+      }
     }
   }
   updateListener();
