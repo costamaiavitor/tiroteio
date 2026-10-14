@@ -38,7 +38,7 @@ const cenario = T => {
     p.alive = true; p.downed = false; p.hp = p.maxHp = 100; p.money = 0; p.kills = 0; p.hs = 0; p.perks = []; p.zbEnd = 0; p.dwEnd = 1e12; // invulnerável (Dying Wish)
     Z.round = 13; Z.nextBoss = 14; Z.nextDog = 99; Z.phase = 'break'; T.zStartRound(); // rodada 14: todos os especiais e o Carniceiro
     const now = () => window.__simNow;
-    const foto = k => ({ k, rnd: n, ts: Z.toSpawn, mixN: Z.mixN, mix: Z.mix.slice(0, 6), mixExtraZero: Z.mix.slice(6).every(x => x === 0), bossQ: Z.bossQ,
+    const foto = k => ({ k, rnd: n, ts: Z.toSpawn, mixN: Z.mixN, mix: Z.mix.slice(0, 6), mixExtraZero: Z.mix.slice(6).every((x, i) => i + 6 === 17 || !x), // o Tanque (17) também entra no clássico (pedido do dono, 13/10) bossQ: Z.bossQ,
       zs: [...Z.zs.values()].sort((a, b) => a.id - b.id).map(z => [z.id, z.kind, z.hp, z.maxHp, z.speed, z.sc, z.st, z.crawler ? 1 : 0, z.dog ? 1 : 0, z.body.pos.x, z.body.pos.y, z.body.pos.z, z.yaw, z.slowT || 0, z.buffT || 0]),
       pl: [p.hp, p.money, p.kills, p.hs] });
     for (let k = 0; k < 14; k++) {

@@ -23974,7 +23974,7 @@ function zUse() {
   const a = ZC.act; if (!a || a.hold) return;
   if (a.ok === false) { play('empty'); return; }
   if (a.cost && a.cost > me.money) { toast('Pontos insuficientes', 1.5); play('empty'); return; }
-  sendToHost({ t: 'use', k: a.k, id: a.id, cur: G.cur === 'dmach' ? C.dmPrev : G.cur, c: a.cost || 0 }); // c: preço que a pessoa viu // com a Máquina da Morte na mão, troca vale para a arma guardada
+  sendToHost({ t: 'use', k: a.k, id: a.id, maq: a.maq, cur: G.cur === 'dmach' ? C.dmPrev : G.cur, c: a.cost || 0 }); // maq: a máquina do 'zbuild' (sem ele o host montava sempre a energia: o PaP nunca montava pelo F); c: preço que a pessoa viu // com a Máquina da Morte na mão, troca vale para a arma guardada
 }
 function zStreak() { // série de abates: 5, 10, 15... em até 2,5 s entre um e outro
   ZC.streak = now - ZC.streakT < 2.5 ? ZC.streak + 1 : 1; ZC.streakT = now;
