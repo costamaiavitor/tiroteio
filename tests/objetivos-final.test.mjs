@@ -36,7 +36,7 @@ test('Sanatório: a sequência termina no V; as 3 cargas estão no mapa, sem "Se
     o.cargas = arg.CARGAS.map(id => { const i = idx(id), Z0 = T.ZD.zint[i], e = T.ZC.world.zint[i], c = T.ZC.zint[i]; return [i >= 0, Z0?.t, !e?.off, T.campZintVez(Z0), T.ZINT_FN.carga.prompt(Z0, i, c, T.ZINT.carga)]; });
     o.zonas = arg.CARGAS.map(id => { const Z0 = T.ZD.zint[idx(id)]; return T.ZD.zoneAt(Z0.x + Z0.n[0], Z0.z + Z0.n[1]); });
     o.longe = Math.min(...[[0, 1], [0, 2], [1, 2]].map(([a, b]) => { const A = T.ZD.zint[idx(arg.CARGAS[a])], B = T.ZD.zint[idx(arg.CARGAS[b])]; return Math.hypot(A.x - B.x, A.z - B.z); }));
-    o.fugaZona = [T.ZD.zoneAt(T.CAMP_V.fuga.zona.x, T.CAMP_V.fuga.zona.z), T.CAMP_OBJ['F.2'].zona === T.CAMP_V.fuga.zona, T.CAMP_OBJ['F.2'].alvo];
+    o.fugaZona = [T.ZD.zoneAt(T.CAMP_V.fuga.zona.x, T.CAMP_V.fuga.zona.z), T.CAMP_OBJ['F.2'].zona.x === T.CAMP_V.fuga.zona.x && T.CAMP_OBJ['F.2'].zona.r === T.ZBAL.fuga.raio, T.CAMP_OBJ['F.2'].alvo];
     o.radio = ['r5s-inicio', 'r5s-cargas', 'r5s-fuga'].map(id => /gaiola|galeria/i.test(T.CAMP_RADIO_TXT[id]?.txt ?? 'gaiola'));
     o.textos = [T.CAMP_OBJ['V.1'].titulo, T.CAMP_OBJ['V.2'].titulo, T.CAMP_OBJ['F.1'].titulo, T.CAMP_OBJ['F.2'].titulo].join(' | ');
     o.arena = ['galeria7' in T.MAPS || typeof T.gal7Estado !== 'undefined' || typeof T.GAL7 !== 'undefined', typeof T.drArena !== 'undefined']; // a arena saiu do jogo (limpeza A8)
@@ -131,7 +131,7 @@ test('morte do Diretor: fuga na hora (sem cena), Estouro sem fim, quem entra no 
     // a zona: segurar o embarque (quem sai recomeça)
     const Zn = T.CAMP_V.fuga.zona, O = () => T.campEstado().obj['F.2'];
     poe(p, Zn.x, Zn.z); T.sim(5); o.meia = +O().p.toFixed(1);
-    poe(p, 0, 0); T.sim(.3); o.saiu = [+O().p.toFixed(1), ob('F.2')];
+    const pAntes = +O().p.toFixed(1); poe(p, 0, 0); T.sim(.3); o.saiu = [+O().p.toFixed(1) === pAntes, ob('F.2')]; // zona vazia: o embarque pausa
     poe(p, Zn.x, Zn.z); for (let k = 0; k < 120 && ob('F.2') !== 'feito'; k++) T.sim(.1);
     o.fugiu = [ob('F.2'), T.CAMP_VS.fase, T.Z.zs.size, T.Z.toSpawn, T.CAMP_EVS.id];
     T.sim(.6);
@@ -144,7 +144,7 @@ test('morte do Diretor: fuga na hora (sem cena), Estouro sem fim, quem entra no 
   });
   assert.deepEqual(r.morte, [null, 'feito', 'ativo', 'fuga', 'estouro', true, 'round', true, null], 'fuga na hora ' + JSON.stringify(r.morte));
   assert.deepEqual(r.meio, ['ativo', 'estouro'], 'quem entra no meio recebe o F.2 e o Estouro da fuga');
-  assert.ok(r.meia > .3 && r.meia < .7, 'metade do embarque ' + r.meia); assert.deepEqual(r.saiu, [0, 'ativo'], 'quem sai da zona recomeça');
+  assert.ok(r.meia > .3 && r.meia < .7, 'metade do embarque ' + r.meia); assert.deepEqual(r.saiu, [true, 'ativo'], 'quem sai da zona: o embarque pausa (não recomeça)');
   assert.deepEqual(r.fugiu, ['feito', 'fim', 0, 0, null], 'fugiram: os zumbis caem, o Estouro acaba');
   assert.deepEqual(r.fim, ['infinito', -1, 'break', 'zombies', false, false, null], 'rodadas infinitas, sem créditos, cena nem salvo ' + JSON.stringify(r.fim));
   assert.ok(r.tela, 'OBJETIVOS CONCLUÍDOS na tela'); assert.doesNotMatch(r.hudTxt, /campanha|\bato\b/i);

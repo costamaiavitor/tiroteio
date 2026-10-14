@@ -79,6 +79,9 @@ export const ZBAL = {
   // Pedido do dono (13/10): o zumbi comum (tipo 0, sem os especiais, cães e chefes) com 7% menos vida e golpe de no máximo 40 em todas
   // as dificuldades (no Normal eram 50: 2 golpes derrubavam; agora 3)
   comum: { vida: .93, danoMax: 40 },
+  // chefes dos objetivos (Vigia, Foguista, Diretor): vida da rodada em que entram × vidaK (com a vida pura, a validação mediu lutas de
+  // 12 a 18 s; o projeto pede minutos). Fuga: zona maior e o embarque só pausa quando a zona fica vazia (antes recomeçava)
+  chefes: { vidaK: 2.5 }, fuga: { raio: 4.5 },
   // Pedido do dono (13/10): o Normal estava difícil demais. Ajustes por dificuldade sobre a tabela ZDIFF (0 Fácil, 1 Normal, 2 Difícil, 3 Pesadelo)
   dificuldade: { 1: { cnt: .9, regen: 3 } },
   // Decisão do dono (13/10): zumbi morto sem tiro por algo que um jogador ligou ou pegou (armadilha, Nuke, fogo do interativo, vapor da

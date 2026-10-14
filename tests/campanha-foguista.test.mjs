@@ -66,7 +66,7 @@ test('IV -> C2 pelo intervalo: na rodada seguinte, os comuns da curva (fração 
     o.chao = H.anda(z.body.pos.x, z.body.pos.z); o.d = Math.hypot(z.body.pos.x - p.pos[0], z.body.pos.z - p.pos[2]); // onde nasceu (depois ele anda, empurrado pelos comuns)
     T.sim(3.5); const P = z.body.pos;
     o.st = z.st; o.campo = T.CAMP_CH.campo; o.enc = T.CAMP_CH.encerra; o.k = z.kind;
-    o.hp = z.maxHp; o.esp = Math.round(T.zHp(o.round) * T.zHpK(o.round) * (T.CAMP_CHEFE[15].base + T.CAMP_CHEFE[15].porJog) * T.CAMP_CHEFE_BASE.hpChefe);
+    o.hp = z.maxHp; o.esp = Math.round(T.zHp(o.round) * T.zHpK(o.round) * (T.CAMP_CHEFE[15].base + T.CAMP_CHEFE[15].porJog) * T.CAMP_CHEFE_BASE.hpChefe * T.ZBAL.chefes.vidaK);
     o.cli = T.CAMP.c.ch && [T.CAMP.c.ch.k, T.CAMP.c.ch.f, T.CAMP.c.ch.campo]; o.bar = document.getElementById('zboss').firstChild.nodeValue; o.barVis = !document.getElementById('zboss').classList.contains('hidden');
     o.modelo = !!T.ZC.zs.get(z.id)?.model.userData.tanque; o.bo = T.campChefeBo(0);
     // chega até o jogador (parado, invulnerável): nenhum ataque nesse meio tempo
@@ -75,12 +75,12 @@ test('IV -> C2 pelo intervalo: na rodada seguinte, os comuns da curva (fração 
     return o;
   });
   assert.deepEqual(r.seq, ['III', 'break:IV', 'IV', 'break:C2'], JSON.stringify(r)); assert.equal(r.obj, 'ativo'); assert.equal(r.ch0, false, 'no intervalo ainda não');
-  assert.equal(r.ts, r.espTs, 'comuns da etapa de chefe pela curva do mapa (fração da rodada com piso) ' + JSON.stringify(r)); assert.ok(r.ts >= 10, 'piso do Sanatório: 10 comuns no Normal mesmo com o chefe cedo (rodada ' + r.round + ')'); assert.equal(r.mixN, 0, 'sem especiais do clássico na rodada do chefe');
+  assert.equal(r.ts, r.espTs, 'comuns da etapa de chefe pela curva do mapa (fração da rodada com piso) ' + JSON.stringify(r)); assert.ok(r.ts >= Math.round(10 * .9), 'piso do Sanatório (× 0,9 do Normal): 10 comuns no Normal mesmo com o chefe cedo (rodada ' + r.round + ')'); assert.equal(r.mixN, 0, 'sem especiais do clássico na rodada do chefe');
   assert.equal(r.st, 'in'); assert.equal(r.k, 15); assert.equal(r.campo, true, 'versão de campo'); assert.equal(r.enc, true, 'a morte encerra a rodada');
   assert.ok(r.chao, 'nasce em chão andável de sala aberta, com caminho'); assert.ok(r.d < 20, `perto dos jogadores (${r.d})`);
   assert.equal(r.hp, r.esp, 'vida = zHp(rodada atual)·(base + porJog·1)'); assert.deepEqual(r.cli, [15, 1, true]); assert.equal(r.bar, 'O FOGUISTA · FASE 1'); assert.ok(r.barVis, 'barra à vista');
   assert.ok(r.modelo, 'modelo do Foguista (tanque nas costas)'); assert.equal(r.bo, 1);
-  assert.ok(r.vivo && r.dmin < 2, `chega até o jogador (${r.dmin})`);
+  assert.ok(r.vivo && r.dmin < 3.5, `chega até o jogador, ao alcance do golpe (${r.dmin})`); // grande (1,6): para a ~3 m para bater
   assert.deepEqual(J.erros, []);
 });
 

@@ -56,7 +56,7 @@ test('Vila: I -> II -> C1; II.4 feito -> a etapa C1 começa no intervalo e o Vig
     T.sim(1); const z = CH.z; o.k = z?.kind; o.campo = CH.campo; o.encerra = CH.encerra;
     if (z) { const P = z.body.pos, d = Math.min(...[...T.S.players.values()].map(q => Math.hypot(q.pos[0] - P.x, q.pos[2] - P.z)));
       o.nasce = { livre: livre(P.x, P.z), d: +d.toFixed(1) }; o.hp = z.maxHp; T.sim(3); o.nasce.y = +P.y.toFixed(2); o.nasce.st = z.st; }
-    o.esp = Math.round(T.zHp(T.Z.round) * T.zHpK(T.Z.round) * 10); // vida da rodada em que ele entra (vidaAtual, 13/10)
+    o.esp = Math.round(T.zHp(T.Z.round) * T.zHpK(T.Z.round) * 10 * T.ZBAL.chefes.vidaK); // vida da rodada em que ele entra (vidaAtual, 13/10)
     o.cli = T.CAMP.c.ch && [T.CAMP.c.ch.k, T.CAMP.c.ch.f, T.CAMP.c.ch.campo]; o.bar = document.getElementById('zboss').firstChild.nodeValue;
     o.arena = [T.ZD.zint.some(x => x.t === 'curto'), 'forte' in T.MAPS || 'curto' in T.ZINT || typeof T.FORTE !== 'undefined', T.S.st.map];
     return o;
@@ -101,7 +101,7 @@ test('ataques no mapa aberto, com aviso antes do dano: varredura marca (e a tela
   assert.deepEqual(r.tv, { s: 1, f: 'setor', g: 120 }); assert.equal(r.marcaAviso, false, 'aviso não marca'); assert.ok(r.marca && r.alvo, 'marcado e preferido ' + JSON.stringify(r));
   assert.deepEqual(r.tela, ['zhud', true], 'a tela da marca aparece na Vila (dentro do HUD)'); assert.equal(r.telaSome, '0');
   assert.equal(r.tr, .8); assert.equal(r.antes, 0); assert.equal(r.rajada, 66, 'rajada: 3 × 22'); assert.ok(r.fraco, 'recuperação da rajada abre o fraco'); assert.equal(r.tiros, 3, 'os 3 tiros no cliente');
-  assert.ok(r.temParede, 'achou uma parede perto'); assert.equal(r.coberto, 0, 'atrás da parede ' + JSON.stringify(r));
+  assert.ok(r.temParede, 'achou uma parede perto'); assert.ok(r.coberto <= 0, 'atrás da parede (a vida pode voltar no meio) ' + JSON.stringify(r));
   assert.equal(r.tg, 1.2); assert.equal(r.gAntes, 0); assert.equal(r.granada, 35); assert.ok(r.cal, 'cal nos olhos');
   assert.deepEqual(J.erros, []);
 });

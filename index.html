@@ -26401,9 +26401,9 @@ function campObjTick(dt) {
       case 'coletar': campItemTick(id, D, O); break;
       case 'fugir': {
         const Zn = campZonaDe(D), dentro = campVivos().filter(q => campNaZona(q, Zn)), gi = O.zi[0];
-        if (O.emb && !dentro.length && !(gi >= 0)) O.emb = 0; // objetivos do mapa (A5): zona sem gaiola = segurar o embarque (quem sai, recomeça)
+        if (O.emb && !dentro.length && !(gi >= 0)) O.emb += dt; // objetivos do mapa: zona sem gaiola; com a zona vazia o embarque só pausa (antes recomeçava: em rodada alta a fuga ficava quase impossível)
         if (!O.emb && dentro.length) { O.emb = now + (D.embarque ?? ZINT.gaiola.embarque); if (gi >= 0) zintPoe(gi, 'embarque', O.emb - now); }
-        if (O.emb && now >= O.emb) { CAMP.fugiram = dentro.map(q => q.id); if (gi >= 0) zintPoe(gi, 'subiu', 0); campObjFeito(id); break; }
+        if (O.emb && now >= O.emb && (dentro.length || gi >= 0)) { CAMP.fugiram = dentro.map(q => q.id); if (gi >= 0) zintPoe(gi, 'subiu', 0); campObjFeito(id); break; }
         if (!O.emb) { O.resta -= dt; if (O.resta <= 0) { O.resta = D.tempo || 75; if (D.radio?.lembra) campRadio(D.radio.lembra); } } // ninguém embarcou: a fuga recomeça
         O.p = O.emb ? clamp(1 - (O.emb - now) / (D.embarque ?? ZINT.gaiola.embarque), 0, 1) : 0; O.h = clamp(O.resta / (D.tempo || 75), 0, 1); campObjEnvia(id);
         break;
@@ -27973,10 +27973,13 @@ function campChefeOnde(cands, onde) { // CAMP_G.nasce durante o nascimento forç
   if (onde === 'chao') { const ok = cands.filter(c => c.i < 0); if (ok.length) { cands.length = 0; cands.push(...ok); } return; }
   const R = onde.perto || (onde === 'perto' ? CAMP_CHEFE_BASE.lacPerto : null); if (!R) return;
   const tg = [...S.players.values()].filter(p => p.alive && !p.downed), act = zActive(); if (!tg.length) return;
-  for (let k = 0; k < 30; k++) { // como o Carniceiro: um raio em volta de um jogador, em chão andável de sala aberta
+  for (let k = 0; k < 90; k++) { // como o Carniceiro: um raio em volta de um jogador, em chão andável de sala aberta (depois de 60 tentativas, folga menor)
     const q = tg[Math.floor(Math.random() * tg.length)], a = Math.random() * Math.PI * 2, d = rand(R[0], R[1]), x = q.pos[0] + Math.cos(a) * d, z = q.pos[2] + Math.sin(a) * d, c = ffCell(x, z);
-    if (c >= 0 && FF.walk[c] && isFinite(FF.dist[c]) && act.has(zRoomAt(x, z)) && footFreeR(x, z, .6)) { cands.length = 0; cands.push({ i: -1, x, z }); return; }
+    if (c >= 0 && FF.walk[c] && isFinite(FF.dist[c]) && act.has(zRoomAt(x, z)) && footFreeR(x, z, k < 60 ? .6 : .42)) { cands.length = 0; cands.push({ i: -1, x, z }); return; }
   }
+  let best = null, bd = Infinity; // sem chão livre no raio (corredor estreito): a janela ou o chão de sair mais perto de um jogador (antes: um ponto comum qualquer, às vezes a 30 m)
+  for (const c of cands) { let d = Infinity; for (const q of tg) d = Math.min(d, Math.hypot(q.pos[0] - c.x, q.pos[2] - c.z)); if (d < bd) { bd = d; best = c; } }
+  if (best) { cands.length = 0; cands.push(best); }
 }
 function campZNasce(kind, onde) { // nasce 1 zumbi do tipo, fora do toSpawn e do sorteio de especiais da rodada (devolve o zumbi ou null)
   if (!CAMP.on || !Z.on || !ZKIND[kind] || Z.dogRound) return null;
@@ -28057,7 +28060,7 @@ CAMP_GANCHOS.inicio.push(() => { if (CAMP_CH.z) broadcast({ t: 'camp', k: 'telx'
 // ---------- host: relógio (CAMP_GANCHOS.tick, campanha e infinito) ----------
 function campChefeBusca() { // campanha: objetivo 'matar' ativo com chefe na tabela e nenhum vivo = o chefe entra (na rodada)
   const CH = CAMP_CH; if (CAMP.modo !== 'campanha' || CH.z || now < CH.buscaT || Z.phase !== 'round') return; CH.buscaT = now + CAMP_CHEFE_BASE.busca;
-  for (const id in CAMP.obj) { const O = CAMP.obj[id], D = CAMP_OBJ[id]; if (O.st === 'ativo' && D?.tipo === 'matar' && CAMP_CHEFE[D.chefe]) { campChefeNasce(D.chefe, { campo: 1 }); return; } } // objetivos do mapa: o chefe luta no próprio mapa, na versão de campo
+  for (const id in CAMP.obj) { const O = CAMP.obj[id], D = CAMP_OBJ[id]; if (O.st === 'ativo' && D?.tipo === 'matar' && CAMP_CHEFE[D.chefe]) { campChefeNasce(D.chefe, { campo: 1, vidaK: ZBAL.chefes.vidaK }); return; } } // objetivos do mapa: o chefe luta no próprio mapa, na versão de campo
 }
 CAMP_GANCHOS.rodada.push(() => { CAMP_CH.buscaT = 0; });
 function campChefeTick(dt) {
@@ -29672,7 +29675,7 @@ Object.assign(CAMP_INF, {
 Object.assign(CAMP_OBJ, {
   'V.1': { tipo: 'usar', titulo: CAMP_V.txt.cargas, alvo: { zint: CAMP_V.cargas, n: CAMP_V.cargas.length }, radio: { lembra: CAMP_V.radio.cargas }, depois: ['V.2'] },
   'V.2': { tipo: 'sobreviver', titulo: CAMP_V.txt.nevoa, depois: ['F.1'] }, // tipo próprio: o motor do D02 não mexe; quem fecha é o fimRodada daqui (e o Diretor entra na rodada seguinte)
-  'F.2': { tipo: 'fugir', titulo: CAMP_V.txt.fuga, zona: CAMP_V.fuga.zona, tempo: CAMP_V.fuga.tempo, embarque: CAMP_V.fuga.embarque, radio: { ini: CAMP_V.radio.fuga, lembra: CAMP_V.radio.fuga } }, // zona sem gaiola: segurar o embarque nela
+  'F.2': { tipo: 'fugir', titulo: CAMP_V.txt.fuga, marca: 'Ambulância', zona: { ...CAMP_V.fuga.zona, r: ZBAL.fuga.raio }, tempo: CAMP_V.fuga.tempo, embarque: CAMP_V.fuga.embarque, radio: { ini: CAMP_V.radio.fuga, lembra: CAMP_V.radio.fuga } }, // zona sem gaiola: segurar o embarque nela
 });
 CAMP_OBJ['F.1'] = { ...CAMP_OBJ['F.1'], tipo: 'matar', chefe: 16 }; // o do D13 (a fuga entra pela morte do Diretor); no Sanatório ele nasce na versão de campo (campChefeBusca)
 Object.assign(CAMP_ATOS.find(a => a.id === 'V'), { objs: ['V.1', 'V.2', 'F.1', 'F.2'], ini: ['V.1'], radioIni: CAMP_V.radio.inicio }); // a etapa V (índice 6)
