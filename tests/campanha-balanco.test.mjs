@@ -60,7 +60,7 @@ test('curva no Normal com 1 jogador: sobe com a rodada nos dois mapas, = tabela 
     const chefes = {}; for (const k of [14, 15, 16]) { const c = T.CAMP_CHEFE[k]; chefes[k] = Math.round(T.zHp(c.rodada) * T.zHpK(c.rodada) * (c.base + c.porJog) * T.CAMP_CHEFE_BASE.hpChefe); }
     return { linhas: CURVA.map(([m, rr]) => linha(m, rr)), vila: serie('vila'), san: serie('sanatorio'), real, conta: [1, 4, 8, 15].map(rr => curva('sanatorio', rr)), chefeV: linha('vila', 10, 1).n, chefeS: linha('sanatorio', 13, 1).n, chefes };
   }, { CURVA });
-  CURVA.forEach(([m, rod, vida, n], i) => { assert.equal(r.linhas[i].vida, vida, `${m} r${rod}: vida`); assert.equal(r.linhas[i].n, n, `${m} r${rod}: zumbis`); });
+  CURVA.forEach(([m, rod, vida, n], i) => { assert.equal(r.linhas[i].vida, vida, `${m} r${rod}: vida`); assert.ok(Math.abs(r.linhas[i].n - n * .9) <= 1, `${m} r${rod}: zumbis (Normal ×0,9, 13/10) ${r.linhas[i].n}`); });
   for (const [m, s] of [['vila', r.vila], ['sanatorio', r.san]]) s.forEach((l, i) => { if (i) { assert.ok(l.vida > s[i - 1].vida, `${m}: vida sobe na ${i + 1}`); assert.ok(l.n >= s[i - 1].n, `${m}: quantidade não cai na ${i + 1}`); } });
   r.real.forEach(([rr, vk, qk], i) => { assert.ok(Math.abs(vk - r.conta[i][0]) < 1e-9 && Math.abs(qk - r.conta[i][1]) < 1e-9, `campCurva(${rr})`); });
   assert.ok(r.chefeV >= 14 && r.chefeV <= 20, `Vigia na 10: ${r.chefeV} comuns (antes 16 fixos)`); assert.ok(r.chefeS >= 16 && r.chefeS <= 22, `Foguista na 13: ${r.chefeS} comuns (antes 20 fixos)`);

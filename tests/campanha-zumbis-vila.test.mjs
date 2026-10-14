@@ -76,7 +76,7 @@ test('clássico: os tipos 7–9 nunca nascem (rodadas 6 a 12 inteiras), o campTi
   });
   assert.equal(r.on, false);
   assert.ok(r.n > 100, 'nasceu pouco no cenário');
-  assert.ok(r.vistos.every(k => k <= 6), `tipo novo no clássico: ${r.vistos}`);
+  assert.ok(r.vistos.every(k => k <= 6 || k === 17), `tipo novo no clássico: ${r.vistos}`); // 17: o Tanque é do clássico (13/10)
   assert.deepEqual(r.tipo, [0, 1, 7, 9]);
 });
 
@@ -114,7 +114,7 @@ test('objetivos da Vila: estreia de cada tipo pela rodada do mapa (só 1 / 1 tri
   const esp = rr => Object.entries(r[rr].cont).filter(([k]) => +k > 0 && +k !== 6).reduce((a, [, v]) => a + v, 0);
   for (const rr of [6, 7, 8, 9]) assert.ok(esp(rr) <= Math.floor(r[rr].tot * .5), `teto de especiais na rodada ${rr}: ${esp(rr)} de ${r[rr].tot} ${JSON.stringify(r[rr].cont)} mixN0 ${r[rr].mixN0}`);
   // números: vida = comum × vidaK (CAMP_CURVA.vila: 1 a partir da rodada 6) × ZKIND.hp; velocidade da tabela; Afogado submerso ('rise', y -1)
-  for (const z of r[9].nasc) {
+  for (const z of r[9].nasc.filter(z => z.k >= 7 && z.k <= 9)) { // os tipos da Vila (o Tanque, 17, é do clássico)
     const hp = Math.round(Math.round(r[9].hpComum) * { 7: 1.2, 8: 1.5, 9: .9 }[z.k]);
     assert.ok(Math.abs(z.hp - hp) <= 1, `vida do tipo ${z.k}: ${z.hp} x ${hp}`);
     if (z.k === 7) assert.ok(z.sp >= 3.4 && z.sp <= 3.8 && z.sc === 1);
@@ -124,7 +124,7 @@ test('objetivos da Vila: estreia de cada tipo pela rodada do mapa (só 1 / 1 tri
   assert.ok(r[8].nasc.filter(z => z.k === 9).every(z => z.x > 0 && z.x < 24 && z.z > 22 && z.z < 42), 'Afogado nasce na margem do Lago');
   assert.deepEqual(r.vistos.sort(), [7, 8, 9]);
   assert.ok(['penitente', 'soldado', 'afogado'].every(id => r.falas.includes(id)), `legendas: ${r.falas}`);
-  if (r.nevoa) { assert.ok(r.nevoa[1] > r.nevoa[0] && r.nevoa[1] <= 2 * r.nevoa[0], `Névoa: Afogado com peso ×2, dentro do teto de especiais (${r.nevoa})`); assert.deepEqual(r.estouro, {}, 'Estouro: só Veloz'); }
+  if (r.nevoa) { assert.ok(r.nevoa[1] > r.nevoa[0] && r.nevoa[1] <= 2 * r.nevoa[0] + 1 /* arredondamento das cotas */, `Névoa: Afogado com peso ×2, dentro do teto de especiais (${r.nevoa})`); assert.deepEqual(r.estouro, {}, 'Estouro: só Veloz'); }
 });
 
 test('Afogado só com água aberta (a cota não fica presa), tipos do Sanatório nunca na Vila, Soldado com 1 trio mesmo com o teto cheio (também no infinito)', { timeout: 300000 }, async () => {

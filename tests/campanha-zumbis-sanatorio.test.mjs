@@ -82,7 +82,7 @@ test('clássico: os tipos 10–13 nunca nascem (rodadas 11 a 20 inteiras), campT
   });
   assert.equal(r.on, false);
   assert.ok(r.n > 200, 'nasceu pouco no cenário');
-  assert.ok(r.vistos.every(k => k <= 6), `tipo novo no clássico: ${r.vistos}`);
+  assert.ok(r.vistos.every(k => k <= 6 || k === 17), `tipo novo no clássico: ${r.vistos}`); // 17: o Tanque é do clássico (13/10)
   assert.equal(r.ck, 0, 'nenhum zumbi do clássico passa pela IA da campanha');
   assert.equal(r.corpos, 0);
   assert.deepEqual(r.tipo, [0, 1, 10, 13]);

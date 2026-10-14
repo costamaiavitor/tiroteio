@@ -99,7 +99,7 @@ test('Estouro: quantidade ×1,3, ritmo ×0,5, só Veloz, comuns correndo com vid
     limpa(); const mx = T.ZDIFF[T.S.st.zdiff].max; T.Z.toSpawn = 100;
     while (T.Z.zs.size < mx) { if (!T.zSpawnOne()) break; } for (const z of T.Z.zs.values()) { z.chkT = 1e12; }
     T.Z.spawnT = window.__simNow; T.sim(2); const vivos = T.Z.zs.size;
-    T.campEvDesliga(); limpa(); return { toS, dl, mix, mixN, zz, mx, vivos, hp0: Math.round(T.zHp(T.Z.round) * T.zHpK(T.Z.round)) };
+    T.campEvDesliga(); limpa(); return { toS, dl, mix, mixN, zz, mx, vivos, hp0: Math.round(Math.round(T.zHp(T.Z.round) * T.zHpK(T.Z.round)) * T.ZBAL.comum.vida) }; // comum −7% (13/10)
   });
   assert.equal(r.toS, 52, 'toSpawn ×1,3'); assert.equal(r.dl, .5, 'spawnDelay ×0,5');
   assert.ok(r.mix.every((n, i) => i === 3 || !n) && r.mixN === r.mix[3], 'especiais só Veloz');
@@ -122,7 +122,7 @@ test('Hora do Silêncio: o host recusa arma de fogo e explosivo, faca ×3, vida 
     const saco = T.Z.bag.slice();
     T.sim(.3); const cur = T.campEvVis().cur;
     T.campEvDesliga(); limpa();
-    return { hp0: Math.round(T.zHp(T.Z.round) * T.zHpK(T.Z.round)), g: pts(130), toS, insta, mix, hp, zhitArma, zhitFaca, danoGran, danoArma, danoFaca, danoBowie, hpGran, perna, dFaca, saco, cur };
+    return { hp0: Math.round(Math.round(T.zHp(T.Z.round) * T.zHpK(T.Z.round)) * T.ZBAL.comum.vida), g: pts(130), toS, insta, mix, hp, zhitArma, zhitFaca, danoGran, danoArma, danoFaca, danoBowie, hpGran, perna, dFaca, saco, cur };
   });
   assert.equal(r.toS, 24, 'toSpawn ×0,6'); assert.equal(r.insta, 0, 'Insta-Kill ativo apagado');
   assert.ok(r.mix.every((n, i) => i === 11 || !n), 'especiais só o Contido');
@@ -270,7 +270,7 @@ test('cada evento desliga e limpa: host sem regra (tipo, dano, zhit, vida, nasci
       rodada(); T.campEvLiga(id); T.sim(.3); const ligado = [ev(), T.CAMP_EVC.vis];
       T.campEvDesliga(); limpa(); T.Z.spawnDelay = 1; T.sim(.3);
       if (T.CAMP_ZKS) { T.CAMP_ZKS.rest = {}; T.CAMP_ZKS.r = T.Z.round; T.CAMP_ZKS.trio = 0; } // O3-D06: sem as cotas dos tipos novos (só a regra do evento); antes de nascer, senão o infinito pode sortear um tipo novo
-      const z = zumbi(2, -3), base = Math.round(Math.round(T.zHp(T.Z.round) * T.zHpK(T.Z.round)) * (T.campCurva(T.Z.round)?.vidaK ?? 1)) /* com a curva do mapa (vidaK) */, v = T.campEvVis();
+      const z = zumbi(2, -3), base = Math.round(Math.round(Math.round(T.zHp(T.Z.round) * T.zHpK(T.Z.round)) * T.ZBAL.comum.vida) * (T.campCurva(T.Z.round)?.vidaK ?? 1)) /* com a curva do mapa (vidaK) */, v = T.campEvVis();
       let n2 = 0; for (let k = 0; k < 50; k++) if (T.campTipo(0) !== 0) n2++;
       out[id] = { ligado, ev: ev(), cli: T.CAMP_EVC.id, vis: v.vis, man: v.man, tipo: n2, dano: T.campDano(z, 77, 'body', 'he', p, true), zhit: T.campZhitOk(p, { w: 'm1911' }, z), hp: z.hp === base || [z.hp, base, z.kind, T.Z.round, T.CAMP.modo], cv: z.cv ?? 1, fog: T.ZC.fogDog };
       limpa();

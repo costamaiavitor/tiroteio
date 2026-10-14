@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { abrirJogo, criarSala, noJogo } from './_jogo.mjs';
 
 let J;
-before(async () => { J = await abrirJogo(); await criarSala(J.page, { mode: 'zombies', map: 'sanatorio', zdiff: 1 }); }, { timeout: 180000 });
+before(async () => { J = await abrirJogo(); await criarSala(J.page, { mode: 'zombies', map: 'sanatorio', zdiff: 1 }); await J.page.evaluate(() => { window.__T.ZBAL.chefes.vidaK = 1; }); }, { timeout: 180000 }); // a mecânica da base com a vida pura (o ×2,5 dos objetivos é balanceamento, testado nos chefes)
 after(async () => { await J?.fechar(); });
 
 // chefe de teste (só nesta página): tipo novo no fim do ZKIND, definição em CAMP_CHEFE, objetivo 'matar' na etapa III
