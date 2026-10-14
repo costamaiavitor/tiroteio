@@ -72,7 +72,7 @@ test('Vila: gerador só depois das 3 peças do motor (achar, pegar com F, levar 
     const st = id => T.CAMP.obj[id]?.st, gi = T.ZD.zint.findIndex(o => o.id === 'gerador-pedreira');
     T.campForca('I.1'); T.sim(.3);
     const seta = document.querySelector('#campMark')?.innerHTML ?? T.CAMP.c.el?.mark?.innerHTML ?? '?';
-    const zd0 = T.C.st.zdiff; T.C.st.zdiff = 0; T.sim(.3); const setaFacil = T.CAMP.c.el?.mark?.innerHTML ?? ''; T.C.st.zdiff = zd0;
+    poe(47.7, -62); const zd0 = T.C.st.zdiff; T.C.st.zdiff = 0; /* no gerador, fora da caixa das peças (a peça a menos de 2,5 m não tem seta) */ T.sim(.3); const setaFacil = T.CAMP.c.el?.mark?.innerHTML ?? ''; T.C.st.zdiff = zd0;
     const depoisSino = { pecas: ['I.P1', 'I.P2', 'I.P3'].map(st), ger: st('I.2') };
     poe(47.7, -62); T.sim(.05); T.zInteract(0); const promptGer = T.ZC.act ? T.ZC.act.txt : null;
     T.srvZUse(p, { k: 'zint', id: gi }); T.sim(.1); const gerAntes = T.Z.zint[gi].st;
