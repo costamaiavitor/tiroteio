@@ -145,7 +145,7 @@ test('pelotão na Vila: apito (1,5 s), 3 Soldados perto dos jogadores (alcançá
     T.VGSRV.pelT = agora(); T.sim(1 / 30); o.tel = [CH.atk?.a.id, +(CH.atk.fa - CH.atk.t0).toFixed(2)]; T.sim(1.4); o.antes = T.campChefeLacVivos(); T.sim(.2);
     const lac = [...T.Z.zs.values()].filter(x => x.lac);
     o.lac = [lac.length, [...new Set(lac.map(x => x.kind))].join()];
-    o.onde = lac.map(x => { const P = x.body.pos; return [livre(P.x, P.z) || x.win >= 0, +Math.hypot(P.x - p.pos[0], P.z - p.pos[2]).toFixed(1)]; });
+    o.onde = lac.map(x => { const P = x.body.pos, c = T.ffCell(P.x, P.z); return [livre(P.x, P.z) || x.win >= 0 || (c >= 0 && !!T.FF.walk[c] && isFinite(T.FF.dist[c]) && T.footFreeR(P.x, P.z, .42)) /* campChefeOnde aceita 0,42 m depois de 60 tentativas */, +Math.hypot(P.x - p.pos[0], P.z - p.pos[2]).toFixed(1)]; });
     o.prox = +(T.VGSRV.pelT - agora()).toFixed(1);
     for (let k = 0; k < 3; k++) { limpa(); T.campChefeAtaca(z, atk('pelotao'), p); T.sim(1.6); } o.teto = T.campChefeLacVivos();
     CH.fase = 2; for (let k = 0; k < 2; k++) { limpa(); T.campChefeAtaca(z, atk('pelotao-3'), p); T.sim(1.6); } o.teto3 = T.campChefeLacVivos(); CH.fase = 0;
