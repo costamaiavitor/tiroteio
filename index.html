@@ -604,7 +604,7 @@ let now = performance.now() / 1000;
 // Ambiente de desenvolvimento (testes e ferramentas rodam em localhost/127.0.0.1): só aqui o jogo expõe os ganchos de depuração
 // (window.__T, relógio travável). No site publicado eles não existem: davam a qualquer um, no console, atalhos prontos para trapacear.
 const DEBUG = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
-const PROTO = 7; /* objetivos do mapa (13/10): sem troca de mapa, cena, créditos, salvo nem checkpoint ({ t: 'camp', k: 'trans' | 'pronto' | 'cena' | 'salva' | 'over' | 'fim' | 'creditos' | 'final' | 'fuga' } e o cp tr/ov/fg saíram), arenas forte/forno/galeria7 fora; antes (6): escalada do infinito; zumbi-v2: peças e montagem (zbuild/zbuilt), armas mudadas; overhaul Ondas 2-3: interativos (zint/zi), campanha (camp/cp), tipo de zumbi com 5 bits, mapas forte/forno/galeria7 */ // versão do protocolo de rede: subir quando mensagens, armas (W) ou mapas mudarem; host e cliente precisam ser iguais
+const PROTO = 8; /* 14/10: etapas novas (VA, VB, VC, SA, SB e pausas P0-P4) e cp.px (rodada do próximo objetivo); antes (7): objetivos do mapa (13/10): sem troca de mapa, cena, créditos, salvo nem checkpoint ({ t: 'camp', k: 'trans' | 'pronto' | 'cena' | 'salva' | 'over' | 'fim' | 'creditos' | 'final' | 'fuga' } e o cp tr/ov/fg saíram), arenas forte/forno/galeria7 fora; antes (6): escalada do infinito; zumbi-v2: peças e montagem (zbuild/zbuilt), armas mudadas; overhaul Ondas 2-3: interativos (zint/zi), campanha (camp/cp), tipo de zumbi com 5 bits, mapas forte/forno/galeria7 */ // versão do protocolo de rede: subir quando mensagens, armas (W) ou mapas mudarem; host e cliente precisam ser iguais
 const CFG = {
   name: String(load('name', 'Jogador' + Math.floor(rand(100, 999)))).replace(/[<>]/g, '').slice(0, 16) || 'Jogador', // mesmo filtro do campo (o localStorage é editável)
   sens: load('sens', 1), fov: load('fov', 85), vol: load('vol', 0.6), shadows: load('shadows', true), gfx: load('gfx', null),
@@ -4671,7 +4671,7 @@ ATMOS.vila.K = A => {
 
   // 8. tonel de cal, brocha e pegadas brancas até o portão
   { const [x, z] = H.livre(A, -3, -103) || [-3, -103];
-    A.cyl(x, 0, z, .33, .33, 1, A.mat('pintado', 0x3a3c3e), 14); A.cyl(x, .99, z, .3, .3, .015, A.flat(0xece8dc), 14);
+    A.cyl(x, 0, z, .33, .33, 1, A.mat('pintado', 0x3a3c3e), 14); A.solid(x, z, .62, .62, 1, 0, 1.2); /* tonel de cal: colisor (recusa perto de ponto de uso) */ A.cyl(x, .99, z, .3, .3, .015, A.flat(0xece8dc), 14);
     const r = A.mesh(H.cel(new THREE.PlaneGeometry(.36, .36), 11), labM); r.position.set(x - .335, .55, z); r.rotation.y = -Math.PI / 2;
     const b = A.box(x + .12, .95, z + .05, .03, .5, .03, madeira); b.rotation.set(.5, 0, -.4); A.box(x + .02, 1.0, z + .1, .12, .06, .06, A.flat(0xe0dccc));
     const pg = [], x1 = -30, z1 = -97.2; for (let i = 0; i < 26; i++) { const k = (i + 1) / 27, px = x + (x1 - x) * k, pz = z + (z1 - z) * k, a = Math.atan2(x1 - x, z1 - z), s = i % 2 ? .13 : -.13;
@@ -12900,6 +12900,7 @@ function buildVila() {
     for (const [x, z] of [[48, -68], [64, -50], [38, -62], [70, -36]]) for (let k = 0; k < 3; k++) big.push(mtx(x + rand(-.6, .6), .6 + k * .5, z + rand(-.6, .6), rand(0, 6), 1.5 - k * .35, 1.1 - k * .2));
     for (let i = 0; i < 26; i++) { const t = rand(-1, 1), x = 60.8 + t * 14, z = -60.8 + t * 14; big.push(mtx(x - rand(1, 3), rand(.5, 2.5), z + rand(1, 3), rand(0, 6), rand(1.2, 2.6), rand(1, 2))); } // encosta no muro
     inst(new THREE.DodecahedronGeometry(1, 0), rockM, big);
+    for (const m of big) { const e = m.elements, r = Math.hypot(e[0], e[1], e[2]) * .65, ry = Math.hypot(e[4], e[5], e[6]) * .75, y1 = e[13] + ry; if (y1 > .3) COL.push({ minX: e[12] - r, maxX: e[12] + r, minY: Math.max(0, e[13] - ry), maxY: y1, minZ: e[14] - r, maxZ: e[14] + r }); } // pedras da encosta sem colisor: caixa dentro da pedra (65% do raio, 75% da altura)
     const mg = new THREE.Group(); mg.position.set(59.6, 0, -59.6); mg.rotation.y = -Math.PI * .75; world.add(mg);
     const dark = new THREE.MeshBasicMaterial({ color: 0x050505 }); const hole = new THREE.Mesh(new THREE.PlaneGeometry(3, 3.2), dark); hole.userData.own = true; hole.position.set(0, 1.6, .02); mg.add(hole);
     for (const x of [-1.6, 1.6]) bx(mg, .3, 3.6, .3, x, 1.8, .2, barkM); bx(mg, 3.8, .35, .35, 0, 3.6, .2, barkM);
@@ -13102,7 +13103,8 @@ function buildVila() {
         ground(G, -60, 0, 97, 150, 'grass', 0x3c4c2c); ground(G, 0, 60, 97, 150, 'dirt', 0x6e5a3e);
         { const tr = [], c1 = [], c2 = []; for (const [u, v] of VD_TREES) { const k = srnd(.9, 1.4), r = srnd(0, 6); tr.push(mtx(u, 1.5 * k, -v, r, k)); c1.push(mtx(u, 4.2 * k, -v, r, k)); c2.push(mtx(u, 6.4 * k, -v, r, k)); }
           ginst(G, new THREE.CylinderGeometry(.22, .34, 3, 6), barkM, tr); ginst(G, new THREE.ConeGeometry(2.2, 4.4, 8), pineM, c1); ginst(G, new THREE.ConeGeometry(1.5, 3.2, 8), pineM, c2);
-          const st = []; for (let i = 0; i < 18; i++) st.push(mtx(srnd(-56, -8), .25, -srnd(100, 146), 0, 1)); ginst(G, new THREE.CylinderGeometry(.35, .4, .5, 8), barkM, st); }
+          const st = []; for (let i = 0; i < 18; i++) st.push(mtx(srnd(-56, -8), .25, -srnd(100, 146), 0, 1)); ginst(G, new THREE.CylinderGeometry(.35, .4, .5, 8), barkM, st);
+          for (const m of st) { const p = new V3(m.elements[12], 0, m.elements[14]).applyAxisAngle(new V3(0, 1, 0), RS[s]); COL.push({ minX: p.x - .3, maxX: p.x + .3, minY: 0, maxY: .5, minZ: p.z - .3, maxZ: p.z + .3 }); } } // tocos da serraria: colisor do tamanho do toco
         tel(G, -34, -124, 5.8, 6.8, 2.2, 3, true, { cum: 'tabua', mat: TEL.tabua(0x9ca890), T: 4, U: .7, corpo: 'cheio', forro: roofW, emp: lam('wood', 0x6b4a2e), gi: .4, cw: .2, chm: .25, falta: 7, solta: 3, chao: 5 }); // cabana do lenhador
         { const lg = []; for (const [v, y] of [[124, .8], [127, .8], [125.5, 2.4]]) for (const o of [-.4, .4]) lg.push(mtx(14, y, -(v + o), 0, 1)); ginst(G, new THREE.CylinderGeometry(.42, .42, 10, 10).rotateZ(Math.PI / 2), barkM, lg); }
         { const rf = new THREE.Mesh(boxGeo(14, .2, 14, 8), TEL.zinco(0xb0a49a)); rf.position.set(42, 4.1, -118); ga(G, rf);
@@ -26286,7 +26288,7 @@ const CAMP = {
   // estado do host
   on: false, modo: null, et: -1, obj: {}, alvos: [], itens: {}, chaves: new Set(), chama: null, npc: null, falaT: {}, radioIni: false, alvoN: 1, npcT: 0,
   c: null, // cliente (campCliReset)
-  get ato() { const e = NET.isHost ? this.et : this.c?.et; if (e < 0 && (NET.isHost ? this.on && this.objFim : this.c?.fo)) return CAMP_ATOS[CAMP_ATOS.length - 1].ato; return CAMP_ATOS[e]?.ato ?? 0; }, // ato da etapa atual (host ou o que o cliente sabe; O3-D04: zintNotaLigada); depois da última etapa, os documentos de todas continuam
+  get ato() { const e = NET.isHost ? this.et : this.c?.et; if (e < 0 && (NET.isHost ? this.on && this.objFim : this.c?.fo)) return CAMP_ATOS.reduce((m, a) => Math.max(m, a.ato), 0); return CAMP_ATOS[e]?.ato ?? 0; }, // ato da etapa atual (host ou o que o cliente sabe; O3-D04: zintNotaLigada); depois da última etapa, os documentos de todas continuam
 };
 const CAMP_GANCHOS = { // funções dos próximos blocos (D05, D07...): o motor chama na ordem, sem gancho novo no código compartilhado
   inicio: [], // (etapa) host: começo da etapa (depois dos objetivos)
@@ -26314,7 +26316,23 @@ const CAMP_ATOS = [
 // etapa abaixo começa quando a anterior acaba (no fim da rodada), sem troca de mapa nem arena (os chefes lutam no próprio mapa, na versão
 // de campo), sem cena, sem kit e sem checkpoint (o time caído acaba a partida, como sempre). Depois da última, a partida segue em rodadas
 // infinitas (o mesmo do infinito: escalada, eventos e chefes de campo). Internamente o modo continua sendo zmode 'campanha'.
-const OBJ_MAPA = { vila: ['I', 'II', 'C1'], sanatorio: ['III', 'IV', 'C2', 'V'] };
+// Pedido do dono (14/10): mais objetivos, no começo, no meio e no fim (até a rodada 20), em rodadas certas e não o tempo todo. Cada etapa
+// tem a rodada em que começa (OBJ_RODADA); a que acabar antes da hora deixa a partida numa pausa (etapa P*, sem objetivo, com o aviso da
+// rodada do próximo) até a rodada dela. Se o time atrasar, a seguinte começa logo no fim da anterior (nunca antes da rodada dela).
+// As etapas novas (VA, VB, VC na Vila; SA, SB no Sanatório) ficam no fim da CAMP_ATOS: os índices das antigas não mudam.
+CAMP_ATOS.push(
+  { id: 'VA', ato: 0, nome: 'A Igreja', mapa: 'vila', objs: ['VA.1', 'VA.2'], ini: ['VA.1'] },
+  { id: 'VB', ato: 1, nome: 'O Farol', mapa: 'vila', objs: ['VB.1', 'VB.2'], ini: ['VB.1'] },
+  { id: 'VC', ato: 1, nome: 'A Mina velha', mapa: 'vila', objs: ['VC.1', 'VC.2'], ini: ['VC.1'] },
+  { id: 'SA', ato: 2, nome: 'O Necrotério', mapa: 'sanatorio', objs: ['SA.1', 'SA.2'], ini: ['SA.1'] },
+  { id: 'SB', ato: 3, nome: 'A Ala Psiquiátrica', mapa: 'sanatorio', objs: ['SB.1', 'SB.2'], ini: ['SB.1'] },
+  ...[0, 1, 2, 3, 4].map(ato => ({ id: 'P' + ato, ato, pausa: 1, nome: 'Pausa', mapa: null, objs: [], ini: [] })), // pausas entre etapas (uma por ato: as notas continuam as da etapa anterior)
+);
+const OBJ_MAPA = { vila: ['I', 'VA', 'II', 'VB', 'VC', 'C1'], sanatorio: ['III', 'SA', 'IV', 'C2', 'SB', 'V'] };
+const OBJ_RODADA = { I: 1, VA: 4, II: 7, VB: 11, VC: 14, C1: 18, III: 1, SA: 4, IV: 7, C2: 10, SB: 13, V: 16 }; // rodada em que cada etapa começa
+const OBJ_MAPA_ANTIGO = { vila: ['I', 'II', 'C1'], sanatorio: ['III', 'IV', 'C2', 'V'] }; // testes antigos (DEBUG + window.__objAntigos): a sequência de 13/10
+const objAntigo = () => DEBUG && !!window.__objAntigos; // só nos testes: sem rodada certa, portas da história abrem e etapas novas fora
+const campPausaDe = ato => CAMP_ATOS.findIndex(a => a.pausa && a.ato === ato);
 // Objetivos (§4.1): { id, tipo, titulo, abre: [portas], radio: { ini, ok, falha, lembra }, depois: [ids], ...campos do tipo }
 //  usar:     alvo: { zint: id ou [ids], st: [estados de pronto] (padrão: o estado final do tipo da campanha), n }
 //  ler:      alvo: { zint: id ou [ids], n }                       chegar:  zona: { x, z, r }
@@ -26387,14 +26405,14 @@ function campForm0(st) { // matchForm: um modo só, com os objetivos do mapa (os
 function campFormOut(st) { campForm0(st); return { zmode: st.zmode }; } // matchForm: o que vai no st
 const campSaneSt = st => ({ zmode: CAMP_MODOS.includes(st.zmode) ? st.zmode : 'classico' }); // saneSt (entrada não confiável)
 // ---------- host: começo e etapas ----------
-function campLimpa() { Object.assign(CAMP, { objFim: false, fimMsg: null, etUlt: -1, obj: {}, alvos: [], itens: {}, chaves: new Set(), chama: null, npc: null, falaT: {}, radioIni: false }); } // fimMsg (R1): o aviso dos objetivos concluídos de uma partida que acabou no mesmo tique não sai na seguinte
+function campLimpa() { Object.assign(CAMP, { objFim: false, fimMsg: null, novoMsg: null, px: 0, etUlt: -1, obj: {}, alvos: [], itens: {}, chaves: new Set(), chama: null, npc: null, falaT: {}, radioIni: false }); } // fimMsg (R1): o aviso dos objetivos concluídos de uma partida que acabou no mesmo tique não sai na seguinte
 function campInicio() { // gancho no começo do zStartGame: liga ou desliga os objetivos (a partida começa sempre como a do clássico)
   const md = S.st?.mode === 'zombies' ? S.st.zmode : null;
   if (md !== 'campanha' && md !== 'infinito') { if (CAMP.on) { CAMP.on = false; CAMP.modo = null; campLimpa(); } return; }
   CAMP.on = true; CAMP.modo = md; campLimpa(); CAMP.et = -1;
   Object.assign(CAMP_INFS, { vistoR: 0, pend: null, n: 0 }); // R1: partida nova sem o chefe de campo pendente da anterior (o campInfTick só zerava quando a rodada voltava abaixo da última vista)
   if (md === 'campanha') { // objetivos do mapa: o zStartGame chama o campComeca depois dos jogadores
-    CAMP.cadeia = (OBJ_MAPA[S.st.map] || []).map(id => CAMP_ATOS.findIndex(a => a.id === id)).filter(e => e >= 0 && campEtapaOk(e));
+    CAMP.cadeia = ((objAntigo() ? OBJ_MAPA_ANTIGO : OBJ_MAPA)[S.st.map] || []).map(id => CAMP_ATOS.findIndex(a => a.id === id)).filter(e => e >= 0 && campEtapaOk(e));
     if (!CAMP.cadeia.length) CAMP.modo = 'infinito'; // mapa sem objetivos: rodadas infinitas desde o começo
   }
 }
@@ -26403,8 +26421,13 @@ function campComeca() { // host: primeira etapa da sequência do mapa (depois do
   CAMP.etR = 0; campEtapaPrepara(CAMP.cadeia[0]);
 }
 function campProxObjetivos() { // host: fim de uma etapa (no intervalo): a seguinte do mapa ou, sem mais, as rodadas infinitas
-  const k = CAMP.cadeia ? CAMP.cadeia.indexOf(CAMP.et) : -1, prox = k >= 0 ? CAMP.cadeia[k + 1] : undefined;
-  if (prox !== undefined) { CAMP.etR = Z.round; campEtapaPrepara(prox); return; }
+  const atual = CAMP_ATOS[CAMP.et]?.pausa ? CAMP.etUlt : CAMP.et;
+  const k = CAMP.cadeia ? CAMP.cadeia.indexOf(atual) : -1, prox = k >= 0 ? CAMP.cadeia[k + 1] : undefined;
+  if (prox !== undefined) {
+    const r0 = OBJ_RODADA[CAMP_ATOS[prox].id] || 0; CAMP.px = r0;
+    if (Z.round + 1 < r0 && !objAntigo()) { if (!CAMP_ATOS[CAMP.et]?.pausa) { CAMP.etR = Z.round; campEtapaPrepara(campPausaDe(CAMP_ATOS[atual].ato)); } return; } // 14/10: ainda não é a rodada dela
+    CAMP.etR = Z.round; campEtapaPrepara(prox); return;
+  }
   CAMP.modo = 'infinito'; CAMP.objFim = true; CAMP.et = -1; CAMP.obj = {}; CAMP.alvos = []; CAMP.npc = null; CAMP.cadeia = null;
   // a troca para o infinito (CAMP_RITMO.inf): os cães e o Carniceiro do clássico voltam (o que a agenda deixou pendente numa etapa de chefe
   // vem logo na rodada seguinte), sem colar nos da agenda; os eventos passam ao sorteio do infinito (campEvInf). A agenda não vale mais.
@@ -26418,12 +26441,14 @@ function campProxObjetivos() { // host: fim de uma etapa (no intervalo): a segui
 CAMP_GANCHOS.tick.push(() => { if (CAMP.fimMsg != null && now > CAMP.fimMsg) { CAMP.fimMsg = null; broadcast({ t: 'msg', txt: 'OBJETIVOS CONCLUÍDOS', sub: 'Agora é sobreviver: as rodadas não acabam', dur: 5 }); } });
 function campEtapaPrepara(e) { // estado da etapa: objetivos e rádio
   const A = CAMP_ATOS[e];
-  CAMP.et = CAMP.etUlt = e; CAMP.obj = {}; CAMP.alvos = []; CAMP.itens = {}; CAMP.chama = null; CAMP.npc = null; CAMP.radioIni = false;
+  CAMP.et = e; if (!A.pausa) CAMP.etUlt = e; CAMP.obj = {}; CAMP.alvos = []; CAMP.itens = {}; CAMP.chama = null; CAMP.npc = null; CAMP.radioIni = false;
   for (const id of campObjsDe(e)) CAMP.obj[id] = { st: 'oculto', p: 0, h: 0, q: null, envT: 0, pend: false };
   for (const id of campLista(A.ini)) campObjAtiva(id);
   for (const f of CAMP_GANCHOS.inicio) f(e);
   broadcast({ t: 'camp', k: 'est', ...campCp() });
+  if (!A.pausa && Z.round > 1 && !objAntigo()) CAMP.novoMsg = now; // 14/10: aviso no tick seguinte (como o fimMsg: o "Rodada N concluída" sai no mesmo tique)
 }
+CAMP_GANCHOS.tick.push(() => { if (CAMP.novoMsg != null && now > CAMP.novoMsg) { CAMP.novoMsg = null; const A = CAMP_ATOS[CAMP.et], D = CAMP_OBJ[campLista(A?.ini)[0]]; if (A && !A.pausa) broadcast({ t: 'msg', txt: A.chefe ? 'CHEFE À VISTA' : 'NOVO OBJETIVO', sub: D?.titulo || '', dur: 4 }); } });
 function campEnergia() { if (!Z.power) { Z.power = true; broadcast({ t: 'zpower' }); } }
 function zAbrePorta(id, quem) { Z.doors.add(id); broadcast({ t: 'zdoor', id }); zBuildWalk(); Z.ffT = 0; } // O3-D02: a abertura de porta do srvZUse (compra) e das portas da história; quem: o jogador (ou null)
 function campAbreHistoria(id, quieto) { // porta da história: abre de graça pelo caminho da compra, com poeira
@@ -26473,7 +26498,9 @@ function campObjAtiva(id) {
   if (D.tipo === 'escoltar') campNpcNovo(id, D, O);
   else if (D.tipo === 'coletar') { const it = CAMP.itens[D.item] ||= { st: 'oculto', x: 0, z: 0, quem: null, i: -1 }; it.obj = id; it.i = (ZD.zint || []).findIndex(o => o.t === 'chave' && (o.chave || o.id) === D.item); if (D.origem && D.origem !== 'elite' && finN(D.origem.x)) campItemSolta(D.item, D.origem.x, D.origem.z); }
   else if (D.tipo === 'fugir') O.resta = D.tempo || 75;
-  for (const d of campLista(D.abre)) campAbreHistoria(d);
+  // 14/10 (dono): as portas não abrem mais sozinhas pelo objetivo (D.abre fica só como a lista das portas do caminho): o time compra
+  if (objAntigo()) for (const d of campLista(D.abre)) campAbreHistoria(d); // testes antigos: as portas da história de 13/10
+  else if (D.tipo === 'ler') for (const i of O.zi) Z.zint[i]?.lidos?.clear(); // ler de novo: a leitura de antes do objetivo não conta
   if (D.radio?.ini) campRadio(D.radio.ini);
   campObjEnvia(id, true);
 }
@@ -26607,6 +26634,7 @@ function campNpcTick(id, D, O, dt) {
       if (perto.hp <= 0) zKill(perto, null, 'body', 'm1911', false, false); } }
   }
   if (cercado) { campFala(F.cercado); n.andando = false; }
+  else if (D.portas && !objAntigo() && !D.portas.every(d => Z.doors.has(d))) { if (n.andando) campFala(F.para); n.andando = false; } // 14/10: caminho fechado (o time compra a porta)
   else if (!alguem) { if (n.andando) campFala(F.para); n.andando = false; }
   else { // anda pela rota
     if (!n.andando) campFala(F.anda); n.andando = true;
@@ -26648,7 +26676,7 @@ function campItemTick(id, D, O) {
 // ---------- host: rede ----------
 function campCp() { // estado completo dos objetivos (zWorldState.cp e { k: 'est' }): etapa, objetivos, itens
   const cp = { et: CAMP.et, ob: Object.entries(CAMP.obj).map(([id, O]) => [id, O.st, r2(O.p), r2(O.h), O.q]), it: Object.entries(CAMP.itens).filter(([, it]) => it.i >= 0).map(([ch, it]) => [ch, it.i, it.st, r2(it.x), r2(it.z), it.quem]),
-    fo: CAMP.objFim ? 1 : 0, eu: CAMP.etUlt ?? -1 }; // fo: os objetivos do mapa acabaram (rodadas infinitas); eu: a última etapa
+    fo: CAMP.objFim ? 1 : 0, eu: CAMP.etUlt ?? -1, px: CAMP.px | 0 }; // fo: os objetivos do mapa acabaram (rodadas infinitas); eu: a última etapa
   for (const f of CAMP_GANCHOS.cp) f(cp);
   return cp;
 }
@@ -26680,7 +26708,7 @@ function campObjCli(id, st, p, h, q) {
 function campSync(cp) { // zSyncWorld (quem entra no meio) e { k: 'est' }: monta o HUD sem tocar a cena
   if (!cp || typeof cp !== 'object') return;
   if (!NET.isHost) CAMP.on = campCliOn();
-  const c = CAMP.c; c.et = Number.isInteger(cp.et) && CAMP_ATOS[cp.et] ? cp.et : -1; c.fo = cp.fo === 1 && c.et < 0; c.etUlt = Number.isInteger(cp.eu) && CAMP_ATOS[cp.eu] ? cp.eu : c.et;
+  const c = CAMP.c; c.et = Number.isInteger(cp.et) && CAMP_ATOS[cp.et] ? cp.et : -1; c.fo = cp.fo === 1 && c.et < 0; c.etUlt = Number.isInteger(cp.eu) && CAMP_ATOS[cp.eu] ? cp.eu : c.et; c.px = Number.isInteger(cp.px) && cp.px > 0 && cp.px < 1e4 ? cp.px : 0;
   if (Array.isArray(cp.ob)) for (const o of cp.ob.slice(0, 32)) if (Array.isArray(o) && campIdOk(o[0]) && ['oculto', 'ativo', 'feito', 'falhou'].includes(o[1])) campObjCli(o[0], o[1], o[2], o[3], o[4]);
   if (Array.isArray(cp.it)) for (const a of cp.it.slice(0, 8)) if (Array.isArray(a) && campIdOk(a[0]) && Number.isInteger(a[1])) campMsg({ k: 'item', i: a[1], x: a[3], z: a[4] }); // posição do item no chão
   for (const f of CAMP_GANCHOS.sync) f(cp);
@@ -26729,7 +26757,8 @@ function campHud(dt) { // gancho no fim do zHud (cada quadro do cliente)
   const c = CAMP.c, E = campHudEl(); if (E.root.style.display === 'none') E.root.style.display = '';
   // painel do objetivo
   const A = CAMP_ATOS[c.et]; let h = '';
-  if (A) {
+  if (A?.pausa) h = c.px ? `<h4>Objetivo</h4><div class="o ok">Próximo objetivo na rodada ${c.px}</div>` : '';
+  else if (A) {
     h = `<h4>${A.chefe ? 'Chefe' : 'Objetivo'}</h4>`; let n = 0;
     for (const id of c.ordem) { const o = c.obj[id], D = CAMP_OBJ[id]; if (!D || (o.st !== 'ativo' && o.st !== 'falhou') || n >= 3) continue; n++;
       const extra = o.st === 'falhou' ? ' <small>(falhou: volta no intervalo)</small>' : o.q ? ` <small>· com ${esc(C.players.get(o.q)?.n || '?')}</small>` : '';
@@ -26909,7 +26938,7 @@ ZINT_FN.gaiola = {
 };
 if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { CAMP, CAMP_GANCHOS, CAMP_ATOS, CAMP_OBJ, CAMP_CURVA, CAMP_NPC, CAMP_TRAVAS, campInicio, campCp, campSync, campMsg, campForca, campEvento,
   campFimRodada, campSaneSt, campFormOut, campForm0, campItemSolta, campObjComZint, campObjAtiva, campFontes, campDanoAlvo, campHud, campAlvoZ,
-  campEstado: () => ({ on: CAMP.on, modo: CAMP.modo, et: CAMP.et, obj: Object.fromEntries(Object.entries(CAMP.obj).map(([k, O]) => [k, { st: O.st, p: O.p, h: O.h, q: O.q }])), alvos: CAMP.alvos.length, cli: CAMP.c }), saneSt, matchForm, zAbrePorta, zWorldState }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+  campEstado: () => ({ on: CAMP.on, modo: CAMP.modo, et: CAMP.et, obj: Object.fromEntries(Object.entries(CAMP.obj).map(([k, O]) => [k, { st: O.st, p: O.p, h: O.h, q: O.q }])), alvos: CAMP.alvos.length, cli: CAMP.c }), saneSt, matchForm, zAbrePorta, zWorldState, OBJ_MAPA, OBJ_RODADA, campEtapaPrepara }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
 // ===== FIM O3-D02 =====
 //
 // @@CAMP-TIPOS@@
@@ -29239,8 +29268,16 @@ Object.assign(CAMP_OBJ, {
     aoFeito: 'energia', radio: { ini: 'r1-energia', ok: 'r1-gerador-pegou', falha: 'r1-gerador-caiu' } },
   'II.1': { tipo: 'ler', titulo: 'Achar a lista do Hospital de campanha', abre: ['IF', 'IK'], alvo: { zint: 'vila-hospital' }, radio: { ok: 'r2-lista', lembra: 'r2-inicio' }, depois: ['II.2'] },
   'II.2': { tipo: 'chegar', titulo: 'Achar Nogueira na Estação', abre: ['FG'], zona: { x: 64.5, z: 41, r: 3 }, radio: { ok: 'r2-escolta', lembra: 'r2-lista' }, depois: ['II.3'] },
-  'II.3': { tipo: 'escoltar', titulo: 'Levar Nogueira ao Castelo', npc: 'cabo', rota: CAMP_VILA.rota, radio: { falha: 'r2-escolta-caiu', lembra: 'r2-escolta' }, depois: ['II.4'] },
+  'II.3': { tipo: 'escoltar', titulo: 'Levar Nogueira ao Castelo', npc: 'cabo', rota: CAMP_VILA.rota, portas: ['FG', 'IF'], radio: { falha: 'r2-escolta-caiu', lembra: 'r2-escolta' }, depois: ['II.4'] },
   'II.4': { tipo: 'usar', titulo: 'Abrir o alçapão da casamata', alvo: { zint: 'alcapao-casamata' }, radio: { ini: 'r2-forte', lembra: 'r2-forte' } },
+});
+Object.assign(CAMP_OBJ, { // 14/10: etapas novas da Vila (VA rodada 4, VB 11, VC 14)
+  'VA.1': { tipo: 'ler', titulo: 'Ler o quadro de avisos da Igreja', marca: 'Quadro da Igreja', alvo: { zint: 'vila-igreja' }, depois: ['VA.2'] },
+  'VA.2': { tipo: 'segurar', titulo: 'Segurar a Igreja', marca: 'Igreja', zona: { x: -18.25, z: -23.5, r: 6 }, dura: 45 },
+  'VB.1': { tipo: 'ler', titulo: 'Ouvir o rádio do Farol', marca: 'Rádio do Farol', alvo: { zint: 'vila-farol' }, depois: ['VB.2'] },
+  'VB.2': { tipo: 'segurar', titulo: 'Segurar o Farol', marca: 'Farol', zona: { x: -22.75, z: 125.5, r: 6 }, dura: 60 },
+  'VC.1': { tipo: 'ler', titulo: 'Ler o quadro da Mina velha', marca: 'Quadro da Mina', alvo: { zint: 'vila-mina' }, depois: ['VC.2'] },
+  'VC.2': { tipo: 'segurar', titulo: 'Segurar a Mina velha', marca: 'Mina velha', zona: { x: 30.25, z: -200.5, r: 6 }, dura: 60 },
 });
 Object.assign(CAMP_ATOS[0], { objs: ['I.1', 'I.2'], ini: ['I.1'] }); Object.assign(CAMP_ATOS[1], { objs: ['II.1', 'II.2', 'II.3', 'II.4'], ini: ['II.1'] });
 { const s = ZINT_MAPA.vila.find(o => o.t === 'sino'); if (s && !s.id) s.id = CAMP_VILA.sino; }
@@ -29548,6 +29585,12 @@ Object.assign(CAMP_OBJ, {
   'IV.1': { tipo: 'usar', titulo: 'Ligar a Energia nas Caldeiras', marca: 'Energia', abre: ['DI', 'HI', 'HP'], alvo: { energia: 1 }, zona: CAMP_SAN.energia, radio: { lembra: 'r4-inicio' }, depois: ['IV.2'] },
   'IV.2': { tipo: 'usar', titulo: 'Ligar as três alas', marca: 'Interruptor da ala', abre: ['GH', 'GN', 'AC', 'CK', 'Nr5'], alvo: { zint: CAMP_SAN.alas, st: ['ligado'], n: 3 }, radio: { lembra: 'r4-alas' }, depois: ['IV.3'] },
   'IV.3': { tipo: 'usar', titulo: 'Fechar o registro da Torre d\'água', marca: 'Registro da Torre', abre: ['KM'], alvo: { zint: CAMP_SAN.registro }, radio: { ok: 'r4-registro', lembra: 'r4-inicio' } },
+});
+Object.assign(CAMP_OBJ, { // 14/10: etapas novas do Sanatório (SA rodada 4, SB 13)
+  'SA.1': { tipo: 'ler', titulo: 'Ouvir o gravador do Necrotério', marca: 'Gravador', alvo: { zint: 'san-necroterio' }, depois: ['SA.2'] },
+  'SA.2': { tipo: 'segurar', titulo: 'Segurar o Necrotério', marca: 'Necrotério', zona: { x: -21.8, z: 40.25, r: 6 }, dura: 50 },
+  'SB.1': { tipo: 'ler', titulo: 'Ler o prontuário da Ala Psiquiátrica', marca: 'Prontuário', alvo: { zint: 'san-psiquiatria' }, depois: ['SB.2'] },
+  'SB.2': { tipo: 'segurar', titulo: 'Segurar a Ala Psiquiátrica', marca: 'Ala Psiquiátrica', zona: { x: 23, z: 28.25, r: 6 }, dura: 60 },
 });
 Object.assign(CAMP_ATOS[3], { objs: ['III.1', 'III.2', 'III.3', 'III.4'], ini: ['III.1'] }); Object.assign(CAMP_ATOS[4], { objs: ['IV.1', 'IV.2', 'IV.3'], ini: ['IV.1'] });
 // sonda do O3-D12 (planta de cima) e auditoria.mjs/conferencia.mjs com --camp sem erro. Notas: (x, z) na face da parede (folha) ou no

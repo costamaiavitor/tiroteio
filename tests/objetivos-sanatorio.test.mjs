@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { abrirJogo, criarSala } from './_jogo.mjs';
 
 let J;
-before(async () => { J = await abrirJogo(); }, { timeout: 120000 });
+before(async () => { J = await abrirJogo(); await J.page.evaluate(() => { window.__objAntigos = true; }); /* 14/10: a sequência de 13/10 (o modo novo em objetivos-rodadas) */ }, { timeout: 120000 });
 after(async () => { await J?.fechar(); });
 
 const PREP = `(T => {

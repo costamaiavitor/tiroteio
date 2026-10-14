@@ -51,3 +51,15 @@ seletor Clássico/Campanha/Infinito. PROTO 7. Detalhes em `limpeza.md`.
 - Balanceamento medido com robô (R2): Normal bem mais leve (Sanatório r10: de 6,7 para 0,3 queda/min do jogador médio); chefes dos objetivos ×2,8 (lutas de ~1,5–3 min). Detalhes em `balanceamento.md`, seção "Balanceamento final 13/10".
 - Bateria inteira: 236/236.
 - Fica para o dono (fora do modo zumbi, não mexi): em `w18Mola` (arma em primeira pessoa, igual no PvP) um comentário `//` antigo engole a mola do pulo da arma; existe desde antes da main.
+
+## Pedido de 14/10: mais objetivos, em rodadas certas, portas só compradas
+- **Portas:** nenhum objetivo abre porta sozinho (o campo `abre` ficou só como a lista das portas do caminho). O time compra; a porta trancada pela chave do Laboratório continua abrindo com a chave. Na escolta, Nogueira espera diante de F↔G e I↔F até o time comprar (`II.3.portas`).
+- **Etapas e rodadas** (`OBJ_MAPA`, `OBJ_RODADA`): cada etapa começa na rodada dela; a que acaba antes deixa a partida numa pausa ("Próximo objetivo na rodada N", etapas `P0`–`P4`, uma por ato para as notas). Se o time atrasar, a seguinte começa no fim da anterior.
+
+| Mapa | Rodada: etapa |
+|---|---|
+| Vila | 1 sino e gerador (I) · **4 Igreja (VA)** · 7 lista, Nogueira e escolta (II) · **11 Farol (VB)** · **14 Mina velha (VC)** · 18 Vigia |
+| Sanatório | 1 livro, chave e Laboratório (III) · **4 Necrotério (SA)** · 7 energia, alas e registro (IV) · 10 Foguista · **13 Ala Psiquiátrica (SB)** · 16 cargas, Névoa, Diretor e fuga (V) |
+
+- Etapas novas: ler o terminal do lugar (a leitura de antes do objetivo não conta) e segurar a sala diante dele (45–60 s, só durante a rodada). Aviso "NOVO OBJETIVO" / "CHEFE À VISTA" no começo de cada etapa.
+- Teste: `tests/objetivos-rodadas.test.mjs`.
