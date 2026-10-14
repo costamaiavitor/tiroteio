@@ -26534,10 +26534,11 @@ function campMsg(m) { // onMsg 'camp' (host -> todos; entrada não confiável: f
     case 'item': { const o = Number.isInteger(m.i) ? ZD?.zint?.[m.i] : null; if (o?.t === 'chave' && finN(m.x) && finN(m.z) && Math.abs(m.x) < 1e4 && Math.abs(m.z) < 1e4) { o.x = m.x; o.z = m.z; } break; }
     case 'porta': { const d = ZD?.doors?.find(x => x.id === m.id); if (d) puff(new V3(d.x, 1.2, d.z), 0x8a7a64, 2.2, 1, .4); break; }
     case 'fx': if (m.f === 'tiro' && vec3(m.a) && vec3(m.b)) { const a = new V3(...m.a); play('pistol', a); puff(new V3(...m.b), 0x8a0000, .35, .3, 0); } break;
-    default: CAMP_GANCHOS.msg[m.k]?.(m);
+    default: if (Object.hasOwn(CAMP_GANCHOS.msg, m.k)) CAMP_GANCHOS.msg[m.k](m); // V3: só os ganchos registrados (k = 'toString', '__proto__'... chamava o que vem do Object.prototype)
   }
 }
 function campObjCli(id, st, p, h, q) {
+  if (!Object.hasOwn(CAMP_OBJ, id)) return; // V3: só objetivos da tabela (um host editado mandava '__proto__' e o c.obj[id] ||= ... escrevia no Object.prototype: o for...in de CAMP.obj quebrava)
   const c = CAMP.c, o = c.obj[id] ||= { st: 'oculto', p: 0, h: 0, q: null };
   if (!c.ordem.includes(id)) c.ordem.push(id);
   const ant = o.st; o.st = st; o.p = finN(p) ? clamp(p, 0, 1) : 0; o.h = finN(h) ? clamp(h, 0, 1) : 0; o.q = typeof q === 'string' ? q.slice(0, 20) : null;
@@ -29885,7 +29886,7 @@ function onMsgInner(m) {
   switch (m.t) {
     case 'welcome': { C.myId = String(m.you); C.st = saneSt(m.st); NET.code = String(m.code || '').slice(0, 8); NET.hostKey = typeof m.hk === 'string' ? m.hk.slice(0, 16) : null;
       if (m.lobby) { LB.on = true; lobbyUI(); break; }
-      ZC.snapTs = 0; buildMap(C.st.map); enterGame(); break; }
+      NET.lastHost = performance.now() + GRACE_MAPA; ZC.snapTs = 0; buildMap(C.st.map); enterGame(); break; } // V3: quem entra no meio monta o mapa com a mesma folga do 'start' (o 1.º sinal de vida do tick só vem depois de montar)
     case 'room': if (typeof m.code === 'string' && /^[A-Z0-9]{5}$/.test(m.code)) { NET.code = m.code; NET.hostKey = typeof m.hk === 'string' ? m.hk.slice(0, 16) : NET.hostKey; updateRoomInfo(); toast('A sala tem um código novo: ' + m.code, 5); } break;
     case 'match':
       C.st = saneSt(m.st); if (curMapId !== C.st.map) buildMap(C.st.map); else clearFx();
