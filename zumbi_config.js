@@ -81,9 +81,16 @@ export const ZBAL = {
   comum: { vida: .93, danoMax: 40 },
   // chefes dos objetivos (Vigia, Foguista, Diretor): vida da rodada em que entram × vidaK (com a vida pura, a validação mediu lutas de
   // 12 a 18 s; o projeto pede minutos). Fuga: zona maior e o embarque só pausa quando a zona fica vazia (antes recomeçava)
-  chefes: { vidaK: 2.5 }, fuga: { raio: 4.5 },
-  // Pedido do dono (13/10): o Normal estava difícil demais. Ajustes por dificuldade sobre a tabela ZDIFF (0 Fácil, 1 Normal, 2 Difícil, 3 Pesadelo)
-  dificuldade: { 1: { cnt: .9, regen: 3 } },
+  // Balanceamento final 13/10: 2,8 (era 2,5) para compensar os 10% de vida a menos do Normal (a vida do chefe também passa pela dificuldade)
+  chefes: { vidaK: 2.8 }, fuga: { raio: 4.5 },
+  // Pedido do dono (13/10): o Normal estava difícil demais. Ajustes por dificuldade sobre a tabela ZDIFF (0 Fácil, 1 Normal, 2 Difícil, 3 Pesadelo).
+  // Balanceamento final 13/10 (medido com o robô, docs/zumbi-v2/balanceamento.md): no Normal, 15% menos zumbis (era 10%), 10% menos vida,
+  // 5% mais lentos, começam a correr ~1 rodada depois (run −8), golpe a cada 1,56 s (era 1,44), no máximo 20 vivos (era 24), nascem 15% mais
+  // espaçados e a vida volta 3 s depois do último golpe, 10% mais rápido. Fácil, Difícil e Pesadelo sem mudança.
+  dificuldade: {
+    1: { cnt: .85, hp: .9, spd: .95, run: -8, atk: 1.3, max: 20, spawn: 1.15, regen: 3, rgn: 22,
+      desc: 'Zumbi comum: 3 golpes para cair (no máximo 40 por golpe), menos zumbis e um pouco mais fracos que no clássico, começam a correr mais tarde, a vida volta 3 s depois do último golpe, começa com 500 pontos.' },
+  },
   // Decisão do dono (13/10): zumbi morto sem tiro por algo que um jogador ligou ou pegou (armadilha, Nuke, fogo do interativo, vapor da
   // válvula) dá pontos a quem ligou/pegou: os de um abate no corpo mais o bônus do tipo (o Carniceiro dá também os 300 do time).
   pontos: { semTiro: 60 },

@@ -157,7 +157,7 @@ test('fases: 60% (inv 2 s, 2,6 m/s, rastro de brasa a 15/s, rachaduras), 25% (ma
     return o;
   });
   assert.deepEqual(r.mano1, [true, false, false], 'manômetro verde'); assert.deepEqual(r.racha1, [false, false, false]);
-  assert.equal(r.f2[0], 1); assert.equal(r.f2[1], .6, 'o golpe para no limite da fase'); assert.equal(r.f2[2], 2.6, 'fase 2: 2,6 m/s'); assert.equal(r.f2[3], 2, 'invulnerável 2 s'); assert.equal(r.inv, 0);
+  assert.equal(r.f2[0], 1); assert.equal(r.f2[1], .6, 'o golpe para no limite da fase'); assert.ok(Math.abs(r.f2[2] - 2.6 * .95) < 1e-9, `fase 2: 2,6 m/s × 0,95 do Normal (balanceamento final 13/10): ${r.f2[2]}`); assert.equal(r.f2[3], 2, 'invulnerável 2 s'); assert.equal(r.inv, 0);
   assert.equal(r.cli2, 2); assert.deepEqual(r.mano2, [false, true, false]); assert.deepEqual(r.racha2, [true, true, true], 'couraça rachada'); assert.equal(r.bar2, 'O FOGUISTA · FASE 2');
   assert.ok(r.rastro >= 4, `rastro de brasa (${r.rastro})`); assert.ok(r.rastroDano >= 10 && r.rastroDano <= 15, `rastro: 15/s (${r.rastroDano})`);
   assert.equal(r.f3[0], 2); assert.equal(r.f3[1], 5); assert.deepEqual(r.mano3, [false, false, true], 'manômetro no vermelho');

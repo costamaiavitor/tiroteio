@@ -16,10 +16,11 @@ async function abrir(map) { if (J) await J.fechar(); J = await abrirJogo(); awai
 
 // a curva (Normal, 1 jogador) documentada: [mapa, rodada, vida do comum, zumbis na rodada] (quem mudar um número atualiza aqui)
 const CURVA = [
-  ['vila', 1, 135, 5], ['vila', 3, 329, 12], ['vila', 6, 650, 26], ['vila', 10, 1045, 36], ['vila', 20, 2710, 72],
-  ['sanatorio', 1, 135, 5], ['sanatorio', 4, 424, 17], ['sanatorio', 8, 850, 31], ['sanatorio', 15, 1683, 54], ['sanatorio', 25, 4365, 90],
+  // vida no Normal (balanceamento final 13/10): a do clássico × 0,9 (ZBAL.dificuldade[1].hp); a quantidade é a do clássico (× 0,85 na conferência)
+  ['vila', 1, 122, 5], ['vila', 3, 296, 12], ['vila', 6, 585, 26], ['vila', 10, 941, 36], ['vila', 20, 2439, 72],
+  ['sanatorio', 1, 122, 5], ['sanatorio', 4, 382, 17], ['sanatorio', 8, 765, 31], ['sanatorio', 15, 1515, 54], ['sanatorio', 25, 3929, 90],
 ];
-const CHEFES = { 14: 10450, 15: 40650, 16: 89483 }; // vida com 1 jogador no Normal (zHp(rodada) · (base + porJog) · hpChefe)
+const CHEFES = { 14: 9405, 15: 36585, 16: 80535 }; // vida com 1 jogador no Normal (zHp(rodada) · 0,9 do Normal · (base + porJog) · hpChefe); antes do balanceamento final (13/10) 10450, 40650, 89483
 
 test('tabelas: curva por mapa (último ponto = clássico), estreias por mapa, agenda com cães e Carniceiro em todo ciclo, eventos que existem', { timeout: 240000 }, async () => {
   await abrir('sanatorio');
@@ -60,7 +61,7 @@ test('curva no Normal com 1 jogador: sobe com a rodada nos dois mapas, = tabela 
     const chefes = {}; for (const k of [14, 15, 16]) { const c = T.CAMP_CHEFE[k]; chefes[k] = Math.round(T.zHp(c.rodada) * T.zHpK(c.rodada) * (c.base + c.porJog) * T.CAMP_CHEFE_BASE.hpChefe); }
     return { linhas: CURVA.map(([m, rr]) => linha(m, rr)), vila: serie('vila'), san: serie('sanatorio'), real, conta: [1, 4, 8, 15].map(rr => curva('sanatorio', rr)), chefeV: linha('vila', 10, 1).n, chefeS: linha('sanatorio', 13, 1).n, chefes };
   }, { CURVA });
-  CURVA.forEach(([m, rod, vida, n], i) => { assert.equal(r.linhas[i].vida, vida, `${m} r${rod}: vida`); assert.ok(Math.abs(r.linhas[i].n - n * .9) <= 1, `${m} r${rod}: zumbis (Normal ×0,9, 13/10) ${r.linhas[i].n}`); });
+  CURVA.forEach(([m, rod, vida, n], i) => { assert.equal(r.linhas[i].vida, vida, `${m} r${rod}: vida`); assert.ok(Math.abs(r.linhas[i].n - n * .85) <= 1, `${m} r${rod}: zumbis (Normal ×0,85, balanceamento final 13/10) ${r.linhas[i].n}`); });
   for (const [m, s] of [['vila', r.vila], ['sanatorio', r.san]]) s.forEach((l, i) => { if (i) { assert.ok(l.vida > s[i - 1].vida, `${m}: vida sobe na ${i + 1}`); assert.ok(l.n >= s[i - 1].n, `${m}: quantidade não cai na ${i + 1}`); } });
   r.real.forEach(([rr, vk, qk], i) => { assert.ok(Math.abs(vk - r.conta[i][0]) < 1e-9 && Math.abs(qk - r.conta[i][1]) < 1e-9, `campCurva(${rr})`); });
   assert.ok(r.chefeV >= 14 && r.chefeV <= 20, `Vigia na 10: ${r.chefeV} comuns (antes 16 fixos)`); assert.ok(r.chefeS >= 16 && r.chefeS <= 22, `Foguista na 13: ${r.chefeS} comuns (antes 20 fixos)`);

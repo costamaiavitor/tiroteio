@@ -70,7 +70,7 @@ test('campanha: o objetivo matar chama o chefe; vida pela rodada da tabela; teto
     T.S.st = { ...T.S.st, zmode: 'campanha' }; T.broadcast({ t: 'match', st: T.S.st }); T.srvStartMatch(); T.sim(.1); // objetivos do mapa: o Sanatório começa na etapa III, na rodada 1
     T.sim(T.Z.phaseEnd - window.__simNow + .2); T.sim(2.2); // pré-rodada, depois o chefe sobe do chão
     const z = CH.z, K = T.ZKIND[TK];
-    const o = { on: T.CAMP.on, round: T.Z.round, ph: T.Z.phase, k: CH.k, st: z?.st, hp: z?.hp, maxHp: z?.maxHp, esp: Math.round(T.zHp(10) * 10), lac: z?.lac ?? 0, ts: T.Z.toSpawn,
+    const o = { on: T.CAMP.on, round: T.Z.round, ph: T.Z.phase, k: CH.k, st: z?.st, hp: z?.hp, maxHp: z?.maxHp, esp: Math.round(T.zHp(10) * T.zHpK(10) * 10), lac: z?.lac ?? 0, ts: T.Z.toSpawn,
       caps: ['capGolpe', 'capFraco', 'capArmadilha', 'capNuke', 'capBarril'].map(c => K[c]), chefe: K.chefe, ia: !!z?.ck, enc: CH.encerra,
       cli: T.CAMP.c.ch && { k: T.CAMP.c.ch.k, f: T.CAMP.c.ch.f, z: T.CAMP.c.ch.z }, bo: T.ZC.bo, av: !!T.CAMP_AV, zi: T.ZD.zint.filter(x => x.id?.startsWith('tp-')).map(x => x.t) };
     const zb = document.getElementById('zboss'); o.txt = zb.firstChild.nodeValue; o.mk = zb.querySelectorAll('.campMk').length; o.oculto = zb.classList.contains('hidden');
@@ -78,7 +78,7 @@ test('campanha: o objetivo matar chama o chefe; vida pela rodada da tabela; teto
     return o;
   });
   assert.equal(r.on, true); assert.equal(r.round, 1); assert.equal(r.ph, 'round'); assert.equal(r.k, r.k | 0);
-  assert.equal(r.st, 'in'); assert.equal(r.hp, r.esp, 'vida = zHp(10)·(6 + 4·1) (Normal, 1 jogador): 10 450'); assert.equal(r.maxHp, 10450);
+  assert.equal(r.st, 'in'); assert.equal(r.hp, r.esp, 'vida = zHp(10)·0,9·(6 + 4·1) (Normal, 1 jogador; o 0,9 é a vida do Normal desde o balanceamento final de 13/10): 9 405'); assert.equal(r.maxHp, 9405);
   assert.deepEqual(r.caps, [.06, .1, .02, .05, .08], 'tetos que faltavam vêm da base (nunca NaN)'); assert.equal(r.chefe, 1); assert.ok(r.ia, 'IA do chefe registrada');
   assert.equal(r.enc, true, 'na campanha a morte encerra a rodada');
   assert.deepEqual(r.cli, { k: r.k, f: 1, z: r.cli.z }); assert.equal(r.bo, 1, 'bo da foto = vida do chefe');
@@ -162,10 +162,10 @@ test('fases: o golpe para no limite, 2 s invulnerável, ataque cancelado; Nuke t
   });
   assert.equal(r.f1[0], 1, 'passou para a fase 2'); assert.ok(Math.abs(r.f1[1] - .66) < 1e-9, 'o golpe parou em 66%'); assert.ok(Math.abs(r.f1[2] - 2) < 1e-6, '2 s invulnerável');
   assert.ok(r.f1[3] && !r.f1[4], 'ataque em curso cancelado'); assert.ok(Math.abs(r.inv - .66) < 1e-9, 'invulnerável: nada de dano');
-  assert.equal(r.cli, 2, 'o cliente vê a fase 2'); assert.equal(r.speed, 2.5, 'velocidade da fase');
-  assert.ok(Math.abs(r.depois - (.66 - 300 / 10450)) < 1e-3, 'depois da invulnerabilidade o dano volta');
+  assert.equal(r.cli, 2, 'o cliente vê a fase 2'); assert.equal(r.speed, 2.5 * .95, 'velocidade da fase (2,5 × 0,95 do Normal, balanceamento final 13/10)');
+  assert.ok(Math.abs(r.depois - (.66 - 300 / 9405)) < 1e-3, 'depois da invulnerabilidade o dano volta'); // 9405 = vida do chefe no Normal (×0,9 desde o balanceamento final 13/10)
   assert.deepEqual(r.f3, [2, .29, 3], 'Nuke (5%) passou do limite: o relógio trocou a fase');
-  assert.equal(r.k3, Math.round(Math.min(1000 * 1.15, 10450 * .06)), 'fase 3: ×1,15 e teto 6%');
+  assert.equal(r.k3, Math.round(Math.min(1000 * 1.15, 9405 * .06)), 'fase 3: ×1,15 e teto 6%');
 });
 
 test('ponto fraco: zhit "fraco" só com a janela aberta, multiplica (×3) e respeita o teto (10%); caixa e multiplicador no cliente', { timeout: 60000 }, async () => {
@@ -186,8 +186,8 @@ test('ponto fraco: zhit "fraco" só com a janela aberta, multiplica (×3) e resp
     return o;
   });
   assert.ok(r.fechado > 0 && Math.abs(r.fechado - r.corpo) < 1e-6, 'janela fechada: vale corpo');
-  assert.ok(Math.abs(r.corpo - Math.min(r.w * 1.1, 10450 * .06)) < 1e-3, 'corpo: teto do tiro');
-  assert.ok(Math.abs(r.aberto - Math.min(r.w * 3 * 1.1, 10450 * .1)) < 1e-3, `fraco aberto: ×3 (${r.aberto})`);
+  assert.ok(Math.abs(r.corpo - Math.min(r.w * 1.1, 9405 * .06)) < 1e-3, 'corpo: teto do tiro');
+  assert.ok(Math.abs(r.aberto - Math.min(r.w * 3 * 1.1, 9405 * .1)) < 1e-3, `fraco aberto: ×3 (${r.aberto})`);
   assert.ok(Math.abs(r.teto - 30) < 1e-6, 'teto do fraco: 10% da vida');
   assert.deepEqual(r.caixas, ['head', 'body', 'legs', 'fraco']); assert.equal(r.mult, 3); assert.equal(r.multFechado, 1); assert.equal(r.trace, 'fraco', 'tiro pelas costas acerta a caixa do fraco');
 });

@@ -91,7 +91,7 @@ test('objetivos da Vila: estreia de cada tipo pela rodada do mapa (só 1 / 1 tri
       const mixN0 = Z.mixN, mix0 = Z.mix.slice(0, 7), tot = Z.toSpawn, nasc = [];
       for (let i = 0; i < 200 && Z.toSpawn > 0; i++) { const id = Z.nextId; if (T.zSpawnOne()) { const z = Z.zs.get(id); nasc.push({ k: z.kind, st: z.st, y: z.body.pos.y, x: z.body.pos.x, z: z.body.pos.z, win: z.win, hp: z.hp, sp: z.speed, sc: z.sc, sub: z.sub || 0, cap: z.capacete || 0 }); } }
       const cont = {}; for (const z of nasc) cont[z.k] = (cont[z.k] || 0) + 1;
-      out[r] = { tot, cont, mixN0, mixN1: Z.mixN, mix0, mix1: Z.mix.slice(0, 7), nasc: nasc.filter(z => z.k >= 7), hpComum: Math.round(T.zHp(r) * 1) };
+      out[r] = { tot, cont, mixN0, mixN1: Z.mixN, mix0, mix1: Z.mix.slice(0, 7), nasc: nasc.filter(z => z.k >= 7), hpComum: Math.round(T.zHp(r) * T.zHpK(r)) }; // × a vida do Normal (0,9 desde o balanceamento final 13/10)
     }
     out.falas = Object.keys(T.CAMP.falaT); // campFala: o limitador guarda quem falou
     // Névoa (O3-D05, campEvPeso): a cota do Afogado dobra; Estouro (só Veloz): nenhum tipo novo
@@ -117,9 +117,10 @@ test('objetivos da Vila: estreia de cada tipo pela rodada do mapa (só 1 / 1 tri
   for (const z of r[9].nasc.filter(z => z.k >= 7 && z.k <= 9)) { // os tipos da Vila (o Tanque, 17, é do clássico)
     const hp = Math.round(Math.round(r[9].hpComum) * { 7: 1.2, 8: 1.5, 9: .9 }[z.k]);
     assert.ok(Math.abs(z.hp - hp) <= 1, `vida do tipo ${z.k}: ${z.hp} x ${hp}`);
-    if (z.k === 7) assert.ok(z.sp >= 3.4 && z.sp <= 3.8 && z.sc === 1);
-    if (z.k === 8) assert.ok(z.sp >= 3.6 && z.sp <= 4.3 && z.sc === 1 && z.cap === 1);
-    if (z.k === 9) assert.ok(z.st === 'rise' && z.y === -1 && z.sub === 1 && z.sp >= 1.3 && z.sp <= 1.8);
+    const V = .95, e = 1e-9; // velocidade do Normal (ZBAL.dificuldade[1].spd, balanceamento final 13/10): a tabela dos tipos × a da dificuldade
+    if (z.k === 7) assert.ok(z.sp >= 3.4 * V - e && z.sp <= 3.8 * V + e && z.sc === 1);
+    if (z.k === 8) assert.ok(z.sp >= 3.6 * V - e && z.sp <= 4.3 * V + e && z.sc === 1 && z.cap === 1);
+    if (z.k === 9) assert.ok(z.st === 'rise' && z.y === -1 && z.sub === 1 && z.sp >= 1.3 * V - e && z.sp <= 1.8 * V + e);
   }
   assert.ok(r[8].nasc.filter(z => z.k === 9).every(z => z.x > 0 && z.x < 24 && z.z > 22 && z.z < 42), 'Afogado nasce na margem do Lago');
   assert.deepEqual(r.vistos.sort(), [7, 8, 9]);

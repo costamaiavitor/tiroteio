@@ -125,8 +125,9 @@ test('objetivos do Sanatório: estreia de cada tipo pela rodada do mapa (só 1),
   assert.ok(r[4].tot < r[16].tot && r[16].tot > 0, 'a quantidade sobe com a rodada');
   // vida = comum × vidaK da curva do mapa (1 a partir da 8) × ZKIND.hp; velocidade da tabela
   for (const [k, hp] of [[10, 1], [11, 2], [12, 1.4], [13, 1.6]]) { const h = r['hp' + k]; assert.ok(Math.abs(h[0] - Math.round(Math.round(h[1] * h[4]) * hp)) <= 2, `vida do tipo ${k}: ${h}`); }
-  assert.ok(r.hp10[2] >= 3.6 && r.hp10[2] <= 4.3 && r.hp10[3] === 1); assert.ok(Math.abs(r.hp11[2] - 2.2) < 1e-6 && r.hp11[3] === 0);
-  assert.ok((r.hp12[3] === 0 && r.hp12[2] <= 1.8) || (r.hp12[3] === 1 && r.hp12[2] >= 3.6)); assert.ok(r.hp13[2] >= 1.3 && r.hp13[2] <= 1.8);
+  const V = .95; // velocidade do Normal (ZBAL.dificuldade[1].spd, balanceamento final 13/10): a tabela dos tipos × a da dificuldade
+  assert.ok(r.hp10[2] >= 3.6 * V - 1e-9 && r.hp10[2] <= 4.3 * V + 1e-9 && r.hp10[3] === 1); assert.ok(Math.abs(r.hp11[2] - 2.2 * V) < 1e-6 && r.hp11[3] === 0);
+  assert.ok((r.hp12[3] === 0 && r.hp12[2] <= 1.8 * V + 1e-9) || (r.hp12[3] === 1 && r.hp12[2] >= 3.6 * V - 1e-9)); assert.ok(r.hp13[2] >= 1.3 * V - 1e-9 && r.hp13[2] <= 1.8 * V + 1e-9);
   assert.ok(['enfermeiro', 'contido', 'carvoeiro', 'pregador'].every(id => r.falas.includes(id)), `legendas: ${r.falas}`);
   assert.deepEqual(r.preg, [0, 1, 1, 1, 2, 2], 'Pregador (nRod): 1 nas 3 primeiras rodadas, depois 2');
   assert.equal(r.inf[12][13], 1, `infinito: estreia do Pregador com 1 ${JSON.stringify(r.inf[12])}`); assert.equal(r.inf[22][13], 2, `infinito: 2 Pregadores na 22 ${JSON.stringify(r.inf[22])}`);

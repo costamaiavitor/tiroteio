@@ -129,7 +129,7 @@ test('fases sem a arena: 66% (sem torre: fica no chão), 33% (sem apagão; ×1,1
     limpa(); CH.fase = 0; z.atord = 0; z.speed = 0; return o;
   });
   assert.deepEqual(r.f2, [1, 'chao'], 'fase 2 sem torre'); assert.ok(r.chao2[0] === 'chao' && Math.abs(r.chao2[1]) < .05, 'continua no chão'); assert.equal(r.cli2, 2);
-  assert.equal(r.f3[0], 2); assert.equal(r.f3[1], 'chao'); assert.equal(r.f3[2], 3, 'fase 3: 3,0 m/s'); assert.equal(r.hemi3, r.hemi, 'sem apagão fora da arena'); assert.ok(!r.cone, 'sem cone');
+  assert.equal(r.f3[0], 2); assert.equal(r.f3[1], 'chao'); assert.ok(Math.abs(r.f3[2] - 3 * .95) < 1e-9, `fase 3: 3,0 m/s × 0,95 do Normal (balanceamento final 13/10): ${r.f3[2]}`); assert.equal(r.hemi3, r.hemi, 'sem apagão fora da arena'); assert.ok(!r.cone, 'sem cone');
   assert.equal(r.k3, 115, 'fase 3: ×1,15');
   assert.equal(r.tb, .7); assert.equal(r.bAntes, 0, 'parado no aviso'); assert.equal(r.bJog, 55, 'a baioneta acerta ' + JSON.stringify(r));
   assert.ok(r.bat, 'achou uma parede'); assert.deepEqual(r.bat.slice(0, 2), [true, true], 'bateu na parede: atordoado e fraco aberto ' + JSON.stringify(r));
