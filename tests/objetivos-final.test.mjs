@@ -132,7 +132,7 @@ test('morte do Diretor: fuga na hora (sem cena), Estouro sem fim, quem entra no 
     const Zn = T.CAMP_V.fuga.zona, O = () => T.campEstado().obj['F.2'];
     poe(p, Zn.x, Zn.z); T.sim(5); o.meia = +O().p.toFixed(1);
     const pAntes = +O().p.toFixed(1); poe(p, 0, 0); T.sim(.3); o.saiu = [+O().p.toFixed(1) === pAntes, ob('F.2')]; // zona vazia: o embarque pausa
-    poe(p, Zn.x, Zn.z); for (let k = 0; k < 120 && ob('F.2') !== 'feito'; k++) T.sim(.1);
+    poe(p, Zn.x, Zn.z); for (let k = 0; k < 720 && ob('F.2') !== 'feito'; k++) T.sim(1 / 60); // R1: de tique em tique (com .1 a rodada acabava no mesmo passo e o F.2 sumia com os objetivos: o teste falhava conforme o sorteio)
     o.fugiu = [ob('F.2'), T.CAMP_VS.fase, T.Z.zs.size, T.Z.toSpawn, T.CAMP_EVS.id];
     T.sim(.6);
     o.fim = [T.CAMP.modo, T.CAMP.et, T.Z.phase, T.S.phase, !!document.getElementById('campCred'), !!document.getElementById('campCena'), localStorage.getItem('tiroteio.campanha')];

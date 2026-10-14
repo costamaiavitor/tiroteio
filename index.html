@@ -26268,11 +26268,12 @@ function campForm0(st) { // matchForm: um modo só, com os objetivos do mapa (os
 function campFormOut(st) { campForm0(st); return { zmode: st.zmode }; } // matchForm: o que vai no st
 const campSaneSt = st => ({ zmode: CAMP_MODOS.includes(st.zmode) ? st.zmode : 'classico' }); // saneSt (entrada não confiável)
 // ---------- host: começo e etapas ----------
-function campLimpa() { Object.assign(CAMP, { objFim: false, etUlt: -1, obj: {}, alvos: [], itens: {}, chaves: new Set(), chama: null, npc: null, falaT: {}, radioIni: false }); }
+function campLimpa() { Object.assign(CAMP, { objFim: false, fimMsg: null, etUlt: -1, obj: {}, alvos: [], itens: {}, chaves: new Set(), chama: null, npc: null, falaT: {}, radioIni: false }); } // fimMsg (R1): o aviso dos objetivos concluídos de uma partida que acabou no mesmo tique não sai na seguinte
 function campInicio() { // gancho no começo do zStartGame: liga ou desliga os objetivos (a partida começa sempre como a do clássico)
   const md = S.st?.mode === 'zombies' ? S.st.zmode : null;
   if (md !== 'campanha' && md !== 'infinito') { if (CAMP.on) { CAMP.on = false; CAMP.modo = null; campLimpa(); } return; }
   CAMP.on = true; CAMP.modo = md; campLimpa(); CAMP.et = -1;
+  Object.assign(CAMP_INFS, { vistoR: 0, pend: null, n: 0 }); // R1: partida nova sem o chefe de campo pendente da anterior (o campInfTick só zerava quando a rodada voltava abaixo da última vista)
   if (md === 'campanha') { // objetivos do mapa: o zStartGame chama o campComeca depois dos jogadores
     CAMP.cadeia = (OBJ_MAPA[S.st.map] || []).map(id => CAMP_ATOS.findIndex(a => a.id === id)).filter(e => e >= 0 && campEtapaOk(e));
     if (!CAMP.cadeia.length) CAMP.modo = 'infinito'; // mapa sem objetivos: rodadas infinitas desde o começo
@@ -26540,7 +26541,7 @@ function campMsg(m) { // onMsg 'camp' (host -> todos; entrada não confiável: f
   if (!m || typeof m.k !== 'string') return;
   const c = CAMP.c;
   switch (m.k) {
-    case 'est': campCliReset(); CAMP.c.radioQ = c.radioQ; CAMP.c.radio = c.radio; CAMP.c.el = c.el; campSync(m); break;
+    case 'est': if (c.npc?.model) { c.npc.model.visible = false; c.npc.model.parent?.remove(c.npc.model); } /* R1: etapa nova no mesmo mapa (II -> Vigia): o Nogueira da etapa anterior ficava parado na cena para sempre (e quem entra no meio não o via) */ campCliReset(); CAMP.c.radioQ = c.radioQ; CAMP.c.radio = c.radio; CAMP.c.el = c.el; campSync(m); break;
     case 'obj': if (campIdOk(m.id) && ['oculto', 'ativo', 'feito', 'falhou'].includes(m.st)) campObjCli(m.id, m.st, m.p, m.h, m.q); break;
     case 'radio': case 'fala': if (campIdOk(m.id) && c.radioQ.length < 8) c.radioQ.push([m.k, m.id]); break;
     case 'npc': if (campIdOk(m.id) && Array.isArray(m.p) && m.p.length === 5 && m.p.every(finN)) { const n = c.npc ||= { id: m.id, x: m.p[0], y: m.p[1], z: m.p[2], yaw: m.p[3], h: 1, model: null }; n.tx = m.p[0]; n.ty = m.p[1]; n.tz = m.p[2]; n.tyaw = m.p[3]; n.h = clamp(m.p[4], 0, 1); n.t = now; } break;
