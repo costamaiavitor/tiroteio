@@ -20309,7 +20309,7 @@ function updateViewmodel(dt) {
   mouseDX *= Math.exp(-dt * 12);
   const x = o.x, y = o.y, z = o.z, rx = o.rx, ry = o.ry, rz = o.rz;
   vmRoot.position.set(x, y, z); vmRoot.rotation.set(rx, ry, rz);
-  vmRoot.visible = me.alive && !(w?.scope && G.scope > 0 && G.scR >= SCOPE.some); // dentro da luneta a arma não aparece
+  vmRoot.visible = me.alive && !C.bombAct && !(w?.scope && G.scope > 0 && G.scR >= SCOPE.some); // dentro da luneta a arma não aparece
   vmRoot.updateMatrixWorld();
   if (ud.fps2 && ak > 0) { // mirando: a animação parada balança o corpo da arma; a mira (medida agora) volta para o centro da tela
     const F = ud.fps2, e = _adsV.copy(F.sl).applyMatrix4(F.body.matrixWorld); vmGun.position.x -= e.x * ak; vmGun.position.y -= e.y * ak; vmRoot.updateMatrixWorld();
@@ -20890,7 +20890,7 @@ function updateWeapon(dt) {
   const since = now - G.lastShot;
   if (since > .08) { const k = Math.exp(-dt * (since > .3 ? 9 : 4)); G.punchP *= k; G.punchY *= k; }
   if (since > .35) G.shots = 0;
-  if (!me.alive || C.chatOpen || C.buyOpen || !locked() || C.phase === 'freeze') { G.trigger = false; return; }
+  if (!me.alive || C.bombAct || C.chatOpen || C.buyOpen || !locked() || C.phase === 'freeze') { G.trigger = false; return; }
   if (ZC.on && keys.KeyF && ZC.act?.k === 'rev') { G.trigger = false; return; } // reanimando: mãos ocupadas
   if (me.sprinting) { // correndo a arma fica abaixada; apertar o gatilho interrompe a corrida (como no CoD)
     G.burstN = 0;
@@ -20906,7 +20906,7 @@ function updateWeapon(dt) {
   }
 }
 function altFire() {
-  const w = W[G.cur]; if (!me.alive || now < G.switchEnd) return;
+  const w = W[G.cur]; if (!me.alive || C.bombAct || now < G.switchEnd) return;
   if (w.scope && !G.reloadEnd) { G.scope = (G.scope + 1) % (w.scope.length + 1); G.rezoom = 0; play('empty'); }
   else if (w.slot === 'knife' && now >= G.nextFire && C.phase !== 'freeze') knifeAttack(true);
   else if (w.slot === 'nade' && now >= G.nextFire && C.phase !== 'freeze') throwNade(false);
@@ -20924,7 +20924,7 @@ function updateMe(dt) {
   const frozen = C.phase === 'freeze';
   const f = new V3(-Math.sin(me.yaw), 0, -Math.cos(me.yaw)), r = new V3(Math.cos(me.yaw), 0, -Math.sin(me.yaw));
   let fw = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), st = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
-  if (C.chatOpen || frozen) fw = st = 0;
+  if (C.chatOpen || frozen || C.bombAct) fw = st = 0; // plantando/desarmando fica parado (como no CS)
   const wish = f.multiplyScalar(fw).add(r.multiplyScalar(st)); if (wish.lengthSq()) wish.normalize();
   const crouchKey = me.downed || me.slideEnd > now || (!C.chatOpen && (keys.KeyC || keys.ControlLeft || keys.ControlRight)); // Ctrl só com o teclado preso (tela cheia): fora dela Ctrl+W fecha a aba
   if (ZC.on && crouchKey && !me.crouch && me.sprinting && me.onGround && !me.downed) { // Zumbis: agachar correndo = deslizar (com PhD Flopper, explode no fim)
@@ -21619,7 +21619,7 @@ function srvHandle(pid, m) {
     case 'shot': {
       // só efeitos (rastro, som, clarão) nos outros clientes, mas repassado a todos: confere arma, origem perto do jogador e cadência
       // (antes, 'shot' com 12 explosões de arma que o jogador não tinha, de qualquer ponto do mapa, a centenas por segundo, travava todo mundo)
-      if (!vec3(m.o) || !isW(m.w)) return;
+      if (!vec3(m.o) || !isW(m.w) || p.act) return;
       if (!p.alive && now - p.diedAt > .6) return;
       const wd = W[m.w]; if (!temArmaZ(p, m.w)) return srvAnom(p, 'shot:arma');
       if (Math.hypot(m.o[0] - p.pos[0], m.o[1] - p.pos[1] - (p.crouch ? EYE_CROUCH : EYE_STAND), m.o[2] - p.pos[2]) > 3) return srvAnom(p, 'shot:origem'); // boca do cano fica a ~0,8 m da câmera
@@ -21671,6 +21671,7 @@ function srvHandle(pid, m) {
     case 'zclay': if (S.st.mode === 'zombies' && Z.on) srvZClay(p, m); break;
     case 'hit': {
       if (S.st.mode === 'zombies') return; // sem fogo amigo no cooperativo
+      if (p.act) return; // plantando/desarmando: está sem arma na mão
       if (!p.alive && now - p.diedAt > .6) return; // tiro dado antes de saber que morreu (com TURN o ping passa de 300 ms)
       if (S.phase === 'freeze' || S.phase === 'end' || S.phase === 'over' || m.v === pid) return; // fora da rodada as armas não disparam
       // o cliente decide o acerto, mas o host confere: arma que ele tem, teto de dano da arma, cadência e linha de visão
@@ -21711,7 +21712,7 @@ function srvHandle(pid, m) {
       for (const q of S.players.values()) if (q.team === p.team) sendTo(q.id, { t: 'mark', id: pid, p: m.p.map(r2) }); break;
     }
     case 'skins': p.skins = cleanSk(m.sk); S.skDirty = true; break;
-    case 'nade': if (!p.alive || p.downed || !isW(m.k) || W[m.k].slot !== 'nade' || m.k === 'clay' || !vec3(m.p) || !vec3(m.v) || !(p.inv[m.k] > 0)
+    case 'nade': if (!p.alive || p.downed || p.act || !isW(m.k) || W[m.k].slot !== 'nade' || m.k === 'clay' || !vec3(m.p) || !vec3(m.v) || !(p.inv[m.k] > 0)
       || Math.hypot(m.p[0] - p.pos[0], m.p[1] - p.pos[1] - 1.5, m.p[2] - p.pos[2]) > 4 || Math.hypot(m.v[0], m.v[1], m.v[2]) > 30) return; p.inv[m.k]--; broadcast({ t: 'nade', id: pid, k: m.k, p: m.p, v: m.v }, pid); break;
     case 'musReq': if (tNow() - (p.musT ?? -9) < 1) return; p.musT = tNow(); srvMusic(pid, m); break; // no máximo um pedido por segundo
     case 'chat': {
@@ -22090,7 +22091,7 @@ function botThink(p, dt) {
     b.lastSeen = [tgt.pos[0], tgt.pos[2]]; b.lastSeenT = now;
     if (wid === 'knife') { wish.set(dx / hd, 0, dz / hd); }
     else if (D.strafe) { b.strafeT -= dt; if (b.strafeT <= 0) { b.strafeT = rand(.3, .9); b.strafeDir = Math.random() < .5 ? -1 : 1; } wish.set(Math.cos(b.yaw), 0, -Math.sin(b.yaw)).multiplyScalar(b.strafeDir * .6); }
-    if (!frozen && now >= b.reactAt && Math.abs(ty) < .12 && now >= b.nextFire && now >= b.reloadEnd) botShoot(p, tgt, D, wid, eye, td);
+    if (!frozen && !p.act && now >= b.reactAt && Math.abs(ty) < .12 && now >= b.nextFire && now >= b.reloadEnd) botShoot(p, tgt, D, wid, eye, td);
   } else {
     b.target = null;
     if (b.alertYaw != null) { b.yaw += clamp(angDiff(b.yaw, b.alertYaw), -6 * dt, 6 * dt); if (Math.abs(angDiff(b.yaw, b.alertYaw)) < .1) b.alertYaw = null; }
@@ -30019,7 +30020,7 @@ function onMsgInner(m) {
           C.actEnd = pl.ac ? now + pl.ac[0] : 0; C.actDur = pl.ac ? pl.ac[1] : 1;
           me.hp = pl.hp; me.armor = pl.ar; me.helmet = !!pl.hm; me.money = pl.m; if (!pl.al && me.alive) { me.alive = false; me.downed = false; C.deadAt = now; }
           if (zmode) { if (me.alive && pl.al && !!pl.dn !== me.downed) zSetDowned(!!pl.dn); ZC.perks = pl.pk; ZC.bowie = !!pl.bw; if (pl.dn && pl.bl) ZC.bleedEnd = now + pl.bl; }
-        } else { const rp = getRemote(pl.id); refreshRemoteInfo(rp); rp.downed = !!pl.dn; if (!pl.al) rp.alive = false; else if (!rp.alive && rp.buf.length) { rp.alive = true; rp.dead = false; } }
+        } else { const rp = getRemote(pl.id); refreshRemoteInfo(rp); rp.model.userData.gh.visible = !pl.ac; rp.downed = !!pl.dn; if (!pl.al) rp.alive = false; else if (!rp.alive && rp.buf.length) { rp.alive = true; rp.dead = false; } }
       }
       for (const id of [...C.players.keys()]) if (!ids.has(id)) C.players.delete(id);
       for (const id of [...R.keys()]) if (!ids.has(id)) removeRemote(id);
@@ -30355,6 +30356,10 @@ function bombHud(dt) {
     else if (B.s === 'planted' && mine?.tm === 'ct' && Math.hypot(me.pos.x - B.p[0], me.pos.z - B.p[2]) < 2) tip = `Segure <b>E</b> para desarmar (${mine.kt ? 5 : 10} s)`;
     if (keys.KeyE && tip && C.actEnd <= now && now > (C.eT || 0)) { C.eT = now + .4; sendToHost({ t: 'bomb', on: 1 }); }
   }
+  const acting = !!(B && me.alive && keys.KeyE && /Segure/.test(tip)) || C.actEnd > now; // plantando/desarmando: mãos ocupadas, sem arma e sem tiro
+  if (acting && !C.bombAct) { G.trigger = false; G.scope = 0; G.rezoom = 0; G.burstN = 0; G.reload = null; G.reloadEnd = 0; }
+  if (!acting && C.bombAct) G.switchEnd = Math.max(G.switchEnd, now + .35); // larga a bomba/o alicate e saca a arma de novo
+  C.bombAct = acting;
   C.eTip = !!tip;
   if (!tip && me.alive && C.st?.mode !== 'zombies') { let best = null, bd = 2.2; for (const d of C.drops || []) { const dd = Math.hypot(me.pos.x - d[2], me.pos.z - d[4]); if (d[1] !== 'kit' && dd < bd) { bd = dd; best = d; } }
     if (best) { const sl = W[best[1]].slot; tip = G.inv[sl] ? `<b>E</b>: trocar ${esc(W[G.inv[sl]].name)} por ${esc(W[best[1]].name)}` : `Ande por cima para pegar ${esc(W[best[1]].name)}`; } }
