@@ -22915,7 +22915,7 @@ function zForaJanela(z, P) {
 function zTamanho(z, kind, D) {
   const T = ZBAL.tamanho, K = ZBAL.tipos[kind] || ZBAL.tipos[0], s = K.s;
   z.sc = Math.max(K.marchaMin ?? 0, Math.min(K.marchaMax ?? 2, z.sc)); const [a, b] = ZBAL.marcha[z.sc];
-  z.speed = rand(a, b) * s ** -T.vel * D.spd; z.dm = K.dm ?? s ** T.dano; // dm: o Tanque bate fraco apesar do tamanho z.ac = s ** T.ritmo; z.aw = T.preparo * z.ac;
+  z.speed = rand(a, b) * s ** -T.vel * D.spd; z.dm = K.dm ?? s ** T.dano /* dm: o Tanque bate fraco apesar do tamanho */; z.ac = s ** T.ritmo; z.aw = T.preparo * z.ac;
   const E = ZBAL.estilos[K.estilo]; if (E) { z.est = K.estilo; z.speed *= 1 + rand(-E.varia, E.varia); z.fase = Math.random() * 6.28; } // zumbi-v2 (Etapa 5): estilo e variação individual
   const vMax = T.velMax?.[S.st?.zdiff ?? 1]; if (vMax && z.speed > vMax) z.speed = vMax * rand(.96, 1); // decisão do dono (13/10): ninguém mais rápido que o cão da dificuldade
 }
