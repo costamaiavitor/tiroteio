@@ -20,7 +20,7 @@ service cloud.firestore {
       // o que estoura o teto de +1 item por gravação. A isenção vale SÓ para os tetos de salto (items/cases),
       // nunca para a forma. Trocar o placeholder pelo uid real (Authentication → Users → coluna "UID do usuário").
       function donoDoProjeto() {
-        return request.auth != null && request.auth.uid in ['COLOQUE_AQUI_O_UID_DO_DONO'];
+        return request.auth != null && request.auth.uid in ['0Fgulu6L0VhRXoMM3CS64oBsqRa2'];
       }
 
       // Estado final do documento depois da gravação (com merge, inclui os campos que já existiam).
