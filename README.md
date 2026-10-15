@@ -155,6 +155,7 @@ As antigas abas **Skins** e **Armeiro** viraram uma só, o **Arsenal**, no estil
   - Fim de partida: 40 (vitória: 150)
   - Fim de jogo nos zumbis: 30 + 8 por rodada
 - **Acabamentos:** Floresta, Deserto, Urbano, Grafite, Areia, Oceano, Cereja, Carbono, Ártico, Tigre, Colmeia, Crepúsculo, Damasco, Neon, Lava, Asiimov, Esmeralda, Ouro, Dragão e Galáxia (Neon, Lava, Dragão e Galáxia brilham). Servem para todas as armas, menos as armas maravilha (Ray Gun, Ray Gun Mark II, Arma Trovão, Wunderwaffe DG-2 e Winter's Howl). Com Pack-a-Punch vale a camuflagem do Pack-a-Punch.
+- **Coleção 2 (16 novas):** Selva, Cinzas, Oliva (comuns); Corrida, Xadrez, Marinha (incomuns); Respingo, Mármore, Zebra, Aurora (raras); Veneno e Gelo Eterno (brilham), Obsidiana, Rubi (épicas); Platina e Fênix (lendárias, a Fênix brilha). Total: 36 skins.
 - **Conta (aba Caixas):** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
 
 - **Facas:** além da Faca (KA-BAR), tem a **Butterfly**. As duas usam os mesmos braços das armas: a mão direita segue uma animação de faca pronta (parado, saque, cortes alternando o lado, estocada no botão direito e inspeção no F) e fecha no cabo. No Arsenal, abra a faca em **Personalizar** e clique em **Usar esta faca**; equipar uma skin da butterfly também já troca a faca.
