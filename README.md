@@ -128,23 +128,34 @@ A dificuldade aparece no canto de cima, junto com o nome do mapa.
 - **Vida:** a barra no centro de baixo da tela mostra a vida (com Juggernog vai até 250). Como no CoD, a vida volta sozinha e aos poucos: depois de alguns segundos sem levar golpe (3,5 s no Normal; o Quick Revive encurta em 25%) ela sobe até encher (100 de vida em 5 s no Normal; com Juggernog sobe mais rápido, 250 em ~8 s). Qualquer golpe reinicia a espera. A borda vermelha da tela mostra quanto falta e some aos poucos junto com a barra; com pouca vida ela pulsa. Toda rodada nova começa com a vida cheia.
 - **Cair e reanimar:** com a vida zerada, você cai com uma pistola e tem 45 s (no Normal) para alguém segurar F em você (o tempo para enquanto alguém está reanimando). Quem sangra volta na rodada seguinte, com a M1911 e os mesmos pontos. Se todos caírem, fim de jogo.
 
-## Skins
+## Arsenal (skins e acessórios) e Caixas
 
-Aba **Skins** no menu.
+As antigas abas **Skins** e **Armeiro** viraram uma só, o **Arsenal**, no estilo do *Gunsmith* do Call of Duty. A abertura de caixas ganhou a aba **Caixas**.
 
-- **Caixas:** você ganha XP jogando e, a cada 300 XP, recebe uma caixa. Conta nova começa com 2.
+- **Arsenal:** escolha a categoria à esquerda (pistolas, SMGs, escopetas, rifles, precisão, pesadas, corpo a corpo) e clique na arma. Abre o gunsmith dela: fundo escuro, a arma grande em 3D de lado (arraste para girar) e o título "NOME GUNSMITH" com duas abas.
+  - **Acessórios:** etiquetas em volta da arma (mira, boca, cano, coronha, empunhadura, carregador, sob o cano, laser), cada uma ligada por uma linha ao lugar do encaixe e mostrando o acessório escolhido. Clique numa etiqueta para ver as opções daquele encaixe (as bloqueadas mostram o nível que libera). Embaixo à esquerda: "Equipado X/5" e as barras de Precisão, Dano, Alcance, Cadência, Mobilidade e Controle, calculadas da arma e dos acessórios (passar o mouse numa opção mostra o ganho em verde e a perda em vermelho). As regras não mudaram: até 5 acessórios, um por encaixe, liberados subindo o nível da arma matando zumbis com ela, e só valem no modo Zumbi (também na arma do Pack-a-Punch). Nesta aba a arma aparece como no modo Zumbi, já com as peças montadas.
+  - **Personalizar:** grade com a Padrão e as 20 skins (as que você ainda não tem ficam apagadas, mas dá para ver na arma). A arma em 3D troca na hora; embaixo à esquerda ficam o nome da skin, a arma e a categoria e a raridade com o losango colorido, e o botão **Equipar** (clique duas vezes numa skin também equipa). Nas facas aparece **Usar esta faca**. Os outros jogadores veem a sua skin.
+- **Caixas:** quatro caixas, com chances melhores nas de cima:
+
+  | Caixa | Como ganhar | Comum | Incomum | Rara | Épica | Lendária |
+  |---|---|---|---|---|---|---|
+  | Comum | 1 a cada 300 XP (conta nova começa com 2) | 60% | 25% | 10% | 4% | 1% |
+  | Rara | juntar 3 Comuns | - | 45% | 35% | 15% | 5% |
+  | Épica | juntar 3 Raras | - | - | 50% | 35% | 15% |
+  | Lendária | juntar 3 Épicas | - | - | - | 60% | 40% |
+
+  Juntar não gasta XP: só troca 3 caixas por uma melhor (uma Lendária vale 27 Comuns, 8100 XP). Abrir é a roleta no estilo CS; faca só sai em Épica ou Lendária. Skin repetida vira XP conforme a raridade: 60, 80, 120, 200 ou 300 (uma Caixa Comum).
+- **XP:**
   - Abate: 10 XP (headshot 15; contra bot vale metade)
   - Zumbi morto: 3 (headshot 5); especiais dão mais (Veloz +2, Explosivo e Tóxico +3, Gritador +4, Brutamonte +6, Carniceiro +50)
   - Rodada de zumbi sobrevivida: 25
   - Reanimar alguém: 20
   - Fim de partida: 40 (vitória: 150)
   - Fim de jogo nos zumbis: 30 + 8 por rodada
-- **Abrir caixa:** roleta no estilo CS. Raridades: Comum 60%, Incomum 25%, Rara 10%, Épica 4%, Lendária 1%. Faca só sai em Épica ou Lendária. Skin repetida vira 60 XP.
 - **Acabamentos:** Floresta, Deserto, Urbano, Grafite, Areia, Oceano, Cereja, Carbono, Ártico, Tigre, Colmeia, Crepúsculo, Damasco, Neon, Lava, Asiimov, Esmeralda, Ouro, Dragão e Galáxia (Neon, Lava, Dragão e Galáxia brilham). Servem para todas as armas, menos as armas maravilha (Ray Gun, Ray Gun Mark II, Arma Trovão, Wunderwaffe DG-2 e Winter's Howl). Com Pack-a-Punch vale a camuflagem do Pack-a-Punch.
-- **Coleção (estilo Valorant):** todas as armas aparecem ao mesmo tempo, em colunas por categoria (pistolas; SMGs e escopetas; rifles; precisão, pesadas e faca), cada uma desenhada com a skin que está equipada. Clique numa arma para abrir a tela dela: à esquerda as skins que você tem (e a Padrão), no centro a arma em 3D (arraste para girar), e o botão **Equipar**. Os outros jogadores veem a sua skin.
-- **Conta:** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
+- **Conta (aba Caixas):** com o Firebase configurado, entre com Google ou e-mail e senha; o inventário fica salvo na conta e aparece em qualquer computador. Sem conta, fica salvo só no navegador e passa para a conta no primeiro login.
 
-- **Facas:** além da Faca (KA-BAR), tem a **Butterfly**. As duas usam os mesmos braços das armas: a mão direita segue uma animação de faca pronta (parado, saque, cortes alternando o lado, estocada no botão direito e inspeção no F) e fecha no cabo. Na Coleção, abra a arma e clique em **Usar esta faca**; equipar uma skin da butterfly também já troca a faca.
+- **Facas:** além da Faca (KA-BAR), tem a **Butterfly**. As duas usam os mesmos braços das armas: a mão direita segue uma animação de faca pronta (parado, saque, cortes alternando o lado, estocada no botão direito e inspeção no F) e fecha no cabo. No Arsenal, abra a faca em **Personalizar** e clique em **Usar esta faca**; equipar uma skin da butterfly também já troca a faca.
 
 ### Configurar as contas (Firebase, uma vez só)
 
@@ -158,7 +169,7 @@ Já configurado no projeto `tiroteio-237ee`. Os passos abaixo servem só para re
 5. **Configurações do projeto (engrenagem) → Seus apps → Web (`</>`):** registre o app e copie o objeto `firebaseConfig`.
 6. No `index.html`, troque `const FIREBASE_CONFIG = null;` por `const FIREBASE_CONFIG = { ...o que você copiou... };`.
 
-A `apiKey` do Firebase não é segredo (ela identifica o projeto); quem protege os dados são as regras acima. Cada jogador só lê e grava o próprio inventário. Como o jogo roda no navegador, alguém que mexa no código consegue se dar skins. As regras do `firestore.rules` limitam a forma do documento e o quanto ele pode mudar a cada gravação (no máximo 10 caixas e 1 skin por vez, uma gravação por segundo), mas sem um servidor o progresso continua sendo decidido pelo cliente. Para jogar entre amigos isso não importa.
+A `apiKey` do Firebase não é segredo (ela identifica o projeto); quem protege os dados são as regras acima. Cada jogador só lê e grava o próprio inventário. Como o jogo roda no navegador, alguém que mexa no código consegue se dar skins. As regras do `firestore.rules` limitam a forma do documento e o quanto ele pode mudar a cada gravação (no máximo o valor de 10 Caixas Comuns e 1 skin por vez, uma gravação por segundo; juntar caixas mantém o valor), mas sem um servidor o progresso continua sendo decidido pelo cliente. Para jogar entre amigos isso não importa.
 
 ## Amigos, lobby e convites
 

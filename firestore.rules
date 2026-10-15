@@ -56,8 +56,17 @@ service cloud.firestore {
           && (!('k' in m) || inteiro(m.k)) && (!('d' in m) || inteiro(m.d)) && (!('hs' in m) || inteiro(m.hs)) && (!('w' in m) || inteiro(m.w))
           && (!('m' in m) || inteiro(m.m)) && (!('zk' in m) || inteiro(m.zk)) && (!('zr' in m) || (inteiro(m.zr) && m.zr <= 10000));
       }
+      // cx: caixas de raridade (Rara r, Épica e, Lendária l); a Comum continua em cases
+      function cxOk(m) {
+        return m is map && m.keys().hasOnly(['r', 'e', 'l'])
+          && (!('r' in m) || (inteiro(m.r) && m.r <= 100000)) && (!('e' in m) || (inteiro(m.e) && m.e <= 100000)) && (!('l' in m) || (inteiro(m.l) && m.l <= 100000));
+      }
+      function cxN(m, k) { return m.get('cx', {}).get(k, 0); }
+      // valor do inventário de caixas em Caixas Comuns: juntar 3 numa de cima mantém o valor
+      function valor(m) { return m.cases + 3 * cxN(m, 'r') + 9 * cxN(m, 'e') + 27 * cxN(m, 'l'); }
       function formaOk() {
-        return d().keys().hasOnly(['xp', 'cases', 'items', 'equipped', 'opened', 'name', 'upd', 'created', 'st'])
+        return d().keys().hasOnly(['xp', 'cases', 'items', 'equipped', 'opened', 'name', 'upd', 'created', 'st', 'cx'])
+          && (!('cx' in d()) || cxOk(d().cx))
           && d().keys().hasAll(['xp', 'cases', 'items', 'equipped', 'opened'])
           && (!('st' in d()) || statsOk(d().st))
           && d().xp is number && d().xp >= 0 && d().xp < 300
@@ -74,18 +83,20 @@ service cloud.firestore {
       // jogador honesto e torna "cases: 999999" impossível numa só escrita.
       // Abrir caixa (openCaseUI l. 8366-8373) faz cases--, opened++ e items.push(1): a caixa só cai 1 e só se
       // opened subiu exatamente 1; items cresce no máximo 1 por gravação.
+      // Caixas de raridade: juntar (3 Comuns → 1 Rara, 3 Raras → 1 Épica, 3 Épicas → 1 Lendária) mantém o valor;
+      // abrir tira no máximo 27 (uma Lendária) por caixa aberta. Ganhar: até +10 em valor por gravação, como antes.
       function saltoOk() {
-        return d().cases <= antes().cases + 10
-          && d().cases >= antes().cases - 1
-          && (d().cases >= antes().cases || d().opened == antes().opened + 1)
-          && d().items.size() <= antes().items.size() + 1;
+        return valor(d()) <= valor(antes()) + 10
+          && d().opened <= antes().opened + 5
+          && valor(d()) >= valor(antes()) - 27 * (d().opened - antes().opened)
+          && d().items.size() <= antes().items.size() + 1 + (d().opened - antes().opened);
       }
 
       // ---- D4: tetos absolutos na criação ----
       // O create não tem estado anterior: um convidado com localStorage editado entraria com qualquer valor.
       // Um convidado honesto dificilmente passa de 200 caixas ou 400 skins antes de criar a conta.
       function tetosCriacao() {
-        return d().cases <= 200 && d().items.size() <= 400; // convidado que jogou muito antes de criar a conta ainda passa; o salto absurdo (cases 999999) não
+        return valor(d()) <= 200 && d().items.size() <= 400; // convidado que jogou muito antes de criar a conta ainda passa; o salto absurdo (cases 999999) não
       }
 
       // ---- D3: intervalo mínimo de 1 s entre gravações ----
