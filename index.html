@@ -17445,8 +17445,8 @@ const SKTEX = {};
 function skinTex(f) {
   if (SKTEX[f.id]) return SKTEX[f.id];
   const S = 256, C = f.c, R = (a, b) => a + Math.random() * (b - a);
-  const mk = draw => { const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); draw(g); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
-  const noise = (g, amt) => { const img = g.getImageData(0, 0, S, S), d = img.data; for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - .5) * amt; d[i] += n; d[i + 1] += n; d[i + 2] += n; } g.putImageData(img, 0, 0); };
+  const mk = draw => { const c = document.createElement('canvas'); c.width = c.height = S * 2; const g = c.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0); draw(g); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
+  const noise = (g, amt) => { const img = g.getImageData(0, 0, g.canvas.width, g.canvas.height), d = img.data; for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - .5) * amt; d[i] += n; d[i + 1] += n; d[i + 2] += n; } g.putImageData(img, 0, 0); };
   const wear = g => { g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = .8; for (let i = 0; i < 14; i++) { const x = R(0, S), y = R(0, S); g.beginPath(); g.moveTo(x, y); g.lineTo(x + R(-20, 20), y + R(-4, 4)); g.stroke(); } };
   // blobs que "dão a volta" na borda (textura repete sem emenda)
   const blob = (g, x, y, rx, ry, col) => { g.fillStyle = col; for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) { g.beginPath(); g.ellipse(x + dx, y + dy, rx, ry, R(0, 3), 0, 7); g.fill(); } };
@@ -17470,7 +17470,7 @@ function skinTex(f) {
   // acabamentos que brilham: o desenho do brilho também vai no mapa de cor
   if (f.glow) {
     const lines = [];
-    const G = document.createElement('canvas'); G.width = G.height = S; const gg = G.getContext('2d'); gg.fillStyle = '#000'; gg.fillRect(0, 0, S, S);
+    const G = document.createElement('canvas'); G.width = G.height = S * 2; const gg = G.getContext('2d'); gg.setTransform(2, 0, 0, 2, 0, 0); gg.fillStyle = '#000'; gg.fillRect(0, 0, S, S);
     const g = map.image.getContext('2d');
     for (const ctx of [g, gg]) ctx.lineCap = 'round';
     if (f.pat === 'circuit') for (let i = 0; i < 18; i++) { const col = i % 2 ? C[1] : C[2]; let x = R(0, S), y = R(0, S); const pts = [[x, y]]; for (let k = 0; k < 5; k++) { if (Math.random() < .5) x += R(-60, 60); else y += R(-60, 60); pts.push([x, y]); } lines.push([col, 2, pts]); }
@@ -17484,10 +17484,10 @@ function skinTex(f) {
 }
 function skinMats(f, mk, fp) {
   const T = skinTex(f), em = T.glow ? { emissiveMap: T.glow, emissive: new THREE.Color(0xffffff).multiplyScalar(fp ? 1.4 : 1) } : {};
-  return {
-    a: mk({ map: T.map, color: 0xffffff, metalness: f.m ?? .45, roughness: f.rg ?? .45, ...em }),
-    b: mk({ map: T.map, color: 0xb0b0b0, metalness: Math.min(f.m ?? .45, .35), roughness: Math.max(f.rg ?? .45, .72), ...em }), // coronha/cabo foscos (senão o topo da coronha vira um risco branco de reflexo)
-  };
+  const a = mk({ map: T.map, color: 0xffffff, metalness: f.m ?? .45, roughness: f.rg ?? .45, ...em }),
+    b = mk({ map: T.map, color: 0xb0b0b0, metalness: Math.min(f.m ?? .45, .35), roughness: Math.max(f.rg ?? .45, .72), ...em }); // coronha/cabo foscos (senão o topo da coronha vira um risco branco de reflexo)
+  a.userData.skin = b.userData.skin = 1;
+  return { a: triMat(a, 3.4), b: triMat(b, 3.4) }; // armas montadas no jogo (zumbi): a estampa segue a forma da peça (projeção nos 3 eixos), sem esticar
 }
 const skinSwatch = id => { const f = SKIN_BY[id]; return f ? skinTex(f).map.image.toDataURL('image/jpeg', .7) : ''; };
 // fp = primeira pessoa: PBR (metal reflete o ambiente). Senão, Lambert leve para o mundo (arma na mão dos outros, na caixa etc.)
@@ -17503,7 +17503,7 @@ function gunMats(pap, fp, skin) {
   const sk = f ? skinMats(f, mk, fp) : null, A = sk?.a, Bm = sk?.b; // skin: 'a' no metal do corpo, 'b' (mais escuro) no polímero/madeira
   const M = {
     metal: camo || A || mk({ map: T.metal, color: 0x3c3f44, metalness: .8, roughness: .5, roughnessMap: T.metal, bumpMap: T.metal, bumpScale: .4 }),
-    steel: camo || mk({ map: T.metal, color: 0x73777e, metalness: .9, roughness: .34, roughnessMap: T.metal }),
+    steel: camo || A || mk({ map: T.metal, color: 0x73777e, metalness: .9, roughness: .34, roughnessMap: T.metal }),
     chrome: camo || mk({ map: T.metal, color: 0xc9cdd3, metalness: 1, roughness: .16 }),
     polymer: camo || Bm || mk({ map: T.poly, color: 0x2a2b2e, metalness: .05, roughness: .82, bumpMap: T.poly, bumpScale: .5 }),
     wood: camo || Bm || mk({ map: T.wood, color: 0x6e3c1c, metalness: 0, roughness: .55, bumpMap: T.wood, bumpScale: .6 }),
@@ -19182,6 +19182,22 @@ function triMat(src, sc) {
   return m;
 }
 // escala das coordenadas da malha (as do vértice, antes do esqueleto) para as da raiz do modelo
+function skinOn(orig, sm, sc) { // skin sobre o material do modelo: mantém relevo (normal), aspereza e os detalhes pintados (pela luminância)
+  const m = orig.clone(), glow = !!sm.emissiveMap;
+  m.color = new THREE.Color(0xffffff); m.metalness = sm.metalness; m.roughness = sm.roughness; m.metalnessMap = null;
+  if (glow) { m.emissive = sm.emissive.clone(); m.emissiveMap = null; } else if (m.emissive) { m.emissive.set(0); m.emissiveMap = null; }
+  const hasMap = !!m.map, tint = new THREE.Color(sm.color);
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, { triS: { value: sc }, skinMap: { value: sm.map }, skinGlow: { value: sm.emissiveMap || sm.map }, skinTint: { value: tint } });
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vTP; varying vec3 vTN;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvTP = position; vTN = normal;');
+    const tri = t => `vec3 tw = pow(abs(normalize(vTN)), vec3(4.)); tw /= tw.x + tw.y + tw.z; vec4 ${t}C = texture2D(${t}, vTP.yz * triS) * tw.x + texture2D(${t}, vTP.xz * triS) * tw.y + texture2D(${t}, vTP.xy * triS) * tw.z;`;
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vTP; varying vec3 vTN; uniform float triS; uniform sampler2D skinMap; uniform sampler2D skinGlow; uniform vec3 skinTint;')
+      .replace('#include <map_fragment>', `{ ${tri('skinMap')} vec3 sk = skinMapC.rgb * skinTint;\n#ifdef USE_MAP\n float l = dot(texture2D(map, vMapUv).rgb, vec3(.299, .587, .114)); sk *= clamp(.5 + l * 1.25, .4, 1.3);\n#endif\n diffuseColor.rgb *= sk; }`)
+      .replace('#include <emissivemap_fragment>', glow ? `{ ${tri('skinGlow')} totalEmissiveRadiance *= skinGlowC.rgb; }` : '');
+  };
+  m.customProgramCacheKey = () => 'skinOn' + (hasMap ? 1 : 0) + (glow ? 1 : 0);
+  return m;
+}
 function fpMeshScale(o, Ri) {
   const p = o.geometry.attributes.position, a = new V3(), b = new V3(), A = new V3(), B = new V3();
   let best = 0, j = 0; a.fromBufferAttribute(p, 0); for (let i = 1; i < p.count; i += Math.max(1, p.count >> 7)) { const d = b.fromBufferAttribute(p, i).distanceToSquared(a); if (d > best) { best = d; j = i; } }
@@ -19196,7 +19212,9 @@ function fpSkin(root, mats, L, keep = [], all = false, filt = null) { // all: pi
     if (!o.isMesh || (filt && !filt(o)) || keep.includes(o.material.name) || (!all && o.material.emissive?.getHex())) return;
     const c = o.material.color, wood = c.r > c.b * 1.6 && c.r > .08; // madeira / marrom
     const sc = +(2.5 / L * fpMeshScale(o, Ri)).toPrecision(3), k = (wood ? 'b' : 'a') + sc; // a malha pode ter escala própria
-    o.material = cache[k] || (cache[k] = triMat(wood ? mats.b || mats.a : mats.a, sc));
+    const sm = wood ? mats.b || mats.a : mats.a;
+    if (sm.userData?.skin) { const ck = k + o.material.uuid; o.material = cache[ck] || (cache[ck] = skinOn(o.material, sm, sc)); return; } // skin: por cima do material do modelo
+    o.material = cache[k] || (cache[k] = triMat(sm, sc));
   });
 }
 // facas baixadas: entram no lugar das procedurais, no mesmo referencial (lâmina para -Z, topo +Y), então a mão, o soquete dos braços do
