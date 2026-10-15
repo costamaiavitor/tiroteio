@@ -17482,12 +17482,37 @@ function skinTex(f) {
   }
   return (SKTEX[f.id] = { map, glow });
 }
+// TRI_SKIN: material triplanar da skin → { src, sc, k } (k: 'a' corpo / 'b' coronha); skinFit troca a escala por arma
+const TRI_SKIN = new WeakMap(), TRI_SC = new Map();
 function skinMats(f, mk, fp) {
-  const T = skinTex(f), em = T.glow ? { emissiveMap: T.glow, emissive: new THREE.Color(0xffffff).multiplyScalar(fp ? 1.4 : 1) } : {};
-  const a = mk({ map: T.map, color: 0xffffff, metalness: f.m ?? .45, roughness: f.rg ?? .45, ...em }),
-    b = mk({ map: T.map, color: 0xb0b0b0, metalness: Math.min(f.m ?? .45, .35), roughness: Math.max(f.rg ?? .45, .72), ...em }); // coronha/cabo foscos (senão o topo da coronha vira um risco branco de reflexo)
+  const T = skinTex(f), m = f.m ?? .45, rg = f.rg ?? .45, em = T.glow ? { emissiveMap: T.glow, emissive: new THREE.Color(0xffffff).multiplyScalar(fp ? 1.4 : 1) } : {};
+  let a, b;
+  if (fp) {
+    a = mk({ map: T.map, color: 0xeeeeee, metalness: m, roughness: rg, ...em }); // um pouco abaixo de 1: estampa clara (Asiimov, Ártico) não estoura
+    b = mk({ map: T.map, color: 0xaaaaaa, metalness: Math.min(m, .35), roughness: Math.max(rg, .72), ...em }); // coronha/cabo foscos (senão o topo da coronha vira um risco branco de reflexo)
+  } else { // fora da 1ª pessoa não há PBR: skin metálica vira Phong (brilho especular na cor da estampa), as outras Lambert; tudo um pouco abaixo de branco
+    const met = m >= .55, ca = new THREE.Color(met ? 0xe6e6e6 : 0xe0e0e0);
+    a = met ? new THREE.MeshPhongMaterial({ map: T.map, color: ca, specular: new THREE.Color(f.c[0]).lerp(new THREE.Color(0xffffff), .35).multiplyScalar(.55), shininess: 20 + (1 - rg) * 70, ...em })
+      : new THREE.MeshLambertMaterial({ map: T.map, color: ca, ...em });
+    b = new THREE.MeshLambertMaterial({ map: T.map, color: 0xa8a8a8, ...em });
+  }
   a.userData.skin = b.userData.skin = 1;
-  return { a: triMat(a, 3.4), b: triMat(b, 3.4) }; // armas montadas no jogo (zumbi): a estampa segue a forma da peça (projeção nos 3 eixos), sem esticar
+  return { a: triSkin(a, 3.4, 'a'), b: triSkin(b, 3.4, 'b') }; // armas montadas no jogo (zumbi): a estampa segue a forma da peça (projeção nos 3 eixos), sem esticar
+}
+function triSkin(src, sc, k) { const key = src.uuid + sc; let t = TRI_SC.get(key); if (!t) { t = triMat(src, sc); TRI_SKIN.set(t, { src, sc, k }); TRI_SC.set(key, t); } return t; }
+// Ajuste da skin numa arma procedural pronta: (1) escala da estampa pelo tamanho da arma (pistola e metralhadora com desenho de
+// tamanho parecido); (2) peças pequenas/finas pintadas com 'a' (miras, gatilho, pinos, cano fino) voltam ao metal escuro, como nas skins do CS.
+function skinFit(g, fp) {
+  g.updateMatrixWorld(true);
+  const L = Math.max(.15, new THREE.Box3().setFromObject(g).getSize(new V3()).z), sc = +Math.min(9, Math.max(1.6, 2.3 / L)).toPrecision(2);
+  const N = gunMats(0, fp, null), bx = new THREE.Box3(), v = new V3();
+  g.traverse(o => {
+    const t = o.isMesh && TRI_SKIN.get(o.material); if (!t) return;
+    const d = bx.setFromObject(o).getSize(v).toArray().sort((x, y) => x - y);
+    if (t.k === 'a' && (d[2] < L * .1 || d[1] < L * .03)) { o.material = N.metal; return; } // detalhe ou haste fina: metal escuro
+    if (t.k === 'b' && d[2] < L * .05) { o.material = N.polymer; return; }
+    o.material = triSkin(t.src, sc, t.k);
+  });
 }
 const skinSwatch = id => { const f = SKIN_BY[id]; return f ? skinTex(f).map.image.toDataURL('image/jpeg', .7) : ''; };
 // fp = primeira pessoa: PBR (metal reflete o ambiente). Senão, Lambert leve para o mundo (arma na mão dos outros, na caixa etc.)
@@ -18238,6 +18263,7 @@ function gunModel(id, fp = false, skin = null) {
   for (const k of ['mag', 'slide', 'bolt', 'pump', 'cyl', 'brk']) if (ud[k]) ud[k + 'Rest'] = ud[k].position.clone();
   if (ud.mag && !ud.magGrab) ud.magGrab = ud.mag.position.clone().add(new V3(0, ud.magUp ? .04 : -.08, 0));
   ud.muzzle = new V3(0, my, mz);
+  if (!pap && model !== 'knife' && model !== 'karambit' && TRI_SKIN.has(M.metal)) skinFit(g, fp); // skin: escala por arma e detalhes em metal escuro
   if (!GM_VM && model !== 'knife' && model !== 'karambit') try { dlGun(g, id, pap || skin ? M : null); } catch (e) { console.warn(e); } // modelo baixado (mundo, mãos dos outros, vitrine)
   if (model === 'knife' || model === 'karambit') try { knifeSwap(g, model, M.blade !== gunMats(false, fp, null).blade ? { a: M.blade, b: M.polymer } : null); } catch (e) { } // faca baixada no lugar da procedural (se já carregou)
   if (pap) papUV(g); // 6-w13
