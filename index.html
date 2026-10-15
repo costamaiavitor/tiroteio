@@ -17199,11 +17199,16 @@ function play(name, pos) {
   if (r && t - r.t < 40) { if (++r.n > 3) return; } else if (r) { r.t = t; r.n = 1; } else SNDN.set(name, { t, n: 1 });
   try { SND[name](sdest(pos)); } catch (e) { }
 }
+// O4-CPU5: cada escrita em AudioParam custa (mesmo com o valor igual): só escreve o que mudou desde a última (câmera parada: nada).
+// O ouvinte só é mexido aqui, então o valor que ele tem é sempre o último escrito; up é fixo (0, 1, 0).
+const _ulF = new V3(), _ulV = new Float64Array(6); let _ulL = null;
+function _ulSet(P, i, v) { if (_ulV[i] !== v) { _ulV[i] = v; P.value = v; } }
 function updateListener() {
   if (!AC) return;
   const p0 = camera.position; if (!(isFinite(p0.x) && isFinite(p0.y) && isFinite(p0.z))) return; // O1: posição não finita fazia o AudioParam lançar exceção e parava o laço de quadros
-  const L = AC.listener, p = camera.position, f = new V3(0, 0, -1).applyQuaternion(camera.quaternion);
-  if (L.positionX) { L.positionX.value = p.x; L.positionY.value = p.y; L.positionZ.value = p.z; L.forwardX.value = f.x; L.forwardY.value = f.y; L.forwardZ.value = f.z; L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
+  const L = AC.listener, p = camera.position, f = _ulF.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  if (L.positionX) { if (_ulL !== L) { _ulL = L; _ulV.fill(NaN); L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
+    _ulSet(L.positionX, 0, p.x); _ulSet(L.positionY, 1, p.y); _ulSet(L.positionZ, 2, p.z); _ulSet(L.forwardX, 3, f.x); _ulSet(L.forwardY, 4, f.y); _ulSet(L.forwardZ, 5, f.z); }
   else { L.setPosition(p.x, p.y, p.z); L.setOrientation(f.x, f.y, f.z, 0, 1, 0); }
 }
 
@@ -18754,11 +18759,13 @@ function aimBone(b, axLocal, nLocal, axWorld, nWorld) { // gira o osso para o ei
   const qW = frameQuat(axWorld, nWorld, IK.f1).multiply(frameQuat(axLocal, nLocal, IK.f2).invert());
   setBoneWorldQuat(b, qW);
 }
-function setBoneWorldQuat(b, q) { b.parent.getWorldQuaternion(_q1); b.quaternion.copy(_q1.invert().multiply(q)); b.updateMatrixWorld(true); }
+function setBoneWorldQuat(b, q) { b.parent.getWorldQuaternion(_q1); b.quaternion.copy(_q1.invert().multiply(q)); } // O4-CPU2: a matriz do osso fica para o fim do armIK
 function armIK(s, target, pole) {
   const k = ARMS.ik[s];
   const bs = k.bs ||= [k.up, k.lo, k.hand]; for (let i = 0; i < 3; i++) { bs[i].position.copy(k.base[i][0]); bs[i].quaternion.copy(k.base[i][1]); }
-  k.up.parent.updateMatrixWorld(true); k.up.updateMatrixWorld(true);
+  // O4-CPU2: as subárvores do braço (mão e dedos) não são refeitas a cada passo. O que o IK lê: a matriz do pai do braço (em dia: o
+  // vmRoot acabou de ser atualizado e nada acima do braço mudou) e getWorldQuaternion (refaz a cadeia de pais até a raiz, com a pose
+  // atual). No fim, uma passada só pela subárvore deixa todas as matrizes como antes (mesmas contas, mesmos valores).
   // mão desejada no mundo: soquete na arma × mão em relação ao soquete
   target.decompose(_v1, _q1, _v2); _m2.compose(_v1, _q1, _v2.set(1, 1, 1)).multiply(k.relInv); const HW = _m2, T = IK.T.setFromMatrixPosition(HW);
   const qT = IK.qT.setFromRotationMatrix(_m1.extractRotation(HW));
@@ -18770,7 +18777,7 @@ function armIK(s, target, pole) {
   const E0 = IK.E0.copy(T).addScaledVector(IK.a1.copy(k.foreH).applyQuaternion(qT), b);
   const S = IK.S.copy(E0).addScaledVector(_v1.fromArray(GRIP['sh' + s]).normalize(), a * .97);
   pole = E0;
-  k.up.parent.worldToLocal(_v2.copy(S)); k.up.position.copy(_v2); k.up.updateMatrixWorld(true);
+  k.up.parent.worldToLocal(_v2.copy(S)); k.up.position.copy(_v2);
   const D = IK.D.copy(T).sub(S); let d = D.length();
   d = Math.max(Math.abs(a - b) + 1e-3, Math.min(d, a + b - 1e-4));
   const u = IK.u.copy(D).normalize(), pv = IK.pv.copy(pole).sub(S); pv.addScaledVector(u, -pv.dot(u)).normalize();
@@ -18782,12 +18789,14 @@ function armIK(s, target, pole) {
   // o antebraço gira junto com a mão (metade), o resto fica no pulso
   const qlo = k.lo.getWorldQuaternion(IK.qlo), rel = IK.rel.copy(qlo).invert().multiply(qT);
   const tw = twistAbout(rel, k.loAx, IK.tw).multiply(IK.q.copy(k.twist0).invert());
-  k.lo.quaternion.multiply(IK.q2.identity().slerp(tw, .5)); k.lo.updateMatrixWorld(true);
+  k.lo.quaternion.multiply(IK.q2.identity().slerp(tw, .5));
   setBoneWorldQuat(k.hand, qT);
+  k.up.updateMatrixWorld(true); // O4-CPU2: a única passada pela subárvore do braço
 }
 function armsIK(ud) {
   const g = ud.armsGun; if (!g) return;
-  vmRoot.updateMatrixWorld(true);
+  // O4-CPU2: sem vmRoot.updateMatrixWorld(true) aqui: o updateViewmodel acabou de atualizar o vmRoot (só chama daqui) e, entre um e
+  // outro, nada embaixo dele muda (o clarão é do vmScene); a passada repetida dava as mesmas matrizes
   for (const [s, t] of [['r', g.rt], ['l', g.lt]]) {
     const T = _v3.setFromMatrixPosition(t.matrixWorld);
     armIK(s, t.matrixWorld, _v4.copy(T).add(_v1.fromArray(GRIP['sh' + s])).add(_v2.fromArray(GRIP['el' + s]))); // cotovelo para baixo e para fora
@@ -21053,7 +21062,8 @@ function tpMuzzle(rp, o, sup) {
 const TP_SUP = {};
 
 // ---------- granadas ----------
-function inBoxR(x, y, z, r) { for (const b of COL) if (x > b.minX - r && x < b.maxX + r && y > b.minY - r && y < b.maxY + r && z > b.minZ - r && z < b.maxZ + r) return true; return false; }
+const _ibq = []; // O4-CPU3: só as caixas perto (grade do colGrid; a folga de 1 cm cobre o arredondamento da borda), mesmo teste
+function inBoxR(x, y, z, r) { const L = colQuery(x - r - .01, x + r + .01, z - r - .01, z + r + .01, _ibq); for (let k = 0; k < L.length; k++) { const b = COL[L[k]]; if (x > b.minX - r && x < b.maxX + r && y > b.minY - r && y < b.maxY + r && z > b.minZ - r && z < b.maxZ + r) return true; } return false; }
 function spawnNade(owner, type, p, v) {
   const mesh = gunModel(type); mesh.scale.setScalar(1.6); fxGroup.add(mesh);
   nades.push({ owner, type, pos: new V3(p[0], p[1], p[2]), vel: new V3(v[0], v[1], v[2]), t: 0, acc: 0, mesh, tick: 0, fuse: type === 'he' || type === 'flash' ? 1.6 : type === 'semtex' || type === 'molotov' || type === 'inc' || type === 'decoy' ? 2 : type === 'monkey' ? 7 : 1.8 });
@@ -21739,11 +21749,13 @@ function pickSpawn(side, taken, who) {
   }
   return best;
 }
+const _syq = []; // O4-CPU4: as caixas do ponto pela grade do colGrid (1 cm de folga), o mesmo teste do COL.some
+function _syBate(x, z, y) { const L = colQuery(x - .01, x + .01, z - .01, z + .01, _syq); for (let k = 0; k < L.length; k++) { const b = COL[L[k]]; if (x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ && b.minY < y + 1.7 && b.maxY > y + 1.2) return true; } return false; }
 function spawnYaw(s) { // nasce olhando para o lado mais aberto (puxado para o meio do mapa), e não para a parede
   const c0 = Math.atan2(s[0], s[2]); let best = c0, bv = -1e9;
   for (let i = 0; i < 16; i++) {
     const a = c0 + i * Math.PI / 8, dx = -Math.sin(a), dz = -Math.cos(a); let t = .5;
-    for (; t < 24; t += .5) { const x = s[0] + dx * t, z = s[2] + dz * t; if (COL.some(b => x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ && b.minY < s[1] + 1.7 && b.maxY > s[1] + 1.2)) break; }
+    for (; t < 24; t += .5) { const x = s[0] + dx * t, z = s[2] + dz * t; if (_syBate(x, z, s[1])) break; }
     const v = t - Math.abs(angDiff(a, c0)) * 2.5; if (v > bv) { bv = v; best = a; }
   }
   return wrapA(best);
@@ -23616,7 +23628,7 @@ function zShock(p, r, col) { // raios em volta de um ponto (Electric Cherry / Ph
 // As caixas de acerto (zBoxes) leem a inclinação e a altura que a pose deixou (zc.ho/hd/hx/oy).
 const zEase = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
 const zBump = (u, a, b) => u <= 0 || u >= 1 ? 0 : Math.min(1, u / a, (1 - u) / b); // sobe em a, segura, desce em b (frações)
-function zR(o, x, y, z, k) { const r = o.rotation; r.x += (x - r.x) * k; r.y += (y - r.y) * k; r.z += (z - r.z) * k; }
+function zR(o, x, y, z, k) { const r = o.rotation; r.set(r.x + (x - r.x) * k, r.y + (y - r.y) * k, r.z + (z - r.z) * k); } // O4-CPU1: um set (1 setFromEuler) em vez de três += (3 setFromEuler); mesmo resultado
 const _zv = new V3(), ZLEAN = [.08, .25, .38, .38];
 function zAnimInit(zc) {
   const R = zSeed(zc.id * 7 + 3), K = zc.kind;
@@ -30336,7 +30348,7 @@ function updateHud(dt) {
     else if (v === 4) { const m = C.ms || {}; score = `Treino · precisão ${m.s ? Math.round(100 * m.h / m.s) : 0}% · tiros na cabeça ${m.h ? Math.round(100 * (m.hh || 0) / m.h) : 0}% · abates ${m.k || 0}`; }
     else score = (v === 3 ? 'Só cabeça' : 'Mata-mata') + ` até ${st.frags}` + (lead ? ` · líder: <span style="color:${esc(lead.c)}">${esc(lead.n)}</span> ${lead.k}` : '');
   }
-  setHTML('score', score);
+  if (!C.csTop) setHTML('score', score); // O4-CPU6: com a barra do CS o 'score' é escrito logo abaixo (antes: '' e a barra, 2 innerHTML por quadro; o fim do quadro é o mesmo)
   C.timeLeft = Math.max(0, C.timeLeft - dt);
   const phLbl = { warmup: 'Aquecimento', freeze: 'Compra: ', live: '', end: '', over: 'Fim de partida' }[C.phase] ?? '';
   const tshow = (C.phase === 'warmup') ? (C.pre ? 'Começando...' : 'Aquecimento') : (C.phase === 'live' && C.bomb?.s === 'planted' ? 'BOMBA ' : phLbl) + fmtT(C.timeLeft);
