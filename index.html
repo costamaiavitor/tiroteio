@@ -12,7 +12,7 @@
 <title>Dan Gun</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='none' stroke='%23ffb020' stroke-width='10'/><circle cx='50' cy='50' r='8' fill='%23ffb020'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Teko:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--acc:#ffb020;--bg:rgba(12,14,19,.88);--line:rgba(255,255,255,.12);--red:#ff4b4b}
 *{box-sizing:border-box}
@@ -385,6 +385,33 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #zboss div{height:10px;margin-top:3px;background:rgba(0,0,0,.55);border:1px solid rgba(255,120,90,.7)}
 #zboss i{display:block;height:100%;width:100%;background:linear-gradient(#ff4a2a,#9a1206)}
 #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.42) 100%)}
+
+/* ===== menu repaginado: mapa de verdade passando ao fundo, vidro fosco, cantos chanfrados, tipografia de jogo ===== */
+#menu{background:linear-gradient(90deg,rgba(5,7,10,.93) 0%,rgba(5,7,10,.72) 46%,rgba(5,7,10,.42) 100%),radial-gradient(120% 90% at 50% 120%,rgba(0,0,0,.85),transparent 60%)!important}
+#menu::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px);mix-blend-mode:overlay}
+.mtop{background:linear-gradient(180deg,rgba(0,0,0,.75),rgba(0,0,0,0))!important;border-bottom:0!important;box-shadow:none!important;height:78px!important}
+.mlogo{font-family:Teko,Rajdhani,sans-serif!important;font-size:46px!important;font-weight:600!important;letter-spacing:3px!important;line-height:1;text-shadow:0 2px 0 #000!important;display:flex;align-items:center;gap:6px}
+.mlogo i{background:var(--acc);color:#111!important;font-size:30px!important;letter-spacing:2px!important;padding:2px 10px 0;vertical-align:0!important;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+#menu .tabs button{font-family:Teko,Rajdhani,sans-serif;font-size:21px!important;letter-spacing:1px!important;padding:0 11px!important;color:#9aa3ae!important;border-bottom:0!important;position:relative}
+#menu .tabs button::after{content:'';position:absolute;left:11px;right:11px;bottom:14px;height:3px;background:var(--acc);transform:scaleX(0);transition:transform .18s}
+#menu .tabs button.on{color:#fff!important;background:none!important;text-shadow:0 0 18px rgba(255,176,32,.45)}
+#menu .tabs button.on::after,#menu .tabs button:hover::after{transform:scaleX(1)}
+.mplayer{min-width:0!important;max-width:250px;flex-shrink:1;overflow:hidden;border-radius:0!important;background:rgba(10,12,16,.55)!important;backdrop-filter:blur(10px);clip-path:polygon(14px 0,100% 0,100% 100%,0 100%,0 14px)}
+#menu .box{background:linear-gradient(180deg,rgba(14,17,23,.66),rgba(8,10,14,.6))!important;backdrop-filter:blur(14px) saturate(120%);-webkit-backdrop-filter:blur(14px) saturate(120%);border:1px solid rgba(255,255,255,.07)!important;border-radius:0!important;box-shadow:0 20px 50px rgba(0,0,0,.35)!important;clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px));position:relative}
+#menu .box::before{content:'';position:absolute;left:0;top:0;width:64px;height:2px;background:var(--acc)}
+#menu h3{font-family:Teko,Rajdhani,sans-serif;font-size:26px!important;font-weight:500;letter-spacing:2px!important;color:#fff!important;border-left:0!important;padding-left:0!important;margin-bottom:12px!important}
+#menu .lbl{font-family:Teko,Rajdhani,sans-serif;font-size:19px;letter-spacing:1.5px;color:#aab3be}
+#menu button.card{border-radius:0!important;background:rgba(255,255,255,.04)!important;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%);transition:transform .15s,background .15s,border-color .15s!important}
+#menu button.card:hover{transform:translateY(-3px);background:rgba(255,255,255,.08)!important}
+#menu button.card b{font-family:Teko,Rajdhani,sans-serif;font-size:27px;font-weight:500;letter-spacing:1px}
+#menu button.card.on{background:linear-gradient(180deg,rgba(255,176,32,.22),rgba(255,176,32,.05))!important;box-shadow:inset 0 -3px 0 var(--acc),0 10px 30px rgba(255,176,32,.12)!important}
+#menu .card[data-map] .thumb{height:118px!important;background:#0b0d10!important;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#menu .card[data-map] .thumb canvas{max-width:100%;max-height:100%;opacity:.92}
+#menu button.big{font-family:Teko,Rajdhani,sans-serif;font-size:30px!important;letter-spacing:3px!important;padding:8px 18px 4px!important;box-shadow:0 0 0 rgba(255,176,32,0);transition:filter .15s,box-shadow .15s}
+#menu button.big:hover{filter:brightness(1.12);box-shadow:0 0 28px rgba(255,176,32,.45)}
+#menu input,#menu select{border-radius:0!important;background:rgba(0,0,0,.45)!important}
+#menu .seg button{border-radius:0!important}
+#menu .seg button.on{background:var(--acc)!important;color:#111!important}
 </style>
 <!-- Bibliotecas servidas do próprio repositório (vendor/: mesmas versões e bytes das CDNs, hashes em vendor/HASHES.md): uma CDN comprometida
      não troca o código do jogo. Exceção: index.html aberto direto do disco (file://), onde o navegador bloqueia módulos ES locais (CORS);
@@ -16887,7 +16914,7 @@ function b11bPerdido(W) {
 }
 function warmMsg(W) { // aviso enquanto o mapa aquece
   let el = document.getElementById('warmMsg');
-  if (!W) { el?.remove(); return; }
+  if (!W || !inGame) { el?.remove(); return; } // no menu (fundo 3D) não mostra o aviso
   if (!el) { el = document.createElement('div'); el.id = 'warmMsg'; el.style.cssText = 'position:fixed;left:0;right:0;top:calc(50% + 30px);text-align:center;color:#fff;font:600 18px system-ui,sans-serif;text-shadow:0 2px 6px #000;pointer-events:none;z-index:30'; document.body.appendChild(el); }
   el.textContent = 'Carregando o mapa... ' + Math.min(99, Math.round(W.i / Math.max(1, W.n) * 100)) + '%';
 }
@@ -30950,6 +30977,11 @@ const MICON = { // ícones dos modos
   rounds: '<svg viewBox="0 0 48 48"><rect x="10" y="16" width="28" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 22h6M16 28h10" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="25" r="3" fill="currentColor"/><path d="M24 16V9h8" fill="none" stroke="currentColor" stroke-width="3"/></svg>',
   dm: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 5v11M24 32v11M5 24h11M32 24h11" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="2.5" fill="currentColor"/></svg>',
   zombies: '<svg viewBox="0 0 48 48"><path d="M14 40V22a10 10 0 0 1 20 0v18" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="20" cy="22" r="2.5" fill="currentColor"/><circle cx="28" cy="22" r="2.5" fill="currentColor"/><path d="M18 31l3 2 3-2 3 2 3-2" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M8 14l6 4M40 14l-6 4" stroke="currentColor" stroke-width="3"/></svg>' };
+const PLMINI = {};
+function plantaMini(cv, id) { // miniatura da planta no card do mapa (desenhada uma vez e copiada)
+  let src = PLMINI[id]; if (!src) { src = PLMINI[id] = document.createElement('canvas'); drawPlanta(src, id); }
+  if (!src.width) return; cv.width = src.width; cv.height = src.height; cv.getContext('2d').drawImage(src, 0, 0);
+}
 function drawPlanta(cv, id) { // planta do mapa vista de cima, na hora de montar a partida
   const M = MAPS[id]; if (!cv || !M || M.zonly) return;
   let bx; try { bx = M.boxes(); } catch (e) { return; }
@@ -30998,10 +31030,10 @@ function matchForm(el, st0) {
     el.innerHTML = `<div class="lbl" style="margin-top:4px">Modo</div>
       <div class="cards">${MODES.map(([k, t, d]) => `<button type="button" class="card${st.mode === k ? ' on' : ''}" data-mode="${k}"><span class="micon">${MICON[k]}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div>
       <div class="lbl">Mapa</div>
-      <div class="cards">${maps.map(([k, m]) => `<button type="button" class="card${cur === k ? ' on' : ''}" data-map="${k}"><div class="thumb" style="background:linear-gradient(180deg,${hex(m.skyTop ?? m.sky)},${hex(m.fogC ?? m.sky)} 56%,${hex(m.theme.floor?.[1] ?? 0x555555)} 58%,#0c0d0b)"></div><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}</div>
+      <div class="cards">${maps.map(([k, m]) => `<button type="button" class="card${cur === k ? ' on' : ''}" data-map="${k}"><div class="thumb" style="background:linear-gradient(180deg,${hex(m.skyTop ?? m.sky)},${hex(m.fogC ?? m.sky)} 56%,${hex(m.theme.floor?.[1] ?? 0x555555)} 58%,#0c0d0b)">${z ? '' : `<canvas data-pl="${k}"></canvas>`}</div><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}</div>
       ${z ? '' : `<div class="lbl">Planta do mapa</div><canvas class="planta" width="420" height="300"></canvas>`}
       <div class="lbl">Opções</div>${opts}`;
-    if (!z) drawPlanta(el.querySelector('canvas.planta'), cur);
+    if (!z) { drawPlanta(el.querySelector('canvas.planta'), cur); el.querySelectorAll('canvas[data-pl]').forEach(c => plantaMini(c, c.dataset.pl)); }
   };
   el.onclick = e => {
     const b = e.target.closest('button'); if (!b || !el.contains(b)) return;
@@ -31869,7 +31901,7 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), .05);
   now = performance.now() / 1000; lastFrameAt = performance.now();
-  if (!inGame) { if (B11M.sujo) { B11M.sujo = false; renderer.clear(); } return; } // O1-B11: no menu não desenha nada (o clear de todo quadro esperava a GPU ocupada)
+  if (!inGame) { if (menuFundo(dt)) return; if (B11M.sujo) { B11M.sujo = false; renderer.clear(); } return; } // O1-B11: no menu não desenha nada (o clear de todo quadro esperava a GPU ocupada)
   B11M.sujo = true; // O1-B11
   if (DEBUG && window.__simLock) now = window.__simNow ?? now; else tick(dt); // testes automáticos controlam o tempo (só em desenvolvimento)
   if (WARM) renderer.clear(); else renderScene(); // aquecendo os shaders do mapa: não desenha (o desenho compilaria tudo de uma vez)
@@ -31921,6 +31953,16 @@ function vjQuadro() {
 }
 if (DEBUG) queueMicrotask(() => { if (window.__T) Object.assign(window.__T, { VJ, vjQuadro, renderScene, vmScene, pmJunta, rgJunta, playerModel }); }); // testes de desenho (bench do O4; __o4SemJunta: monta o mapa PvP sem a junção, para comparar)
 // ===== O4-D04 fim =====
+const MF = { t: 0, acc: 0, pedido: false };
+function menuFundo(dt) { // menu: um mapa de verdade passando devagar atrás dos painéis (fora no gráfico 'baixo', com a aba escondida ou num mapa zumbi)
+  if (CFG.gfx === 'baixo' || document.hidden || window.__semFundo3d || $('#menu').classList.contains('hidden')) return false;
+  if (!curMapId) { if (!MF.pedido) { MF.pedido = true; setTimeout(() => { if (!inGame && !curMapId) try { buildMap(['dust', 'arena', 'duna', 'miragem'][Math.random() * 4 | 0]); } catch (e) { } }, 1500); } return false; }
+  if (curMap?.zombie || curMap?.zonly || WARM) return false; // espera o aquecimento dos shaders
+  MF.acc += dt; if (MF.acc < 1 / 30) return true; MF.t += MF.acc; MF.acc = 0; // 30 quadros por segundo bastam no fundo
+  const R = Math.min(curMap.w, curMap.d) * .3, a = MF.t * .035;
+  camera.position.set(Math.cos(a) * R, 7.5 + Math.sin(MF.t * .1) * 1.5, Math.sin(a) * R); camera.lookAt(0, 1.2, 0);
+  sky.position.copy(camera.position); renderer.render(scene, camera); B11M.sujo = true; return true;
+}
 function renderScene() {
   sky.position.copy(camera.position); if (CULL.length) zCull(); b10Quadro(); vjQuadro(); // O1-B10, O4-D04
   if (CFG.gfx === 'alto') { gradePass.uniforms.time.value = now % 100; g01Composer(); composer.render(); } // 6-g01
