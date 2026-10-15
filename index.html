@@ -441,6 +441,107 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 .mf .zdesc{font-size:13px;line-height:1.3;max-height:5.2em;overflow:hidden}
 #lobby .actbar{margin-top:12px!important}
 #lobby h3{margin-bottom:6px!important}
+
+/* ===== Arsenal (Skins + Armeiro, estilo Gunsmith do CoD) e Caixas ===== */
+#menu .mbody>#arsenalPane{max-width:none;margin:-12px -28px;height:calc(100% + 24px);position:relative;overflow:hidden;background:radial-gradient(80% 75% at 64% 50%,#171b22 0%,#07080a 72%)}
+#arsenalPane::before{content:'';position:absolute;left:-14vh;top:50%;width:74vh;height:74vh;transform:translateY(-50%) rotate(45deg);border:1px solid rgba(255,255,255,.06);background:linear-gradient(135deg,rgba(255,255,255,.04),rgba(255,255,255,0) 60%);pointer-events:none}
+#arsenalPane button{font-family:inherit;border-radius:0;letter-spacing:normal}
+.arpick{position:relative;height:100%;display:grid;grid-template-columns:250px minmax(0,1fr);gap:26px;padding:20px 28px;box-sizing:border-box}
+.arh1,#arTitle{font-family:Teko,Rajdhani,sans-serif;font-weight:300;font-size:56px;line-height:.85;letter-spacing:2px;color:#fff;margin:0;text-transform:uppercase;white-space:nowrap}
+#arTitle{width:max-content;max-width:70vw;overflow:hidden;text-overflow:ellipsis}
+#arTitle i,.arh1 i{font-style:normal;color:#8d97a5}
+.arcats{display:flex;flex-direction:column;gap:4px}
+.arcats .hint{margin:4px 0 12px}
+#arsenalPane .arcats button{display:flex;justify-content:space-between;align-items:baseline;font-family:Teko,Rajdhani,sans-serif;font-size:25px;font-weight:400;text-transform:uppercase;letter-spacing:1px;background:rgba(255,255,255,.03);border:0;border-left:3px solid transparent;color:#9aa3ae;padding:5px 12px 1px}
+#arsenalPane .arcats button.on{color:#fff;border-left-color:var(--acc);background:linear-gradient(90deg,rgba(255,176,32,.18),transparent)}
+.arcats small{font-size:17px;color:#6c7682}
+.arpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));grid-auto-rows:116px;gap:10px;align-content:start;padding-top:62px}
+.artile{position:relative;cursor:pointer;background:rgba(14,17,23,.78);border:1px solid rgba(255,255,255,.07);border-bottom:3px solid var(--rc);clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,0 100%);padding:6px 10px;overflow:hidden;transition:background .15s,transform .15s}
+.artile:hover{background:rgba(255,176,32,.1);transform:translateY(-2px)}
+.artile img{display:block;width:100%;height:60px;object-fit:contain;filter:drop-shadow(0 3px 4px rgba(0,0,0,.6))}
+.artile img:not([src]){visibility:hidden}
+.artile b{display:block;font-family:Teko,Rajdhani,sans-serif;font-size:23px;font-weight:500;color:#fff;line-height:1;letter-spacing:1px;margin-top:4px}
+.artile small{display:flex;justify-content:space-between;gap:6px;font-size:12px;color:#8d97a5;white-space:nowrap;overflow:hidden}
+.artile small i{font-style:normal;color:var(--rc);overflow:hidden;text-overflow:ellipsis}
+.arsmith{position:absolute;inset:0}
+#arCv{position:absolute;inset:0;width:100%;height:100%;cursor:grab;background:none}
+#arSvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#arSvg line{stroke:rgba(255,255,255,.38);stroke-width:1}
+#arSvg circle{fill:#fff;stroke:var(--acc);stroke-width:2}
+#arTags{position:absolute;inset:0;pointer-events:none}
+#arsenalPane .artag{position:absolute;width:158px;height:50px;pointer-events:auto;text-align:left;padding:5px 10px;background:rgba(10,12,16,.88);border:1px solid rgba(255,255,255,.13);clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));color:#fff;font-weight:400}
+.artag span{display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#8d97a5;white-space:nowrap}
+.artag span em{font-style:normal;color:var(--acc);margin-right:6px}
+.artag b{display:block;font-family:Teko,Rajdhani,sans-serif;font-size:21px;font-weight:500;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#arsenalPane .artag.on{border-left:3px solid var(--acc)}
+#arsenalPane .artag.sel,#arsenalPane .artag:hover{border-color:var(--acc);background:rgba(44,32,10,.92)}
+.arleft{position:absolute;left:28px;top:14px;bottom:14px;width:340px;display:flex;flex-direction:column;gap:9px;z-index:2}
+#arsenalPane .arback{align-self:flex-start;background:none;border:0;color:#8d97a5;font-size:14px;letter-spacing:1px;padding:0;text-transform:uppercase;font-weight:700}
+#arsenalPane .arback:hover{color:var(--acc)}
+.artabs{display:flex;gap:24px;border-bottom:1px solid rgba(255,255,255,.1)}
+#arsenalPane .artabs button{background:none;border:0;font-family:Teko,Rajdhani,sans-serif;font-size:25px;font-weight:400;letter-spacing:2px;text-transform:uppercase;color:#7d8692;padding:0 0 1px;border-bottom:3px solid transparent;margin-bottom:-1px}
+#arsenalPane .artabs button.on{color:#fff;border-bottom-color:var(--acc)}
+#arsenalPane .artabs button:disabled{opacity:.3;cursor:default}
+#arPanel{flex:1;min-height:0;overflow:hidden}
+.arlv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:baseline;margin-bottom:10px}
+.arlv b{font-family:Teko,Rajdhani,sans-serif;font-size:22px;font-weight:500;color:#fff;letter-spacing:1px}
+.arlv span{font-size:12px;color:#8d97a5;text-align:right}
+.arlv .axbar{grid-column:1/-1}
+.arph{font-family:Teko,Rajdhani,sans-serif;font-size:20px;letter-spacing:2px;color:var(--acc);text-transform:uppercase;margin-bottom:4px}
+#arsenalPane .aropt{display:block;width:100%;text-align:left;margin-bottom:5px;padding:6px 10px;background:rgba(14,17,23,.8);border:1px solid rgba(255,255,255,.08);border-left:3px solid transparent;color:#fff;font-weight:400}
+.aropt b{display:block;font-family:Teko,Rajdhani,sans-serif;font-size:20px;font-weight:500;line-height:1.1;letter-spacing:.5px}
+.aropt small{display:block;font-size:12px;color:#9aa3ae;line-height:1.25}
+#arsenalPane .aropt.on{border-left-color:var(--acc);background:linear-gradient(90deg,rgba(255,176,32,.16),rgba(14,17,23,.8))}
+#arsenalPane .aropt:hover{border-color:rgba(255,176,32,.6)}
+#arsenalPane .aropt.lock{opacity:.45;cursor:not-allowed}
+.areq{display:flex;align-items:center;gap:10px;font-family:Teko,Rajdhani,sans-serif;font-size:21px;letter-spacing:2px;color:#aab3be;text-transform:uppercase}
+.areq b{color:#fff;font-weight:500}
+.areq i{width:9px;height:9px;border-radius:50%;border:1px solid #8d97a5;display:inline-block;margin-right:4px}
+.areq i.on{background:var(--acc);border-color:var(--acc)}
+.arst{display:grid;grid-template-columns:86px 1fr 30px;align-items:center;gap:8px;font-size:13px;color:#aab3be;margin-top:5px}
+.arst i{position:relative;height:5px;background:rgba(255,255,255,.1)}
+.arst u{position:absolute;left:0;top:0;height:100%;background:#e8ecf1}
+.arst em{position:absolute;top:0;height:100%}
+.arst em.up{background:#4cd964}.arst em.dn{background:#ff4b4b}
+.arst b{text-align:right;color:#fff;font-weight:600}
+.armini{font-size:12px;color:#8d97a5;margin-top:7px}
+.arskh{display:flex;justify-content:space-between;align-items:baseline;font-family:Teko,Rajdhani,sans-serif;font-size:20px;letter-spacing:2px;color:#aab3be;text-transform:uppercase;margin-bottom:5px}
+.arskh b{color:#fff;font-weight:500}
+.arsks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.arsk{position:relative;cursor:pointer;background:rgba(14,17,23,.85);border:1px solid rgba(255,255,255,.07);border-bottom:2px solid var(--rc);padding:3px}
+.arsk .sw{height:28px;background-size:110px;background-position:center}
+.arsk .sw.def{background:repeating-linear-gradient(135deg,#2a2d33 0 6px,#33373f 6px 12px)}
+.arsk b{display:block;font-size:11px;font-weight:600;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.arsk.lock{opacity:.32}
+.arsk.on{box-shadow:0 0 0 2px var(--acc);opacity:1}
+.arsk i{position:absolute;left:3px;top:3px;width:8px;height:8px;background:var(--acc);transform:rotate(45deg)}
+.arbp h2{font-family:Teko,Rajdhani,sans-serif;font-size:50px;font-weight:400;line-height:1.05;margin:0;color:#fff;text-transform:uppercase;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.arbp .arcat{color:#7f95ad;font-size:15px;letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+.arbp .arrar{display:flex;align-items:center;gap:8px;color:var(--rc);font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:14px;margin:4px 0 10px}
+.arbp .arrar::before{content:'';width:10px;height:10px;background:var(--rc);transform:rotate(45deg);box-shadow:0 0 10px var(--rc)}
+#arFoot .row{display:flex;gap:8px}
+#arFoot button.big{flex:1;font-size:24px!important;padding:6px 14px 2px!important}
+#arFoot button.big:disabled{filter:grayscale(1);opacity:.5}
+.cxgrid{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;align-items:start}
+.cxside{display:flex;flex-direction:column;gap:12px}
+.cxcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.cxcard{position:relative;background:linear-gradient(180deg,rgba(14,17,23,.75),rgba(8,10,14,.7));backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.07);border-top:3px solid var(--cc);clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px));padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px}
+.cxbox{height:74px;position:relative;display:flex;align-items:center;justify-content:center}
+.cxbox span{width:76px;height:52px;background:linear-gradient(180deg,var(--cc),#15171c 150%);clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%,0 10px);position:relative;filter:drop-shadow(0 0 14px var(--cc))}
+.cxbox span::after{content:'';position:absolute;left:0;right:0;top:16px;height:4px;background:rgba(0,0,0,.45)}
+.cxbox b{position:absolute;right:4px;top:0;font-family:Teko,Rajdhani,sans-serif;font-size:36px;font-weight:500;color:#fff}
+.cxcard h4{white-space:nowrap;font-family:Teko,Rajdhani,sans-serif;font-size:25px;font-weight:500;margin:0;color:var(--cc);letter-spacing:1px;text-transform:uppercase;line-height:1}
+.cxhow{font-size:13px;color:#aab3be;min-height:17px}
+.cxodds div{display:grid;grid-template-columns:62px 1fr 34px;align-items:center;gap:6px;font-size:12px;line-height:1.5}
+.cxodds div.z{opacity:.28}
+.cxodds i{height:5px;background:rgba(255,255,255,.08)}.cxodds u{display:block;height:100%}
+.cxodds b{text-align:right;color:#fff}
+.cxcard button.big{white-space:nowrap;font-size:22px!important;padding:5px 10px 1px!important;margin-top:4px}
+.cxcard button.big:disabled{filter:grayscale(1);opacity:.45}
+.cxfuse{font-size:13px!important;padding:6px!important;border-radius:0!important}
+.cxfuse.hint{text-align:center;padding:7px 0!important}
+#skRoll{margin-top:12px}
+#skRollRes{min-height:52px}
 </style>
 <!-- Bibliotecas servidas do próprio repositório (vendor/: mesmas versões e bytes das CDNs, hashes em vendor/HASHES.md): uma CDN comprometida
      não troca o código do jogo. Exceção: index.html aberto direto do disco (file://), onde o navegador bloqueia módulos ES locais (CORS);
@@ -516,7 +617,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
   <div class="mshell">
     <header class="mtop">
       <div class="mlogo">DAN <i>GUN</i></div>
-      <nav class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="friends">Amigos</button><button data-tab="skins">Skins</button><button data-tab="armory">Armeiro</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></nav>
+      <nav class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="friends">Amigos</button><button data-tab="arsenal">Arsenal</button><button data-tab="cases">Caixas</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></nav>
       <div class="mplayer"><div class="mav" id="mAv">J</div><div class="mpinfo"><input id="inName" maxlength="16" autocomplete="off" title="Seu nome"><div class="mpsub" id="mpSub"></div><div class="mpxp"><i id="mpXp"></i></div></div></div>
     </header>
     <main class="mbody">
@@ -539,33 +640,37 @@ summary{cursor:pointer;color:#fff;font-weight:700}
       </div>
       <div class="box" id="sideFr"></div></div>
     </div>
-    <div data-pane="armory" class="hidden"><div class="box" id="armoryBox"></div></div>
     <div data-pane="friends" id="friendsPane" class="hidden"><div class="box" id="frBox" style="max-width:760px;margin:0 auto"></div></div>
-    <div data-pane="skins" id="skinsPane" class="hidden">
-      <div class="skhead">
-        <div class="box" id="skAcct"></div>
-        <div class="box skcase">
-          <div class="row" style="justify-content:space-between;align-items:flex-end"><div><div class="lbl" style="margin-top:0">Caixas</div><div class="casen"><span class="cicon"></span><b id="skCases">0</b></div></div><button id="btnCase" class="big" style="width:auto;padding:10px 22px">Abrir caixa</button></div>
-          <div class="lbl">Próxima caixa <span id="skXpTxt" style="float:right;color:#ddd;letter-spacing:0"></span></div>
-          <div class="xpbar"><i id="skXp"></i></div>
-          <div class="hint" style="margin-top:8px">XP: abate 10 (headshot 15, bot vale metade) · zumbi 3 · rodada de zumbi sobrevivida 25 · reanimar 20 · partida 40 · vitória 150.</div>
+    <!-- Arsenal: Skins + Armeiro numa aba só, no estilo do Gunsmith do CoD (escolha da arma → gunsmith com Acessórios e Personalizar) -->
+    <div data-pane="arsenal" id="arsenalPane" class="hidden">
+      <div id="arPick" class="arpick"><div class="arcats" id="arCats"></div><div class="arpgrid" id="arGrid"></div></div>
+      <div id="arSmith" class="arsmith hidden">
+        <canvas id="arCv"></canvas><svg id="arSvg"></svg><div id="arTags"></div>
+        <div class="arleft">
+          <button id="arBack" class="arback">← Armas</button>
+          <h1 id="arTitle"></h1>
+          <div class="artabs"><button data-at="att">Acessórios</button><button data-at="cus">Personalizar</button></div>
+          <div id="arPanel"></div>
+          <div id="arFoot"></div>
         </div>
       </div>
-      <div id="skRoll" class="box hidden" style="margin-top:12px"><div class="rstrip"><div class="rtrack"></div><div class="rmark"></div></div><div id="skRollRes"></div></div>
-      <div id="skColl" class="box vcoll">
-        <div id="skGridView">
-          <div class="vhead"><h3>Coleção</h3><span class="hint">Clique numa arma para ver e equipar as skins</span></div>
-          <div id="vGrid" class="vgrid"></div>
-        </div>
-        <div id="skDetail" class="hidden">
-          <div class="vhead"><button id="skBack">← Coleção</button><h3 id="skDTitle"></h3><span id="skDCount" class="hint"></span></div>
-          <div class="vdet">
-            <div><div class="lbl" style="margin-top:0">Suas skins</div><div id="skGrid" class="vskins"></div></div>
-            <div class="vstage"><canvas id="skPrev"></canvas><div class="hint vdrag">arraste para girar</div><div id="skSel" class="vsel"></div></div>
+    </div>
+    <!-- Caixas: conta, XP até a próxima caixa, as quatro caixas de raridade e a roleta -->
+    <div data-pane="cases" id="casesPane" class="hidden">
+      <div class="cxgrid">
+        <div class="cxside">
+          <div class="box" id="skAcct"></div>
+          <div class="box">
+            <div class="lbl" style="margin-top:0">Próxima caixa <span id="skXpTxt" style="float:right;color:#ddd;letter-spacing:0"></span></div>
+            <div class="xpbar"><i id="skXp"></i></div>
+            <div class="hint" style="margin-top:8px">XP: abate 10 (headshot 15, bot vale metade) · zumbi 3 · rodada de zumbi sobrevivida 25 · reanimar 20 · partida 40 · vitória 150. Skin repetida vira XP (60 a 300, conforme a raridade). Facas só saem em Épica ou Lendária.</div>
           </div>
         </div>
+        <div class="cxmain">
+          <div id="cxCards" class="cxcards"></div>
+          <div id="skRoll" class="box"><div class="rstrip"><div class="rtrack"></div><div class="rmark"></div></div><div id="skRollRes"><div class="hint">Escolha uma caixa e clique em Abrir.</div></div></div>
+        </div>
       </div>
-      <div class="hint" style="margin-top:8px">Raridades: <span style="color:#b0c3d9">Comum 60%</span> · <span style="color:#4b69ff">Incomum 25%</span> · <span style="color:#8847ff">Rara 10%</span> · <span style="color:#d32ce6">Épica 4%</span> · <span style="color:#ffae39">Lendária 1%</span>. Facas só saem em Épica ou Lendária. Clique duas vezes numa skin para equipar.</div>
     </div>
     <div data-pane="cfg" class="hidden"><div class="box" style="max-width:520px"><div id="menuSettings"></div></div></div>
     <div data-pane="keys" class="hidden">
@@ -18324,11 +18429,12 @@ function gunModel(id, fp = false, skin = null) {
   if (ud.mag && !ud.magGrab) ud.magGrab = ud.mag.position.clone().add(new V3(0, ud.magUp ? .04 : -.08, 0));
   ud.muzzle = new V3(0, my, mz);
   if (!pap && model !== 'knife' && model !== 'karambit' && TRI_SKIN.has(M.metal)) skinFit(g, fp); // skin: escala por arma e detalhes em metal escuro
-  if (!GM_VM && model !== 'knife' && model !== 'karambit') try { dlGun(g, id, pap || skin ? M : null); } catch (e) { console.warn(e); } // modelo baixado (mundo, mãos dos outros, vitrine)
+  if (!GM_VM && !GM_PROC && model !== 'knife' && model !== 'karambit') try { dlGun(g, id, pap || skin ? M : null); } catch (e) { console.warn(e); } // modelo baixado (mundo, mãos dos outros, vitrine)
   if (model === 'knife' || model === 'karambit') try { knifeSwap(g, model, M.blade !== gunMats(false, fp, null).blade ? { a: M.blade, b: M.polymer } : null); } catch (e) { } // faca baixada no lugar da procedural (se já carregou)
   if (pap) papUV(g); // 6-w13
   return g;
 }
+let ATT_PV = null, GM_PROC = false; // Arsenal (menu): prévia dos acessórios e arma feita no código (sem a baixada)
 let GM_VM = false; // gunModel chamado pela primeira pessoa (lá a arma baixada entra com os braços prontos, não aqui)
 // arma baixada no lugar da procedural fora da primeira pessoa: o gatilho fica logo acima/à frente do ponto da mão (ud.rh) e o tamanho é o real
 function dlGun(g, id, M) {
@@ -20476,6 +20582,7 @@ function wLevel(id) {
 }
 const attUnlocked = id => ATT_ORDER.slice(0, wLevel(id).l - 1);
 function attOn(id) { // acessórios valendo agora (só no modo Zumbi)
+  if (ATT_PV) return ATT_PV.list; // prévia do Arsenal (menu): os acessórios escolhidos, sem mexer no jogo
   if (!ZC.on || !attOK(id) || fpw(id)) return []; // só nas armas feitas no código (modo Zumbi), nunca nas baixadas
   const un = new Set(attUnlocked(id));
   return (PROF.data?.att?.[attBase(id)] || []).filter(a => un.has(a) && ATT[a]);
@@ -20536,7 +20643,7 @@ function attScan(gun) { // vértices visíveis da arma no espaço dela (P: x, y,
 function attPartsProc(id, gun, ud) {
   const on = attOn(id); if (!on.length || !ud.muzzle) return;
   const b = attBase(id), sem = ATTV.sem[b] || [], slot = s => { const a = on.find(a => ATT[a].slot === s); return a && !sem.includes(s) && !sem.includes(a) ? a : null; };
-  const N = gunMats(false, true, null), M = gunMats(W[id]?.pap | 0, true, skinOf(id)), X = attMats(), hi = CFG.gfx !== 'baixo';
+  const N = gunMats(false, true, null), M = gunMats(W[id]?.pap | 0, true, ATT_PV ? ATT_PV.f : skinOf(id)), X = attMats(), hi = CFG.gfx !== 'baixo';
   const hg = W[b]?.slot === 'secondary', pis = !!(ud.slide && ud.pistol), sg = ud.rig === 'shell' || ud.rig === 'break', bull = W[b]?.model === 'bull';
   const movers = [ud.slide, ud.pump, ud.brk].filter(Boolean), V = (x, y, z) => new V3(x, y, z);
   gun.updateMatrixWorld(true);
@@ -20830,27 +20937,6 @@ function w15PenteDuplo(gun, mag, cs, Mb, q, ki, hgt, dy, put, RB, N) { // o segu
     let z0 = Math.min(A.n ? A.z0 : 1e9, B.n ? B.z0 : 1e9), z1 = Math.max(A.n ? A.z1 : -1e9, B.n ? B.z1 : -1e9); if (z0 > z1) { z0 = Mb.min.z; z1 = Mb.max.z; } if (z1 - z0 < .012) continue; // fatia estreita demais (ponta do curvo): sem braçadeira, que ficaria solta
     mag.attach(put(gun, RB(Mb.max.x - C.min.x + .006, .008, z1 - z0 + .006, .002), N.optic, (C.min.x + Mb.max.x) / 2, ly, (z0 + z1) / 2));
   }
-}
-// tela do Armeiro (menu): nível, XP e acessórios de cada arma
-let ARM_SEL = null;
-function armoryUI() {
-  const el = $('#armoryBox'); if (!el || !PROF.data) return;
-  const ws = Object.keys(W).filter(k => attOK(k) && !W[k].pap).sort((a, b) => wLevel(b).l - wLevel(a).l || (PROF.data.wxp?.[b] || 0) - (PROF.data.wxp?.[a] || 0) || W[a].name.localeCompare(W[b].name));
-  if (!ARM_SEL || !ws.includes(ARM_SEL)) ARM_SEL = ws[0];
-  const bar = (x, n) => `<div class="axbar"><i style="width:${n ? Math.round(100 * x / n) : 100}%"></i></div>`;
-  const list = ws.map(k => { const L = wLevel(k); return `<button class="armw${k === ARM_SEL ? ' on' : ''}" data-w="${k}"><b>${esc(W[k].name)}</b><span>Nv ${L.l}</span>${bar(L.xp, L.need)}</button>`; }).join('');
-  const L = wLevel(ARM_SEL), un = new Set(attUnlocked(ARM_SEL)), eq = PROF.data.att?.[ARM_SEL] || [];
-  const rows = ATT_ORDER.map((a, i) => {
-    const A = ATT[a], ok = un.has(a), on = eq.includes(a);
-    return `<label class="arma${ok ? '' : ' lock'}${on ? ' on' : ''}"><input type="checkbox" data-a="${a}"${on ? ' checked' : ''}${ok ? '' : ' disabled'}><span class="sl">${ATT_SLOTS[A.slot]}</span><b>${esc(A.name)}</b><small>${ok ? esc(A.d) : 'Libera no nível ' + (i + 2)}</small></label>`;
-  }).join('');
-  el.innerHTML = `<div class="armgrid"><div class="armlist">${list}</div><div class="armdet"><h3>${esc(W[ARM_SEL].name)} <small>Nível ${L.l}${L.need ? ` · ${L.xp}/${L.need} XP` : ' · máximo'}</small></h3>${bar(L.xp, L.need)}<div class="hint">Escolha até ${ATT_MAX} acessórios, um por encaixe (${eq.length}/${ATT_MAX}). Valem no modo Zumbi, também na arma do Pack-a-Punch. Mate zumbis com a arma para subir de nível (tiro na cabeça vale mais).</div><div class="armatts">${rows}</div></div></div>`;
-  el.querySelectorAll('.armw').forEach(b => b.onclick = () => { ARM_SEL = b.dataset.w; armoryUI(); });
-  el.querySelectorAll('.arma input').forEach(c => c.onchange = () => {
-    const a = c.dataset.a, d = PROF.data; d.att = d.att || {}; if (!attUnlocked(ARM_SEL).includes(a)) { c.checked = false; return; } let cur = (d.att[ARM_SEL] || []).filter(x => x !== a);
-    if (c.checked) { cur = cur.filter(x => ATT[x].slot !== ATT[a].slot); if (cur.length >= ATT_MAX) { c.checked = false; centerMsg('Máximo de ' + ATT_MAX + ' acessórios', '', 1.5); return; } cur.push(a); }
-    d.att[ARM_SEL] = cur; profSave(); armoryUI();
-  });
 }
 function startReload() {
   const w = W[G.cur], a = G.ammo[G.cur];
@@ -31146,13 +31232,14 @@ function grantAllSkins() {
 }
 const PROF = { user: null, uid: null, email: '', name: '', cloud: false, fb: false, data: null, saveT: 0, status: '' };
 const FB = {};
-const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0, st: {}, wxp: {}, att: {} });
+const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0, st: {}, wxp: {}, att: {}, cx: { r: 0, e: 0, l: 0 } }); // cases: Caixas Comuns; cx: Raras, Épicas e Lendárias
 const STK = ['k', 'd', 'hs', 'w', 'm', 'zk', 'zr']; // abates, mortes, headshots, vitórias, partidas, zumbis, recorde de rodada
 function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) { if (w === '_faca') { if (f === 'karambit') o._faca = f; } else if (typeof f === 'string' && Object.hasOwn(W, w) && Object.hasOwn(SKIN_BY, f)) o[w] = f; } return o; } // hasOwn: 'constructor'/'toString' passavam e quebravam o state de todos
 function cleanProf(d) {
   const p = newProfile(0); if (!d || typeof d !== 'object') return p;
   p.xp = Math.max(0, +d.xp || 0); p.cases = Math.max(0, Math.floor(+d.cases || 0)); p.opened = Math.max(0, Math.floor(+d.opened || 0));
   p.items = Array.isArray(d.items) ? [...new Set(d.items.filter(it => typeof it === 'string' && Object.hasOwn(W, it.split(':')[0]) && Object.hasOwn(SKIN_BY, it.split(':')[1] ?? '')))] : [];
+  if (d.cx && typeof d.cx === 'object') for (const k of ['r', 'e', 'l']) p.cx[k] = Math.max(0, Math.min(1e5, Math.floor(+d.cx[k] || 0))); // caixas de raridade (perfil antigo: zero)
   p.st = {}; if (d.st && typeof d.st === 'object') for (const k of STK) p.st[k] = Math.max(0, Math.floor(+d.st[k] || 0));
   if (d.wxp && typeof d.wxp === 'object') for (const [k, v] of Object.entries(d.wxp)) if (Object.hasOwn(W, k) && +v > 0) p.wxp[k] = Math.min(1e7, Math.floor(+v)); // nível das armas (Armeiro)
   if (d.att && typeof d.att === 'object') for (const [k, v] of Object.entries(d.att)) if (Object.hasOwn(W, k) && Array.isArray(v)) { const a = [], sl = new Set(); for (const x of v.slice(0, 20)) if (typeof x === 'string' && Object.hasOwn(ATT, x) && !sl.has(ATT[x].slot) && a.length < ATT_MAX) { sl.add(ATT[x].slot); a.push(x); } if (a.length) p.att[k] = a; }
@@ -31314,7 +31401,7 @@ function frUI() {
   const box = $('#frBox'); if (!box) return;
   let h;
   if (!PROF.fb) h = '<b>Amigos</b><div class="hint">Carregando contas...</div>';
-  else if (!PROF.uid) h = '<b>Amigos</b><div class="hint">Entre na sua conta (aba Skins) para adicionar amigos e receber convites.</div>';
+  else if (!PROF.uid) h = '<b>Amigos</b><div class="hint">Entre na sua conta (aba Caixas) para adicionar amigos e receber convites.</div>';
   else if (!PROF.user) h = `<b>Escolha seu nome de usuário</b><div class="hint" style="margin-top:4px">É o seu ID fixo: aparece no jogo e seus amigos te adicionam por ele. Não dá para trocar depois. De 3 a 16 caracteres: letras minúsculas, números ou _.</div>
     <div class="row" style="margin-top:10px"><input id="frUser" maxlength="16" placeholder="usuário" autocomplete="off" style="flex:1"><button id="frClaim">Confirmar</button></div>`;
   else {
@@ -31335,7 +31422,7 @@ function frUI() {
   setHTMLm('invBar', inGame || LB.on ? '' : FR.inv.map(i => `<div class="invb"><span><b>${esc(i.fromName)}</b> te chamou para ${i.priv ? 'uma sala só com convite' : 'uma sala'}${i.mode ? ' · ' + esc(i.mode) : ''}</span><span style="flex:1"></span><button data-ij="${esc(i.id)}">Entrar</button><button data-ix="${esc(i.id)}">Recusar</button></div>`).join(''));
   // quadro lateral da tela Jogar: amigos online (com atalho para a sala deles)
   const on = [...FR.list.values()].filter(f => f.st === 'ok' && frOnline(frOther(f).name));
-  setHTMLm('sideFr', '<h3>Amigos online</h3>' + (!PROF.uid ? '<div class="hint" style="margin:0">Entre na sua conta (aba Skins) para ver seus amigos e receber convites.</div>'
+  setHTMLm('sideFr', '<h3>Amigos online</h3>' + (!PROF.uid ? '<div class="hint" style="margin:0">Entre na sua conta (aba Caixas) para ver seus amigos e receber convites.</div>'
     : !PROF.user ? '<div class="hint" style="margin:0">Escolha seu usuário na aba Amigos.</div>'
     : on.length ? on.map(f => { const o = frOther(f), inf = FR.info[o.name] || {}; return `<div class="lbrow"><span class="dot on"></span><b>${esc(o.name)}</b>${inf.room && inf.room !== NET.code ? (inf.rp ? '<small>sala privada</small>' : `<button data-fj="${esc(inf.room)}">Entrar</button>`) : ''}</div>`; }).join('')
     : `<div class="hint" style="margin:0">Nenhum amigo online agora.${FR.list.size ? '' : ' Adicione amigos na aba Amigos.'}</div>`));
@@ -31544,13 +31631,22 @@ function grantXP(n) {
   const d = PROF.data; if (!d || !(n > 0)) return;
   d.xp += n; let got = 0;
   while (d.xp >= XP_CASE) { d.xp -= XP_CASE; d.cases++; got++; }
-  if (got && inGame) { toast(got > 1 ? `Você ganhou ${got} caixas de skin! Abra no menu → Skins` : 'Você ganhou uma caixa de skin! Abra no menu → Skins', 4); play('kaching'); }
+  if (got && inGame) { toast(got > 1 ? `Você ganhou ${got} Caixas Comuns! Abra no menu → Caixas` : 'Você ganhou uma Caixa Comum! Abra no menu → Caixas', 4); play('kaching'); }
   profSave(); if (!inGame) skinsUI(); // em jogo o menu está escondido (e sair recarrega a página): redesenhar aqui travava o host ~0,3 s a cada XP
 }
-// ---------- caixa ----------
-function rollItem() {
-  let r = Math.random() * 100, rar = 0;
-  for (let i = 0; i < RARITY.length; i++) { r -= RARITY[i].p; if (r <= 0) { rar = i; break; } }
+// ---------- caixas: Comum (a cada XP_CASE de XP), Rara, Épica e Lendária (juntando 3 da raridade de baixo) ----------
+const CASES = [ // p: chance (%) de cada raridade de skin: Comum, Incomum, Rara, Épica, Lendária
+  { k: 'c', name: 'Caixa Comum', pl: 'Comuns', css: '#b0c3d9', p: [60, 25, 10, 4, 1], how: `1 a cada ${XP_CASE} XP jogando` },
+  { k: 'r', name: 'Caixa Rara', pl: 'Raras', css: '#4b69ff', p: [0, 45, 35, 15, 5], how: 'Junte 3 Caixas Comuns' },
+  { k: 'e', name: 'Caixa Épica', pl: 'Épicas', css: '#d32ce6', p: [0, 0, 50, 35, 15], how: 'Junte 3 Caixas Raras' },
+  { k: 'l', name: 'Caixa Lendária', pl: 'Lendárias', css: '#ffae39', p: [0, 0, 0, 60, 40], how: 'Junte 3 Caixas Épicas' },
+];
+const CX_FUSE = 3, DUP_XP = [60, 80, 120, 200, 300]; // skin repetida vira XP conforme a raridade dela
+const cxN = (d, t) => t ? (d.cx?.[CASES[t].k] || 0) : d.cases; // a Comum continua sendo o campo antigo "cases"
+function cxAdd(d, t, n) { if (!t) d.cases += n; else { d.cx = d.cx || { r: 0, e: 0, l: 0 }; d.cx[CASES[t].k] = (d.cx[CASES[t].k] || 0) + n; } }
+function rollItem(t = 0) {
+  const P = (CASES[t] || CASES[0]).p; let r = Math.random() * 100, rar = 0;
+  for (let i = 0; i < P.length; i++) { if (!P[i]) continue; rar = i; r -= P[i]; if (r <= 0) break; }
   const fs = SKINS.filter(s => s.r === rar), f = fs[Math.floor(Math.random() * fs.length)];
   const ws = SKIN_WEAPONS().filter(w => w !== 'knife'); let w = ws[Math.floor(Math.random() * ws.length)];
   if (rar >= 3 && Math.random() < .25) w = Math.random() < .5 ? 'knife' : 'karambit'; // faca só sai em Épica ou Lendária
@@ -31583,14 +31679,13 @@ function skCard(it, extra = '') {
 }
 function skinsUI() {
   mpUI();
-  const pane = $('#skinsPane'); if (!pane || !PROF.data) return;
-  const d = PROF.data;
-  // conta
+  if (!PROF.data || !$('#casesPane')) return;
+  // conta (aba Caixas)
   let ac;
   if (!PROF.fb) ac = `<b>Perfil local</b><div class="hint" style="margin-top:4px">${FIREBASE_CONFIG ? 'Carregando contas...' : 'As contas online ainda não foram configuradas: o progresso fica salvo só neste navegador.'}</div>`;
   else if (!PROF.uid) ac = `<b>Entre para salvar suas skins na conta</b>
     <div class="row" style="margin-top:8px"><button id="acGoogle">Entrar com Google</button></div>
-    <div class="row" style="margin-top:8px"><input id="acEmail" type="email" placeholder="e-mail" autocomplete="email" style="flex:1;min-width:140px"><input id="acPass" type="password" placeholder="senha" autocomplete="current-password" style="flex:1;min-width:110px"></div>
+    <div class="row" style="margin-top:8px"><input id="acEmail" type="email" placeholder="e-mail" autocomplete="email" style="flex:1;min-width:110px"><input id="acPass" type="password" placeholder="senha" autocomplete="current-password" style="flex:1;min-width:90px"></div>
     <div class="row" style="margin-top:6px"><input id="acUser" maxlength="16" placeholder="usuário (para criar conta)" autocomplete="off" style="flex:1"></div>
     <div class="row" style="margin-top:6px"><button id="acLogin">Entrar</button><button id="acSignup">Criar conta</button></div>
     <div class="hint" style="margin-top:6px">Sem entrar, o progresso fica neste navegador e vai pra conta no primeiro login.</div>`;
@@ -31603,46 +31698,187 @@ function skinsUI() {
   $('#acLogin') && ($('#acLogin').onclick = () => authDo('login'));
   $('#acSignup') && ($('#acSignup').onclick = () => authDo('signup'));
   $('#acOut') && ($('#acOut').onclick = () => authDo('logout'));
-  // progresso e caixas
+  casesUI();
+  if (!$('#arsenalPane').classList.contains('hidden')) arsenalUI();
+}
+// ---------- aba Caixas: as quatro caixas (quantas tem, chances, como ganhar, juntar) ----------
+function casesUI() {
+  const d = PROF.data; if (!d || !$('#cxCards')) return;
   $('#skXp').style.width = (d.xp / XP_CASE * 100).toFixed(1) + '%';
   $('#skXpTxt').textContent = `${Math.floor(d.xp)} / ${XP_CASE} XP`;
-  $('#skCases').textContent = d.cases;
-  $('#btnCase').disabled = !d.cases || SKUI.rolling;
-  $('#btnCase').textContent = SKUI.rolling ? 'Abrindo...' : d.cases ? 'Abrir caixa' : 'Sem caixas';
-  // coleção estilo Valorant: todas as armas à mostra, em colunas por categoria; clicar abre a tela da arma
-  const items = d.items.filter(it => it !== SKUI.hide);
-  const grid = SKUI.view !== 'detail';
-  $('#skGridView').classList.toggle('hidden', !grid); $('#skDetail').classList.toggle('hidden', grid);
-  if (grid) {
-    setHTMLm('vGrid', vCategories().map(col => `<div class="vcol">${col.map(([cat, ws]) => `<div class="vcat">${cat}</div>` + ws.map(w => {
-      const n = items.filter(it => it.startsWith(w + ':')).length, f = d.equipped[w] || '', rar = f ? SKIN_BY[f].r : -1, url = thumbURL(w, f);
-      return `<div class="vtile" data-w="${w}" style="--rc:${rar >= 0 ? RARITY[rar].css : 'transparent'}">${url ? `<img src="${url}" alt="">` : `<img data-th="${w}:${f}" alt="">`}<b>${esc(itemInfo(w + ':x').wn)}</b>${isKnife(w) && knifeInUse() === w ? `<i style="color:var(--acc)">em uso${f ? ' · ' + esc(SKIN_BY[f].name) : ''}</i>` : f ? `<i>${esc(SKIN_BY[f].name)}</i>` : ''}${n ? `<span>${n}</span>` : ''}</div>`;
-    }).join('')).join('')}</div>`).join(''));
-    pvShow(null);
+  setHTMLm('cxCards', CASES.map((c, t) => {
+    const n = cxN(d, t), canF = t && cxN(d, t - 1) >= CX_FUSE && !SKUI.rolling;
+    return `<div class="cxcard" style="--cc:${c.css}" data-case="${c.k}"><div class="cxbox"><span></span><b>${n}</b></div><h4>${c.name}</h4><div class="cxhow">${c.how}</div>
+      <div class="cxodds">${c.p.map((p, i) => `<div class="${p ? '' : 'z'}"><span style="color:${RARITY[i].css}">${RARITY[i].name}</span><i><u style="width:${p ? Math.max(3, p) : 0}%;background:${RARITY[i].css}"></u></i><b>${p}%</b></div>`).join('')}</div>
+      <button class="big" data-open="${t}"${n && !SKUI.rolling ? '' : ' disabled'}>${SKUI.rolling ? 'Abrindo...' : n ? 'Abrir' : 'Sem caixas'}</button>
+      ${t ? `<button class="cxfuse" data-fuse="${t}"${canF ? '' : ' disabled'}>Juntar ${CX_FUSE} ${CASES[t - 1].pl} → 1 (você tem ${cxN(d, t - 1)})</button>` : '<div class="cxfuse hint">Conta nova começa com 2</div>'}</div>`;
+  }).join(''));
+}
+function fuseCase(t) { // junta 3 caixas de uma raridade numa da raridade acima
+  const d = PROF.data; if (!d || !t || SKUI.rolling || cxN(d, t - 1) < CX_FUSE) return;
+  cxAdd(d, t - 1, -CX_FUSE); cxAdd(d, t, 1); profSave(true); play('kaching'); skinsUI();
+}
+// ---------- aba Arsenal: escolher a arma → gunsmith (Acessórios e Personalizar) ----------
+const AR = { w: null, cat: 0, tab: 'att', slot: null, sel: null, hov: undefined, tagPos: {} };
+const AR_CAT1 = { Pistolas: 'Pistola', SMGs: 'Submetralhadora', Escopetas: 'Escopeta', Rifles: 'Rifle de assalto', 'Precisão': 'Rifle de precisão', Pesadas: 'Arma pesada', 'Corpo a corpo': 'Corpo a corpo', Outras: 'Especial' };
+const AR_ICON = { optic: '◎', muzzle: '≡', barrel: '━', under: '┴', mag: '▮', rgrip: '◢', stock: '◣', laser: '✦' };
+const AR_ROWS = { top: ['stock', 'optic', 'barrel', 'muzzle'], bot: ['rgrip', 'mag', 'under', 'laser'] };
+const arWeapons = () => [...new Set([...SKIN_WEAPONS(), ...Object.keys(W).filter(k => attOK(k) && !W[k].pap)])];
+const arCats = () => vCategories(arWeapons()).flat();
+const arAtts = w => attOK(w) ? (PROF.data.att?.[w] || []).filter(a => attUnlocked(w).includes(a)) : [];
+// atributos (0–100) a partir da arma (W) e dos multiplicadores dos acessórios; só para mostrar, o jogo usa attStat
+function arStats(w, list) {
+  const x = W[w], m = k => list.reduce((v, a) => v * (ATT[a][k] ?? 1), 1), c = v => Math.max(0, Math.min(100, Math.round(v)));
+  const lg = (v, a, b) => (Math.log10(Math.max(v, 1e-5)) - Math.log10(a)) / (Math.log10(b) - Math.log10(a));
+  return [
+    ['Precisão', c(100 * (1 - lg((x.spread || .01) * m('spr') * m('hip'), .002, .09)))],
+    ['Dano', c(100 * (x.dmg || 0) * (x.pellets ? Math.pow(x.pellets, .6) : 1) * m('dmgX') / 130)],
+    ['Alcance', c(100 * Math.pow(x.rm || .8, 4 / m('rangeX')))],
+    ['Cadência', c(100 / (x.rate || 1) / 15)],
+    ['Mobilidade', c(100 * (.55 * ((x.speed || 1) - .75) / .27 + .25 * Math.min(1, (m('adsSpd') - .8) / .8) + .2 * (1 - (x.move || .1) * m('moveX') / .3)))],
+    ['Controle', c(100 * (1 - lg((x.recoil || .02) * m('kick'), .005, .12)))],
+  ];
+}
+function arFoot() {
+  const d = PROF.data, w = AR.w; if (!w) return;
+  if (AR.tab === 'att') {
+    const eq = arAtts(w);
+    let alt = null; if (AR.hov !== undefined && AR.slot) { alt = eq.filter(a => ATT[a].slot !== AR.slot); if (AR.hov) alt.push(AR.hov); }
+    const S = arStats(w, eq), A = alt && arStats(w, alt), x = W[w], mag = l => Math.max(1, Math.round((x.mag || 0) * l.reduce((v, a) => v * (ATT[a].magX ?? 1), 1))), rl = l => ((x.reload || 0) * l.reduce((v, a) => v * (ATT[a].reloadX ?? 1), 1)).toFixed(1).replace('.', ',');
+    setHTMLm('arFoot', `<div class="areq">Equipado <b>${eq.length}/${ATT_MAX}</b><span>${Array.from({ length: ATT_MAX }, (_, i) => `<i class="${i < eq.length ? 'on' : ''}"></i>`).join('')}</span></div>` +
+      S.map(([n, v], i) => { const v2 = A ? A[i][1] : v, lo = Math.min(v, v2), df = Math.abs(v2 - v); return `<div class="arst"><span>${n}</span><i><u style="width:${lo}%"></u>${df ? `<em class="${v2 > v ? 'up' : 'dn'}" style="left:${lo}%;width:${df}%"></em>` : ''}</i><b>${v2}</b></div>`; }).join('') +
+      (x.mag ? `<div class="armini">Pente ${A ? mag(alt) : mag(eq)} · Recarga ${A ? rl(alt) : rl(eq)} s · os acessórios valem no modo Zumbi</div>` : ''));
     return;
   }
-  const w = SKUI.weap, mine = items.filter(it => it.startsWith(w + ':')).sort((a, b) => itemInfo(b).rar - itemInfo(a).rar);
-  const eqDef = !d.equipped[w];
-  setHTMLm('skDTitle', esc(itemInfo(w + ':x').wn));
-  setHTMLm('skDCount', (mine.length ? `${mine.length} de ${SKINS.length} skins` : 'nenhuma skin ainda — abra caixas!') + (isKnife(w) ? (knifeInUse() === w ? ' · <b style="color:var(--acc)">faca em uso</b>' : ' · <button id="skUseK" style="padding:3px 10px">Usar esta faca</button>') : ''));
-  if ($('#skUseK')) $('#skUseK').onclick = () => { if (w === 'karambit') d.equipped._faca = 'karambit'; else delete d.equipped._faca; profSave(); skinsUI(); skinsChanged(); };
-  setHTMLm('skGrid', `<div class="skc${SKUI.sel === 'def:' + w ? ' on' : ''}" data-def="${w}" style="--rc:#5a6070"><div class="sw def"></div><b>Padrão</b><small style="color:#9aa">sem skin</small>${eqDef ? '<i>EQUIPADA</i>' : ''}</div>` + mine.map(it => skCard(it)).join(''));
-  if (SKUI.sel && SKUI.sel !== 'def:' + w && !mine.includes(SKUI.sel)) SKUI.sel = null;
-  if (!SKUI.sel) SKUI.sel = d.equipped[w] && mine.includes(w + ':' + d.equipped[w]) ? w + ':' + d.equipped[w] : 'def:' + w;
-  if (SKUI.sel.startsWith('def:')) {
-    setHTMLm('skSel', `<div class="sknm" style="--rc:#5a6070"><b>Padrão</b><span style="color:#9aa">sem skin</span></div>${eqDef ? '<button disabled>Equipada</button>' : '<button id="skEq" class="big">Equipar</button>'}`);
-    if (!eqDef) $('#skEq').onclick = () => { delete d.equipped[w]; profSave(); skinsUI(); skinsChanged(); };
-    pvShow(w, null);
-  } else {
-    const { f, s: sk, rar } = itemInfo(SKUI.sel), eq = d.equipped[w] === f;
-    setHTMLm('skSel', `<div class="sknm" style="--rc:${RARITY[rar].css}"><b>${esc(sk.name)}</b><span>${RARITY[rar].name}</span></div><button id="skEq" class="${eq ? '' : 'big'}">${eq ? 'Remover skin' : 'Equipar'}</button>`);
-    $('#skEq').onclick = () => equipItem(SKUI.sel, !eq);
-    pvShow(w, f);
+  const own = arSkinOwned(w), f = AR.sel, s = f && SKIN_BY[f], have = !f || own.has(f), eqF = d.equipped[w] || null, isEq = (f || null) === eqF;
+  const rc = s ? RARITY[s.r].css : '#7f8a99', cat = arCats().find(([, ws]) => ws.includes(w))?.[0];
+  setHTMLm('arFoot', `<div class="arbp" style="--rc:${rc}"><h2>${esc(s ? s.name : 'Padrão')}</h2><div class="arcat">${esc(itemInfo(w + ':x').wn)} · ${esc(AR_CAT1[cat] || 'Arma')}</div><div class="arrar">${s ? RARITY[s.r].name : 'Sem skin'}</div></div>
+    <div class="row"><button id="arEq" class="big"${have && !isEq ? '' : ' disabled'}>${!have ? 'Ganhe em Caixas' : isEq ? 'Equipada' : 'Equipar'}</button>${isKnife(w) ? (knifeInUse() === w ? '' : '<button id="arUseK" class="big alt">Usar esta faca</button>') : ''}</div>`);
+  $('#arEq').onclick = () => { if (!f) { delete d.equipped[w]; profSave(); skinsChanged(); arsenalUI(); } else equipItem(w + ':' + f, true); };
+  if ($('#arUseK')) $('#arUseK').onclick = () => { if (w === 'karambit') d.equipped._faca = 'karambit'; else delete d.equipped._faca; profSave(); skinsChanged(); arsenalUI(); };
+}
+const arSkinOwned = w => new Set(PROF.data.items.filter(it => it !== SKUI.hide && it.startsWith(w + ':')).map(it => it.split(':')[1]));
+function arsenalUI() {
+  const d = PROF.data; if (!d || !$('#arsenalPane')) return;
+  const cats = arCats(); if (AR.w && !arWeapons().includes(AR.w)) AR.w = null;
+  $('#arPick').classList.toggle('hidden', !!AR.w); $('#arSmith').classList.toggle('hidden', !AR.w);
+  if (!AR.w) { // escolha da arma: categorias à esquerda, armas da categoria à direita
+    AR.cat = Math.min(AR.cat, cats.length - 1);
+    const nAll = arWeapons().length * SKINS.length;
+    setHTMLm('arCats', `<h1 class="arh1">Arsenal</h1><div class="hint">Escolha uma arma para abrir o gunsmith dela: acessórios e skins. ${d.items.length}/${nAll} skins na coleção.</div>` + cats.map(([c, ws], i) => `<button data-cat="${i}" class="${i === AR.cat ? 'on' : ''}">${c}<small>${ws.length}</small></button>`).join(''));
+    setHTMLm('arGrid', cats[AR.cat][1].map(w => {
+      const f = d.equipped[w] || '', rar = f ? SKIN_BY[f].r : -1, url = thumbURL(w, f), n = arSkinOwned(w).size, ok = attOK(w);
+      return `<div class="artile" data-w="${w}" style="--rc:${rar >= 0 ? RARITY[rar].css : 'rgba(255,255,255,.12)'}">${url ? `<img src="${url}" alt="">` : `<img data-th="${w}:${f}" alt="">`}<b>${esc(itemInfo(w + ':x').wn)}</b><small><span>${ok ? 'Nv ' + wLevel(w).l + ' · ' : ''}${n}/${SKINS.length} skins${isKnife(w) && knifeInUse() === w ? ' · em uso' : ''}</span>${f ? `<i>${esc(SKIN_BY[f].name)}</i>` : ''}</small></div>`;
+    }).join(''));
+    return;
   }
+  const w = AR.w, ok = attOK(w); if (!ok) AR.tab = 'cus';
+  setHTMLm('arTitle', `${esc(itemInfo(w + ':x').wn)} <i>Gunsmith</i>`);
+  document.querySelectorAll('#arSmith .artabs button').forEach(b => { b.classList.toggle('on', b.dataset.at === AR.tab); b.disabled = b.dataset.at === 'att' && !ok; });
+  if (AR.tab === 'att') {
+    const L = wLevel(w), un = attUnlocked(w), eq = arAtts(w);
+    let h = `<div class="arlv"><b>Nível ${L.l}</b><span>${L.need ? `${L.xp}/${L.need} XP` : 'nível máximo'}</span><div class="axbar"><i style="width:${L.need ? Math.round(100 * L.xp / L.need) : 100}%"></i></div></div>`;
+    if (AR.slot) {
+      const cur = eq.find(a => ATT[a].slot === AR.slot) || '';
+      h += `<div class="arph">${ATT_SLOTS[AR.slot]}</div><button class="aropt${cur ? '' : ' on'}" data-opt=""><b>Nenhum</b><small>Encaixe vazio</small></button>` + ATT_ORDER.filter(a => ATT[a].slot === AR.slot).map(a => {
+        const o = un.includes(a); return `<button class="aropt${a === cur ? ' on' : ''}${o ? '' : ' lock'}" data-opt="${a}"><b>${esc(ATT[a].name)}</b><small>${o ? esc(ATT[a].d) : 'Libera no nível ' + (ATT_ORDER.indexOf(a) + 2)}</small></button>`;
+      }).join('');
+    } else h += `<div class="hint">Clique numa etiqueta em volta da arma para trocar o acessório daquele encaixe (até ${ATT_MAX}, um por encaixe). Valem no modo Zumbi, também na arma do Pack-a-Punch. Mate zumbis com esta arma para subir de nível e liberar mais.</div>`;
+    setHTMLm('arPanel', h);
+  } else {
+    const own = arSkinOwned(w), eqF = d.equipped[w] || '';
+    if (AR.sel === null) AR.sel = eqF; // começa na skin equipada
+    const list = [...SKINS].sort((a, b) => (own.has(b.id) - own.has(a.id)) || b.r - a.r);
+    setHTMLm('arPanel', `<div class="arskh">Skins <b>${own.size}/${SKINS.length}</b></div><div class="arsks"><div class="arsk${AR.sel === '' ? ' on' : ''}" data-sk="" style="--rc:#5a6070">${eqF ? '' : '<i></i>'}<div class="sw def"></div><b>Padrão</b></div>` +
+      list.map(s => `<div class="arsk${own.has(s.id) ? '' : ' lock'}${AR.sel === s.id ? ' on' : ''}" data-sk="${s.id}" style="--rc:${RARITY[s.r].css}" title="${esc(s.name)} · ${RARITY[s.r].name}${own.has(s.id) ? '' : ' (ainda não tem)'}">${eqF === s.id ? '<i></i>' : ''}<div class="sw" style="background-image:url(${swatch(s.id)})"></div><b>${esc(s.name)}</b></div>`).join('') + '</div>');
+  }
+  arFoot(); arStage(); arModel();
+}
+// palco 3D do gunsmith: arma grande de lado, etiquetas ligadas por linhas aos encaixes
+let ARV = null;
+function arStage() {
+  const cv = $('#arCv'); if (ARV) { if (!ARV.on) { ARV.on = true; requestAnimationFrame(ARV.loop); } return; }
+  const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); r.toneMapping = THREE.ACESFilmicToneMapping; r.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const sc = new THREE.Scene(), pm = new THREE.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(r), .04).texture; pm.dispose();
+  sc.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.1)); const dl = new THREE.DirectionalLight(0xfff2e0, 2.4); dl.position.set(1, 2, 2); sc.add(dl);
+  const rim = new THREE.DirectionalLight(0xbcd4ff, 1.4); rim.position.set(-2, .5, -2); sc.add(rim);
+  const cam = new THREE.PerspectiveCamera(20, 2, .01, 50), pivot = new THREE.Group(); sc.add(pivot);
+  ARV = { r, sc, cam, pivot, key: null, rot: 0, drag: null, on: true, gun: null, anc: null, sz: null, cw: 0, ch: 0 };
+  cv.onpointerdown = e => { ARV.drag = e.clientX; cv.setPointerCapture(e.pointerId); };
+  cv.onpointermove = e => { if (ARV.drag != null) { ARV.rot += (e.clientX - ARV.drag) * .012; ARV.drag = e.clientX; } };
+  cv.onpointerup = cv.onpointercancel = () => { ARV.drag = null; };
+  ARV.loop = () => {
+    if ($('#menu').classList.contains('hidden') || $('#arsenalPane').classList.contains('hidden') || !AR.w) { ARV.on = false; return; } // fora da tela o laço para
+    requestAnimationFrame(ARV.loop); if (!ARV.gun) return;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (w && (w !== ARV.cw || h !== ARV.ch)) { ARV.cw = w; ARV.ch = h; r.setSize(w, h, false); arFit(); arTags(); }
+    if (ARV.drag == null) { if (AR.tab === 'att') { ARV.rot = Math.atan2(Math.sin(ARV.rot), Math.cos(ARV.rot)) * .9; } else ARV.rot += .003; } // Acessórios: volta para o lado; Personalizar: gira devagar
+    pivot.rotation.y = -Math.PI / 2 + .2 + ARV.rot; pivot.updateMatrixWorld(true);
+    r.render(sc, cam); arLines();
+  };
+  requestAnimationFrame(ARV.loop);
+}
+function arModel() {
+  if (!ARV) return; const d = PROF.data, w = AR.w, att = AR.tab === 'att', f = att ? (d.equipped[w] || null) : (AR.sel || null), list = att ? arAtts(w) : [];
+  const key = [w, f, att, list.join()].join('|'); if (ARV.key === key) { arTags(); return; } ARV.key = key;
+  while (ARV.pivot.children.length) { const c = ARV.pivot.children[0]; ARV.pivot.remove(c); c.traverse(o => o.geometry?.dispose()); }
+  GM_PROC = att; let g; try { g = gunModel(w, true, f); } finally { GM_PROC = false; } // Acessórios: a arma feita no código (a do modo Zumbi), com as peças
+  g.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(g); // medida sem as peças (o feixe do laser tem 2,5 m)
+  if (list.length) { ATT_PV = { list, f }; try { attPartsProc(w, g, g.userData); } catch (e) { console.warn(e); } ATT_PV = null; }
+  ARV.anc = att && attOK(w) ? arAnchors(g, box) : null;
+  g.position.sub(box.getCenter(new V3())); ARV.pivot.add(g); ARV.gun = g; ARV.sz = box.getSize(new V3());
+  if (!att) ARV.rot = 0;
+  arFit(); arTags();
+}
+function arAnchors(g, box) { // onde cada encaixe fica na arma (espaço da arma)
+  const ud = g.userData, V = (x, y, z) => new V3(x, y, z), mz = ud.muzzle || V(0, 0, box.min.z), rh = ud.rh || V(0, box.min.y * .5, box.max.z * .3), lh = ud.lh || V(0, mz.y - .03, (rh.z + mz.z) / 2);
+  let mag = V(0, box.min.y + .03, (rh.z + lh.z) / 2); if (ud.mag) mag = g.worldToLocal(ud.mag.getWorldPosition(new V3())).add(V(0, -.03, 0));
+  return { muzzle: mz.clone(), barrel: V(0, mz.y, lh.z + (mz.z - lh.z) * .55), optic: ud.sight ? V(ud.sight.x, ud.sight.y, ud.sightR ?? ud.sight.z) : V(0, box.max.y, rh.z - .06), stock: V(0, rh.y + .04, box.max.z - .04), laser: V(lh.x, lh.y + .015, lh.z - .05), under: V(lh.x, lh.y - .015, lh.z), mag, rgrip: rh.clone() };
+}
+function arFit() {
+  if (!ARV?.gun) return; const cv = $('#arCv'), W_ = cv.clientWidth, H = cv.clientHeight; if (!W_ || !H) return;
+  const att = AR.tab === 'att', left = $('#arSmith .arleft').offsetWidth + 40, cx = (left + W_) / 2, cy = H * (att ? .5 : .46);
+  const t = Math.tan(THREE.MathUtils.degToRad(ARV.cam.fov / 2)), asp = W_ / H, L = Math.max(ARV.sz.z, .2), Hh = Math.max(ARV.sz.y, .08);
+  const frac = Math.min(att ? .5 : .62, (W_ - left - 40) / W_ * (att ? .78 : .92));
+  const dist = Math.max(L / (frac * 2 * t * asp), Hh / ((att ? .3 : .45) * 2 * t));
+  const cam = ARV.cam; cam.aspect = asp; cam.position.set(0, 0, dist); cam.lookAt(0, 0, 0); cam.setViewOffset(W_, H, W_ / 2 - cx, H / 2 - cy, W_, H); cam.updateProjectionMatrix();
+}
+function arProj(v) { const cv = $('#arCv'), p = ARV.gun.localToWorld(v.clone()).project(ARV.cam); return [(p.x + 1) / 2 * cv.clientWidth, (1 - p.y) / 2 * cv.clientHeight]; }
+function arTags() { // etiquetas: encaixes de cima e de baixo, espalhadas sem se encostar
+  const tg = $('#arTags'), svg = $('#arSvg'); AR.tagPos = {};
+  if (!ARV?.anc || AR.tab !== 'att' || !ARV.cw) { tg.innerHTML = ''; svg.innerHTML = ''; return; }
+  const rot = ARV.pivot.rotation.y; ARV.pivot.rotation.y = -Math.PI / 2 + .2; ARV.pivot.updateMatrixWorld(true);
+  const W_ = ARV.cw, H = ARV.ch, left = $('#arSmith .arleft').offsetWidth + 40, tw = 158, th = 50, gap = 12, P = {};
+  for (const s in ARV.anc) P[s] = arProj(ARV.anc[s]);
+  ARV.pivot.rotation.y = rot; ARV.pivot.updateMatrixWorld(true);
+  const ys = Object.values(P).map(p => p[1]), y0 = Math.min(...ys), y1 = Math.max(...ys), eq = arAtts(AR.w), html = [];
+  for (const [row, sl] of Object.entries(AR_ROWS)) {
+    const y = row === 'top' ? Math.max(70, y0 - th - 80) : Math.min(H - th - 14, y1 + 70);
+    const it = sl.map(s => ({ s, x: P[s][0] - tw / 2 + (row === 'top' ? -40 : 40) })).sort((a, b) => a.x - b.x);
+    const lft = row === 'top' && y < 215 ? Math.max(left, $('#arTitle').offsetWidth + 52, 480) : left; // não encosta no título nem nas abas
+    for (let i = 0; i < it.length; i++) it[i].x = Math.max(it[i].x, i ? it[i - 1].x + tw + gap : lft);
+    for (let i = it.length - 1; i >= 0; i--) it[i].x = Math.min(it[i].x, i < it.length - 1 ? it[i + 1].x - tw - gap : W_ - tw - 16);
+    for (const { s, x } of it) {
+      const a = eq.find(a => ATT[a].slot === s);
+      AR.tagPos[s] = [x + tw / 2, row === 'top' ? y + th : y];
+      html.push(`<button class="artag${a ? ' on' : ''}${AR.slot === s ? ' sel' : ''}" data-slot="${s}" style="left:${Math.round(x)}px;top:${Math.round(y)}px"><span><em>${AR_ICON[s]}</em>${ATT_SLOTS[s]}</span>${a ? `<b>${esc(ATT[a].name)}</b>` : ''}</button>`);
+    }
+  }
+  tg.innerHTML = html.join('');
+}
+function arLines() {
+  const svg = $('#arSvg'); if (!ARV.anc || AR.tab !== 'att') return;
+  let h = ''; for (const s in AR.tagPos) { const [x1, y1] = AR.tagPos[s], [x2, y2] = arProj(ARV.anc[s]); h += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/><circle cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="3.5"/>`; }
+  svg.innerHTML = h;
+}
+function arSetAtt(w, slot, a) { // mesmas regras do Armeiro: até ATT_MAX, um por encaixe, só os liberados pelo nível
+  const d = PROF.data; d.att = d.att || {}; let cur = (d.att[w] || []).filter(x => ATT[x].slot !== slot);
+  if (a) { if (!attUnlocked(w).includes(a)) return; if (cur.length >= ATT_MAX) { centerMsg('Máximo de ' + ATT_MAX + ' acessórios', '', 1.5); return; } cur.push(a); }
+  d.att[w] = cur; AR.hov = undefined; profSave(); arsenalUI();
 }
 // colunas como no Arsenal do Valorant: pistolas | SMGs + escopetas | rifles | precisão + pesadas + corpo a corpo
-function vCategories() {
-  const all = SKIN_WEAPONS(), used = new Set();
+function vCategories(all = SKIN_WEAPONS()) {
+  const used = new Set();
   const cols = [
     [['Pistolas', ['glock', 'usp', 'p250', 'deagle', 'm1911', 'cz75', 'python', 'fiveseven', 'b23r', 'c96']]],
     [['SMGs', ['mp5', 'p90', 'mp40', 'mp5k', 'ak74u', 'ppsh', 'thompson', 'spectre', 'kiparis', 'uzi', 'pm63']], ['Escopetas', ['nova', 'olympia', 'stakeout', 'spas', 'trench', 'hs10', 'ks23']]],
@@ -31674,10 +31910,10 @@ function b11Peer(cb) { // true: cb roda quando o script terminar; false: já car
   document.head.appendChild(s); return true;
 }
 // Miniaturas das armas no menu: cada uma trava a página 60–400 ms (gunModel + shaders), ~10 s ao todo logo depois da abertura,
-// bem quando a pessoa começa a clicar. No menu elas esperam 1,5 s sem mouse/teclado (a aba Skins aberta não espera).
+// bem quando a pessoa começa a clicar. No menu elas esperam 1,5 s sem mouse/teclado (a aba Arsenal aberta não espera).
 const B11M = { t: performance.now() };
 for (const ev of ['pointermove', 'pointerdown', 'keydown', 'wheel']) addEventListener(ev, () => { B11M.t = performance.now(); }, { capture: true, passive: true });
-function b11Mexendo() { return performance.now() - B11M.t < 1500 && ($('#menu').classList.contains('hidden') || $('#skinsPane').classList.contains('hidden')); }
+function b11Mexendo() { return performance.now() - B11M.t < 1500 && ($('#menu').classList.contains('hidden') || $('#arsenalPane').classList.contains('hidden')); }
 function thPump() {
   const k = thQ[0]; if (!k) return;
   if (inGame && !C.buyOpen) { setTimeout(thPump, 500); return; }
@@ -31702,19 +31938,19 @@ function thPump() {
   else done(TH.c.toDataURL('image/png'));
 }
 function setHTMLm(id, html) { const el = document.getElementById(id); if (el && el.innerHTML !== html) el.innerHTML = html; }
-// roleta estilo CS: a faixa corre e para no item sorteado
-function openCaseUI() {
-  const d = PROF.data; if (!d || !d.cases || SKUI.rolling) return;
+// roleta estilo CS: a faixa corre e para no item sorteado (t: qual caixa, 0 Comum … 3 Lendária)
+function openCaseUI(t = 0) {
+  const d = PROF.data; if (!d || !cxN(d, t) || SKUI.rolling) return;
   audioInit();
-  d.cases--; d.opened++;
-  const it = rollItem(), dup = d.items.includes(it);
+  cxAdd(d, t, -1); d.opened++;
+  const it = rollItem(t), dup = d.items.includes(it);
   if (!dup) d.items.push(it);
   profSave(true);
   SKUI.rolling = true; SKUI.hide = dup ? null : it; skinsUI(); // não mostra o prêmio no inventário antes da roleta parar
   const N = 60, WIN = 52, strip = [];
-  for (let i = 0; i < N; i++) strip.push(i === WIN ? it : rollItem());
+  for (let i = 0; i < N; i++) strip.push(i === WIN ? it : rollItem(t));
   const box = $('#skRoll'), track = box.querySelector('.rtrack');
-  box.classList.remove('hidden'); setHTMLm('skRollRes', '');
+  setHTMLm('skRollRes', `<div class="hint">Abrindo ${CASES[t].name}...</div>`);
   track.style.transition = 'none'; track.style.transform = 'translateX(0)';
   track.innerHTML = strip.map(x => skCard(x)).join('');
   const cw = 116, vw = box.querySelector('.rstrip').clientWidth, x = -(WIN * cw + cw / 2 - vw / 2 + rand(-45, 45));
@@ -31723,51 +31959,28 @@ function openCaseUI() {
   setTimeout(() => {
     const { s, wn, rar } = itemInfo(it);
     track.children[WIN]?.classList.add('win');
-    setHTMLm('skRollRes', `<div class="sknm big" style="--rc:${RARITY[rar].css}"><b>${esc(wn)} | ${esc(s.name)}</b><span>${RARITY[rar].name}</span></div>${dup ? '<div class="hint">Repetida: virou +60 XP</div>' : ''}`);
+    setHTMLm('skRollRes', `<div class="sknm big" style="--rc:${RARITY[rar].css}"><b>${esc(wn)} | ${esc(s.name)}</b><span>${RARITY[rar].name}</span></div>${dup ? `<div class="hint">Repetida: virou +${DUP_XP[rar]} XP</div>` : '<div class="hint">Equipe no Arsenal → Personalizar.</div>'}`);
     play(rar >= 3 ? 'pap' : 'kaching');
-    SKUI.rolling = false; SKUI.hide = null; SKUI.sel = it; SKUI.weap = it.split(':')[0]; SKUI.view = 'detail';
-    if (dup) grantXP(60); else skinsUI();
+    SKUI.rolling = false; SKUI.hide = null; AR.w = it.split(':')[0]; AR.tab = 'cus'; AR.sel = it.split(':')[1]; AR.slot = null; // o Arsenal abre nela
+    if (dup) grantXP(DUP_XP[rar]); else skinsUI();
   }, 5400);
-}
-// prévia 3D da arma com a skin (renderizador pequeno, só enquanto a aba está aberta)
-let PV = null;
-function pvShow(w, f) {
-  const cv = $('#skPrev'); if (!cv) return;
-  if (!PV && !w) return; // O1-B11: sem arma, nada a mostrar (o contexto WebGL e o ambiente PMREM só nascem na 1ª arma aberta)
-  if (!PV) {
-    const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); r.toneMapping = THREE.ACESFilmicToneMapping; r.setPixelRatio(Math.min(devicePixelRatio, 2));
-    const sc = new THREE.Scene(), pm = new THREE.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(r), .04).texture; pm.dispose();
-    sc.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.1)); const dl = new THREE.DirectionalLight(0xfff2e0, 2.4); dl.position.set(1, 2, 2); sc.add(dl);
-    const rim = new THREE.DirectionalLight(0xbcd4ff, 1.4); rim.position.set(-2, .5, -2); sc.add(rim);
-    const cam = new THREE.PerspectiveCamera(28, 2, .01, 20), pivot = new THREE.Group(); sc.add(pivot);
-    PV = { r, sc, cam, pivot, key: null, t0: performance.now(), rot: 0, drag: null };
-    cv.onpointerdown = e => { PV.drag = e.clientX; cv.setPointerCapture(e.pointerId); };
-    cv.onpointermove = e => { if (PV.drag != null) { PV.rot += (e.clientX - PV.drag) * .012; PV.drag = e.clientX; } };
-    cv.onpointerup = cv.onpointercancel = () => { PV.drag = null; };
-    const loop = PV.loop = () => {
-      const vis = !$('#menu').classList.contains('hidden') && !$('#skinsPane').classList.contains('hidden') && !$('#skDetail').classList.contains('hidden');
-      if (!vis) { PV.on = false; return; } // O1-B11: fora da tela o laço para; o pvShow seguinte o religa
-      requestAnimationFrame(loop); if (!PV.pivot.children.length) return;
-      const w = cv.clientWidth, h = cv.clientHeight; if (w && (cv.width !== Math.round(w * PV.r.getPixelRatio()))) { PV.r.setSize(w, h, false); PV.cam.aspect = w / h; PV.cam.updateProjectionMatrix(); }
-      if (PV.drag == null) PV.rot += .004; PV.pivot.rotation.y = Math.PI / 2 + PV.rot;
-      PV.r.render(PV.sc, PV.cam);
-    };
-  }
-  if (!PV.on) { PV.on = true; requestAnimationFrame(PV.loop); } // O1-B11
-  const key = w ? w + ':' + f : null; if (PV.key === key) return; PV.key = key;
-  while (PV.pivot.children.length) { const c = PV.pivot.children[0]; PV.pivot.remove(c); c.traverse(o => o.geometry?.dispose()); }
-  if (!w) { PV.r.clear(); return; }
-  const g = gunModel(w, true, f), box = new THREE.Box3().setFromObject(g), c = box.getCenter(new V3()), sz = box.getSize(new V3());
-  g.position.sub(c); PV.pivot.add(g);
-  const L = Math.max(sz.x, sz.y, sz.z); PV.cam.position.set(0, L * .08, L * 1.9); PV.cam.lookAt(0, 0, 0); PV.rot = 0;
 }
 function skinsInit() {
   profLoadLocal();
-  $('#btnCase').onclick = openCaseUI;
-  $('#vGrid').onclick = e => { const c = e.target.closest('[data-w]'); if (!c) return; SKUI.weap = c.dataset.w; SKUI.sel = null; SKUI.view = 'detail'; skinsUI(); };
-  $('#skBack').onclick = () => { SKUI.view = 'grid'; skinsUI(); };
-  $('#skGrid').onclick = e => { const c = e.target.closest('[data-it],[data-def]'); if (!c) return; SKUI.sel = c.dataset.it || 'def:' + c.dataset.def; skinsUI(); };
-  $('#skGrid').ondblclick = e => { const c = e.target.closest('[data-it]'); if (!c) return; const it = c.dataset.it, { w, f } = itemInfo(it); equipItem(it, PROF.data.equipped[w] !== f); };
+  $('#cxCards').onclick = e => { const b = e.target.closest('button'); if (!b || b.disabled) return; if (b.dataset.open != null) openCaseUI(+b.dataset.open); else if (b.dataset.fuse) fuseCase(+b.dataset.fuse); };
+  $('#arCats').onclick = e => { const b = e.target.closest('[data-cat]'); if (!b) return; AR.cat = +b.dataset.cat; arsenalUI(); };
+  $('#arGrid').onclick = e => { const c = e.target.closest('[data-w]'); if (!c) return; AR.w = c.dataset.w; AR.tab = attOK(AR.w) ? 'att' : 'cus'; AR.sel = null; AR.slot = null; AR.hov = undefined; arsenalUI(); };
+  $('#arBack').onclick = () => { AR.w = null; AR.slot = null; $('#arTags').innerHTML = ''; $('#arSvg').innerHTML = ''; arsenalUI(); };
+  document.querySelectorAll('#arSmith .artabs button').forEach(b => b.onclick = () => { if (b.disabled) return; AR.tab = b.dataset.at; AR.slot = null; AR.hov = undefined; AR.sel = null; arsenalUI(); });
+  $('#arTags').onclick = e => { const b = e.target.closest('[data-slot]'); if (!b) return; AR.slot = AR.slot === b.dataset.slot ? null : b.dataset.slot; AR.hov = undefined; arsenalUI(); arTags(); };
+  const pan = $('#arPanel');
+  pan.onclick = e => {
+    const o = e.target.closest('[data-opt]'); if (o) { if (!o.classList.contains('lock')) arSetAtt(AR.w, AR.slot, o.dataset.opt); return; }
+    const k = e.target.closest('[data-sk]'); if (k) { AR.sel = k.dataset.sk; arsenalUI(); }
+  };
+  pan.ondblclick = e => { const k = e.target.closest('[data-sk]'); if (k && k.dataset.sk && arSkinOwned(AR.w).has(k.dataset.sk)) equipItem(AR.w + ':' + k.dataset.sk, true); };
+  pan.onmouseover = e => { const o = e.target.closest('[data-opt]'); const v = o && !o.classList.contains('lock') ? o.dataset.opt : undefined; if (v !== AR.hov) { AR.hov = v; arFoot(); } }; // prévia dos atributos
+  pan.onmouseleave = () => { if (AR.hov !== undefined) { AR.hov = undefined; arFoot(); } };
   skinsUI();
   fbInit();
 }
@@ -31781,8 +31994,8 @@ skinsInit();
 document.querySelectorAll('#menu .tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('#menu .tabs button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('#menu [data-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab));
-  if (b.dataset.tab === 'skins') skinsUI();
-  if (b.dataset.tab === 'armory') armoryUI();
+  if (b.dataset.tab === 'cases') skinsUI();
+  if (b.dataset.tab === 'arsenal') arsenalUI();
   if (b.dataset.tab === 'friends') frUI();
 });
 const getHostForm = () => ({ ...lastSt, ...load('lastSt', {}) }); // modo, mapa e opções agora se escolhem no lobby
