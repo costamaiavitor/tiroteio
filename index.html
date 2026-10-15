@@ -16688,7 +16688,7 @@ function buildMap(id) {
   const mats = {}, boxes = M.boxes();
   const trees = [];
   if (M.trees) for (const [x, z] of M.trees) { trees.push([x, z], [-x, -z]); boxes.push(B(x, z, .6, .6, 3, 'wood'), B(-x, -z, .6, .6, 3, 'wood')); }
-  const merge = M.zombie || M.merge ? new Map() : null; // mapas zumbis (grandes): caixas do mesmo material e do mesmo bloco de 48 m viram uma malha só
+  const merge = DEBUG && window.__o4SemJunta ? null : new Map(); // caixas do mesmo material e do mesmo bloco de 48 m viram uma malha só (O4-D03: também nos mapas do Mata-mata, que eram uma malha por caixa: ~220 chamadas na Favela)
   for (const b of boxes) {
     // 'inv' = colisor invisível do vão da janela: segura jogador e zumbi, mas deixa a bala passar (ns)
     // 'col' = colisor invisível sólido (o desenho é feito à parte, ex.: chafariz, moinho, tronco)
@@ -16706,11 +16706,13 @@ function buildMap(id) {
   }
   if (merge) for (const { mat, gs } of merge.values()) { const m = new THREE.Mesh(mergeGeos(gs), mat); m.userData.blk = 1; m.castShadow = m.receiveShadow = true; world.add(m); }
   const leaf = new THREE.MeshLambertMaterial({ color: 0x2f5d3a }), snow = new THREE.MeshLambertMaterial({ color: 0xf4f7fa });
+  const copas = new THREE.Group(); // O4-D03: as copas viram 2 malhas (com e sem sombra, cor por vértice) em vez de 3 por árvore
   for (const [x, z] of trees) {
-    const c1 = new THREE.Mesh(new THREE.ConeGeometry(1.8, 3.2, 8), leaf); c1.position.set(x, 3.6, z); c1.castShadow = true; world.add(c1);
-    const c2 = new THREE.Mesh(new THREE.ConeGeometry(1.3, 2.6, 8), leaf); c2.position.set(x, 5.2, z); c2.castShadow = true; world.add(c2);
-    const c3 = new THREE.Mesh(new THREE.ConeGeometry(.7, 1.2, 8), snow); c3.position.set(x, 6.3, z); world.add(c3);
+    const c1 = new THREE.Mesh(new THREE.ConeGeometry(1.8, 3.2, 8), leaf); c1.position.set(x, 3.6, z); c1.castShadow = true; copas.add(c1);
+    const c2 = new THREE.Mesh(new THREE.ConeGeometry(1.3, 2.6, 8), leaf); c2.position.set(x, 5.2, z); c2.castShadow = true; copas.add(c2);
+    const c3 = new THREE.Mesh(new THREE.ConeGeometry(.7, 1.2, 8), snow); c3.position.set(x, 6.3, z); copas.add(c3);
   }
+  if (trees.length) { if (merge) mergeParts(copas); world.add(copas); }
   if (M.build) M.build(M);
   if (M.zombie) mergeStatic();
   if (M.marcas) paredeMarcas(M, boxes); // marcas nas paredes (3A-1)
@@ -16793,7 +16795,7 @@ let WARM = null;
 function warmUp(M) {
   WARM?.end();
   const warm = new THREE.Group();
-  warm.add(playerModel('#888888'), gunModel('ak47'), nameSprite('x', '#fff'));
+  warm.add(pmJunta(playerModel('#888888')), gunModel('ak47'), nameSprite('x', '#fff')); // O4-D01: o boneco juntado (cor por vértice) como o dos remotos
   if (M.zombie) warm.add(zombieModel(false), zombieModel(true), zombieModel(false, 2), zombieModel(false, 6), gunModel('raygun_pap'), gunModel('thundergun'));
   warm.add(new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, transparent: true, depthWrite: false })));
   warm.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(), new V3(0, 1, 0)]), new THREE.LineBasicMaterial({ transparent: true })));
@@ -20955,7 +20957,7 @@ function getRemote(id) {
   let rp = R.get(id);
   if (rp) return rp;
   const info = C.players.get(id), color = info?.c ?? '#aaaaaa';
-  const model = playerModel(color); model.visible = false; scene.add(model);
+  const model = pmJunta(playerModel(color)); model.visible = false; scene.add(model); // O4-D01
   if (CFG.gfx === 'alto') model.traverse(o => { if (o.isMesh) o.castShadow = true; });
   rp = { id, model, buf: [], pos: new V3(), last: new V3(), yaw: 0, pitch: 0, crouch: 0, alive: false, dead: false, deadT: 0, downed: false, w: null, spd: 0, anim: 0, stepT: 0, color, name: '', tag: null };
   R.set(id, rp);
@@ -20969,9 +20971,41 @@ function remoteGunTpl(mid, skin) {
   const k = mid + '|' + (skin || '') + (C.st?.mode === 'zombies' ? '|z' : ''), nl = Object.keys(FPC).filter(fpReady).length + B08.n; let t = RGUN.get(k); // O1-B08: + armas que ficaram prontas
   if (t && !t.userData.dl && nl > t.userData.nl) t = null; // chegou modelo baixado depois do molde: refaz
   if (t?.userData.b08 && !b08Ok(t.userData.b08)) t = null; // O1-B08: mapa novo e o modelo baixado ainda não ficou pronto nele: volta à procedural
-  if (!t) { B08.gate = true; try { t = gunModel(mid, false, skin); } finally { B08.gate = false; } t.scale.setScalar(1.1); t.userData.nl = nl; RGUN.set(k, t); }
+  if (!t) { B08.gate = true; try { t = gunModel(mid, false, skin); } finally { B08.gate = false; } t.scale.setScalar(1.1); t.userData.nl = nl; rgJunta(t); RGUN.set(k, t); } // O4-D02
   return t;
 }
+// ===== O4-D01/D02: boneco e arma dos outros jogadores com menos chamadas de desenho (mesmo desenho) =====
+// Medido (Mata-mata na Favela, 7 bots, Médio): cada boneco tinha 39 malhas e cada arma na mão dele 27 a 102 (4 a 23 materiais):
+// ~590 das ~610 chamadas do quadro. Nada disso se mexe peça a peça, só por grupo (perna, cabeça, mão, braço).
+// D01: em cada grupo rígido do boneco, as peças lisas (Lambert só com cor) viram uma malha com cor por vértice (mergeParts).
+//   Ficam soltas as peças da cor do time (bodyM muda na troca de time; braço e antebraço o tpArm estica) e os óculos (emissivo).
+//   Só nos jogadores remotos: o NPC da campanha (CAMP_NPC.cabo.monta) troca material e esconde peças do playerModel.
+// D02: o molde da arma (RGUN, nunca é desenhado; os jogadores recebem cópias) junta as peças paradas de mesmo material (mesma
+//   assinatura: os clones do glTF também juntam) numa malha no espaço do molde. Fica de fora o escondido, o transparente, o
+//   espelhado (o lado da face inverteria) e geometria com atributo além de posição/normal/uv (tangente, cor, uv1).
+function pmJunta(g) { const fora = new Set(); g.traverse(o => { if (o.isMesh && o.material === g.userData.bodyM) fora.add(o); }); mergeParts(g, fora); return g; }
+function rgSig(m) { // mesma assinatura = desenha igual (com o userData: o buildMap reajusta o reflexo pelo userData.env); shader mexido: só o próprio material
+  if (m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile) return m.uuid;
+  try { return matSig(m) + '|ud:' + JSON.stringify(m.userData); } catch (e) { return m.uuid; }
+}
+function rgJunta(t) {
+  t.updateMatrixWorld(true); const inv = t.matrixWorld.clone().invert(), sig = new Map(), grp = new Map();
+  t.traverse(o => {
+    if (o === t || !mergeable(o) || !o.frustumCulled || o.layers.mask !== 1) return;
+    for (let q = o.parent; q && q !== t; q = q.parent) if (!q.visible) return;
+    const A = o.geometry.attributes; if (Object.keys(A).some(n => n !== 'position' && n !== 'normal' && n !== 'uv')) return;
+    const M = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld); if (M.determinant() <= 0) return;
+    let s = sig.get(o.material); if (s === undefined) sig.set(o.material, s = rgSig(o.material));
+    const k = s + '#' + !!A.uv + (+o.castShadow) + (+o.receiveShadow); let e = grp.get(k); if (!e) grp.set(k, e = { L: [], M: [] }); e.L.push(o); e.M.push(M);
+  });
+  for (const { L, M } of grp.values()) {
+    if (L.length < 2) continue;
+    const mm = new THREE.Mesh(mergeMeshes(L, M, false, !!L[0].geometry.attributes.uv), L[0].material); mm.castShadow = L[0].castShadow; mm.receiveShadow = L[0].receiveShadow;
+    for (const o of L) o.parent.remove(o); // sem dispose: a geometria pode ser do glTF baixado (a primeira pessoa usa a mesma)
+    t.add(mm);
+  }
+}
+// ===== O4-D01/D02 fim =====
 function cloneShared(t) { // o three copia userData por JSON (aqui ele guarda malhas): fica de fora da cópia
   const st = []; t.traverse(o => { st.push(o.userData); o.userData = {}; });
   try { return SkeletonUtils.clone(t); } finally { let i = 0; t.traverse(o => { o.userData = st[i++]; }); }
@@ -31620,8 +31654,55 @@ function frame() {
   if (DEBUG && window.__simLock) now = window.__simNow ?? now; else tick(dt); // testes automáticos controlam o tempo (só em desenvolvimento)
   if (WARM) renderer.clear(); else renderScene(); // aquecendo os shaders do mapa: não desenha (o desenho compilaria tudo de uma vez)
 }
+// ===== O4-D04: vegetação em pedaços desenhada numa chamada por família =====
+// Medido (Vila, Médio, rodada com zumbis): ~560 das ~1180 chamadas do quadro eram pedaços de vegetação (InstancedMesh de 32 m por
+// tipo, de 1 a 30 tufos cada, só ~30 pares geometria/material). A distância de desenho e o LOD continuam no código do mapa (visible e
+// count de cada pedaço, a cada .2 s). Depois do aquecimento, os pedaços que ainda estão soltos no world (os que a junção O1-B01/B21 não
+// levou) saem da cena e cada família (geometria + material + sombra + ordem + cor por instância) vira uma InstancedMesh só: a cada
+// quadro entram os pedaços visíveis, na camada 0 e no frustum (a mesma esfera que o three testava), de perto para longe; a cópia só é
+// refeita quando esse conjunto muda. Mesmo desenho: as mesmas instâncias (matriz e cor), o mesmo material e o mesmo programa.
+// Fica de fora quem projeta sombra (o recorte é o da câmera; a sombra tem o seu) e pedaço com filho, matriz própria ou onBeforeRender.
+const VJ = { w: null, fam: [], fr: new THREE.Frustum(), m: new THREE.Matrix4(), I: new THREE.Matrix4(), p: new V3(), st: { pedacos: 0, familias: 0, refaz: 0 } };
+function vjSolta() { for (const f of VJ.fam) { f.im.parent?.remove(f.im); f.im.dispose(); } VJ.fam = []; VJ.w = null; }
+function vjMonta() {
+  VJ.w = world; const fam = new Map();
+  for (const o of world.children) {
+    if (!o.isInstancedMesh || !o.userData.veg || o.castShadow || o.children.length || !o.frustumCulled || Array.isArray(o.material) || o.onBeforeRender !== THREE.Object3D.prototype.onBeforeRender || !o.matrixWorld.equals(VJ.I)) continue;
+    const k = o.geometry.id + '|' + o.material.id + '|' + (+o.receiveShadow) + '|' + o.renderOrder + '|' + !!o.instanceColor; let f = fam.get(k); if (!f) fam.set(k, f = { ped: [], n: 0 });
+    if (!o.boundingSphere) o.computeBoundingSphere(); f.ped.push({ o, n: -1, v: -1, d: 0 }); f.n += o.instanceMatrix.count;
+  }
+  for (const f of fam.values()) {
+    const o0 = f.ped[0].o, im = new THREE.InstancedMesh(o0.geometry, o0.material, f.n);
+    im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); if (o0.instanceColor) { im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(f.n * 3), 3); im.instanceColor.setUsage(THREE.DynamicDrawUsage); }
+    im.receiveShadow = o0.receiveShadow; im.renderOrder = o0.renderOrder; im.frustumCulled = false; im.boundingSphere = new THREE.Sphere(); im.count = 0; im.visible = false;
+    im.userData.own = f.ped.some(e => e.o.userData.own); im.userData.vj = 1; im.matrixAutoUpdate = im.matrixWorldAutoUpdate = false;
+    for (const e of f.ped) { world.remove(e.o); e.o.dispose(); } // o pedaço não é mais desenhado: libera as instâncias dele na placa (o array fica, é de onde se copia)
+    world.add(im); f.im = im; VJ.fam.push(f); VJ.st.pedacos += f.ped.length;
+  }
+  VJ.st.familias = VJ.fam.length;
+}
+function vjQuadro() {
+  if (VJ.w !== world) { if (VJ.fam.length) vjSolta(); if (WARM || cullTodo) return; vjMonta(); }
+  if (!VJ.fam.length) return;
+  camera.updateMatrixWorld(); VJ.fr.setFromProjectionMatrix(VJ.m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)); const P = VJ.p.setFromMatrixPosition(camera.matrixWorld);
+  for (const f of VJ.fam) {
+    let mud = false;
+    for (const e of f.ped) { const o = e.o, n = o.visible && (o.layers.mask & 1) && o.count > 0 && VJ.fr.intersectsSphere(o.boundingSphere) ? o.count : 0;
+      if (n !== e.n || (n && (o.instanceMatrix.version !== e.v))) { e.n = n; e.v = o.instanceMatrix.version; mud = true; } }
+    if (!mud) continue;
+    const vis = f.ped.filter(e => e.n > 0), im = f.im, A = im.instanceMatrix.array, C = im.instanceColor?.array; let k = 0;
+    for (const e of vis) e.d = e.o.boundingSphere.center.distanceToSquared(P);
+    vis.sort((a, b) => a.d - b.d); // de perto para longe, como a ordem do three entre os pedaços
+    im.boundingSphere.makeEmpty(); // centro para a ordem de desenho entre objetos (o three ordena pela esfera)
+    for (const e of vis) { const o = e.o, n = e.n; A.set(o.instanceMatrix.array.subarray(0, n * 16), k * 16); if (C) C.set(o.instanceColor.array.subarray(0, n * 3), k * 3); k += n; im.boundingSphere.union(o.boundingSphere); }
+    im.count = k; im.visible = k > 0; VJ.st.refaz++;
+    if (k) { im.instanceMatrix.clearUpdateRanges(); im.instanceMatrix.addUpdateRange(0, k * 16); im.instanceMatrix.needsUpdate = true; if (C) { im.instanceColor.clearUpdateRanges(); im.instanceColor.addUpdateRange(0, k * 3); im.instanceColor.needsUpdate = true; } }
+  }
+}
+if (DEBUG) queueMicrotask(() => { if (window.__T) Object.assign(window.__T, { VJ, vjQuadro, renderScene, vmScene, pmJunta, rgJunta, playerModel }); }); // testes de desenho (bench do O4; __o4SemJunta: monta o mapa PvP sem a junção, para comparar)
+// ===== O4-D04 fim =====
 function renderScene() {
-  sky.position.copy(camera.position); if (CULL.length) zCull(); b10Quadro(); // O1-B10
+  sky.position.copy(camera.position); if (CULL.length) zCull(); b10Quadro(); vjQuadro(); // O1-B10, O4-D04
   if (CFG.gfx === 'alto') { gradePass.uniforms.time.value = now % 100; g01Composer(); composer.render(); } // 6-g01
   else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); if (posLeve()) gradeMedio(); } // Médio no Sanatório: cor da área com cópia; na Vila ela vem no shader dos materiais (O1-B10)
 }
