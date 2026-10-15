@@ -604,7 +604,7 @@ let now = performance.now() / 1000;
 // Ambiente de desenvolvimento (testes e ferramentas rodam em localhost/127.0.0.1): só aqui o jogo expõe os ganchos de depuração
 // (window.__T, relógio travável). No site publicado eles não existem: davam a qualquer um, no console, atalhos prontos para trapacear.
 const DEBUG = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
-const PROTO = 8; /* 14/10: etapas novas (VA, VB, VC, SA, SB e pausas P0-P4) e cp.px (rodada do próximo objetivo); antes (7): objetivos do mapa (13/10): sem troca de mapa, cena, créditos, salvo nem checkpoint ({ t: 'camp', k: 'trans' | 'pronto' | 'cena' | 'salva' | 'over' | 'fim' | 'creditos' | 'final' | 'fuga' } e o cp tr/ov/fg saíram), arenas forte/forno/galeria7 fora; antes (6): escalada do infinito; zumbi-v2: peças e montagem (zbuild/zbuilt), armas mudadas; overhaul Ondas 2-3: interativos (zint/zi), campanha (camp/cp), tipo de zumbi com 5 bits, mapas forte/forno/galeria7 */ // versão do protocolo de rede: subir quando mensagens, armas (W) ou mapas mudarem; host e cliente precisam ser iguais
+const PROTO = 9; /* 15/10 (9): formato de fio R1 ('state' em diferença por conexão, 'pos' em lista e as do mesmo quadro juntas; ver R1enc); antes (8), 14/10: etapas novas (VA, VB, VC, SA, SB e pausas P0-P4) e cp.px (rodada do próximo objetivo); antes (7): objetivos do mapa (13/10): sem troca de mapa, cena, créditos, salvo nem checkpoint ({ t: 'camp', k: 'trans' | 'pronto' | 'cena' | 'salva' | 'over' | 'fim' | 'creditos' | 'final' | 'fuga' } e o cp tr/ov/fg saíram), arenas forte/forno/galeria7 fora; antes (6): escalada do infinito; zumbi-v2: peças e montagem (zbuild/zbuilt), armas mudadas; overhaul Ondas 2-3: interativos (zint/zi), campanha (camp/cp), tipo de zumbi com 5 bits, mapas forte/forno/galeria7 */ // versão do protocolo de rede: subir quando mensagens, armas (W) ou mapas mudarem; host e cliente precisam ser iguais
 const CFG = {
   name: String(load('name', 'Jogador' + Math.floor(rand(100, 999)))).replace(/[<>]/g, '').slice(0, 16) || 'Jogador', // mesmo filtro do campo (o localStorage é editável)
   sens: load('sens', 1), fov: load('fov', 85), vol: load('vol', 0.6), shadows: load('shadows', true), gfx: load('gfx', null),
@@ -21245,7 +21245,7 @@ function attachFast(conn, onData, maxLen = 0) { // maxLen: no host, tamanho máx
   try {
     const dc = conn.peerConnection.createDataChannel('rapido', { negotiated: true, id: FAST_ID, ordered: false, maxRetransmits: 0 });
     conn.fast = dc;
-    dc.onmessage = e => { conn.fastOk = true; if (typeof e.data !== 'string' || (maxLen && e.data.length > maxLen)) return; let m; try { m = JSON.parse(e.data); } catch (err) { return; } if (m && typeof m === 'object' && (m.t !== 'ping' || m.c)) onData(m); };
+    dc.onmessage = e => { conn.fastOk = true; if (typeof e.data !== 'string' || (maxLen && e.data.length > maxLen)) return; let m; try { m = JSON.parse(e.data); } catch (err) { return; } if (Array.isArray(m)) return r1FastDec(m, onData, maxLen > 0); if (m && typeof m === 'object' && (m.t !== 'ping' || m.c)) onData(m); }; // R1: 'pos' vem em lista
     dc.onopen = () => { let n = 0; const iv = setInterval(() => { if (dc.readyState !== 'open' || n++ > 20) return clearInterval(iv); try { dc.send('{"t":"ping"}'); } catch (e) { } if (conn.fastOk && n > 3) clearInterval(iv); }, 500); };
   } catch (e) { console.warn('canal rápido indisponível', e); }
 }
@@ -21255,13 +21255,13 @@ function sendFastTo(conn, m, json) {
   if (conn.open) try { conn.send(m); } catch (e) { }
 }
 function broadcastFast(m, except) {
-  let json; // um JSON.stringify só, não um por jogador
-  for (const [pid, conn] of NET.conns) if (pid !== except && conn.open) sendFastTo(conn, m, json ??= JSON.stringify(m));
+  if (R1.q) R1.q.push([m, except]); // R1: o que o host manda pelo canal rápido no quadro (posições, zumbis) sai junto no r1Fecha
+  else { let json; for (const [pid, conn] of NET.conns) if (pid !== except && conn.open) sendFastTo(conn, m, json ??= m.t === 'pos' ? r1PosH([m]) : JSON.stringify(m)); } // um JSON.stringify só, não um por jogador
   if (except !== C.myId) onMsg(m);
 }
 function sendToHostFast(m) {
   if (NET.isHost) srvHandle(C.myId, m);
-  else if (NET.hostConn?.open) sendFastTo(NET.hostConn, m);
+  else if (NET.hostConn?.open) sendFastTo(NET.hostConn, m, m.t === 'pos' ? r1PosC(m) : undefined); // R1: 'pos' em lista
 }
 // Relógio: mensagens rápidas levam a hora de quem mandou (ts). Por remetente, guardo o menor atraso visto
 // (offset, sobe devagar se o relógio derivar) e uso ts + offset como hora de chegada "sem tremida".
@@ -21320,13 +21320,148 @@ function sendToHost(m) {
   else if (NET.hostConn?.open) { try { NET.hostConn.send(m); } catch (e) { } }
 }
 function broadcast(m, except) {
-  for (const [pid, conn] of NET.conns) if (pid !== except && conn.open) { try { conn.send(m); } catch (e) { } }
+  R1.m = m; R1.s = null; // R1: o R1enc de cada conexão devolve o mesmo texto (um JSON.stringify só)
+  for (const [pid, conn] of NET.conns) if (pid !== except && conn.open) { try { if (R1.s === null && conn.stringify) R1.s = JSON.stringify(m); conn.send(m); } catch (e) { } }
+  R1.m = R1.s = null;
   if (except !== C.myId) onMsg(m);
 }
 function sendTo(pid, m) {
   if (pid === C.myId) onMsg(m);
   else { const c = NET.conns.get(pid); if (c?.open) try { c.send(m); } catch (e) { } }
 }
+// ===== R1: formato de fio enxuto (PROTO 9) =====
+// O jogo continua trocando as mesmas mensagens (objetos); só o que passa no fio muda, e é desfeito do outro lado antes do onMsg/srvOnData
+// (os testes com conexão falsa, sem PeerJS, continuam vendo os objetos de sempre).
+// 1) Canal confiável: o PeerJS chama conn.stringify(m) a cada send. No host ele vira R1enc: o mesmo JSON de um broadcast sai de um
+//    JSON.stringify só (R1.m/R1.s) e o 'state' vai como diferença do último 'state' daquela conexão (canal ordenado e sem perda):
+//    campos de cima iguais viram um bit em '=', jogador sem mudança não vai, jogador com mudança manda só os campos novos (pd),
+//    quem saiu vai em px, e o mundo dos zumbis (z) manda só as chaves que mudaram (bits em 'z='). O cliente (conn.parse = R1dec)
+//    remonta o 'state' completo, igual ao de antes. Base nova a cada conexão (quem entra recebe tudo na 1.ª).
+// 2) Canal rápido: 'pos' vira lista (cliente -> host ['p', x, y, z, yaw, pitch, c, w, ts, sq]; host -> cliente
+//    ['P', ts0, id, x, y, z, yaw, pitch, f, w, dts, sq, id, ...]) e tudo que o host manda pelo canal rápido no mesmo quadro
+//    (bots, o próprio host, foto dos zumbis) vai num pacote só (R1.q, aberto e fechado no tick; ['M', ['P', ...], {zs}, ...]).
+//    Sem campo novo: os números e o arredondamento são os mesmos. Bot parado não repete a mesma foto 20x/s (ver botThink).
+const R1 = { m: null, s: null, q: null, rq: null, te: null },
+  R1_ST = ['ph', 'tl', 'r', 'win', 'pre', 'drops', 'sc', 'hist', 'ot', 'bomb'], // campos de cima do 'state' que podem ir como "igual ao anterior"
+  R1_Z = ['r', 'ph', 'pw', 'd', 'box', 'pap', 'dr', 'qr', 'dog', 'tr', 'cm', 'zi', 'bt', 'cp']; // chaves do zWorldState (chave fora da lista vai sempre)
+const r1Js = v => typeof v === 'object' && v !== null ? JSON.stringify(v) : v; // valor comparável (objeto vira texto)
+function R1enc(conn, m) {
+  if (typeof m?.__r1s === 'string') return m.__r1s; // já codificado (lote do quadro)
+  if (m === R1.m && R1.s !== null) return R1.s; // broadcast: o mesmo texto para todos
+  if (m?.t !== 'state' || !Array.isArray(m.pl)) return JSON.stringify(m);
+  const B = conn.r1 || { k: {}, pl: new Map(), z: null }, nk = { ...B.k }, o = { t: 'state', '~': 1 }; let eq = 0;
+  for (const k in m) {
+    const v = m[k]; if (k === 't' || k === 'pl' || k === 'z' || v === undefined) continue;
+    const i = R1_ST.indexOf(k); if (i < 0) { o[k] = v; continue; }
+    const s = JSON.stringify(v); if (nk[k] === s) eq |= 1 << i; else { nk[k] = s; o[k] = v; }
+  }
+  for (const k of R1_ST) if (m[k] === undefined) delete nk[k];
+  if (eq) o['='] = eq;
+  const npl = new Map(), pd = [];
+  for (const p of m.pl) {
+    const sp = {}; for (const k in p) if (p[k] !== undefined) sp[k] = r1Js(p[k]);
+    const ant = B.pl.get(p.id); npl.set(p.id, sp);
+    if (!ant) { pd.push(p); continue; }
+    if (Object.keys(ant).some(k => !(k in sp))) { pd.push({ ...p, '!': 1 }); continue; } // campo que sumiu (troca de modo): vai inteiro
+    let d = null; for (const k in sp) if (sp[k] !== ant[k]) (d ||= { id: p.id })[k] = p[k];
+    if (d) pd.push(d);
+  }
+  const px = []; for (const id of B.pl.keys()) if (!npl.has(id)) px.push(id);
+  if (pd.length) o.pd = pd; if (px.length) o.px = px;
+  let nz = B.z;
+  if (m.z) {
+    nz = {}; const z = {}; let ze = 0;
+    for (const k in m.z) { const v = m.z[k]; if (v === undefined) continue; const s = JSON.stringify(v), i = R1_Z.indexOf(k); nz[k] = s; if (i >= 0 && B.z?.[k] === s) ze |= 1 << i; else z[k] = v; }
+    o.z = z; if (ze) o['z='] = ze;
+  }
+  const s = JSON.stringify(o);
+  if (s.length > 5400 && (R1.te ||= new TextEncoder()).encode(s).length >= 16300) return s; // o PeerJS recusa (grande demais): a base não anda
+  conn.r1 = { k: nk, pl: npl, z: nz }; return s;
+}
+function R1dec(conn, m) {
+  if (!m || m.t !== 'state' || m['~'] !== 1) return m;
+  const B = conn.r1 || (conn.r1 = { k: {}, pl: new Map(), z: null }), eq = m['='] | 0;
+  delete m['~']; delete m['='];
+  R1_ST.forEach((k, i) => { if (eq & (1 << i)) { if (k in B.k) m[k] = JSON.parse(B.k[k]); } else if (m[k] === undefined) delete B.k[k]; else B.k[k] = JSON.stringify(m[k]); });
+  const px = new Set(Array.isArray(m.px) ? m.px.map(String) : []), npl = new Map();
+  for (const [id, s] of B.pl) if (!px.has(id)) npl.set(id, s);
+  for (const d of Array.isArray(m.pd) ? m.pd : []) {
+    if (!d || typeof d !== 'object') continue;
+    const id = String(d.id), ant = npl.get(id), p = !ant || d['!'] ? { ...d } : { ...JSON.parse(ant), ...d };
+    delete p['!']; npl.set(id, JSON.stringify(p));
+  }
+  B.pl = npl; m.pl = [...npl.values()].map(s => JSON.parse(s)); delete m.pd; delete m.px;
+  if (m.z && typeof m.z === 'object') {
+    const ze = m['z='] | 0, z = {};
+    R1_Z.forEach((k, i) => { if (ze & (1 << i) && B.z && k in B.z) z[k] = JSON.parse(B.z[k]); });
+    Object.assign(z, m.z); B.z = {}; for (const k in z) B.z[k] = JSON.stringify(z[k]);
+    m.z = z;
+  }
+  delete m['z='];
+  return m;
+}
+function r1Liga(conn, host) { // conexão PeerJS (json): host codifica, cliente decodifica
+  if (host) {
+    conn.stringify = m => R1enc(conn, m);
+    // no quadro do host (R1.rq aberto no tick), cada send já vira texto na hora (mesma ordem e conteúdo de antes) e o r1Fecha
+    // manda tudo daquela conexão num pacote só ({ t: '_l', l: [...] }); fora do tick (lobby, resposta a mensagem) sai na hora
+    const send0 = conn.r1s0 = conn.send.bind(conn);
+    conn.send = (m, ch) => { if (!R1.rq || !conn.open || m?.__peerData) return send0(m, ch); // (aviso interno do PeerJS, como o de fechar, sai na hora)
+    const q = conn.r1q ||= []; q.push(R1enc(conn, m)); if (q.length === 1) R1.rq.push(conn); };
+  } else conn.parse = s => {
+    const dec = m => { try { return R1dec(conn, m); } catch (e) { console.warn('state inválido', e); return null; } };
+    const m = JSON.parse(s); if (m?.t === '_l' && Array.isArray(m.l)) { m.l = m.l.map(dec); return m; } return dec(m);
+  };
+}
+function r1FechaR() { // canal confiável: um pacote por conexão com o que saiu no quadro
+  const cs = R1.rq; R1.rq = null; if (!cs) return;
+  for (const conn of cs) {
+    const q = conn.r1q; conn.r1q = null; if (!q?.length || !conn.open) continue;
+    try {
+      if (q.length === 1) { conn.r1s0({ __r1s: q[0] }); continue; }
+      const s = '{"t":"_l","l":[' + q.join(',') + ']}';
+      if (s.length < 5400 || (R1.te ||= new TextEncoder()).encode(s).length < 16300) conn.r1s0({ __r1s: s });
+      else for (const x of q) conn.r1s0({ __r1s: x }); // grande demais para um pacote do PeerJS: um por um
+    } catch (e) { }
+  }
+}
+// canal rápido: 'pos' em lista
+const r1Nul = v => v === undefined ? null : v, r1Und = v => v === null ? undefined : v;
+function r1PosC(m) { return JSON.stringify(['p', m.p[0], m.p[1], m.p[2], m.y, m.pi, m.c, r1Nul(m.w), r1Nul(m.ts), r1Nul(m.sq)]); } // cliente -> host
+function r1PosH(ms) { // host -> clientes: várias posições num pacote
+  const ts0 = ms[0].ts || 0, a = ['P', ts0];
+  for (const m of ms) a.push(m.id, m.p[0], m.p[1], m.p[2], m.y, m.pi, (m.c ? 1 : 0) | (m.d !== undefined ? 2 : 0) | (m.d ? 4 : 0), r1Nul(m.w), m.ts ? r3(m.ts - ts0) : null, r1Nul(m.sq));
+  return JSON.stringify(a);
+}
+function r1FastDec(a, onData, host) { // lista do canal rápido -> as mensagens de sempre
+  if (a[0] === 'M' && !host) { for (let i = 1; i < a.length; i++) { const e = a[i]; if (Array.isArray(e)) { if (e[0] === 'P') r1FastDec(e, onData, false); } else if (e && typeof e === 'object') onData(e); } return; } // várias mensagens num pacote
+  if (host) { if (a[0] === 'p' && a.length === 10) onData({ t: 'pos', p: [a[1], a[2], a[3]], y: a[4], pi: a[5], c: a[6], w: r1Und(a[7]), ts: r1Und(a[8]), sq: r1Und(a[9]) }); return; }
+  if (a[0] !== 'P') return;
+  const ts0 = +a[1] || 0;
+  for (let i = 2; i + 9 < a.length; i += 10) {
+    const f = a[i + 6] | 0, dts = a[i + 8];
+    onData({ t: 'pos', id: a[i], p: [a[i + 1], a[i + 2], a[i + 3]], y: a[i + 4], pi: a[i + 5], c: f & 1, w: r1Und(a[i + 7]), d: f & 2 ? (f & 4 ? 1 : 0) : undefined, ts: dts === null ? undefined : ts0 + dts, sq: r1Und(a[i + 9]) });
+  }
+}
+function r1Lote(ms) { // texto de um pacote: as 'pos' viram uma lista 'P'; com outras mensagens junto, ['M', ...]
+  const ps = ms.filter(m => m.t === 'pos'), os = ms.filter(m => m.t !== 'pos');
+  if (!os.length) return r1PosH(ps);
+  if (os.length === 1 && !ps.length) return JSON.stringify(os[0]);
+  return JSON.stringify(['M', ...(ps.length ? [JSON.parse(r1PosH(ps))] : []), ...os]);
+}
+function r1Fecha() { // manda o que juntou no quadro do host: um pacote por conexão
+  r1FechaR();
+  const q = R1.q; R1.q = null; if (!q?.length) return;
+  let todos = null;
+  for (const [pid, conn] of NET.conns) {
+    if (!conn.open) continue;
+    const ms = []; for (const [m, ex] of q) if (ex !== pid) ms.push(m); if (!ms.length) continue;
+    const f = conn.fast;
+    if (conn.fastOk && f?.readyState === 'open') { if (f.bufferedAmount < 32000) try { f.send(ms.length === q.length ? (todos ??= r1Lote(ms)) : r1Lote(ms)); } catch (e) { } }
+    else for (const m of ms) sendFastTo(conn, m);
+  }
+}
+// ===== R1 fim =====
 function peerAvailable() { return typeof window.Peer === 'function'; }
 function tokenReentrada(code) { // um token aleatório por sala, renovado a cada entrada e esquecido em 10 min (apagar o armazenamento do navegador perde a reentrada: raro)
   try {
@@ -21413,17 +21548,18 @@ function joinRoom(code) {
   peer.on('open', () => {
     stage = 'linking';
     const conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
-    NET.hostConn = conn;
-    // v: 2 = entende "state" sem as skins repetidas (o host manda a versão completa para quem não manda v)
+    NET.hostConn = conn; r1Liga(conn, false); // R1: 'state' em diferença
+    // v: 2 = entende "state" sem as skins repetidas (o host manda a versão completa para quem não manda v); v: 3 = formato de fio R1
     // rk: token de reentrada (guardado por sala por 10 min: só quem tem o nome E o token recupera pontos e armas ao voltar); pv: versão do protocolo; u: usuário fixo (salas só com convite)
-    conn.on('open', () => { stage = 'waiting'; attachFast(conn, m => { NET.lastHost = performance.now(); if (welcomed) onMsg(m); }); conn.send({ t: 'join', v: 2, pv: PROTO, name: CFG.name, u: PROF.user || '', sk: cleanSk(PROF.data?.equipped), rk: tokenReentrada(code) }); });
-    conn.on('data', m => {
+    conn.on('open', () => { stage = 'waiting'; attachFast(conn, m => { NET.lastHost = performance.now(); if (welcomed) onMsg(m); }); conn.send({ t: 'join', v: 3, pv: PROTO, name: CFG.name, u: PROF.user || '', sk: cleanSk(PROF.data?.equipped), rk: tokenReentrada(code) }); });
+    const aoDado = m => {
       NET.lastHost = performance.now(); if (!m || typeof m !== 'object') return;
       if (!welcomed && (m.t === 'err' || m.t === 'deny')) return fail(String(m.txt || 'Conexão recusada').slice(0, 160)); // sala cheia, versão diferente, removido, só com convite
       if (!welcomed && m.t === 'welcome' && NET.linkKey && m.hk !== NET.linkKey) return fail('Esse código agora é de outra sala (o host mudou). Peça um link novo.'); // entrou pelo link: confere o segredo do host
       if (m.t === 'welcome') { welcomed = true; NET.joining = false; clearTimeout(timer); NET.code = code; NET.online = true; status.textContent = ''; }
       onMsg(m);
-    });
+    };
+    conn.on('data', m => { if (m?.t === '_l' && Array.isArray(m.l)) { for (const x of m.l) aoDado(x); } else aoDado(m); }); // R1: lote do quadro do host, na ordem
     conn.on('close', () => { if (welcomed) lostConnection(); else fail('Conexão recusada'); });
     conn.on('error', err => { if (err?.type === 'message-too-big' || err?.type === 'not-open-yet') console.warn('conn', err); else if (welcomed) lostConnection(); });
   });
@@ -21474,7 +21610,7 @@ function srvOnData(conn, d) {
     if ((d.pv | 0) !== PROTO) return recusa('Sua versão do jogo é diferente da do host: recarregue a página com Ctrl+F5 e tente de novo'); // tabelas de armas/mapas e mensagens precisam bater
     if ([...S.players.values()].filter(p => !p.isBot).length >= MAX_JOGADORES) return recusa('Sala cheia');
     if (LB.priv && !LB.allow.has(normUser(d.u))) return recusa('Essa sala é só com convite: peça para o host te convidar');
-    const id = 'p' + (S.nextId++); conn.pid = id; conn.v = +d.v || 1; NET.conns.set(id, conn); S.skDirty = true;
+    const id = 'p' + (S.nextId++); conn.pid = id; conn.v = +d.v || 1; if (conn.v >= 3) r1Liga(conn, true); NET.conns.set(id, conn); S.skDirty = true;
     { const pend = NET.pendL || [], i = pend.indexOf(conn); if (i >= 0) pend.splice(i, 1); NET.pend = pend.length; } // virou jogador: sai da fila de pendentes
     // nome: sem < >, sem caracteres invisíveis (homoglifos de "Vitor" com um caractere invisível no placar), até 16; repetido na sala ganha " (2)" como os bots
     let name = String(d.name || 'Jogador').normalize('NFKC').replace(INVISIVEIS, '').trim().slice(0, 16) || 'Jogador';
@@ -21751,7 +21887,7 @@ function srvDamage(vid, aid, raw, zone, w) {
   if (v.armor > 0 && zone !== 'legs' && (zone !== 'head' || v.helmet)) { const nd = dmg * (wd.pen ?? .5); v.armor = Math.max(0, Math.round(v.armor - (dmg - nd) * .5)); dmg = nd; }
   dmg = Math.max(1, Math.round(dmg)); const hp0 = v.hp; v.hp = Math.max(0, v.hp - dmg); srvTrack(aid, v, hp0 - v.hp);
   const a = S.players.get(aid);
-  broadcast({ t: 'dmg', v: vid, a: aid, hp: v.hp, ar: v.armor, d: dmg, ap: a ? [a.pos[0], a.pos[2]] : null });
+  broadcast({ t: 'dmg', v: vid, a: aid, hp: v.hp, ar: v.armor, d: dmg, ap: a ? [r2(a.pos[0]), r2(a.pos[2])] : null }); // R1: ap em cm (só a seta de dano da vítima usa; ia com 15 casas)
   if (v.isBot && a && a !== v) { v.bot.lastSeen = [a.pos[0], a.pos[2]]; v.bot.lastSeenT = now; v.bot.repathAt = 0; v.bot.alertYaw = Math.atan2(-(a.pos[0] - v.pos[0]), -(a.pos[2] - v.pos[2])); }
   if (v.hp <= 0) srvKill(v, a && a !== v ? a : null, w, zone === 'head');
 }
@@ -22067,7 +22203,7 @@ function srvState() {
   // as skins eram ~60% do "state" (4 por segundo); agora só vão quando alguém troca, e a cada ~2 s por garantia
   const lean = full || S.skDirty ? msg : { ...msg, pl: pl.map(({ sk, ...o }) => o) };
   S.skDirty = false;
-  for (const conn of NET.conns.values()) if (conn.open) try { conn.send(conn.v >= 2 ? lean : msg); } catch (e) { }
+  for (const conn of NET.conns.values()) if (conn.open) try { conn.send(conn.v >= 3 ? msg : conn.v >= 2 ? lean : msg); } catch (e) { } // v3 (R1): o R1enc manda só o que mudou (skins inclusive)
   onMsg(lean);
 }
 // quem fechou a aba sem avisar (o WebRTC às vezes demora pra perceber) sai depois de 20 s sem mandar nada (12 s derrubava PC fraco que travava carregando)
@@ -22081,6 +22217,7 @@ function srvCheckTimeouts() {
 function srvTick(dt) {
   srvCheckTimeouts();
   if (S.st.mode === 'zombies') { zTick(dt); S.stateT -= dt; if (S.stateT <= 0) { S.stateT = .25; srvState(); } return; }
+  S.botT = (S.botT || 0) - dt; S.botEnv = S.botT <= 0; if (S.botEnv) S.botT = Math.max(0, S.botT + 1 / 20); // R1: um relógio só de 20 Hz para os bots (as posições de todos saem no mesmo pacote)
   for (const p of S.players.values()) if (p.isBot) botThink(p, dt);
   if (csMode() && S.drops?.size) dropTick();
   const st = S.st, n = S.players.size;
@@ -22174,8 +22311,11 @@ function botThink(p, dt) {
   moveBody(body, dt);
   if (pos.y < -25) { srvKill(p, null, 'world', false); return; }
   p.pos = [pos.x, pos.y, pos.z]; p.yaw = b.yaw; p.pitch = b.pitch; p.w = wid;
-  b.sendT -= dt;
-  if (b.sendT <= 0) { b.sendT = Math.max(0, b.sendT + 1 / 20); broadcastFast({ t: 'pos', id: p.id, p: [r2(pos.x), r2(pos.y), r2(pos.z)], y: r3(wrapA(b.yaw)), pi: r3(b.pitch), c: 0, w: wid, ts: r3(now), sq: p.sq }); }
+  if (S.botEnv) { // R1: bot parado (mesma foto) manda 3 iguais (pacote perdido não deixa ele andando no cliente) e depois só 2x/s
+    const m = { t: 'pos', id: p.id, p: [r2(pos.x), r2(pos.y), r2(pos.z)], y: r3(wrapA(b.yaw)), pi: r3(b.pitch), c: 0, w: wid, ts: r3(now), sq: p.sq }, k = m.p.join() + ',' + m.y + ',' + m.pi + ',' + wid + ',' + m.sq;
+    if (k !== b.r1k) { b.r1k = k; b.r1n = 0; }
+    if (b.r1n++ < 3 || now >= b.r1t) { b.r1t = now + .5; broadcastFast(m); }
+  }
 }
 function botObj(p) { // para onde o bot vai quando não vê ninguém (modo Rodadas)
   const B = S.bomb, st = curMap.sites, area = k => { const r = st[k]; return [rand(r[0] + 2, r[1] - 2), rand(r[2] + 2, r[3] - 2)]; };
@@ -30081,19 +30221,20 @@ function zTickObjects() {
 const zBoardsEnc = b => { let o = '', k = 0; for (const v of b) { if (v === 6 && k < 26) { k++; continue; } if (k) o += String.fromCharCode(96 + k); k = v === 6 ? 1 : 0; if (v !== 6) o += v; } if (k) o += String.fromCharCode(96 + k); return o; }; // "a".."z" = 1 a 26 janelas inteiras
 const zBoardsDec = s => { const o = []; for (const ch of s) { const c = ch.charCodeAt(0); if (c > 96) for (let i = 96; i < c; i++) o.push(6); else o.push(c - 48); } return o; };
 function zSnap() {
-  const a = []; let bo = 0;
+  const a = [], ar = []; let bo = 0; // ar (R1): o que vai para os outros (zumbi parado: 3 fotos iguais e depois 2x/s); a: completo, para o próprio host
   for (const z of Z.zs.values()) {
     const P = z.body.pos, f = z.sc | (z.atkWind ? 4 : 0) | (z.crawler ? 8 : 0) | (z.dog ? 16 : 0) | (z.st === 'out' || z.st === 'tear' || z.st === 'climb' ? 32 : 0) | (z.st === 'rise' ? 64 : 0) | zfTipo(z.kind) | (z.st === 'vault' ? 1024 : 0); // 128-512 e 2048-4096: tipo (O3-D03: 5 bits)
-    a.push(z.id, r2(P.x), r2(P.y), r2(P.z), r2(wrapA(z.yaw)), f);
+    const e = [z.id, r2(P.x), r2(P.y), r2(P.z), r2(wrapA(z.yaw)), f], k = e.join(); a.push(...e);
+    if (k !== z.r1k) { z.r1k = k; z.r1n = 0; } if (z.r1n++ < 3 || now >= z.r1t) { z.r1t = now + .5; ar.push(...e); } // R1 (o cliente só tira o zumbi depois de 2,5 s sem foto)
     if (ZKIND[z.kind].chefe) bo = Math.max(bo, r2(Math.max(0, z.hp) / z.maxHp));
   }
   if (CAMP_CH.z) bo = campChefeBo(bo); // O3-D07: com um chefe da campanha vivo, a barra é a dele
   const bk = Z.boards.join(), sendB = bk !== Z.lastB || (Z.snapN = (Z.snapN || 0) + 1) % 10 === 0; Z.lastB = bk;
-  const msg = { t: 'zs', ts: r3(now), z: a, b: sendB ? zBoardsEnc(Z.boards) : undefined, ins: Z.insta > now ? r2(Z.insta - now) : 0, dbl: Z.dbl > now ? r2(Z.dbl - now) : 0, rem: Z.phase === 'round' ? Z.toSpawn + Z.zs.size : 0 };
+  const msg = { t: 'zs', ts: r3(now), z: a, b: sendB ? zBoardsEnc(Z.boards) : undefined, ins: Z.insta > now ? r2(Z.insta - now) : undefined, dbl: Z.dbl > now ? r2(Z.dbl - now) : undefined, rem: Z.phase === 'round' ? Z.toSpawn + Z.zs.size : 0 }; // R1: ins/dbl só quando ativos (ausente = 0 no zOnSnap)
   if (Z.fire > now) msg.fs = r2(Z.fire - now); if (Z.bf > now) msg.bf = r2(Z.bf - now); if (Z.phase === 'break') msg.nx = r2(Math.max(0, Z.phaseEnd - now)); // só vai quando tem
   if (bo) msg.bo = bo; // vida do Carniceiro
   if (Z.clouds.length && msg.b === undefined && ((Z.clN = (Z.clN || 0) + 1) % 10 === 5 || Z.clouds[Z.clouds.length - 1].id !== Z.lastCl)) { Z.lastCl = Z.clouds[Z.clouds.length - 1].id; msg.cl = Z.clouds.map(c => [c.id, r2(c.x), r2(c.z), r2(c.end - now)]); } // nuvens tóxicas: quando nasce uma e de 10 em 10 fotos (quem entra no meio também vê)
-  broadcastFast(msg);
+  if (ar.length === a.length) broadcastFast(msg); else { broadcastFast({ ...msg, z: ar }, C.myId); onMsg(msg); } // R1: o host vê a foto completa, os outros sem as repetidas
 }
 function zWorldState() {
   return { r: Z.round, ph: Z.phase, pw: Z.power ? 1 : 0, d: [...Z.doors], box: [Z.box.loc, Z.box.st, Z.box.user, Z.box.st === 'offer' ? Z.box.w : null], pap: [Z.pap.st, Z.pap.user, Z.pap.st === 'ready' ? Z.pap.w : null],
@@ -31719,10 +31860,12 @@ function renderScene() {
   else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); if (posLeve()) gradeMedio(); } // Médio no Sanatório: cor da área com cópia; na Vila ela vem no shader dos materiais (O1-B10)
 }
 function tick(dt) {
-  if (NET.isHost) srvTick(dt);
+  if (R1.q || R1.rq) r1Fecha(); // (sobra de um quadro que parou no meio)
+  if (NET.isHost) { R1.q = []; R1.rq = []; srvTick(dt); } // R1: o que o host manda no quadro sai junto (um pacote por canal e conexão)
   updateMe(dt);
   updateWeapon(dt);
   sendPos(dt);
+  if (R1.q || R1.rq) r1Fecha();
   clientHeartbeat(dt);
   if (!me.alive) {
     if (C.spec && !R.get(C.spec)?.alive) C.spec = null;
@@ -31782,6 +31925,7 @@ requestAnimationFrame(frame);
 if (DEBUG) window.__T = { get NOW() { return now; }, showPause, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade, zKill, zDrop, zEndRound,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
+if (DEBUG) Object.assign(window.__T, { R1, R1enc, R1dec, r1PosH, r1PosC, r1FastDec }); // R1: ganchos de teste do formato de fio
 // ===== O2-C01: ganchos de teste para a auditoria de itens (tools/itens/auditoria.mjs); só leitura e as funções do próprio jogo, nada de gameplay =====
 if (DEBUG) Object.assign(window.__T, { zBuildWalk, footFreeR, segClearR, zRoomAt, zActive, zDoorOpen, zBoxPlace, zHigh, colQuery, ffCell, ZPERKS, ZTRAP, ZMAXPERKS, ZWEAP, PR, STEP, ZVAULT, ZTOP });
 // ===== FIM O2-C01 =====

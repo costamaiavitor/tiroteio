@@ -32,7 +32,7 @@ const PREP = `(T => {
     if (T.Z.phase !== 'round') { T.Z.phaseEnd = 0; T.sim(.1); }
     T.Z.toSpawn = 0; T.Z.spawnT = 1e12; for (const z of [...T.Z.zs.values()]) T.zKill(z, p, 'head', 'm1911', false, false); T.Z.zs.clear(); T.sim(.3);
   };
-  const cliente = nome => { const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null }; T.srvOnData(c, { t: 'join', v: 2, pv: 8, name: nome }); return c; };
+  const cliente = nome => { const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; }, peerConnection: null }; T.srvOnData(c, { t: 'join', v: 2, pv: 9, name: nome }); return c; };
   const ultimoCp = c => c.out.filter(m => m.t === 'state' && m.z?.cp).pop()?.z.cp;
   const ativos = () => Object.entries(T.CAMP.obj).filter(([, o]) => o.st === 'ativo').map(([k]) => k).sort();
   return { p, poe, segura, idx, zumbi, obj, forcaTudo, fimRodada, cliente, ultimoCp, ativos };

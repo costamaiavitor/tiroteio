@@ -201,7 +201,7 @@ test('quem entra no meio: recebe o chefe de campo, a fase e o aviso no ar; o cli
     const { p, CH, poe, quieto, atk, limpa, pronto, livre } = H; quieto(); limpa(); const z = pronto(); CH.fase = 1; const [cx, cz] = livre(6); z.body.pos.set(cx, 0, cz); poe(p, cx, cz + 5); p.dwEnd = 1e12;
     T.campChefeAtaca(z, atk('brasa'), p); T.sim(.1);
     const c = { open: true, out: [], send(m) { this.out.push(m); }, close() { this.open = false; } };
-    T.srvOnData(c, { t: 'join', v: 2, pv: 8, name: 'Meio' }); T.sim(.2);
+    T.srvOnData(c, { t: 'join', v: 2, pv: 9, name: 'Meio' }); T.sim(.2);
     const q = T.S.players.get(c.pid), st = c.out.filter(m => m.t === 'state' && m.z).pop(), cp = st?.z?.cp;
     const o = { entrou: !!q, ch: cp?.ch?.slice(0, 3), campo: cp?.ch?.[6], tel: cp?.tel?.[0]?.a };
     T.srvDrop(c); T.campCliReset(); T.campSync(cp); T.sim(1 / 60); o.cli = T.CAMP.c.ch && [T.CAMP.c.ch.k, T.CAMP.c.ch.f, T.CAMP.c.ch.campo]; o.bar = document.getElementById('zboss').firstChild.nodeValue;
