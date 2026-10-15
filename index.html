@@ -412,6 +412,35 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #menu input,#menu select{border-radius:0!important;background:rgba(0,0,0,.45)!important}
 #menu .seg button{border-radius:0!important}
 #menu .seg button.on{background:var(--acc)!important;color:#111!important}
+
+/* lobby sem rolagem: jogadores | modo e mapa | planta e opções */
+#lobby .lbcols{display:grid!important;grid-template-columns:240px minmax(0,1fr)!important;gap:22px!important}
+.mf{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,360px);gap:22px;align-items:start}
+@media(max-width:1100px){.mf{grid-template-columns:1fr}}
+.mf .lbl{margin:10px 0 6px!important}
+.mf .cards{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))!important;gap:8px!important}
+.mf button.card{padding:8px 12px!important}
+.mf button.card .micon{display:none}
+#lobby .actbar button.big{font-size:25px!important;padding:5px 14px 2px!important}
+.mf button.card b{font-size:23px!important}
+.mf button.card small{display:block;font-size:12px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#menu .mf .card[data-map] .thumb{height:70px!important}
+.lbmus{margin-top:10px}.lbmus>div[style]{flex-wrap:wrap}.lbmus input{min-width:0}.lbmus .hint{font-size:12px}
+.mf .card[data-map]{padding:0!important}
+.mf .card[data-map] b,.mf .card[data-map] small{padding:0 10px}
+.mf .card[data-map] small{padding-bottom:6px}
+.mf canvas.planta{display:block;max-width:100%;height:auto;max-height:170px}
+.lbmus input{flex:1 1 100%}
+.mf .seg{flex-wrap:wrap}
+.mf .optrow{display:grid!important;grid-template-columns:1fr;gap:4px}
+.mbody{padding:12px 28px 12px!important}
+#menu .box{padding:14px 18px!important}
+#menu .mf .cards:has(.card[data-map]){grid-template-columns:repeat(auto-fit,minmax(96px,1fr))!important}
+.mf .card[data-map] b{font-size:19px!important}
+.mf .seg button{padding:5px 9px!important;font-size:14px!important}
+.mf .zdesc{font-size:13px;line-height:1.3;max-height:5.2em;overflow:hidden}
+#lobby .actbar{margin-top:12px!important}
+#lobby h3{margin-bottom:6px!important}
 </style>
 <!-- Bibliotecas servidas do próprio repositório (vendor/: mesmas versões e bytes das CDNs, hashes em vendor/HASHES.md): uma CDN comprometida
      não troca o código do jogo. Exceção: index.html aberto direto do disco (file://), onde o navegador bloqueia módulos ES locais (CORS);
@@ -496,7 +525,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
       <div id="lobby" class="box hidden" style="grid-column:1/-1"></div>
       <div class="box" id="hostBox">
         <h3>Criar partida</h3>
-        <div id="hostForm"></div>
+        <div id="hostForm" class="hint" style="font-size:16px;margin:0 0 14px">Crie a sala e, no lobby, chame os amigos e escolha <b>modo</b>, <b>mapa</b> e <b>opções</b> da partida.</div>
         <div class="actbar"><button id="btnHost" class="big" disabled>Carregando...</button>
         <button id="btnHostPriv" class="big alt" disabled>Só com convite</button></div>
         <div id="hostStatus" class="status"></div>
@@ -31027,12 +31056,12 @@ function matchForm(el, st0) {
       : `<div class="optrow">${st.mode === 'rounds' ? `<div><div class="lbl">Formato</div>${seg('wing', [[0, 'Competitivo'], [1, 'Wingman 2x2 (só o bomb A)']])}</div><div><div class="lbl">Rodadas para vencer</div>${seg('rounds', [3, 5, 8, 10, 13, 16].map(n => [n, n]))}</div><div><div class="lbl">Fogo amigo</div>${seg('ff', [[1, 'Ligado'], [0, 'Desligado']])}</div>` : `<div><div class="lbl">Variante</div>${seg('dmv', DMV_N.map((t, i) => [i, t]))}</div><div><div class="lbl">Abates para vencer</div>${seg('frags', [10, 15, 20, 30, 50].map(n => [n, n]))}</div>`}
         <div><div class="lbl">Bots</div>${seg('bots', [0, 1, 2, 3, 4, 5, 6, 7].map(n => [n, n]))}</div>
         <div><div class="lbl">Nível dos bots</div>${seg('diff', [[0, 'Fácil'], [1, 'Normal'], [2, 'Difícil']])}</div></div>`;
-    el.innerHTML = `<div class="lbl" style="margin-top:4px">Modo</div>
+    el.innerHTML = `<div class="mf"><div class="mfA"><div class="lbl" style="margin-top:4px">Modo</div>
       <div class="cards">${MODES.map(([k, t, d]) => `<button type="button" class="card${st.mode === k ? ' on' : ''}" data-mode="${k}"><span class="micon">${MICON[k]}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div>
       <div class="lbl">Mapa</div>
       <div class="cards">${maps.map(([k, m]) => `<button type="button" class="card${cur === k ? ' on' : ''}" data-map="${k}"><div class="thumb" style="background:linear-gradient(180deg,${hex(m.skyTop ?? m.sky)},${hex(m.fogC ?? m.sky)} 56%,${hex(m.theme.floor?.[1] ?? 0x555555)} 58%,#0c0d0b)">${z ? '' : `<canvas data-pl="${k}"></canvas>`}</div><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}</div>
-      ${z ? '' : `<div class="lbl">Planta do mapa</div><canvas class="planta" width="420" height="300"></canvas>`}
-      <div class="lbl">Opções</div>${opts}`;
+      ${z ? '' : `<div class="lbl">Planta do mapa</div><canvas class="planta" width="420" height="300"></canvas>`}</div><div class="mfB">
+      <div class="lbl">Opções</div>${opts}</div></div>`;
     if (!z) { drawPlanta(el.querySelector('canvas.planta'), cur); el.querySelectorAll('canvas[data-pl]').forEach(c => plantaMini(c, c.dataset.pl)); }
   };
   el.onclick = e => {
@@ -31479,8 +31508,8 @@ function lobbyUI() {
   if (!on) return;
   if (el.dataset.k !== (host ? 'h' : 'c')) { // esqueleto (o formulário do host não é redesenhado a cada mudança)
     el.dataset.k = host ? 'h' : 'c';
-    el.innerHTML = `<h3 id="lbHead"></h3><div class="lbcols"><div><div class="lbl" style="margin-top:0">Jogadores</div><div id="lbPl"></div>${host ? '<div class="lbl">Convidar amigos</div><div id="lbFr"></div>' : ''}</div>
-      <div>${host ? '<div id="lbForm"></div><div class="lbl">Música tema (todos ouvem)</div><div style="display:flex;gap:8px"><input id="lbMus" placeholder="Link do Spotify, do YouTube ou de um .mp3" maxlength="400" style="flex:1"><button id="lbMusGo">Tocar</button><button id="lbMusX">Parar</button></div><div class="hint">Na partida, qualquer jogador troca a música no menu (Esc) ou no chat: /musica link, /musica pausar, /musica parar.</div>' : '<div id="lbInfo"></div>'}</div></div>
+    el.innerHTML = `<h3 id="lbHead"></h3><div class="lbcols"><div><div class="lbl" style="margin-top:0">Jogadores</div><div id="lbPl"></div>${host ? '<div class="lbl">Convidar amigos</div><div id="lbFr"></div><div class="lbmus"><div class="lbl">Música tema (todos ouvem)</div><div style="display:flex;gap:8px"><input id="lbMus" placeholder="Link do Spotify, do YouTube ou de um .mp3" maxlength="400" style="flex:1"><button id="lbMusGo">Tocar</button><button id="lbMusX">Parar</button></div><div class="hint">Na partida, qualquer jogador troca a música no menu (Esc) ou no chat: /musica link, /musica pausar, /musica parar.</div></div>' : ''}</div>
+      <div>${host ? '<div id="lbForm"></div>' : '<div id="lbInfo"></div>'}</div></div>
       <div class="actbar">${host ? '<button id="lbGo" class="big">Começar partida</button>' : ''}<button id="lbOut" class="big">${host ? 'Fechar sala' : 'Sair do lobby'}</button></div>`;
     if (host) {
       LB.getForm = matchForm($('#lbForm'), S.st);
@@ -31756,7 +31785,7 @@ document.querySelectorAll('#menu .tabs button').forEach(b => b.onclick = () => {
   if (b.dataset.tab === 'armory') armoryUI();
   if (b.dataset.tab === 'friends') frUI();
 });
-const getHostForm = matchForm($('#hostForm'), lastSt);
+const getHostForm = () => ({ ...lastSt, ...load('lastSt', {}) }); // modo, mapa e opções agora se escolhem no lobby
 settingsForm($('#menuSettings'));
 $('#inName').value = CFG.name;
 $('#inName').oninput = () => { CFG.name = $('#inName').value.replace(/[<>]/g, '').slice(0, 16) || 'Jogador'; save('name', CFG.name); mpUI(); };
