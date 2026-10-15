@@ -15436,7 +15436,7 @@ ATMOS_POST.push((mapId, AT, M) => {
     if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('sfxU', new THREE.Float32BufferAttribute(uvs, 2)); g.setIndex(idx); g.computeVertexNormals();
       novo(new THREE.Mesh(g, SFX_UMIDO), a.root).renderOrder = 1; } } }
 
-  if (DEBUG) window.__SFX = { SFX, AT, world, scene };
+  if (DEBUG) o3DebugSFX(AT); // O3-M1
   MAP_ANIM.push(sfxTick);
 });
 // uma função por quadro: relógio, batida, cor da névoa, parede que respira, pano, espelhos e a troca do gráfico Baixo (só quando muda)
@@ -15656,7 +15656,7 @@ function sfxSan(AT, M) {
       const m = novo(new THREE.Mesh(ar, SFX_CALOR), a.root); m.position.set(fx + .55, 2.5, z); m.renderOrder = 3; }
     if (I.length) novo(new THREE.Mesh(malha(P, I, { sfxU: [U, 3] }), SAN_BRASA), a.root).renderOrder = 2; } }
 
-  if (DEBUG) window.__SFX = { SFX, AT, world, scene };
+  if (DEBUG) o3DebugSFX(AT); // O3-M1
   MAP_ANIM.push(sfxTick);
   if (CFG.gfx === 'baixo') sfxTick(0); // no Baixo os materiais voltam já na montagem (o aquecimento pega os certos)
 }
@@ -16669,6 +16669,7 @@ function buildMap(id) {
   const M = MAPS[id] || MAPS.arena; curMapId = MAPS[id] ? id : 'arena'; curMap = M; texZ = curMapId === 'vila'; // texturas da fase 3 só na Vila (o Sanatório recebe as dele na fase 5)
   texS = curMapId === 'sanatorio'; // 5B-1
   scene.remove(world); disposeGroup(world); world = a30Fixa(new THREE.Group()); scene.add(world); // O1-A30
+  o3SoltaMapa(); // O3-M1: caches por mapa largam o world anterior
   clearFx(); zClearDynamic(); MAP_ANIM = []; atmosReset();
   me.downed = false;
   scene.background = new THREE.Color(M.fogC ?? M.sky);
@@ -16728,6 +16729,24 @@ function buildMap(id) {
   warmUp(M);
   MAPA_FRESCO = curMapId; queueMicrotask(() => { MAPA_FRESCO = null; }); // 6-g06
 }
+// ===== O3-M1: troca de mapa sem segurar o mapa anterior =====
+// Medido (vila -> favela na mesma página, heap depois do GC): o world da Vila inteiro (~2600 peças, ~40 MB de JS) continuava vivo,
+// preso em caches por mapa que só eram limpos de forma preguiçosa (ou nunca, no PvP). Aqui eles largam o mapa anterior na hora da troca.
+const O3_SEM_MUNDO = Object.freeze({});
+function o3SoltaMapa() {
+  B21.Z.length = 0; B21.P = []; B21.G = []; B21.w = null; // O1-B21: o b21Escolhe/b21Vigia só limpavam as listas, o B21.w seguia com o world velho
+  B16.on = false; B16.w = B16.obj = B16.raiz = B16.b02 = B16.b02o = null; // O1-B16: fora do Baixo o B16.w nunca era solto (o ATMOS_POST do próximo mapa zumbi refaz)
+  B02.on = false; B02.w = B02.raiz = B02.obj = null; // O1-B02: idem (o ATMOS_POST do Sanatório religa)
+  SFX.fx2o.clear(); SFX.o2fx.clear(); SFX.alvos.length = SFX.novos.length = SFX.espelhos.length = 0; SFX.resp = SFX.pano = null; // 5B-9: como no ATMOS_POST (num mapa PvP ninguém limpava)
+  // modo campanha: marcas de "mundo atual" (comparadas com ZC.world para limpar os efeitos do mapa anterior) seguravam o ZC.world velho;
+  // uma marca que não é mundo nenhum mantém a comparação diferente, como antes
+  for (const c of [CAMP_ZKC, CAMP_ZK2C]) if (c.mundo) c.mundo = O3_SEM_MUNDO;
+  if (CAMP_EVC.visW) CAMP_EVC.visW = O3_SEM_MUNDO;
+}
+function o3DebugSFX(at) { // __SFX dos testes: fora da função do mapa (uma closure lá dentro seguraria o AT e, com ele, o world do mapa anterior)
+  const r = new WeakRef(at); window.__SFX = { SFX, get AT() { return r.deref(); }, get world() { return world; }, scene };
+}
+// ===== O3-M1 fim =====
 // ===== O1-A34: picos de "primeira vez" adiantados para o aquecimento =====
 // Medido (Vila e Sanatório, Médio): depois do aquecimento, os picos de 70-200 ms que se repetiam só na 1ª vez eram programas que o
 // aquecimento compilava (renderer.compile) mas nunca desenhava: o 1º uso de verdade (getUniforms/checagem) esperava a placa. Dois casos:
