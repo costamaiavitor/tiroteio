@@ -32,9 +32,9 @@ service cloud.firestore {
       function inteiro(v) { return v is int && v >= 0; }
 
       // items: lista de "arma:skin" (cleanProf l. 8154: W[arma] && SKIN_BY[skin]; ids de arma [a-z0-9_], de skin [a-z]).
-      // 55 armas com skin x 20 acabamentos = 1100 no máximo; 1200 deixa folga para armas novas.
+      // ~60 armas com skin x 36 acabamentos = ~2200 no máximo; 3000 deixa folga para armas e skins novas.
       function itensOk(l) {
-        return l is list && l.size() <= 1200
+        return l is list && l.size() <= 3000
           && l.join(',').matches('^$|^[a-z0-9_]{1,24}:[a-z]{1,16}(,[a-z0-9_]{1,24}:[a-z]{1,16})*$');
       }
 
