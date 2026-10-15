@@ -17698,8 +17698,9 @@ function gunModel(id, fp = false, skin = null) {
     case 'revolver': {
       const st = M.steel;
       add(g, EX([[-.03, .0], [-.03, .045], [-.015, .06], [.075, .06], [.075, .006], [.052, .0], [.044, -.012], [.028, -.032], [-.004, -.032], [-.016, -.012]], .028, [[[.004, .012], [.052, .012], [.052, .05], [.004, .05]], [[.002, -.004], [.036, -.004], [.022, -.025], [.002, -.025]]]), st);
-      add(g, EX([[.075, .014], [.075, .062], [.24, .062], [.246, .056], [.246, .036], [.2, .014]], .019), st);
-      for (let k = 0; k < 6; k++) add(g, new THREE.BoxGeometry(.004, .005, .012), M.dark, 0, .064, -.1 - k * .024);
+      add(g, CY(.0095, .171, 18), st, 0, .047, -.1605); // cano
+      add(g, EX([[.075, .054], [.075, .062], [.24, .062], [.246, .058], [.246, .054]], .01, Array.from({ length: 6 }, (_, k) => [[.092 + k * .024, .0555], [.106 + k * .024, .0555], [.106 + k * .024, .06], [.092 + k * .024, .06]]), .001), st); // fita ventilada (janelas vazadas)
+      add(g, EX([[.075, .02], [.075, .045], [.246, .045], [.246, .028], ['q', .244, .02, .236, .02]], .017, null, .003), st); // trilho inferior inteiriço (capa da vareta do extrator)
       bore(0, .047, -.246, .005);
       const cyl = grp(g, 0, .031, -.03); add(cyl, CY(.02, .044, 16), st);
       for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; add(cyl, CY(.0045, .046, 8), M.dark, Math.cos(a) * .012, Math.sin(a) * .012, 0); add(cyl, new THREE.BoxGeometry(.003, .003, .03), M.dark, Math.cos(a + .52) * .019, Math.sin(a + .52) * .019, 0, 0, 0, a + .52); }
@@ -17738,7 +17739,7 @@ function gunModel(id, fp = false, skin = null) {
     case 'mp40': {
       add(g, CY(.019, .24, 16), M.metal, 0, .032, -.05); add(g, CY(.0095, .15, 12), M.metal, 0, .028, -.24); add(g, CY(.012, .016, 12), M.metal, 0, .028, -.32); bore(0, .028, -.328, .005);
       add(g, EX([[.08, -.004], [.23, .012], [.23, .02], [.08, .02]], .028), M.metal);
-      add(g, EX([[-.05, .014], [.12, .014], [.12, -.005], [.07, -.005], [.07, -.035], [.03, -.035], [.03, -.005], [-.05, -.005]], .034), M.metal);
+      add(g, EX([[-.05, .014], [.124, .014], [.124, -.045], [.076, -.045], [.076, -.005], [-.05, -.005]], .034), M.metal); // poço do carregador logo acima dele (antes 3 cm atrás: o carregador ficava solto embaixo do tubo)
       add(g, EX([[.03, .0], [.03, .052], [.045, .066], [.05, .066], [.05, .0]], .006), M.metal, 0, .0, -.27);
       const bolt = grp(g, -.022, .036, .0); add(bolt, CY(.004, .016, 8), M.metal, -.006, 0, 0, 0, Math.PI / 2); add(bolt, new THREE.SphereGeometry(.0075, 10, 8), M.metal, -.015, 0, 0); ud.bolt = bolt;
       const mag = grp(g, 0, -.035, -.1); add(mag, EX([[-.017, 0], [.017, 0], [.017, -.2], [-.017, -.2]], .026, null, .003), M.metal);
@@ -17881,7 +17882,7 @@ function gunModel(id, fp = false, skin = null) {
       if (lmg && !mg42 && !ston) ud.w09Tambor = { c: new V3(0, -.092, -.088), r: .068, x: .025 }; // 6-w09: tambor da RPK (espaço da arma), a mão o contorna (w09Tambor)
       else if (stg) { add(mag, EX(banana(.25, 1.4, .052, .05), .028), M.metal); ud.magGrab = new V3(0, -.21, -.06); }
       else if (m14) { add(mag, EX(banana(.1, 2, .062), .03), M.metal); ud.magGrab = new V3(0, -.12, -.1); }
-      else { add(mag, EX(banana(.21, .34, .074, .066), .03), id.startsWith('ak47') ? M.bakelite : M.metal); for (let i = 0; i < 4; i++) add(mag, new THREE.BoxGeometry(.032, .004, .012), M.dark, 0, -.04 - i * .04, .012 + i * .012, .15 + i * .1); ud.magGrab = new V3(0, -.17, -.05); }
+      else { add(mag, EX(banana(.21, .34, .074, .066), .03), id.startsWith('ak47') ? M.bakelite : M.metal); for (let i = 0; i < 4; i++) { const R = .34, th = (.04 + i * .04) / R; add(mag, new THREE.BoxGeometry(.032, .004, .012), M.dark, 0, -R * Math.sin(th), -R * (1 - Math.cos(th)), th); } /* nervuras na linha do centro da curva */ ud.magGrab = new V3(0, -.17, -.05); }
       ud.mag = mag;
       if (/^(ak47|ak74u|galil|rpk)/.test(id)) ud.rock = { z: lmg ? -.02 : -.037, a: lmg ? .3 : .42, cx: .036, cy: -.024 }; // a3: carregador de bico (rock-in), alavanca do lado direito (6-w02: a AK-74u também; antes o dela descia reto)
       if (m14) { add(g, EX([[-.02, -.006], [-.008, -.03], ['q', -.018, -.062, -.04, -.09], [-.095, -.084], ['q', -.13, -.05, -.16, -.02], [-.1, -.006]], .036, null, .004), woodM); ud.gripAx = { top: new V3(0, -.024, .036), bot: new V3(0, -.082, .062) }; } // a4: M14 sem punho de pistola (mão no pescoço da coronha)
@@ -17978,8 +17979,11 @@ function gunModel(id, fp = false, skin = null) {
     }
     case 'scout': case 'awp': case 'dmr': {
       const awp = model === 'awp', dmr = model === 'dmr', kar = bid === 'kar98k', l96 = bid === 'l96', psg = bid === 'psg1', body = kar ? M.wood : awp && !l96 ? M.green : M.tan, dw = psg ? M.polymer : M.wood;
-      add(g, CY(.018, .2, 18), M.metal, 0, .032, -.03);
-      if (dmr) {
+      if (!dmr) add(g, CY(.018, .2, 18), M.metal, 0, .032, -.03);
+      if (dmr) { // Dragunov/PSG1: caixa da culatra de chapa com o poço do carregador e o guarda-mato embaixo (antes era só um tubo e o carregador flutuava 3 cm abaixo dele)
+        add(g, EX([[-.11, .03], [-.1, .048], [.07, .048], [.085, .04], [.09, .02], [.09, -.012], [.08, -.042], [-.002, -.042], [-.01, -.035], [-.065, -.035], [-.075, -.01], [-.11, -.004]], .04, null, .003), M.metal);
+        add(g, new THREE.BoxGeometry(.041, .002, .15), M.dark, 0, .03, -.005); // emenda da tampa
+        add(g, RB(.006, .012, .03, .002), M.dark, -.022, .012, .02); // alavanca de segurança (lado esquerdo)
         add(g, EX([[.08, -.012], [.08, .03], [.3, .026], [.31, .016], [.31, -.004], [.28, -.016]], .046, null, .004), dw);
         add(g, EX([[-.1, .03], [-.36, .018], [-.37, .01], [-.37, -.08], [-.36, -.086], [-.3, -.07], [-.14, -.04], [-.1, -.03]], .036, [[[-.33, .006], [-.2, .014], [-.2, -.02], [-.33, -.05]]], .004), dw);
         add(g, EX([[-.1, .012], [-.07, .012], ['q', -.08, -.04, -.09, -.085], [-.12, -.085], ['q', -.12, -.04, -.1, .012]], .03, null, .004), dw);
@@ -18002,8 +18006,8 @@ function gunModel(id, fp = false, skin = null) {
         const cl = grp(g, 0, .084, .03), rd = grp(cl, 0, 0, 0); add(cl, RB(.011, .05, .004, .001), M.steel, 0, -.022, .002);
         for (let i = 0; i < 5; i++) { add(rd, CY(.0046, .056, 8), M.brass, (i & 1 ? .0024 : -.0024), -.004 - i * .0088, -.028); add(rd, CY(.0028, .014, 8, .0008), M.brass, (i & 1 ? .0024 : -.0024), -.004 - i * .0088, -.063); }
         cl.visible = false; ud.clipG = cl; ud.clipR = rd; ud.clipRest = cl.position.clone(); ud.rig = 'clip';
-      } else { const mag = grp(g, 0, -.04, -.03); if (psg) add(mag, RB(.03, .1, .055, .004), M.metal, 0, -.05, 0); else if (dmr) add(mag, EX(banana(.16, .5, .06, .055), .028), M.metal); else add(mag, RB(.032, .042, .078, .003), M.metal, 0, -.01, 0); ud.mag = mag; ud.magGrab = new V3(0, dmr ? -.16 : -.08, -.03); }
-      guard(g, -.02, -.035, .048);
+      } else { const mag = grp(g, 0, -.04, dmr ? -.035 : -.03); if (psg) add(mag, RB(.03, .1, .055, .004), M.metal, 0, -.05, 0); else if (dmr) add(mag, EX(banana(.16, .5, .06, .055), .028), M.metal); else add(mag, RB(.032, .042, .078, .003), M.metal, 0, -.01, 0); ud.mag = mag; ud.magGrab = new V3(0, dmr ? -.16 : -.08, dmr ? -.035 : -.03); }
+      guard(g, dmr ? -.055 : -.02, -.035, .048); // dmr: gatilho logo à frente do punho (antes ficava 5 cm adiante, embaixo do carregador)
       if (awp) for (const s of [-1, 1]) add(g, CY(.004, .17, 8), M.metal, s * .014, -.02, -.3, -.08);
       ud.lh = new V3(-.005, -.035, -.2); ud.vm = [.005, -.008, .02];
       if (dmr) ud.lh.y = -.016; // 6-w08: Dragunov/PSG1: o guarda-mão termina em y -0,016 (a mão de apoio ficava 2 cm abaixo dele, segurando o ar)
