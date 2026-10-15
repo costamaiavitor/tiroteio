@@ -22175,8 +22175,24 @@ function srvKill(v, a, w, hs) {
   }
   broadcast({ t: 'kill', k: a ? a.id : null, v: v.id, w, hs: !!hs, as: as?.id, tk: tk ? 1 : 0 });
 }
+// Wingman: metade do mapa fechada (parede invisível + cortina vermelha); o bomb da vez alterna A, B, A... a cada rodada
+const WG = { site: null, box: null, mesh: null, col: null };
+function wingSite() { const st = NET.isHost ? S.st : C.st; return st?.mode === 'rounds' && st.wing ? (NET.isHost ? S.wSite : C.wSite) || 'A' : null; }
+function wingWall(site) {
+  if (WG.site === site && WG.col === COL) return;
+  if (WG.box) { const i = WG.col?.indexOf(WG.box) ?? -1; if (i >= 0) WG.col.splice(i, 1); WG.box = null; }
+  if (WG.mesh) { WG.mesh.parent?.remove(WG.mesh); WG.mesh.geometry.dispose(); WG.mesh.material.dispose(); WG.mesh = null; }
+  WG.site = site; WG.col = COL;
+  if (site && curMap?.bomb) { // A fica a leste (x > 0) e B a oeste nos três mapas: fecha o lado do outro bomb a 24 m do meio (as bases ficam livres)
+    const M = curMap, xc = site === 'A' ? -24 : 24;
+    WG.box = { minX: site === 'A' ? -M.w / 2 - 2 : xc, maxX: site === 'A' ? xc : M.w / 2 + 2, minY: -1, maxY: 30, minZ: -M.d / 2 - 2, maxZ: M.d / 2 + 2 }; COL.push(WG.box);
+    WG.mesh = new THREE.Mesh(new THREE.PlaneGeometry(M.d, 9), new THREE.MeshBasicMaterial({ color: 0xff3a20, transparent: true, opacity: .2, side: THREE.DoubleSide, depthWrite: false }));
+    WG.mesh.rotation.y = Math.PI / 2; WG.mesh.position.set(xc, 4.5, 0); world.add(WG.mesh);
+  }
+  if (NET.isHost && curMap) buildNav(curMap); // bots não tentam passar pela parede
+}
 function pickSpawn(side, taken, who) {
-  const list = side ? SPAWNS[side] : SPAWNS.a.concat(SPAWNS.b);
+  const list0 = side ? SPAWNS[side] : SPAWNS.a.concat(SPAWNS.b), B = WG.box, list = B ? list0.filter(s => !(s[0] > B.minX && s[0] < B.maxX)) : list0;
   if (side) { for (const s of list) if (!taken.some(t => Math.hypot(t[0] - s[0], t[2] - s[2]) < 1.5)) return s; return list[Math.floor(Math.random() * list.length)]; }
   // DM: longe dos inimigos vivos
   let best = list[0], bd = -1;
@@ -22231,7 +22247,7 @@ function srvStartMatch() {
 }
 function srvTarget() { const R1 = S.st.rounds - 1; return S.ot ? R1 + 3 * (S.ot - 1) + 4 : R1 + 1; } // vitórias para fechar (prorrogação: 4 de 6)
 function srvStartRound() {
-  S.round++; S.phase = 'freeze'; S.phaseEnd = now + (S.st.wing ? 10 : RC.freeze) + (S.pauseNext || 0); if (S.pauseNext) { S.pauseNext = 0; }
+  S.round++; S.wSite = S.st.wing ? (S.round % 2 ? 'A' : 'B') : null; wingWall(S.wSite); S.phase = 'freeze'; S.phaseEnd = now + (S.st.wing ? 10 : RC.freeze) + (S.pauseNext || 0); if (S.pauseNext) { S.pauseNext = 0; }
   let txt = 'RODADA ' + S.round, sub = 'Compre com B';
   if (S.half) { // intervalo (troca de lado, $800) e prorrogação (MR3, $10.000; troca de lado a cada 3 rodadas)
     const k = S.half; S.half = false;
@@ -22255,7 +22271,7 @@ function srvStartRound() {
   }
   const ts = [...S.players.values()].filter(p => p.team === 't'), c = ts[Math.floor(Math.random() * ts.length)];
   S.bomb = c ? { st: 'carried', by: c.id, pos: c.pos.slice(), end: 0, pl: false } : null;
-  S.bSite = S.st.wing || Math.random() < .5 ? 'A' : 'B'; // bomb escolhido pelos bots do ataque (Wingman: só o A)
+  S.bSite = S.st.wing ? S.wSite : Math.random() < .5 ? 'A' : 'B'; // bomb escolhido pelos bots do ataque (Wingman: o bomb da vez)
   for (const p of S.players.values()) if (p.isBot) botBuy(p);
   broadcast({ t: 'msg', txt, sub, dur: 3.5, snd: 'round' });
   if (c) sendTo(c.id, { t: 'info', txt: 'Você está com a bomba: plante no bomb A ou B segurando E' });
@@ -22371,7 +22387,7 @@ function srvMoveTeam(p, tm) {
   if (p.alive) { srvKill(p, null, 'world', false); p.deaths--; } // rodada valendo: sai dela (como no CS), sem contar morte
   setTeam(p, tm); p.alive = false; p.inv = defInv(); if (tm === 'ct') p.inv.secondary = 'usp'; p.armor = 0; p.helmet = false; p.kit = false;
 }
-function inSite(x, z) { const st = curMap?.sites, wing = (NET.isHost ? S.st : C.st)?.wing; if (st) for (const k in st) { if (wing && k !== 'A') continue; const r = st[k]; if (x > r[0] && x < r[1] && z > r[2] && z < r[3]) return k; } return null; }
+function inSite(x, z) { const st = curMap?.sites, ws = wingSite(); if (st) for (const k in st) { if (ws && k !== ws) continue; const r = st[k]; if (x > r[0] && x < r[1] && z > r[2] && z < r[3]) return k; } return null; }
 function bombDrop(p) { const B = S.bomb; if (p && B?.st === 'carried' && B.by === p.id) { B.st = 'dropped'; B.pos = p.pos.slice(); } }
 function bombTick() {
   const B = S.bomb, ps = [...S.players.values()];
@@ -22462,6 +22478,7 @@ function srvState() {
   const msg = { t: 'state', ph: S.phase, tl: r2(Math.max(0, S.phaseEnd - now)), r: S.round, pl, win: S.winner, pre: S.pre ? r2(Math.max(0, S.pre - now)) : 0, st: full ? S.st : undefined };
   if (csMode()) msg.drops = S.drops ? [...S.drops.values()].map(d => [d.id, d.w, r2(d.pos[0]), r2(d.pos[1]), r2(d.pos[2])]) : [];
   if (isTDM()) msg.sc = S.score;
+  if (isR()) msg.ws = S.wSite || undefined;
   if (isR()) { const B = S.bomb; msg.sc = S.score; msg.hist = S.hist; msg.ot = S.ot; msg.bomb = B ? { s: B.st, p: B.pos.map(r2), by: B.by, site: B.site } : null; }
   if (zmode && Z.on) { // mundo dos zumbis: só quando muda algo (ou 1 vez por segundo, por garantia); portas e compras já vão como evento
     const z = zWorldState(), k = [z.r, z.ph, z.pw, z.d.length, z.box[0], z.box[1], z.box[2], z.pap[0], z.pap[1], z.qr, z.dog, z.dr.map(d => d[0]).join(), z.tr.map(t => t[0]).join(), z.cm.map(c => c[0]).join(), z.zi.map(t => t[0]).join()].join('|'); // O2-C04: zi
@@ -22590,11 +22607,11 @@ function botObj(p) { // para onde o bot vai quando não vê ninguém (modo Rodad
   const mid = k => { const r = st[k]; return [(r[0] + r[1]) / 2, (r[2] + r[3]) / 2]; }, near = (q, c, d) => Math.hypot(q.pos[0] - c[0], q.pos[2] - c[1]) < d;
   if (p.team === 't') {
     if (B.st === 'dropped') return [B.pos[0], B.pos[2]];
-    const c = mid(S.bSite), ts = [...S.players.values()].filter(q => q.alive && q.team === 't'); // junta o time perto do bomb e entra junto (não pinga um por um)
-    if (near(p, c, 30) && !near(p, c, 14) && now - S.liveStart < 50 && ts.filter(q => near(q, c, 32)).length < Math.ceil(ts.length * .6)) return [p.pos[0], p.pos[2]];
+    const c = mid(S.bSite), ts = [...S.players.values()].filter(q => q.alive && q.team === 't' && q.isBot); // humano não segue o plano: os bots juntam só entre eles // junta o time perto do bomb e entra junto (não pinga um por um)
+    if (near(p, c, 30) && !near(p, c, 14) && now - S.liveStart < (S.st.wing ? 22 : 50) && ts.filter(q => near(q, c, 32)).length < Math.ceil(ts.length * .6)) return [p.pos[0], p.pos[2]];
     return area(S.bSite);
   }
-  if (S.st.wing) return area('A');
+  if (S.st.wing) return area(S.wSite || 'A');
   let seen = null; for (const q of S.players.values()) if (q.isBot && q.alive && q.team === 'ct' && q.bot.lastSeen && now - q.bot.lastSeenT < 8 && (!seen || q.bot.lastSeenT > seen[2])) seen = [q.bot.lastSeen[0], q.bot.lastSeen[1], q.bot.lastSeenT];
   if (seen) { let bk = null, bd = 1e9; for (const k in st) { const m = mid(k), d = Math.hypot(m[0] - seen[0], m[1] - seen[1]); if (d < bd) { bd = d; bk = k; } } if (bd < 40) return area(bk); } // viu o ataque perto de um bomb: a defesa gira para lá
   return area((p.id.charCodeAt(p.id.length - 1) + S.round) % 2 ? 'A' : 'B');
@@ -30551,6 +30568,7 @@ function onMsgInner(m) {
       break;
     case 'state': {
       // tudo que entra no HUD por innerHTML é número ou passa por esc(): um host editado mandava texto (HTML) nos campos numéricos
+      if (m.ws !== undefined || C.wSite) { C.wSite = m.ws === 'A' || m.ws === 'B' ? m.ws : null; if (!NET.isHost) wingWall(C.st?.wing ? C.wSite : null); }
       C.phase = String(m.ph); C.timeLeft = +m.tl || 0; C.round = m.r | 0; C.winner = m.win == null ? null : String(m.win); C.pre = +m.pre || 0; C.bomb = m.bomb && typeof m.bomb === 'object' ? m.bomb : null; if (m.sc && typeof m.sc === 'object') C.sc = { t: m.sc.t | 0, ct: m.sc.ct | 0 }; if (Array.isArray(m.hist)) C.hist = m.hist.slice(0, 60); C.drops = Array.isArray(m.drops) ? m.drops.filter(d => Array.isArray(d) && isW(d[1])).slice(0, 80) : []; C.ot = m.ot | 0;
       if (m.st && typeof m.st === 'object') { const st = saneSt(m.st); if (C.st && C.st.map !== st.map) buildMap(st.map); C.st = st; }
       const zmode = C.st?.mode === 'zombies', ids = new Set();
@@ -30899,7 +30917,7 @@ function bombHud(dt) {
   const mine = C.players.get(C.myId); let tip = '';
   if (B && me.alive && C.phase === 'live') {
     const site = inSite(me.pos.x, me.pos.z);
-    if (B.s === 'carried' && B.by === C.myId) tip = site ? `Segure <b>E</b> para plantar no bomb ${site}` : `Você está com a bomba · leve ao bomb ${C.st?.wing ? 'A' : 'A ou B'} · <b>5</b> pega na mão, <b>G</b> larga`;
+    if (B.s === 'carried' && B.by === C.myId) tip = site ? `Segure <b>E</b> para plantar no bomb ${site}` : `Você está com a bomba · leve ao bomb ${wingSite() || 'A ou B'} · <b>5</b> pega na mão, <b>G</b> larga`;
     else if (B.s === 'planted' && mine?.tm === 'ct' && Math.hypot(me.pos.x - B.p[0], me.pos.z - B.p[2]) < 2) tip = `Segure <b>E</b> para desarmar (${mine.kt ? 5 : 10} s)`;
     if (keys.KeyE && tip && C.actEnd <= now && now > (C.eT || 0)) { C.eT = now + .4; sendToHost({ t: 'bomb', on: 1 }); }
   }
@@ -31197,7 +31215,7 @@ function matchForm(el, st0) {
     const maps = Object.entries(MAPS).filter(([, m]) => !!m.zonly === z && (z || (st.mode === 'rounds') === !!m.bomb));
     const opts = z
       ? `<div class="lbl">Dificuldade</div>${seg('zdiff', ZDIFF.map((d, i) => [i, d.name]))}<div class="zdesc"><b>${ZDIFF[st.zdiff].name}:</b> ${ZDIFF[st.zdiff].desc}</div>`
-      : `<div class="optrow">${st.mode === 'rounds' ? `<div><div class="lbl">Formato</div>${seg('wing', [[0, 'Competitivo'], [1, 'Wingman 2x2 (só o bomb A)']])}</div><div><div class="lbl">Rodadas para vencer</div>${seg('rounds', [3, 5, 8, 10, 13, 16].map(n => [n, n]))}</div><div><div class="lbl">Fogo amigo</div>${seg('ff', [[1, 'Ligado'], [0, 'Desligado']])}</div>` : `<div><div class="lbl">Variante</div>${seg('dmv', DMV_N.map((t, i) => [i, t]))}</div><div><div class="lbl">Abates para vencer</div>${seg('frags', [10, 15, 20, 30, 50].map(n => [n, n]))}</div>`}
+      : `<div class="optrow">${st.mode === 'rounds' ? `<div><div class="lbl">Formato</div>${seg('wing', [[0, 'Competitivo'], [1, 'Wingman 2x2 (meio mapa, bomb alterna)']])}</div><div><div class="lbl">Rodadas para vencer</div>${seg('rounds', [3, 5, 8, 10, 13, 16].map(n => [n, n]))}</div><div><div class="lbl">Fogo amigo</div>${seg('ff', [[1, 'Ligado'], [0, 'Desligado']])}</div>` : `<div><div class="lbl">Variante</div>${seg('dmv', DMV_N.map((t, i) => [i, t]))}</div><div><div class="lbl">Abates para vencer</div>${seg('frags', [10, 15, 20, 30, 50].map(n => [n, n]))}</div>`}
         <div><div class="lbl">Bots</div>${seg('bots', [0, 1, 2, 3, 4, 5, 6, 7].map(n => [n, n]))}</div>
         <div><div class="lbl">Nível dos bots</div>${seg('diff', [[0, 'Fácil'], [1, 'Normal'], [2, 'Difícil']])}</div></div>`;
     el.innerHTML = `<div class="mf"><div class="mfA"><div class="lbl" style="margin-top:4px">Modo</div>
