@@ -20590,6 +20590,21 @@ const ATT = {
   under_agrip: { slot: 'under', name: 'Empunhadura Angular', d: 'Mira 20% mais rápida e -8% de dispersão', adsSpd: 1.2, spr: .92 },
   stock: { slot: 'stock', name: 'Coronha Tática', d: 'Atira andando com 40% menos dispersão', moveX: .6 },
   mag_ext2: { slot: 'mag', name: 'Carregador Estendido II', d: '+50% de munição no carregador, recarga um pouco mais lenta', magX: 1.5, reloadX: 1.1 },
+  // acessórios novos (do nível 15 em diante; vis: peça 3D usada no desenho, 0 = não muda o desenho da arma)
+  optic_mini: { slot: 'optic', name: 'Mini Reflex', d: 'Ponto vermelho compacto; mira 10% mais rápida', zoom: 1.05, dot: 1, adsSpd: 1.1 },
+  muzzle_brake: { slot: 'muzzle', name: 'Freio de Boca', d: 'Tranco bem menor (-50%) e -10% de dispersão', spr: .9, kick: .5, vis: 'muzzle_comp' },
+  under_stubby: { slot: 'under', name: 'Empunhadura Curta', d: 'Tiro sem mirar 15% mais preciso e mira 10% mais rápida', hip: .85, adsSpd: 1.1, vis: 'under_vgrip' },
+  rgrip_tape: { slot: 'rgrip', name: 'Fita Antiderrapante', d: 'Mira 15% mais rápida e -10% de tranco', adsSpd: 1.15, kick: .9, vis: 'rgrip' },
+  barrel_heavy: { slot: 'barrel', name: 'Cano Pesado', d: '+8% de dano e alcance maior; mira um pouco mais lenta', dmgX: 1.08, rangeX: 1.3, adsSpd: .85, vis: 'barrel_long' },
+  mag_dual: { slot: 'mag', name: 'Carregador Duplo', d: '+10% de munição e recarga 20% mais rápida', magX: 1.1, reloadX: .8, vis: 'mag_fast' },
+  laser_5mw: { slot: 'laser', name: 'Laser 5mW', d: 'Tiro sem mirar 25% mais preciso e mira 10% mais rápida', hip: .75, adsSpd: 1.1, laser: 1, vis: 'laser' },
+  stock_heavy: { slot: 'stock', name: 'Coronha Pesada', d: 'Tranco -30% e -10% de dispersão; anda atirando um pouco pior', kick: .7, spr: .9, moveX: .85, vis: 'stock' },
+  optic_acog: { slot: 'optic', name: 'Luneta 2x', d: 'Zoom 1,6x para longe; mira um pouco mais lenta', zoom: 1.6, dot: 2, adsSpd: .9 },
+  muzzle_flash: { slot: 'muzzle', name: 'Abafador de Clarão', d: 'Menos clarão e -10% de tranco', kick: .9, hip: .95, vis: 'muzzle_comp' },
+  under_bipod: { slot: 'under', name: 'Bipé Dobrável', d: '-20% de dispersão; mira um pouco mais lenta', spr: .8, adsSpd: .9, vis: 'under_agrip' },
+  barrel_short: { slot: 'barrel', name: 'Cano Curto', d: 'Mira 15% mais rápida e anda atirando melhor; alcance menor', adsSpd: 1.15, moveX: .8, rangeX: .8, vis: 0 },
+  stock_none: { slot: 'stock', name: 'Sem Coronha', d: 'Mira 25% mais rápida; mais tranco', adsSpd: 1.25, kick: 1.2, vis: 0 },
+  mag_drum: { slot: 'mag', name: 'Tambor', d: 'Dobro de munição no carregador; recarga 30% mais lenta', magX: 2, reloadX: 1.3, vis: 'mag_ext2' },
 };
 const ATT_ORDER = Object.keys(ATT); // um acessório por nível, do nível 2 ao 14
 const ATT_SLOTS = { optic: 'Mira', muzzle: 'Boca', barrel: 'Cano', under: 'Sob o cano', mag: 'Carregador', rgrip: 'Empunhadura', stock: 'Coronha', laser: 'Laser' };
@@ -20664,7 +20679,7 @@ function attScan(gun) { // vértices visíveis da arma no espaço dela (P: x, y,
 }
 function attPartsProc(id, gun, ud) {
   const on = attOn(id); if (!on.length || !ud.muzzle) return;
-  const b = attBase(id), sem = ATTV.sem[b] || [], slot = s => { const a = on.find(a => ATT[a].slot === s); return a && !sem.includes(s) && !sem.includes(a) ? a : null; };
+  const b = attBase(id), sem = ATTV.sem[b] || [], slot = s => { const a = on.find(a => ATT[a].slot === s); if (!a || sem.includes(s) || sem.includes(a)) return null; const v = ATT[a].vis; return v === 0 ? null : v || a; }; // vis: peça 3D usada no desenho
   const N = gunMats(false, true, null), M = gunMats(W[id]?.pap | 0, true, ATT_PV ? ATT_PV.f : skinOf(id)), X = attMats(), hi = CFG.gfx !== 'baixo';
   const hg = W[b]?.slot === 'secondary', pis = !!(ud.slide && ud.pistol), sg = ud.rig === 'shell' || ud.rig === 'break', bull = W[b]?.model === 'bull';
   const movers = [ud.slide, ud.pump, ud.brk].filter(Boolean), V = (x, y, z) => new V3(x, y, z);
@@ -32295,7 +32310,7 @@ fpLoad('p:ak'); fpLoad('m:knife'); fpLoad('m:karambit'); FPC['k:pack'] = new GLT
 setTimeout(() => { let q = Promise.resolve(); for (const k of Object.keys(FPM)) q = q.then(() => fpLoad('m:' + k)); }, 8000); // modelos das armas aos poucos (mundo e mãos dos outros)
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos); só em desenvolvimento (DEBUG), nunca no site publicado
-if (DEBUG) window.__T = { get NOW() { return now; }, showPause, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
+if (DEBUG) window.__T = { get NOW() { return now; }, showPause, attPartsProc, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade, zKill, zDrop, zEndRound,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 if (DEBUG) Object.assign(window.__T, { R1, R1enc, R1dec, r1PosH, r1PosC, r1FastDec }); // R1: ganchos de teste do formato de fio

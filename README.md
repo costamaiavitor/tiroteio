@@ -130,6 +130,8 @@ A dificuldade aparece no canto de cima, junto com o nome do mapa.
 
 ## Arsenal (skins e acessórios) e Caixas
 
+- **Acessórios (27):** além dos 13 de antes, mais 14: Mini Reflex, Luneta 2x, Freio de Boca, Abafador de Clarão, Cano Pesado, Cano Curto, Empunhadura Curta, Bipé Dobrável, Fita Antiderrapante, Laser 5mW, Coronha Pesada, Sem Coronha, Carregador Duplo e Tambor (liberados do nível 15 ao 28 de cada arma). Cada um tem vantagens e desvantagens nas barras de atributos.
+
 As antigas abas **Skins** e **Armeiro** viraram uma só, o **Arsenal**, no estilo do *Gunsmith* do Call of Duty. A abertura de caixas ganhou a aba **Caixas**.
 
 - **Arsenal:** escolha a categoria à esquerda (pistolas, SMGs, escopetas, rifles, precisão, pesadas, corpo a corpo) e clique na arma. Abre o gunsmith dela: fundo escuro, a arma grande em 3D de lado (arraste para girar) e o título "NOME GUNSMITH" com duas abas.
