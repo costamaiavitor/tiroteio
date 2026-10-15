@@ -30,12 +30,12 @@ export async function abrirJogo({ bloquearPeer = true, console: log = false } = 
 
 // Cria a sala como host. mode: 'zombies' | 'dm' | 'rounds'. Devolve quando o host está vivo no mapa.
 export async function criarSala(page, { mode = 'zombies', map = mode === 'zombies' ? 'sanatorio' : 'arena', bots = 0, zdiff = 1 } = {}) {
-  await page.click(`#hostForm [data-mode="${mode}"]`);
-  await page.click(`#hostForm [data-map="${map}"]`);
-  if (mode === 'zombies') await page.click(`#hostForm [data-k="zdiff"][data-v="${zdiff}"]`);
-  else await page.click(`#hostForm [data-k="bots"][data-v="${bots}"]`);
-  await page.click('#btnHost'); // abre o lobby (menu novo); "Começar partida" inicia de fato
+  await page.click('#btnHost'); // abre o lobby; modo, mapa e opções se escolhem lá; "Começar partida" inicia de fato
   await page.waitForSelector('#lbGo', { timeout: 60000 });
+  await page.click(`#lbForm [data-mode="${mode}"]`);
+  await page.click(`#lbForm [data-map="${map}"]`);
+  if (mode === 'zombies') await page.click(`#lbForm [data-k="zdiff"][data-v="${zdiff}"]`);
+  else await page.click(`#lbForm [data-k="bots"][data-v="${bots}"]`);
   // o clique pelo setTimeout (como no campanha-base): a montagem da Vila trava a aba por mais de 30 s com a máquina carregada e o
   // page.click esperava 'scheduled navigations' até estourar o prazo (falha só de ambiente, os testes seguintes do arquivo caíam juntos)
   await page.evaluate(() => { setTimeout(() => document.querySelector('#lbGo').click(), 0); });

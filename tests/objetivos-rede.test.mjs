@@ -13,7 +13,9 @@ import assert from 'node:assert/strict';
 process.env.ZV2_OBJ ||= '1';
 const { abrirJogo } = await import('./_jogo.mjs');
 async function criarSala(page, { map, zdiff = 1 }) { // como o do _jogo.mjs, com o clique pelo DOM e espera longa (máquina carregada: montar o mapa trava a página > 30 s)
-  await page.evaluate(([map, zdiff]) => { const q = s => document.querySelector(s); q('#hostForm [data-mode="zombies"]').click(); q(`#hostForm [data-map="${map}"]`).click(); q(`#hostForm [data-k="zdiff"][data-v="${zdiff}"]`).click(); q('#btnHost').click(); }, [map, zdiff]);
+  await page.evaluate(([map, zdiff]) => { const q = s => document.querySelector(s); q('#btnHost').click(); }, [map, zdiff]);
+  await page.waitForSelector('#lbForm [data-mode="zombies"]', { timeout: 120000 }); // modo, mapa e opções agora ficam no lobby
+  await page.evaluate(([map, zdiff]) => { const q = s => document.querySelector(s); q('#lbForm [data-mode="zombies"]').click(); q(`#lbForm [data-map="${map}"]`).click(); q(`#lbForm [data-k="zdiff"][data-v="${zdiff}"]`).click(); }, [map, zdiff]);
   await page.waitForSelector('#lbGo', { timeout: 120000 });
   await page.evaluate(() => setTimeout(() => document.querySelector('#lbGo').click(), 0));
   await page.waitForFunction(() => { const T = window.__T; return T.S.players.get('h')?.alive && T.Z.on; }, null, { timeout: 300000, polling: 1000 });

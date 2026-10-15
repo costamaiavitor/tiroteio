@@ -16,7 +16,7 @@ const instalar = () => J.page.evaluate(() => {
   window.__prep = (seg = 0) => {
     if (seg) T.sim(seg);
     const h = T.S.players.get('h'), bot = [...T.S.players.values()].find(p => p.isBot);
-    h.alive = true; h.hp = 100; T.me.alive = true; h.pos = [T.me.pos.x, T.me.pos.y, T.me.pos.z]; h.pb = null; h.ph = []; h.anom = null; h.hb = null;
+    h.alive = true; h.hp = 100; T.me.alive = true; h.pos = [T.me.pos.x, T.me.pos.y, T.me.pos.z]; h.pb = null; h.ph = []; h.anom = null; h.hb = null; h.prot = 0; if (bot) bot.prot = 0; // proteção de quem acabou de nascer (Mata-mata) fora do teste
     const V3 = T.camera.position.constructor, eye = new V3(h.pos[0], h.pos[1] + 1.62, h.pos[2]);
     for (const [dx, dz] of [[1.5, 0], [-1.5, 0], [0, 1.5], [0, -1.5], [2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]]) {
       const c = new V3(h.pos[0] + dx, h.pos[1] + 1.15, h.pos[2] + dz), d = c.clone().sub(eye), dist = d.length(); d.divideScalar(dist);

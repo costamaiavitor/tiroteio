@@ -48,7 +48,9 @@ const textoHud = () => J.page.evaluate(() => ['zhud', 'center', 'toast'].map(id 
 const ESPIA = `(T => { const msgs = [], c = { open: true, send(m) { msgs.push(typeof m === 'string' ? JSON.parse(m) : m); }, close() {} }; T.NET.conns.set('zz-espiao', c); return { msgs, fim: () => { T.NET.conns.delete('zz-espiao'); } }; })`;
 // cria a sala sem o clique do Playwright esperar o mapa (a Vila monta em mais de 30 s no SwiftShader com a máquina ocupada)
 async function criar(page, map, zdiff) {
-  await page.evaluate(([map, zdiff]) => { const q = s => document.querySelector(s); q('#hostForm [data-mode="zombies"]').click(); q(`#hostForm [data-map="${map}"]`).click(); q(`#hostForm [data-k="zdiff"][data-v="${zdiff}"]`).click(); q('#btnHost').click(); }, [map, zdiff]);
+  await page.evaluate(([map, zdiff]) => { const q = s => document.querySelector(s); q('#btnHost').click(); }, [map, zdiff]);
+  await page.waitForSelector('#lbForm [data-mode="zombies"]', { timeout: 120000 }); // modo, mapa e opções agora ficam no lobby
+  await page.evaluate(([map, zdiff]) => { const q = s => document.querySelector(s); q('#lbForm [data-mode="zombies"]').click(); q(`#lbForm [data-map="${map}"]`).click(); q(`#lbForm [data-k="zdiff"][data-v="${zdiff}"]`).click(); }, [map, zdiff]);
   await page.waitForFunction(() => !!document.querySelector('#lbGo') && document.querySelector('#lbGo').offsetParent !== null, null, { timeout: 120000 });
   await page.evaluate(() => { setTimeout(() => document.querySelector('#lbGo').click(), 0); });
   await page.waitForFunction(() => { const T = window.__T; return T.S.players.get('h')?.alive && T.Z.on; }, null, { timeout: 300000, polling: 500 });
@@ -95,9 +97,9 @@ test('menu: um modo só (cartões Vila e Sanatório), dificuldade, sem Ato/Campa
   // localStorage de verdade: lastSt do infinito na arena, a página recarrega e a partida começa na Vila com os objetivos
   await J.page.evaluate(() => localStorage.setItem('tiroteio.lastSt', JSON.stringify({ map: 'forte', cmap: 'galeria7', zmap: 'forte', mode: 'zombies', zmode: 'infinito', ato: 3, zdiff: 1 })));
   await J.page.reload({ waitUntil: 'load' }); await J.page.waitForFunction(() => window.__T && !document.querySelector('#btnHost').disabled, null, { timeout: 60000 });
-  const f = await J.page.evaluate(() => ({ mapas: [...document.querySelectorAll('#hostForm [data-map]')].map(b => b.dataset.map), on: document.querySelector('#hostForm [data-map].on')?.dataset.map, txt: document.querySelector('#hostForm').innerText }));
+  await J.page.evaluate(() => document.querySelector('#btnHost').click()); await J.page.waitForSelector('#lbForm [data-map]', { timeout: 60000 }); // o formulário fica no lobby
+  const f = await J.page.evaluate(() => ({ mapas: [...document.querySelectorAll('#lbForm [data-map]')].map(b => b.dataset.map), on: document.querySelector('#lbForm [data-map].on')?.dataset.map, txt: document.querySelector('#lbForm').innerText }));
   assert.deepEqual(f.mapas, ['sanatorio', 'vila']); assert.equal(f.on, 'vila'); assert.ok(!/campanha|\bato\b|infinito/i.test(f.txt), f.txt);
-  await J.page.evaluate(() => document.querySelector('#btnHost').click());
   await J.page.waitForFunction(() => !!document.querySelector('#lbGo') && document.querySelector('#lbGo').offsetParent !== null, null, { timeout: 120000 });
   await J.page.evaluate(() => { setTimeout(() => document.querySelector('#lbGo').click(), 0); });
   await J.page.waitForFunction(() => { const T = window.__T; return T.S.players.get('h')?.alive && T.Z.on; }, null, { timeout: 300000, polling: 500 });
