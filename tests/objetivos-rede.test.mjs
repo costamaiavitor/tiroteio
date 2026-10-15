@@ -27,7 +27,7 @@ const rodar = (fn, a = {}) => J.page.evaluate(([src, arg]) => (new Function('T',
 
 const AJ = `(T => {
   const p = T.S.players.get('h'), prob = [], log = [];
-  const conn = nome => { const c = { open: true, out: [], send(m) { this.out.push(JSON.parse(JSON.stringify(m))); }, close() { this.open = false; }, peerConnection: null }; T.srvOnData(c, { t: 'join', v: 2, pv: 8, name: nome }); c.q = T.S.players.get(c.pid); c.grace = 1e15; return c; }; // grace: o falso não manda ping
+  const conn = nome => { const c = { open: true, out: [], send(m) { this.out.push(JSON.parse(JSON.stringify(m))); }, close() { this.open = false; }, peerConnection: null }; T.srvOnData(c, { t: 'join', v: 2, pv: 9, name: nome }); c.q = T.S.players.get(c.pid); c.grace = 1e15; return c; }; // grace: o falso não manda ping
   const segura = () => { T.Z.spawnT = 1e12; for (const q of T.S.players.values()) q.dwEnd = 1e12; };
   const rodada = () => { if (T.Z.phase !== 'round') { T.Z.phaseEnd = window.__simNow; T.sim(.1); } };
   const acaba = () => { for (const z of [...T.Z.zs.values()]) T.zKill(z, p, 'head', 'm1911', false, false); T.Z.toSpawn = 0; T.Z.reQ = []; T.sim(.3); };
