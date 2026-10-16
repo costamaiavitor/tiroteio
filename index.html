@@ -232,6 +232,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #scope .sl,#scope svg{position:absolute;left:50%;top:50%;width:var(--d);height:var(--d);margin:calc(var(--d)/-2)}
 #scope .sl{border-radius:50%;box-shadow:0 0 0 100vmax #000;background:radial-gradient(circle at 36% 30%,rgba(170,205,255,.07),transparent 34%),radial-gradient(circle,transparent 0 56%,rgba(0,0,0,.2) 74%,rgba(0,0,0,.66) 91%,#000 99%)}
 #scope svg{overflow:visible}
+#fabRet{position:absolute;left:50%;top:50%;--d:11vh;width:var(--d);height:var(--d);margin:calc(var(--d)/-2);border-radius:50%;overflow:hidden;pointer-events:none}#fabRet svg{width:100%;height:100%;display:block}#fabRet circle{filter:drop-shadow(0 0 2px #ff2a1a)}
 #scope .pap{fill:#ff3a2a;filter:drop-shadow(0 0 2px #ff2a1a)}
 #dmgflash{position:absolute;inset:0;box-shadow:inset 0 0 120px rgba(255,0,0,.7);opacity:0}
 .arc{position:absolute;left:50%;top:50%;width:240px;height:240px;margin:-120px;border-radius:50%;border-top:9px solid rgba(255,40,40,.95);filter:drop-shadow(0 -2px 6px rgba(255,0,0,.8));transition:opacity 1s}
@@ -585,6 +586,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 
 <div id="hud" class="hidden">
   <div id="scope" class="hidden"></div>
+  <div id="fabRet" class="hidden"><svg viewBox="-100 -100 200 200"><path d="M-100 0H-34M34 0H100M0 34V100" stroke="#000" stroke-width="7"/><path d="M-34 0H-5M5 0H34M0 5V34M0-100V-5" stroke="#000" stroke-width="1.6"/><circle r="3.2" fill="#ff3a2a"/></svg></div>
   <div id="xhair"><i class="v"></i><i class="h"></i></div><div id="reddot" class="hidden"></div>
   <div id="hitmark"></div>
   <div id="dmgflash"></div>
@@ -17872,7 +17874,7 @@ function gunModel(id, fp = false, skin = null) {
     add(par, new THREE.CircleGeometry(.00055, 12), Rt, x, yc, rz); // ponto central (1 MOA)
     add(par, new THREE.RingGeometry(.0052, .0056, 48), Rt, x, yc, rz); // anel de 65 MOA
     for (const [dx, dy] of [[0, .0056], [0, -.0056], [.0056, 0], [-.0056, 0]]) add(par, new THREE.PlaneGeometry(dy ? .00035 : .0014, dy ? .0014 : .00035), Rt, x + dx * 1.12, yc + dy * 1.12, rz); // marcas no anel
-    ud.sight = new V3(x, yc, rz); ud.sightR = z + D / 2;
+    ud.sight = new V3(x, yc, rz); ud.sightR = z + D / 2; ud.fab = 'holo'; // mira de fábrica: zoom 1,25x no ADS (ver FABM)
   };
   // mira de ferro: alça (anel de abertura ou entalhe) atrás e massa (poste com orelhas de proteção) na frente, com ponto de trítio
   const irons = (y, zr, zf, o = {}) => {
@@ -17900,6 +17902,20 @@ function gunModel(id, fp = false, skin = null) {
     for (const k of [-.28, .28]) { add(par, new THREE.TorusGeometry(r + .003, .004, 6, 16), M.metal, x, y, z + len * k); add(par, RB(.012, .02, .014, .002), M.metal, x, y - r - .01, z + len * k); }
     if (pso) { add(par, CY(r * 1.5, .05, 18), M.metal, x, y, z - len / 2 - .08); add(par, CY(r * 1.25, .035, 14, r * 1.1), M.dark, x, y, z + len / 2 + .06); for (const k of [-.3, .3]) add(par, RB(.018, .016, .02, .003), M.dark, x + .012, y - r - .006, z + len * k); } // quebra-luz, ocular de borracha, base lateral
     ud.scopeEye = new V3(x, y, z + len / 2 + .046); // centro da ocular (a6)
+  };
+  // luneta curta de fábrica (AUG, G11, Enfield, HK21): tubo aberto com retícula de postes (grossos na borda, fio no meio) e ponto vermelho;
+  // a mira (ud.sight) é o centro da frente do tubo, então no ADS o olho fica atrás da ocular olhando por dentro dele (zoom em FABM)
+  const tubo = (y, z, len, r, mat, pe) => {
+    const q = new THREE.CylinderGeometry(r, r, len, hi ? 18 : 10, 1, true); q.rotateX(-Math.PI / 2); add(g, q, mat, 0, y, z);
+    for (const e of [-1, 1]) add(g, new THREE.TorusGeometry(r, .0035, 6, 18), M.dark, 0, y, z + e * len / 2);
+    { const h = y - r - pe; add(g, RB(.022, h, .03, .003), M.dark, 0, pe + h / 2 + .001, z); } // 6-w06: o pé acaba no fundo do tubo
+    const rz = z - len / 2 + .004, a = r * .35, R = r - .0005, T = r * .13, t = r * .04;
+    add(g, new THREE.CircleGeometry(r * .08, 12), M.reticle, 0, y, rz + .0002);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, -1], [0, 1]]) {
+      const pl = (c0, c1, e) => { const L = c1 - c0, m = (c0 + c1) / 2; add(g, new THREE.PlaneGeometry(dx ? L : e, dx ? e : L), M.dark, dx * m, y + dy * m, rz); };
+      if (dy < 1) pl(a, R, T); pl(r * .1, a, t); // poste grosso só embaixo e dos lados (como a retícula alemã nº 1); fio fino até perto do ponto
+    }
+    ud.sight = new V3(0, y, rz); ud.sightR = z + len / 2; ud.fab = 'luneta';
   };
   const guard = (par, u0, v0, len = .05, w = .01) => { // guarda-mato com furo + gatilho curvo
     add(par, EX([[u0 - .006, v0], [u0 + len, v0], [u0 + len, v0 - .005], [u0 + len - .018, v0 - .03], [u0 - .004, v0 - .03], [u0 - .01, v0 - .018]], w, [[[u0, v0 - .005], [u0 + len - .007, v0 - .005], [u0 + len - .022, v0 - .025], [u0, v0 - .025]]]), M.metal);
@@ -18055,8 +18071,7 @@ function gunModel(id, fp = false, skin = null) {
         add(g, CY(.0085, .24), M.metal, 0, by, -.49); add(g, RB(.03, .028, .03, .004), M.metal, 0, .05, -.4);
         add(g, CY(.012, .05, 12), M.metal, 0, by, -.625); add(g, mrg([0, 1, 2, 3].map(i => tg(new THREE.BoxGeometry(.003, .003, .03), Math.cos(i * 1.571 + .785) * .012, by + Math.sin(i * 1.571 + .785) * .012, -.63))), M.dark);
         bore(0, by, -.651, .006); mz = -.653;
-        add(g, new THREE.CylinderGeometry(.013, .013, .032, hi ? 16 : 8), M.metal, 0, .068, .088, 0, 0, Math.PI / 2); // alça de tambor
-        irons(.084, .088, -.405, { base: .026, fbase: .02 });
+        add(g, RB(.026, .008, .1, .002), M.metal, 0, .062, .02); tubo(.112, .02, .15, .019, M.metal, .066); // luneta de fábrica (como a HK21 baixada) em montagem de garra
         add(g, EX([[.05, -.012], [.13, -.012], [.13, -.05], [.115, -.058], [.05, -.058]], .05), M.metal); add(g, RB(.004, .02, .06, .001), M.dark, -.025, -.03, -.09);
         add(g, legs(rf + .012, rf + .2, -.024, .017), M.metal); ud.lh = new V3(-.005, -.026, -.26);
         const chg = grp(g, -.012, .052, -.32); add(chg, CY(.0035, .03, 8), M.dark, -.013, 0, -.005, 0, Math.PI / 2 - .45); add(chg, RB(.01, .01, .014, .003), M.dark, -.026, 0, -.011);
@@ -18164,12 +18179,13 @@ function gunModel(id, fp = false, skin = null) {
       add(g, new THREE.BoxGeometry(.002, .016, .05), M.dark, .0205, .038, -.01); add(g, CY(.007, .026, 10), M.metal, .024, .042, .05, 0, -.5);
       if (ch) { add(g, CY(.026, hl, 16, .023), M.polymer, 0, .032, -(.11 + hl / 2)); for (let i = 0; i < (com ? 5 : 7); i++) add(g, new THREE.TorusGeometry(.0255, .002, 6, 16), M.dark, 0, .032, -(.13 + i * .026)); }
       else add(g, EX([[.106, .0], [.106, .064], [.3, .064], [.3, .0], [.29, -.008], [.116, -.008]], .05, null, .005), fal ? M.polymer : M.metal);
-      if (ch) add(g, EX([[-.09, 0], [.07, 0], [.06, .026], [-.07, .026], [-.072, .038], [-.09, .038]], .016, [[[-.05, .006], [.045, .006], [.04, .02], [-.045, .02]]]), M.metal, 0, .058, 0); // alça de transporte
+      if (m16) add(g, EX([[-.09, 0], [.07, 0], [.06, .026], [-.07, .026], [-.072, .038], [-.09, .038]], .016, [[[-.05, .006], [.045, .006], [.04, .02], [-.045, .02]]]), M.metal, 0, .058, 0); // alça de transporte
       else if (!fal) for (const s of [-1, 1]) { rail(g, s * .029, .032, -.2, .18); } else for (let i = 0; i < 5; i++) add(g, new THREE.BoxGeometry(.052, .012, .01), M.dark, 0, .03, -(.13 + i * .03));
-      if (!ch && !fal) rail(g, 0, .062, -.09, .36); // a3: o FAL não tem trilho em cima
-      if (fal) for (const s of [-1, 1]) add(g, RB(.003, .022, .016, .001), M.metal, s * .011, .078, .07); else if (!ch) holo(g, 0, .066, -.005); // a3: FAL: orelhas da alça na traseira da caixa
+      if (!m16 && !fal) rail(g, 0, .062, com ? -.01 : -.09, com ? .18 : .36); // Commando: trilho só na caixa (guarda-mão redondo) // a3: o FAL não tem trilho em cima
+      if (fal) for (const s of [-1, 1]) add(g, RB(.003, .022, .016, .001), M.metal, s * .011, .078, .07); else if (!m16) holo(g, 0, .066, -.005); // M4 e Commando: holográfica de fábrica // a3: FAL: orelhas da alça na traseira da caixa
       if (fal) { add(g, RB(.026, .026, .04, .004), M.metal, 0, .034, -.36); for (const s of [-1, 1]) add(g, RB(.004, .028, .012, .001), M.metal, s * .009, .074, -.36); } // a3: FAL: bloco de gás e orelhas da massa
-      else if (ch) add(g, EX([[.0, .0], [.008, .05], [.02, .05], [.028, .0]], .014), M.metal, 0, .04, fs);
+      else if (m16) add(g, EX([[.0, .0], [.008, .05], [.02, .05], [.028, .0]], .014), M.metal, 0, .04, fs);
+      else if (com) { add(g, RB(.018, .016, .018, .002), M.metal, 0, .046, fs); add(g, EX([[.0, .0], [.0, .004], [.02, .004], [.02, .0]], .016, null, .001), M.dark, 0, .054, fs + .01); } // massa rebatida no bloco de gás
       else add(g, EX([[.0, .0], [.0, .004], [.03, .004], [.03, .0]], .018, null, .001), M.dark, 0, .064, -.3); // massa rebatida, baixinha (não aparece na janela da holográfica)
       add(g, CY(.008, .14 + ex, 12), M.metal, 0, .032, -.37 - ex / 2); add(g, CY(.011, .045, 10), M.dark, 0, .032, -.46 - ex);
       for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + .78; add(g, new THREE.BoxGeometry(.003, .003, .03), M.metal, Math.cos(a) * .012, .032 + Math.sin(a) * .012, -.46 - ex); }
@@ -18184,7 +18200,7 @@ function gunModel(id, fp = false, skin = null) {
       else { add(g, CY(.014, .11, 14), M.metal, 0, .038, .15); add(g, EX([[-.2, .07], [-.33, .07], [-.34, .06], [-.34, -.035], [-.33, -.04], [-.29, -.025], [-.25, .025], [-.2, .03]], .044, null, .004), M.polymer); add(g, EX([[-.34, .062], [-.352, .062], [-.352, -.036], [-.34, -.04]], .046), M.dark); }
       ud.lh = new V3(-.005, -.012, com ? -.19 : -.21);
       if (fal) irons(.09, .07, -.36, { base: .032, fbase: .058 }); // a3: linha de mira ~6 cm acima do cano, como no FAL
-      if (ch) irons(.104, .075, fs, { base: .01, fbase: .068 });
+      if (m16) irons(.104, .075, fs, { base: .01, fbase: .068 });
       break;
     }
     case 'shotgun': case 'launcher': {
@@ -18362,13 +18378,7 @@ function gunModel(id, fp = false, skin = null) {
     }
     case 'bull': { // bullpup (AUG, Famas, G11, Enfield): punho e gatilho na frente do carregador
       const aug = bid === 'aug', fam = bid === 'famas', g11 = bid === 'g11', enf = bid === 'enfield', bodyM = aug ? M.green : g11 ? M.tan : M.polymer;
-      const optic = (y, z, len, r, mat) => { // luneta curta (tubo aberto) com ponto vermelho
-        const q = new THREE.CylinderGeometry(r, r, len, hi ? 18 : 10, 1, true); q.rotateX(-Math.PI / 2); add(g, q, mat, 0, y, z);
-        for (const e of [-1, 1]) add(g, new THREE.TorusGeometry(r, .0035, 6, 18), M.dark, 0, y, z + e * len / 2);
-        { const h = y - r - W06.pe; add(g, RB(.022, h, .03, .003), M.dark, 0, W06.pe + h / 2 + .001, z); } // 6-w06: o pé acaba no fundo do tubo (antes subia até 4 mm abaixo do eixo e tampava a metade de baixo da mira)
-        add(g, new THREE.CircleGeometry(.0009, 10), M.reticle, 0, y, z - len / 2 + .004);
-        ud.sight = new V3(0, y, z - len / 2 + .004); ud.sightR = z + len / 2;
-      };
+      const optic = (y, z, len, r, mat) => tubo(y, z, len, r, mat, W06.pe); // luneta curta de fábrica (ver tubo)
       if (g11) add(g, EX([[-.34, -.07], [-.34, .07], [.2, .07], [.24, .04], [.24, -.02], [.16, -.03], [.16, -.012], [.13, -.012], [.13, -.03], [-.02, -.03], [-.04, -.07]], .06, [[[.04, -.004], [.11, -.004], [.11, -.026], [.04, -.026]]], .006), bodyM); // caixa sem cápsulas
       else {
         add(g, EX([[-.36, -.085], [-.36, .045], [-.3, .055], [.06, .055], [.06, .02], [.2, .02], [.24, .012], [.24, -.012], [.2, -.022], [.13, -.022], [.13, -.01], [.07, -.01], [.07, -.03], [-.12, -.03], ['q', -.2, -.03, -.25, -.085]], aug ? .06 : .054, null, .005), bodyM);
@@ -19423,6 +19433,11 @@ function fpBuild(id, ud) {
   const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)).multiply(tq.clone().invert()), sp = tips.sight.clone().applyMatrix4(Gv).applyQuaternion(aq);
   holder.add(root);
   Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, mz, follow, ik, body, C, aq, sl: tips.sight.clone().applyMatrix4(C), ap: new V3(0, 0, -(P.view === 'pistol' ? ADS.csPistola : ADS.csLonga)).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
+  ud.fab = null; ud.fabLens = null; // a holográfica da arma feita no código não vale aqui (a M4 baixada usa a mira de ferro dela)
+  if (D?.lens && !W[id]?.scope) { // mira de fábrica do modelo baixado (P90: colimador; HK21/M249: luneta): no ADS a lente fica transparente, com retícula e zoom (FABM)
+    ud.fab = FAB_HOLO.includes(attBase(id)) ? 'holo' : 'luneta'; ud.fabLens = [];
+    if (ud.fab === 'luneta') model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name) && !ud.fabLens.includes(o.material)) { o.material.transparent = true; ud.fabLens.push(o.material); } });
+  }
   // a15: o saque do pacote cabe no tempo do jogo (G.switchDur); modelo que chega depois entra no ponto do saque em que a troca está (ou parado)
   const sw = G.switchEnd - now, dr = clips.draw && sw > .02; mixer.stopAllAction(); fpPlay(ud, dr ? 'draw' : 'idle', dr ? G.switchDur : undefined); mixer.update(dr ? Math.max(0, G.switchDur - sw) : 0); if (dr) ud.fps2.until = G.switchEnd;
   if (D?.cover) fpCoverInit(ud.fps2, model.children[0], D); // a7: tampa de alimentação do modelo (metralhadora de fita)
@@ -20551,6 +20566,17 @@ function w18Mola(o, k, v, alvo, w, dt, lo = -1e9, hi = 1e9) { // o[k] vai a alvo
   o[k] = x; o[v] = u; return x;
 }
 // ===== fim 6-w18 =====
+// ---------- mira de fábrica no ADS (holográfica da M4/Commando/P90; luneta curta da AUG/G11/Enfield/HK21) ----------
+// A mira modelada na arma é o ponto de visada (ud.sight no centro da janela/ocular; ud.fab marca qual é). zoom: multiplica o zoom do ADS
+// (1,25x de todas as armas): holográfica 1,25x (como a Mira Holográfica do Arsenal), luneta 1,6x (2x no total, como a Luneta 2x).
+// Luneta do modelo baixado (HK21/M249): a lente escura fica transparente entre lente[0] e lente[1] de G.ads e a retícula (#fabRet) aparece.
+const FABM = { zoom: { holo: 1.25, luneta: 1.6 }, lente: [.55, .95], vidro: .92 };
+const fabZoom = (w, ud) => !w?.scope && ud ? FABM.zoom[ud.fab] || 1 : 1;
+function fabMira(ud) {
+  const k = ud.fab === 'luneta' && ud.fps2 && vmRoot.visible ? seg(G.ads || 0, FABM.lente[0], FABM.lente[1]) : 0, op = Math.round(k * 20) / 20;
+  if (ud.fabLens) for (const m of ud.fabLens) m.opacity = 1 - FABM.vidro * k;
+  if (fabMira.op !== op) { fabMira.op = op; const el = $('#fabRet'); el.style.opacity = op; el.classList.toggle('hidden', !op); }
+}
 function updateViewmodel(dt) {
   const w = W[G.cur], ud = vmGun?.userData || {}, vo = ud.vm || [0, 0, 0];
   const hs = Math.hypot(me.vel.x, me.vel.z);
@@ -20595,6 +20621,7 @@ function updateViewmodel(dt) {
   }
   if (ud.fps2) { ud.fps2.mz.updateMatrixWorld(true); ud.muzzle.setFromMatrixPosition(ud.fps2.mz.matrixWorld); vmRoot.worldToLocal(ud.muzzle); } // boca do cano segue a animação
   w19Clarao(ud); // 6-w19
+  fabMira(ud);
   if (ud.armsGun && vmRoot.visible) armsIK(ud);
   updateVmFx(dt);
 }
@@ -20659,7 +20686,7 @@ const ATT_SLOTS = { optic: 'Mira', muzzle: 'Boca', barrel: 'Cano', under: 'Sob o
 const ATT_MAX = 5, WLV_MAX = ATT_ORDER.length + 1;
 const attBase = id => W[id]?.base || id;
 // mira de fábrica: luneta (não aceita outra mira por cima) ou holográfica (sai quando outra mira entra)
-const FAB_LUNETA = ['scout', 'awp', 'dragunov', 'l96', 'psg1', 'aug', 'g11', 'enfield'], FAB_HOLO = ['m4', 'commando', 'p90'];
+const FAB_LUNETA = ['scout', 'awp', 'dragunov', 'l96', 'psg1', 'aug', 'g11', 'enfield', 'hk21'], FAB_HOLO = ['m4', 'commando', 'p90'];
 const fabOptic = id => { const b = attBase(id); return FAB_LUNETA.includes(b) ? 'Luneta de fábrica' : FAB_HOLO.includes(b) ? 'Holográfica de fábrica' : null; };
 const fabLuneta = id => FAB_LUNETA.includes(attBase(id));
 const attOK = id => { const b = attBase(id), w = W[b]; return !!w && !w.ls && !w.pu && !w.splash && !w.thunder && !w.frost && !w.chain && !['knife', 'karambit', 'chinalake', 'raygun', 'raygun2', 'thundergun', 'wunderwaffe', 'wintershowl', 'crossbow', 'law', 'monkey', 'dmach'].includes(b) && (w.slot === 'primary' || w.slot === 'secondary' || !!w.wall || !!w.box); };
@@ -20794,7 +20821,7 @@ function attPartsProc(id, gun, ud) {
       ret.push(put(par, new THREE.CircleGeometry(.0007, 12), N.reticle, x, yc, zf + .0022));
       const gl = put(par, new THREE.PlaneGeometry(w, h), X.glass, x, yc, zf + .0015); gl.renderOrder = 2;
     }
-    ud.sight = V(x, yc, zf + .0015); ud.sightR = zc + d / 2;
+    ud.sight = V(x, yc, zf + .0015); ud.sightR = zc + d / 2; ud.fab = null; // a mira acessória substitui a de fábrica (o zoom é o dela)
   }
   // cano longo: o que está na boca do cano anda para a frente, o que atravessa estica, e um pedaço de cano preenche
   const R0 = q(mz.x - .04, mz.x + .04, my - .04, my + .04, mz.z - .001, mz.z + .006), rb = R0.n ? Math.max(.004, Math.min(.02, my - R0.y0)) : .008, ex = R0.n ? Math.max(1, (R0.x1 - R0.x0) / 2 / rb) : 1;
@@ -32346,7 +32373,7 @@ function tick(dt) {
   G.ads = lerp(G.ads || 0, adsT, Math.min(1, dt * 11 * attStat(G.cur, 'adsSpd'))); if (G.ads < .002) G.ads = 0;
   $('#xhair').style.opacity = G.ads > .5 ? 0 : 1;
   scopeTick(dt, w);
-  let fov = CFG.fov * (1 - (1 - 1 / (1.25 * attStat(G.cur, 'zoom'))) * G.ads) + me.sprintK * 7 + (me.lungeK || 0) * KNF.bote.fov; // mirar dá um zoom leve; correr abre um pouco
+  let fov = CFG.fov * (1 - (1 - 1 / (1.25 * attStat(G.cur, 'zoom') * fabZoom(w, vmGun?.userData))) * G.ads) + me.sprintK * 7 + (me.lungeK || 0) * KNF.bote.fov; // mirar dá um zoom leve; correr abre um pouco
   if (w?.scope && G.scR > 0) fov = lerp(fov, G.scF || fov, seg(G.scR, SCOPE.zoom[0], SCOPE.zoom[1])); // luneta: o zoom chega junto com a ocular
   fov = Math.round(fov * 10) / 10;
   if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
