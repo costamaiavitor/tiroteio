@@ -20631,6 +20631,10 @@ const ATT_ORDER = Object.keys(ATT); // um acessório por nível, do nível 2 ao 
 const ATT_SLOTS = { optic: 'Mira', muzzle: 'Boca', barrel: 'Cano', under: 'Sob o cano', mag: 'Carregador', rgrip: 'Empunhadura', stock: 'Coronha', laser: 'Laser' };
 const ATT_MAX = 5, WLV_MAX = ATT_ORDER.length + 1;
 const attBase = id => W[id]?.base || id;
+// mira de fábrica: luneta (não aceita outra mira por cima) ou holográfica (sai quando outra mira entra)
+const FAB_LUNETA = ['scout', 'awp', 'dragunov', 'l96', 'psg1', 'aug', 'g11', 'enfield'], FAB_HOLO = ['m4', 'commando', 'p90'];
+const fabOptic = id => { const b = attBase(id); return FAB_LUNETA.includes(b) ? 'Luneta de fábrica' : FAB_HOLO.includes(b) ? 'Holográfica de fábrica' : null; };
+const fabLuneta = id => FAB_LUNETA.includes(attBase(id));
 const attOK = id => { const b = attBase(id), w = W[b]; return !!w && !w.ls && !w.pu && !w.splash && !w.thunder && !w.frost && !w.chain && !['knife', 'karambit', 'chinalake', 'raygun', 'raygun2', 'thundergun', 'wunderwaffe', 'wintershowl', 'crossbow', 'law', 'monkey', 'dmach'].includes(b) && (w.slot === 'primary' || w.slot === 'secondary' || !!w.wall || !!w.box); };
 const wlvNeed = l => 120 + 60 * (l - 1); // XP para passar do nível l para o l+1
 function wLevel(id) {
@@ -20643,7 +20647,7 @@ function attOn(id) { // acessórios valendo agora (só no modo Zumbi)
   if (ATT_PV) return ATT_PV.list; // prévia do Arsenal (menu): os acessórios escolhidos, sem mexer no jogo
   if (!ZC.on || !attOK(id) || fpw(id)) return []; // só nas armas feitas no código (modo Zumbi), nunca nas baixadas
   const un = new Set(attUnlocked(id));
-  return (PROF.data?.att?.[attBase(id)] || []).filter(a => un.has(a) && ATT[a]);
+  return (PROF.data?.att?.[attBase(id)] || []).filter(a => un.has(a) && ATT[a] && !(ATT[a].slot === 'optic' && fabLuneta(id))); // luneta de fábrica: sem outra mira
 }
 function attStat(id, k) { let v = 1; for (const a of attOn(id)) if (ATT[a][k] != null) v *= ATT[a][k]; return v; }
 const attHas = (id, k) => attOn(id).some(a => ATT[a][k]);
@@ -20700,7 +20704,7 @@ function attScan(gun) { // vértices visíveis da arma no espaço dela (P: x, y,
 }
 function attPartsProc(id, gun, ud) {
   const on = attOn(id); if (!on.length || !ud.muzzle) return;
-  const b = attBase(id), sem = ATTV.sem[b] || [], slot = s => { const a = on.find(a => ATT[a].slot === s); if (!a || sem.includes(s) || sem.includes(a)) return null; const v = ATT[a].vis; return v === 0 ? null : v || a; }; // vis: peça 3D usada no desenho
+  const b = attBase(id), sem = [...(ATTV.sem[b] || []), ...(fabLuneta(b) ? ['optic'] : [])], slot = s => { const a = on.find(a => ATT[a].slot === s); if (!a || sem.includes(s) || sem.includes(a)) return null; const v = ATT[a].vis; return v === 0 ? null : v || a; }; // vis: peça 3D usada no desenho
   const N = gunMats(false, true, null), M = gunMats(W[id]?.pap | 0, true, ATT_PV ? ATT_PV.f : skinOf(id)), X = attMats(), hi = CFG.gfx !== 'baixo';
   const hg = W[b]?.slot === 'secondary', pis = !!(ud.slide && ud.pistol), sg = ud.rig === 'shell' || ud.rig === 'break', bull = W[b]?.model === 'bull';
   const movers = [ud.slide, ud.pump, ud.brk].filter(Boolean), V = (x, y, z) => new V3(x, y, z);
@@ -31859,9 +31863,10 @@ function arsenalUI() {
     let h = `<div class="arlv"><b>Nível ${L.l}</b><span>${L.need ? `${L.xp}/${L.need} XP` : 'nível máximo'}</span><div class="axbar"><i style="width:${L.need ? Math.round(100 * L.xp / L.need) : 100}%"></i></div></div>`;
     if (AR.slot) {
       const cur = eq.find(a => ATT[a].slot === AR.slot) || '';
-      h += `<div class="arph">${ATT_SLOTS[AR.slot]}</div><button class="aropt${cur ? '' : ' on'}" data-opt=""><b>Nenhum</b><small>Encaixe vazio</small></button>` + ATT_ORDER.filter(a => ATT[a].slot === AR.slot).map(a => {
+      const fab = AR.slot === 'optic' && fabOptic(w), trava = AR.slot === 'optic' && fabLuneta(w);
+      h += `<div class="arph">${ATT_SLOTS[AR.slot]}</div><button class="aropt${cur ? '' : ' on'}" data-opt=""><b>${fab || 'Nenhum'}</b><small>${fab ? 'Já vem montada na arma' : 'Encaixe vazio'}</small></button>` + (trava ? '<div class="hint" style="margin-top:6px">Esta arma já vem com luneta de fábrica: não aceita outra mira.</div>' : ATT_ORDER.filter(a => ATT[a].slot === AR.slot).map(a => {
         const o = un.includes(a); return `<button class="aropt${a === cur ? ' on' : ''}${o ? '' : ' lock'}" data-opt="${a}"><b>${esc(ATT[a].name)}</b><small>${o ? esc(ATT[a].d) : 'Libera no nível ' + (ATT_ORDER.indexOf(a) + 2)}</small></button>`;
-      }).join('');
+      }).join(''));
     } else h += `<div class="hint">Clique numa etiqueta em volta da arma para trocar o acessório daquele encaixe (até ${ATT_MAX}, um por encaixe). Valem no modo Zumbi, também na arma do Pack-a-Punch. Mate zumbis com esta arma para subir de nível e liberar mais.</div>`;
     setHTMLm('arPanel', h);
   } else {
@@ -31940,7 +31945,7 @@ function arTags() { // etiquetas: encaixes de cima e de baixo, espalhadas sem se
     for (const { s, x } of it) {
       const a = eq.find(a => ATT[a].slot === s);
       AR.tagPos[s] = [x + tw / 2, row === 'top' ? y + th : y];
-      html.push(`<button class="artag${a ? ' on' : ''}${AR.slot === s ? ' sel' : ''}" data-slot="${s}" style="left:${Math.round(x)}px;top:${Math.round(y)}px"><span><em>${AR_ICON[s]}</em>${ATT_SLOTS[s]}</span>${a ? `<b>${esc(ATT[a].name)}</b>` : ''}</button>`);
+      html.push(`<button class="artag${a ? ' on' : ''}${AR.slot === s ? ' sel' : ''}" data-slot="${s}" style="left:${Math.round(x)}px;top:${Math.round(y)}px"><span><em>${AR_ICON[s]}</em>${ATT_SLOTS[s]}</span>${a ? `<b>${esc(ATT[a].name)}</b>` : s === 'optic' && fabOptic(AR.w) ? `<b>${fabOptic(AR.w)}</b>` : ''}</button>`);
     }
   }
   tg.innerHTML = html.join('');
