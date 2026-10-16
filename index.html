@@ -31303,6 +31303,9 @@ function grantAllSkins() {
   const before = d.items.length, all = [];
   for (const w of SKIN_WEAPONS()) for (const f of SKINS) all.push(w + ':' + f.id);
   d.items = [...new Set([...d.items, ...all])];
+  let up = 0; const max = Array.from({ length: WLV_MAX - 1 }, (_, i) => wlvNeed(i + 1)).reduce((a, b) => a + b, 0); // XP para o nível máximo
+  d.wxp = d.wxp || {}; for (const k of Object.keys(W)) if (attOK(k) && attBase(k) === k && (d.wxp[k] || 0) < max) { d.wxp[k] = max; up++; } // conta do dono: todas as armas no nível máximo
+  if (up && d.items.length === before) { profSave(true); PROF.status = 'Conta do dono: todas as armas no nível máximo.'; }
   if (d.items.length > before) { profSave(true); PROF.status = `Conta do dono: todas as ${d.items.length} skins liberadas.`; }
   return d.items.length - before;
 }

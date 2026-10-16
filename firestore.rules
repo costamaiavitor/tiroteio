@@ -64,8 +64,13 @@ service cloud.firestore {
       function cxN(m, k) { return m.get('cx', {}).get(k, 0); }
       // valor do inventário de caixas em Caixas Comuns: juntar 3 numa de cima mantém o valor
       function valor(m) { return m.cases + 3 * cxN(m, 'r') + 9 * cxN(m, 'e') + 27 * cxN(m, 'l'); }
+      // wxp: XP de cada arma (nível do Arsenal); att: acessórios escolhidos por arma; elo: patente (Rodadas)
+      function mapaArmasOk(m) { return m is map && m.keys().size() <= 150 && m.keys().join(',').matches('^$|^[a-z0-9_]{1,24}(,[a-z0-9_]{1,24})*$'); }
       function formaOk() {
-        return d().keys().hasOnly(['xp', 'cases', 'items', 'equipped', 'opened', 'name', 'upd', 'created', 'st', 'cx'])
+        return d().keys().hasOnly(['xp', 'cases', 'items', 'equipped', 'opened', 'name', 'upd', 'created', 'st', 'cx', 'wxp', 'att', 'elo'])
+          && (!('wxp' in d()) || mapaArmasOk(d().wxp))
+          && (!('att' in d()) || mapaArmasOk(d().att))
+          && (!('elo' in d()) || (d().elo is number && d().elo >= 0 && d().elo <= 5000))
           && (!('cx' in d()) || cxOk(d().cx))
           && d().keys().hasAll(['xp', 'cases', 'items', 'equipped', 'opened'])
           && (!('st' in d()) || statsOk(d().st))
