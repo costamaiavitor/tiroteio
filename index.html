@@ -17673,6 +17673,31 @@ function skinTex(f) {
       case 'gold': { const gr = g.createLinearGradient(0, 0, 0, S); gr.addColorStop(0, C[0]); gr.addColorStop(.5, '#f6d67a'); gr.addColorStop(1, C[0]); g.fillStyle = gr; g.fillRect(0, 0, S, S); g.globalAlpha = .08; for (let y = 0; y < S; y += 2) { g.fillStyle = Math.random() < .5 ? '#fff' : C[1]; g.fillRect(0, y, S, 1); } g.globalAlpha = 1; break; }
     }
   });
+  // acabamento de verdade (todas as skins): variação de cor, sujeira, riscos, tinta lascada mostrando o metal e detalhes gráficos
+  { const g = map.image.getContext('2d'), DECO = { urbano: 'stencil', floresta: 'stencil', deserto: 'stencil', selva: 'stencil', marinha: 'stencil', cinzas: 'stencil', oliva: 'stencil',
+      corrida: 'race', xadrez: 'race', asiimov: 'hazard', tigre: 'claw', zebra: 'claw', carbono: 'serial', grafite: 'serial', cereja: 'serial', areia: 'serial', artico: 'stencil',
+      colmeia: 'tech', neon: 'tech', veneno: 'tech', gelo: 'tech', ouro: 'engrave', platina: 'engrave', damasco: 'engrave', dragao: 'emblem', fenix: 'emblem', galaxia: 'stars', lava: 'emblem', obsidiana: 'engrave', rubi: 'engrave', esmeralda: 'engrave', crepusculo: 'stars', aurora: 'stars', respingo: 'serial', marmore: 'engrave', oceano: 'stencil' };
+    const tint = (alpha, col) => { g.globalAlpha = alpha; g.fillStyle = col; };
+    // manchas grandes de tom (a tinta não é uniforme) e sujeira nas "bordas"
+    for (let i = 0; i < 8; i++) { tint(.028, Math.random() < .5 ? '#000' : '#fff'); blob(g, R(0, S), R(0, S), R(40, 90), R(30, 70), g.fillStyle); }
+    // riscos finos
+    g.lineWidth = .6; for (let i = 0; i < 26; i++) { g.globalAlpha = R(.08, .2); g.strokeStyle = Math.random() < .7 ? '#fff' : '#000'; const x = R(0, S), y = R(0, S); g.beginPath(); g.moveTo(x, y); g.lineTo(x + R(-26, 26), y + R(-6, 6)); g.stroke(); }
+    // tinta lascada: pontinhos de metal aparecendo (menos nas skins de metal polido)
+    if ((f.m ?? .45) < .9) for (let i = 0; i < 70; i++) { const x = R(0, S), y = R(0, S), r = R(.5, 2.2); tint(R(.35, .7), '#9aa0a8'); g.beginPath(); g.ellipse(x, y, r, r * R(.4, 1), R(0, 3), 0, 7); g.fill(); }
+    g.globalAlpha = 1;
+    const txt = (t, x, y, size, col, a = .8, rot = 0) => { g.save(); g.translate(x, y); g.rotate(rot); g.globalAlpha = a; g.fillStyle = col; g.font = `700 ${size}px Rajdhani,Consolas,monospace`; g.fillText(t, 0, 0); g.restore(); };
+    const ink = C[C.length - 1], light = '#f2f2f2', kind = DECO[f.id];
+    if (kind === 'stencil') { txt('DAN GUN', R(20, 120), R(40, 230), 15, Math.random() < .5 ? light : '#111', .45); txt('Nº ' + (100 + (f.id.length * 37) % 900), R(20, 160), R(30, 240), 10, light, .5); }
+    if (kind === 'serial') { txt('DG-' + f.id.toUpperCase().slice(0, 4) + '-' + (1000 + f.id.length * 271 % 9000), 12, S * .78, 11, light, .55); g.fillStyle = light; g.globalAlpha = .35; g.fillRect(12, S * .8, 90, 1.5); g.globalAlpha = 1; }
+    if (kind === 'race') { txt(String(7 + f.id.length % 90), S * .62, S * .55, 64, C[C.length > 2 ? 2 : 1], .9); g.globalAlpha = .9; g.fillStyle = C[1]; g.fillRect(0, S * .1, S, 5); g.fillRect(0, S * .1 + 9, S, 2); g.globalAlpha = 1; }
+    if (kind === 'hazard') { g.save(); g.beginPath(); g.rect(0, S * .82, S, 18); g.clip(); for (let x = -40; x < S + 40; x += 18) { g.fillStyle = (x / 18) % 2 ? '#111' : C[1]; g.beginPath(); g.moveTo(x, S * .82 + 18); g.lineTo(x + 9, S * .82); g.lineTo(x + 18, S * .82); g.lineTo(x + 9, S * .82 + 18); g.fill(); } g.restore(); txt('ASIIMOV // DG', 14, S * .42, 13, '#1a1a1c', .7); }
+    if (kind === 'claw') { g.strokeStyle = ink; g.lineCap = 'round'; for (let k = 0; k < 2; k++) { const x0 = R(30, 200), y0 = R(30, 200); for (let i = 0; i < 3; i++) { g.lineWidth = 4 - i; g.globalAlpha = .55; g.beginPath(); g.moveTo(x0 + i * 10, y0); g.quadraticCurveTo(x0 + i * 10 + 14, y0 + 30, x0 + i * 10 + 6, y0 + 60); g.stroke(); } } g.globalAlpha = 1; }
+    if (kind === 'tech') { g.strokeStyle = C[1] || light; g.lineWidth = 1; g.globalAlpha = .5; for (let i = 0; i < 6; i++) { const x = R(10, 220), y = R(10, 220); g.strokeRect(x, y, R(14, 34), R(8, 18)); g.beginPath(); g.moveTo(x, y); g.lineTo(x - 12, y - 12); g.stroke(); } g.globalAlpha = 1; txt('SYS.' + f.id.slice(0, 3).toUpperCase(), 16, S * .9, 10, C[1] || light, .7); }
+    if (kind === 'engrave') { g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1; for (let i = 0; i < 3; i++) { const cx = R(40, 220), cy = R(40, 220); for (let a = 0; a < 6.3; a += .35) { g.beginPath(); g.arc(cx + Math.cos(a) * 14, cy + Math.sin(a) * 14, 9, a, a + 2.2); g.stroke(); } } g.strokeStyle = 'rgba(255,255,255,.25)'; for (let y = 0; y < S; y += 64) { g.beginPath(); for (let x = 0; x <= S; x += 4) g.lineTo(x, y + Math.sin(x / 12) * 4); g.stroke(); } }
+    if (kind === 'emblem') { const cx = R(70, 190), cy = R(70, 190); g.globalAlpha = .75; g.fillStyle = C[1]; g.beginPath(); for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283 - Math.PI / 2, r = i % 2 ? 11 : 26; g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } g.closePath(); g.fill(); g.strokeStyle = C[2] || light; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, 32, 0, 7); g.stroke(); g.globalAlpha = 1; }
+    if (kind === 'stars') { for (let i = 0; i < 90; i++) { tint(R(.3, .9), '#fff'); const r = Math.random() < .08 ? 1.6 : .6; g.beginPath(); g.arc(R(0, S), R(0, S), r, 0, 7); g.fill(); } g.globalAlpha = 1; }
+    map.needsUpdate = true;
+  }
   // acabamentos que brilham: o desenho do brilho também vai no mapa de cor
   if (f.glow) {
     const lines = [];
