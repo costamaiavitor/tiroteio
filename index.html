@@ -20617,7 +20617,7 @@ function updateViewmodel(dt) {
   }
   // mirando: a raiz dos braços (ombros, clavículas, mangas) fica onde estava no quadril; só as mãos vão com a arma (senão a manga entra na frente do olho)
   if (ud.armsGun && ARMS.gunC) ARMS.gunC.position.set(-.165 + (ak > 0 ? hx - o.x : 0), .145 + (ak > 0 ? hy - o.y : 0), .43 + (ak > 0 ? hz - o.z : 0));
-  if (!ud.fps2) gunAnim(ud, w, o);
+  if (!ud.fps2) akAnim(ud, w, o, G.akR);
   mouseDX *= Math.exp(-dt * 12);
   const x = o.x, y = o.y, z = o.z, rx = o.rx, ry = o.ry, rz = o.rz;
   vmRoot.position.set(x, y, z); vmRoot.rotation.set(rx, ry, rz);
@@ -20687,7 +20687,7 @@ const ATT = {
   barrel_short: { slot: 'barrel', name: 'Cano Curto', d: 'Mira 15% mais rápida e anda atirando melhor; alcance menor', adsSpd: 1.15, moveX: .8, rangeX: .8, vis: 0 },
   stock_none: { slot: 'stock', name: 'Sem Coronha', d: 'Mira 25% mais rápida; mais tranco', adsSpd: 1.25, kick: 1.2, vis: 0 },
   mag_drum: { slot: 'mag', name: 'Tambor', d: 'Dobro de munição no carregador; recarga 30% mais lenta', magX: 2, reloadX: 1.3, vis: 'mag_ext2' },
-  akimbo: { slot: 'under', name: 'Pistolas Duplas', d: 'Uma pistola em cada mão: botão esquerdo atira com a direita, botão direito com a esquerda. Dobro de munição; sem mirar, recarga mais lenta', magX: 2, reloadX: 1.35, akimbo: 1, pistol: 1, vis: 0 },
+  akimbo: { slot: 'under', name: 'Pistolas Duplas', d: 'Uma pistola em cada mão: botão esquerdo atira com a da esquerda, o direito com a da direita. Cada uma com o seu pente; sem mirar, recarga mais lenta', reloadX: 1.35, akimbo: 1, pistol: 1, vis: 0 },
 };
 const ATT_ORDER = Object.keys(ATT); // um acessório por nível, do nível 2 ao 14
 const ATT_SLOTS = { optic: 'Mira', muzzle: 'Boca', barrel: 'Cano', under: 'Sob o cano', mag: 'Carregador', rgrip: 'Empunhadura', stock: 'Coronha', laser: 'Laser' };
@@ -21066,7 +21066,7 @@ function w15PenteDuplo(gun, mag, cs, Mb, q, ki, hgt, dy, put, RB, N) { // o segu
 }
 function startReload() {
   const w = W[G.cur], a = G.ammo[G.cur];
-  if (!a || G.reloadEnd || a.mag >= wMag(G.cur) || a.res <= 0) return;
+  if (!a || G.reloadEnd || (a.mag >= wMag(G.cur) && (!akOn() || akPL(a) >= wMag(G.cur))) || a.res <= 0) return; // Pistolas Duplas: recarrega se qualquer um dos pentes não está cheio
   const sp = zPerk('speed') ? .5 : 1;
   if (zPerk('cherry') && !me.downed) sendToHost({ t: 'zfx', k: 'ch', f: r2(1 - a.mag / wMag(G.cur)) }); // Electric Cherry: o host confere a bebida e a recarga
   G.burstN = 0; G.reloadStart = now; G.scope = 0; G.rezoom = 0; G.reloadEmpty = a.mag === 0; G.reloadVazias = wMag(G.cur) - a.mag; G.rEv = {}; // vazias: cápsulas disparadas (revólver e cano duplo ejetam só elas)
@@ -21108,32 +21108,39 @@ function muzzleWorld(esq) {
 const _akB = new V3(), _akE = new V3();
 function showHitmarker(hs) { const h = $('#hitmark'); h.className = hs ? 'hs' : ''; h.style.transition = 'none'; h.style.opacity = 1; requestAnimationFrame(() => { h.style.transition = 'opacity .35s'; h.style.opacity = 0; }); }
 // ===== Pistolas Duplas (acessório do Armeiro, só pistolas no modo Zumbi) =====
-// Uma pistola em cada mão, cada botão do mouse com a sua (cadência própria, pente dividido). A da esquerda é a mesma arma na mão
+// Uma pistola em cada mão, cada botão do mouse com a do seu lado (cadência própria, pente dividido). A da esquerda é a mesma arma na mão
 // desenhada de novo espelhada (vmScene com escala x = -1, ver akPassada): braço, recarga e animações saem iguais, sem modelo a mais.
 // O braço esquerdo de verdade some (osso do braço com escala ~0) e o espelho do direito faz o papel dele.
 const akOn = () => !!vmGun?.userData.akimbo && attHas(G.cur, 'akimbo');
 const AK = { flash: 0 };
-function akPassada(desenha) { // segunda passada da arma na mão, espelhada (pistola da esquerda), com o coice e o clarão dela
+const akPL = a => (a.magL ??= wMag(G.cur)); // pente da pistola da esquerda (a.mag é o da direita); arma nova/munição cheia: começa cheio
+function akAnim(ud, w, o, t) { // ferrolho/tambor de cada pistola segue só o tiro dela (G.akR direita, G.akL esquerda)
+  if (!ud.akimbo) return gunAnim(ud, w, o);
+  const ls = G.lastShot; G.lastShot = t ?? -9; gunAnim(ud, w, o); G.lastShot = ls;
+}
+const _akO = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 };
+function akPassada(desenha) { // segunda passada da arma na mão, espelhada (pistola da esquerda), com o coice, o clarão e o ferrolho dela
   if (!akOn() || !vmRoot.visible) return;
-  const d = (G.kickL || 0) - G.kick, fv = vmFlash.visible, ud = vmGun.userData;
+  const d = (G.kickL || 0) - G.kick, fv = vmFlash.visible, ud = vmGun.userData, w = W[G.cur];
+  akAnim(ud, w, _akO, G.akL);
   vmRoot.position.z += d * .06; vmRoot.rotation.x += d * .1; vmRoot.updateMatrixWorld();
   if (now < AK.flash && ud.muzzle) { w19Boca(ud, vmFlash.position); vmFlash.visible = true; } else vmFlash.visible = false; // (medido antes do espelho: a cena espelha o clarão junto)
   vmScene.scale.x = -1;
   desenha();
-  vmScene.scale.x = 1; vmRoot.position.z -= d * .06; vmRoot.rotation.x -= d * .1; vmFlash.visible = fv; vmScene.updateMatrixWorld();
+  vmScene.scale.x = 1; vmRoot.position.z -= d * .06; vmRoot.rotation.x -= d * .1; vmFlash.visible = fv; akAnim(ud, w, _akO, G.akR); vmScene.updateMatrixWorld();
   if (fv) w19Boca(ud, vmFlash.position);
 }
 function shoot(esq) {
   const w = W[G.cur], a = G.ammo[G.cur];
   if (!a) return;
   if (esq) { // pistola da esquerda: cadência própria
-    if (a.mag <= 0) { play('empty'); G.nextFire2 = now + .25; if (a.res > 0) startReload(); return; }
-    a.mag--; C.protEnd = 0; G.nextFire2 = now + w.rate * (zPerk('dt') ? .75 : 1); G.lastShot = now; G.lastShotW = G.cur; G.shots++;
+    if (akPL(a) <= 0) { play('empty'); G.nextFire2 = now + .25; if (a.res > 0) startReload(); return; }
+    a.magL--; C.protEnd = 0; G.nextFire2 = now + w.rate * (zPerk('dt') ? .75 : 1); G.lastShot = G.akL = now; G.lastShotW = G.cur; G.shots++;
   } else {
   if (a.mag <= 0) { play('empty'); G.nextFire = now + .25; G.burstN = 0; if (a.res > 0) startReload(); return; }
   if (w.burst) G.burstN = G.burstN > 0 && G.burstW === G.cur ? G.burstN - 1 : w.burst - 1, G.burstW = G.cur; // rajada: os tiros seguintes saem sozinhos (frameWeapon)
   a.mag--; if (!a.mag) G.burstN = 0; C.protEnd = 0; // atirou: perde a proteção de quem acabou de nascer
-  G.nextFire = now + (G.burstN > 0 ? w.brate : w.rate) * (zPerk('dt') ? .75 : 1); G.lastShot = now; G.lastShotW = G.cur; G.shots++;
+  G.nextFire = now + (G.burstN > 0 ? w.brate : w.rate) * (zPerk('dt') ? .75 : 1); G.lastShot = G.akR = now; G.lastShotW = G.cur; G.shots++;
   }
   const mz = muzzleWorld(esq);
   if (w.thunder) thunderBlast(w, mz);
@@ -21173,7 +21180,7 @@ function shoot(esq) {
   if (vmGun?.userData.fps2) fpPlay(vmGun.userData, 'fire');
   if (!['shotgun', 'launcher', 'dbarrel', 'revolver', 'scout', 'awp'].includes(w.model) || w.rate < .6 && w.model === 'shotgun') ejectShell(w); // bomba/ferrolho ejetam na hora da ação
   if (w.scope && G.scope && w.model !== 'dmr') { G.rezoom = G.scope; G.scope = 0; } // ferrolho manual sai da luneta; Dragunov/PSG1 (semiautomáticas) ficam
-  if (a.mag === 0 && a.res > 0) { const id = G.cur; setTimeout(() => { if (G.cur === id) startReload(); }, w.model === 'shotgun' && w.rate >= .6 ? 550 : 250); } // zumbi-v2 (Etapa 2): não corta a bomba da escopeta no último cartucho; zv2-R2: só recarrega se a arma continua na mão
+  if ((esq ? a.magL : a.mag) === 0 && a.res > 0) { const id = G.cur; setTimeout(() => { if (G.cur === id) startReload(); }, w.model === 'shotgun' && w.rate >= .6 ? 550 : 250); } // zumbi-v2 (Etapa 2): não corta a bomba da escopeta no último cartucho; zv2-R2: só recarrega se a arma continua na mão
 }
 function knifeAttack(heavy) {
   const w = W.knife; G.nextFire = now + (heavy ? w.altRate : w.rate); G.swing = 0; G.kan = { type: heavy ? 'stab' : G.lastSlash?.type === 'slash' && now - G.lastSlash.t0 < 1 ? 'slash2' : 'slash', t0: now }; if (!heavy) G.lastSlash = G.kan; // golpes seguidos alternam o lado
@@ -21223,7 +21230,7 @@ function updateWeapon(dt) {
     } else if (S_.stage === 'end' && now - S_.t0 >= .45 * S_.sp) { G.reload = null; G.reloadEnd = 0; }
     if (G.reload && S_.stage !== 'end' && (G.trigger || mouseDown || G.trigger2) && a?.mag > 0 && locked()) { G.reload = null; G.reloadEnd = 0; } // atirar interrompe
     if (G.reload && S_.stage !== 'start') rldFimBala(S_, a); // 6-w16
-  } else if (G.reloadEnd && now >= G.reloadEnd) { const a = G.ammo[G.cur]; if (a) { const take = Math.min(wMag(G.cur) - a.mag, a.res); a.mag += take; a.res -= take; } G.reloadEnd = 0; }
+  } else if (G.reloadEnd && now >= G.reloadEnd) { const a = G.ammo[G.cur]; if (a) { const take = Math.min(wMag(G.cur) - a.mag, a.res); a.mag += take; a.res -= take; if (akOn()) { const tL = Math.min(wMag(G.cur) - akPL(a), a.res); a.magL += tL; a.res -= tL; } } G.reloadEnd = 0; }
   if (G.reloadEnd) G.trigger = G.trigger2 = false; // decisão do dono (13/10): clique durante a recarga não fica guardado (atirava sozinho no fim); a escopeta com bala no tubo já saiu da recarga acima
   if (G.rezoom && now >= G.nextFire) { G.scope = G.rezoom; G.rezoom = 0; }
   const since = now - G.lastShot;
@@ -30928,7 +30935,7 @@ function updateHud(dt) {
     hpBar(ZM ? (C.players.get(C.myId)?.mh || 100) : 100, ZM && ZC.hpS != null ? ZC.hpS : me.hp);
     const a = G.ammo[G.cur];
     const wname = G.cur === 'knife' && ZC.bowie ? 'Faca Bowie' : (w?.name || '');
-    setHTML('ammo', `<span class="wn">${esc(wname)}</span>` + (G.cur === 'dmach' ? `${Math.max(0, Math.ceil(ZC.dmEnd - now))}<small> s</small>` : a ? `${a.mag}<small> / ${a.res}</small>` : (w?.slot === 'nade' ? `${G.inv[G.cur] || 0}` : '')));
+    setHTML('ammo', `<span class="wn">${esc(wname)}</span>` + (G.cur === 'dmach' ? `${Math.max(0, Math.ceil(ZC.dmEnd - now))}<small> s</small>` : a ? (akOn() ? `${akPL(a)}<small> | </small>${a.mag}<small> / ${a.res}</small>` : `${a.mag}<small> / ${a.res}</small>`) : (w?.slot === 'nade' ? `${G.inv[G.cur] || 0}` : '')));
     const sl = [['1', G.inv.primary], ['2', G.inv.secondary], ['5', G.inv.third], ['', hasW('dmach') ? 'dmach' : null], ['3', 'knife'], ['4', G.inv.he ? 'he' : null], ['4', G.inv.semtex ? 'semtex' : null], ['4', G.inv.smoke ? 'smoke' : null], ['4', G.inv.flash ? 'flash' : null], ['4', G.inv.molotov ? 'molotov' : null], ['4', G.inv.inc ? 'inc' : null], ['4', G.inv.decoy ? 'decoy' : null], ['4', G.inv.monkey ? 'monkey' : null], ['4', G.inv.clay ? 'clay' : null]].filter(s => s[1]);
     setHTML('slots', sl.map(([k, id]) => `<div class="${id === G.cur ? 'on' : ''}">${k} ${esc(W[id].name)}${(id === 'he' || id === 'monkey' || id === 'semtex' || id === 'clay') && ZM ? ' x' + G.inv[id] : ''}</div>`).join('') + (C.carry ? `<div class="${C.bombHand ? 'on' : ''}">5 Bomba (C4)</div>` : ''));
   } else { setHTML('hp', ''); setHTML('ammo', ''); setHTML('slots', ''); hpBar(0); }
@@ -31199,12 +31206,13 @@ canvas.addEventListener('mousedown', e => {
   if (!inGame) return;
   if (!locked()) { requestLock(); return; }
   audioInit();
-  if (e.button === 0) { mouseDown = true; G.trigger = true; if (!me.alive) cycleSpec(); }
+  if (e.button === 0 && akOn() && me.alive) { G.trigger2 = true; G.mouse2 = true; } // Pistolas Duplas: o esquerdo atira com a pistola da esquerda
+  else if (e.button === 0) { mouseDown = true; G.trigger = true; if (!me.alive) cycleSpec(); }
   if (e.button === 1) { e.preventDefault(); sendMark(); }
-  if (e.button === 2 && akOn()) { G.trigger2 = true; G.mouse2 = true; return; } // Pistolas Duplas: o botão direito atira com a pistola da esquerda
+  if (e.button === 2 && akOn()) { mouseDown = true; G.trigger = true; return; } // Pistolas Duplas: o botão direito atira com a pistola da direita
   if (e.button === 2) { const w = W[G.cur]; if (w && !w.scope && (w.slot === 'primary' || w.slot === 'secondary')) { G.adsHold = true; if (zPerk('ds') && me.alive && !me.downed) zAimAssist(); } else altFire(); }
 });
-addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; if (e.button === 2) { G.adsHold = false; G.mouse2 = false; } });
+addEventListener('mouseup', e => { if (akOn()) { if (e.button === 0) G.mouse2 = false; if (e.button === 2) mouseDown = false; return; } if (e.button === 0) mouseDown = false; if (e.button === 2) { G.adsHold = false; G.mouse2 = false; } });
 addEventListener('contextmenu', e => { if (inGame) e.preventDefault(); });
 let mouseAvg = 0;
 addEventListener('mousemove', e => {
