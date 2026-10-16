@@ -250,6 +250,8 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #zprompt span{display:inline-block;max-width:min(760px,92vw)}
 #zprompt small{display:block;font-size:17px;font-weight:600;color:#e6e6e6;margin-top:3px}
 #mmap{position:absolute;top:34px;left:12px;width:220px;height:220px;border-radius:50%;display:none;box-shadow:0 0 0 2px rgba(255,255,255,.22),0 4px 14px rgba(0,0,0,.6)}
+#mmap.zr{left:auto;right:12px;top:10px;width:190px;height:190px} #feed.zr{top:212px} /* Zumbi: minimapa no canto de cima à direita (a esquerda tem objetivo, zumbis restantes e peças); o feed desce para baixo dele */
+@media (max-width:700px){#mmap.zr{width:130px;height:130px} #feed.zr{top:150px}}
 #rbig{position:absolute;left:50%;top:calc(50% + 28px);transform:translate(-50%,-50%);display:none;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.8)}
 #bombui{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);text-align:center;font-size:18px;color:#fff;text-shadow:0 1px 3px #000}
 #bombui .bar{width:260px;height:8px;background:#0008;margin:6px auto 0;border-radius:4px;overflow:hidden}#bombui .bar i{display:block;height:100%;background:#ffb020}
@@ -31036,22 +31038,58 @@ function bombHud(dt) {
   const prog = C.actEnd > now ? clamp(1 - (C.actEnd - now) / C.actDur, 0, 1) : 0;
   setHTML('bombui', tip + (prog ? `<div class="bar"><i style="width:${(prog * 100) | 0}%"></i></div>` : ''));
   for (let i = MARKS.length - 1; i >= 0; i--) if (now > MARKS[i].end || !inGame) { scene.remove(MARKS[i].s); MARKS.splice(i, 1); }
-  drawMinimap(dt); // zumbi-v2 (Etapa 6): minimapa do modo Zumbi removido
+  drawMinimap(dt); // radar do Rodadas e minimapa com névoa do Zumbi
 }
 // ---------- radar do modo Rodadas (como o do CS2): redondo, centrado em você e girando com a visão; M abre o mapa inteiro ----------
 const RMM = { key: null, bg: null, S: 4, t: 0, tb: 0, big: false };
-function rmmBuild(M) { // fundo: chão, paredes, coberturas, passagens cobertas, bombs e bases (4 px por metro), pintado uma vez por mapa
-  const S = RMM.S, W2 = M.w / 2, D2 = M.d / 2, b = document.createElement('canvas'); b.width = M.w * S; b.height = M.d * S; const g = b.getContext('2d');
+function rmmBuild(M) { // fundo: chão, paredes, coberturas, passagens cobertas, bombs e bases (4 px por metro; 2 nos mapas zumbis, enormes), pintado uma vez por mapa
+  const S = RMM.S = ZC.on ? 2 : 4, W2 = M.w / 2, D2 = M.d / 2, b = document.createElement('canvas'); b.width = M.w * S; b.height = M.d * S; const g = b.getContext('2d');
   const Rc = (x0, z0, x1, z1, col) => { g.fillStyle = col; g.fillRect((x0 + W2) * S, (z0 + D2) * S, (x1 - x0) * S, (z1 - z0) * S); };
-  Rc(-W2, -D2, W2, D2, '#5c636c');
-  for (const r of Object.values(M.sites)) Rc(r[0], r[2], r[1], r[3], '#7d4c47');
+  const zf = ZC.on; Rc(-W2, -D2, W2, D2, zf ? '#2c3a33' : '#5c636c'); // Zumbi: chão explorado esverdeado escuro (o não explorado é cinza claro)
+  for (const r of Object.values(M.sites || {})) Rc(r[0], r[2], r[1], r[3], '#7d4c47');
   for (const [list, col] of [[M.spawns, 'rgba(224,160,48,.28)'], [M.spawnsB, 'rgba(74,144,226,.28)']]) for (const [x, z] of list || []) Rc(x - 1.5, z - 1.5, x + 1.5, z + 1.5, col);
   for (const c of COL) {
     if (c.maxY <= .3) continue;
     if (c.minY > 2) { Rc(c.minX, c.minZ, c.maxX, c.maxZ, 'rgba(18,20,24,.38)'); continue; } // teto (túnel, apartamento): mais escuro
-    Rc(c.minX, c.minZ, c.maxX, c.maxZ, c.maxY - c.minY > 2.5 ? '#16191d' : '#363b43');
+    Rc(c.minX, c.minZ, c.maxX, c.maxZ, c.maxY - c.minY > 2.5 ? (zf ? '#0b0d0f' : '#16191d') : (zf ? '#5d6670' : '#363b43'));
   }
   RMM.bg = b; RMM.key = curMapId;
+  if (ZC.on) { // névoa do modo Zumbi: tudo cinza até alguém do time passar perto (zmmRevela)
+    const f = RMM.fog = document.createElement('canvas'); f.width = b.width; f.height = b.height; const fg = f.getContext('2d');
+    fg.fillStyle = '#8d9198'; fg.fillRect(0, 0, f.width, f.height); fg.fillStyle = 'rgba(0,0,0,.06)';
+    for (let y = 0; y < f.height; y += 6) fg.fillRect(0, y, f.width, 1); // riscas leves: lê como "não explorado", não como parede
+    RMM.vis = [];
+  } else RMM.fog = null;
+}
+// ---------- minimapa do modo Zumbi: o mesmo radar do Rodadas, com névoa que abre conforme o time explora ----------
+const ZMM = { r: 20, t: 0 }; // r: raio revelado em volta de cada jogador (m)
+function zmmRevela(dt) {
+  if (!RMM.fog || (ZMM.t -= dt) > 0) return; ZMM.t = .25;
+  const S = RMM.S, M = curMap, W2 = M.w / 2, D2 = M.d / 2, g = RMM.fog.getContext('2d'), pts = [];
+  if (me.alive) pts.push([me.pos.x, me.pos.z]);
+  for (const rp of R.values()) if (rp.alive) pts.push([rp.pos.x, rp.pos.z]);
+  g.globalCompositeOperation = 'destination-out';
+  for (const [x, z] of pts) {
+    if (RMM.vis.some(v => Math.hypot(v[0] - x, v[1] - z) < 2.5)) continue; // já aberto aqui
+    RMM.vis.push([x, z]); if (RMM.vis.length > 400) RMM.vis.shift();
+    const X = (x + W2) * S, Y = (z + D2) * S, r = ZMM.r * S, gr = g.createRadialGradient(X, Y, r * .55, X, Y, r);
+    gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(X - r, Y - r, r * 2, r * 2);
+  }
+  g.globalCompositeOperation = 'source-over';
+}
+function zmmScene(g, toS, edge, big) { // aliados sempre; zumbis só os que você vê (perto)
+  const eye = camera.position.clone(), u = big ? 1 : 2;
+  for (const rp of R.values()) {
+    if (!rp.alive) continue; const info = C.players.get(rp.id); edge(toS(rp.pos.x, rp.pos.z), (x, y, a) => {
+      g.globalAlpha = a; g.fillStyle = '#4ad0ff'; g.strokeStyle = '#000'; g.lineWidth = 1.5 * u; g.beginPath(); g.arc(x, y, 6 * u, 0, 7); g.fill(); g.stroke(); g.globalAlpha = 1;
+      if (big && info) { g.fillStyle = '#fff'; g.font = '600 12px Rajdhani,sans-serif'; g.textAlign = 'center'; g.fillText(info.n, x, y - 13); }
+    });
+  }
+  for (const zc of ZC.zs.values()) {
+    if (zc.dead) continue; const d = Math.hypot(zc.pos.x - eye.x, zc.pos.z - eye.z); if (d > 30) continue;
+    const [x, y, ins] = toS(zc.pos.x, zc.pos.z); if (!ins || !losClear(eye, new V3(zc.pos.x, zc.pos.y + 1.2, zc.pos.z))) continue;
+    g.fillStyle = '#ff3030'; g.strokeStyle = '#000'; g.lineWidth = u; g.beginPath(); g.arc(x, y, 4 * u, 0, 7); g.fill(); g.stroke();
+  }
 }
 function rmmScene(g, toS, edge, big) { // bombs, pings, bomba, aliados e inimigos à vista (letras sempre em pé)
   const M = curMap, myT = C.players.get(C.myId)?.tm, eye = camera.position.clone(), B = C.bomb, u = big ? 1 : 2; // u: o radar é desenhado em dobro (tela nítida)
@@ -31072,21 +31110,23 @@ function rmmScene(g, toS, edge, big) { // bombs, pings, bomba, aliados e inimigo
   }
 }
 function drawMinimap(dt) {
-  const cv = $('#mmap'), big = $('#rbig'), M = curMap, on = !!(C.st?.mode === 'rounds' && inGame && M?.sites);
+  const cv = $('#mmap'), big = $('#rbig'), M = curMap, zm = !!(ZC.on && inGame && M?.w), on = zm || !!(C.st?.mode === 'rounds' && inGame && M?.sites);
+  cv.classList.toggle('zr', zm); $('#feed').classList.toggle('zr', zm && !RMM.big); if (!on) { RMM.big = false; if (!inGame) RMM.key = null; } // saiu da partida: a próxima começa com o mapa todo cinza de novo
   cv.style.display = on && !RMM.big ? 'block' : 'none'; big.style.display = on && RMM.big ? 'block' : 'none';
-  const ar = on && me.alive ? (M.areas || []).find(a => me.pos.x >= a[1] && me.pos.x <= a[2] && me.pos.z >= a[3] && me.pos.z <= a[4]) : null; setHTML('mmLbl', ar && !RMM.big ? esc(ar[0]) : '');
+  const ar = on && !zm && me.alive ? (M.areas || []).find(a => me.pos.x >= a[1] && me.pos.x <= a[2] && me.pos.z >= a[3] && me.pos.z <= a[4]) : null; setHTML('mmLbl', ar && !RMM.big ? esc(ar[0]) : '');
   if (!on) return;
-  if (RMM.key !== curMapId) rmmBuild(M);
+  if (RMM.key !== curMapId || (zm && !RMM.fog)) rmmBuild(M);
+  if (zm) zmmRevela(dt);
   if ((RMM.t -= dt) > 0) return; RMM.t = 1 / 20;
   const S = RMM.S, W2 = M.w / 2, D2 = M.d / 2, mx = camera.position.x, mz = camera.position.z, th = camera.rotation.y; // segue a câmera (morto: quem você assiste)
-  const N = cv.width, c = N / 2, Rm = 34, k = c / Rm, cs = Math.cos(th), sn = Math.sin(th), g = cv.getContext('2d');
+  const N = cv.width, c = N / 2, Rm = zm ? 40 : 34, k = c / Rm, cs = Math.cos(th), sn = Math.sin(th), g = cv.getContext('2d');
   const toS = (x, z) => { const dx = (x - mx) * k, dz = (z - mz) * k, X = dx * cs - dz * sn, Y = dx * sn + dz * cs; return [c + X, c + Y, X * X + Y * Y < (c - 18) ** 2]; };
   const edge = (p, draw) => { if (p[2]) return draw(p[0], p[1], 1); const dx = p[0] - c, dy = p[1] - c, d = Math.hypot(dx, dy) || 1, r = c - 26; draw(c + dx / d * r, c + dy / d * r, .7); };
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, N, N);
   g.save(); g.beginPath(); g.arc(c, c, c - 1, 0, 7); g.clip();
   g.fillStyle = '#121418'; g.fillRect(0, 0, N, N);
-  g.save(); g.translate(c, c); g.rotate(th); g.scale(k / S, k / S); g.translate(-(mx + W2) * S, -(mz + D2) * S); g.drawImage(RMM.bg, 0, 0); g.restore();
-  rmmScene(g, toS, edge, false);
+  g.save(); g.translate(c, c); g.rotate(th); g.scale(k / S, k / S); g.translate(-(mx + W2) * S, -(mz + D2) * S); g.drawImage(RMM.bg, 0, 0); if (zm) g.drawImage(RMM.fog, 0, 0); g.restore();
+  (zm ? zmmScene : rmmScene)(g, toS, edge, false);
   g.fillStyle = 'rgba(255,255,255,.1)'; g.beginPath(); g.moveTo(c, c); g.arc(c, c, c, -Math.PI / 2 - .55, -Math.PI / 2 + .55); g.closePath(); g.fill(); // cone de visão
   g.fillStyle = me.alive ? '#fff' : '#aaa'; g.strokeStyle = '#000'; g.lineWidth = 3; g.beginPath(); g.moveTo(c, c - 18); g.lineTo(c - 11, c + 11); g.lineTo(c, c + 5); g.lineTo(c + 11, c + 11); g.closePath(); g.fill(); g.stroke();
   g.restore();
@@ -31099,12 +31139,12 @@ function rmmBig(cv) { // M: mapa inteiro, norte para cima, com o nome de cada lu
   const w = Math.round(M.w * sc), h = Math.round(M.d * sc);
   if (cv.width !== w * dpr || cv.height !== h * dpr) { cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.fillStyle = '#0d0f12'; g.fillRect(0, 0, w, h); g.drawImage(RMM.bg, 0, 0, M.w * S, M.d * S, 0, 0, w, h);
+  g.fillStyle = '#0d0f12'; g.fillRect(0, 0, w, h); g.drawImage(RMM.bg, 0, 0, M.w * S, M.d * S, 0, 0, w, h); if (RMM.fog && ZC.on) g.drawImage(RMM.fog, 0, 0, M.w * S, M.d * S, 0, 0, w, h);
   const toS = (x, z) => [(x + W2) * sc, (z + D2) * sc, true], edge = (p, draw) => draw(p[0], p[1], 1);
   g.textAlign = 'center'; g.textBaseline = 'middle'; const done = new Set();
-  for (const a of M.areas || []) { if (done.has(a[0]) || /^Bomb /.test(a[0])) continue; done.add(a[0]); const [x, y] = toS((a[1] + a[2]) / 2, (a[3] + a[4]) / 2);
+  if (!ZC.on) for (const a of M.areas || []) { if (done.has(a[0]) || /^Bomb /.test(a[0])) continue; done.add(a[0]); const [x, y] = toS((a[1] + a[2]) / 2, (a[3] + a[4]) / 2);
     g.font = '700 13px Rajdhani,sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.8)'; const t = a[0].toUpperCase(), tw = g.measureText(t).width / 2 + 4, cx = Math.max(tw, Math.min(w - tw, x)); g.strokeText(t, cx, y); g.fillStyle = 'rgba(255,255,255,.8)'; g.fillText(t, cx, y); }
-  rmmScene(g, toS, edge, true);
+  (ZC.on ? zmmScene : rmmScene)(g, toS, edge, true);
   { const [x, y] = toS(me.pos.x, me.pos.z); g.save(); g.translate(x, y); g.rotate(-camera.rotation.y); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -11); g.lineTo(-7, 7); g.lineTo(0, 3); g.lineTo(7, 7); g.closePath(); g.fill(); g.stroke(); g.restore(); }
   g.font = '700 16px Rajdhani,sans-serif'; g.textAlign = 'left'; g.fillStyle = '#ffd23a'; g.strokeStyle = 'rgba(0,0,0,.85)'; g.lineWidth = 3; g.strokeText((M.name || '').toUpperCase() + ' · M fecha', 12, h - 14); g.fillText((M.name || '').toUpperCase() + ' · M fecha', 12, h - 14);
   g.strokeStyle = 'rgba(255,255,255,.2)'; g.lineWidth = 1; g.strokeRect(.5, .5, w - 1, h - 1);
@@ -31171,7 +31211,7 @@ addEventListener('keydown', e => {
   if (G.cur === 'dmach' && hasW('dmach') && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'KeyQ'].includes(e.code)) return; // Máquina da Morte: não troca até acabar
   switch (e.code) {
     case 'KeyF': if (ZC.on && ZC.act) zUse(); else armaInspect(); break; // zumbi: F usa o que está perto; sem nada perto, inspeciona
-    case 'KeyM': if (C.st?.mode === 'rounds') { RMM.big = !RMM.big; RMM.tb = 0; } break; // radar do modo Rodadas: M alterna o mapa inteiro (o minimapa do modo Zumbi saiu na zumbi-v2)
+    case 'KeyM': if (C.st?.mode === 'rounds' || (ZC.on && inGame)) { RMM.big = !RMM.big; RMM.tb = 0; } break; // radar do modo Rodadas: M alterna o mapa inteiro (o minimapa do modo Zumbi saiu na zumbi-v2)
     case 'KeyV': if (ZC.on && me.alive && !me.sprinting && !(ZC.revLocal > 0) && now >= G.nextFire && now >= G.switchEnd) knifeAttack(false); break;
     case 'Digit1': G.inv.primary && equip(G.inv.primary); break;
     case 'Digit2': G.inv.secondary && equip(G.inv.secondary); break;
