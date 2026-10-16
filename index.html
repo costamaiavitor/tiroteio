@@ -13777,6 +13777,8 @@ window.__SANP = () => AT?.piora && { ord: AT.piora.ord, v: +AT.piora.v.toFixed(3
 // ---------- pós-processamento (só no Alto): brilho (bloom) nas luzes, olhos e clarões ----------
 const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
 const vmPass = new RenderPass(vmScene, vmCam); vmPass.clear = false; vmPass.clearDepth = true;
+const vmPassAk = new RenderPass(vmScene, vmCam); vmPassAk.clear = false; // Pistolas Duplas: a pistola da esquerda (passada espelhada)
+{ const r0 = vmPassAk.render.bind(vmPassAk); vmPassAk.render = (...a) => akPassada(() => r0(...a)); }
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), BLOOM0.s, BLOOM0.r, BLOOM0.t);
 // correção de cor final (Alto): contraste em S suave, saturação, tom quente nas altas, aberração nas bordas e grão de filme
 // por área (A.look, escritos no atmosTick): tint, sat, vig, con (contraste linear, pivô .3), gr (grão), ca (aberração), sh/hi (cor das sombras/altas)
@@ -13797,7 +13799,7 @@ const gradePass = new ShaderPass({
       c += (n - .5) * gr;
       gl_FragColor = vec4(c, 1.0); }`,
 });
-composer.addPass(new RenderPass(scene, camera)); composer.addPass(vmPass); composer.addPass(bloomPass); composer.addPass(new OutputPass()); composer.addPass(gradePass);
+composer.addPass(new RenderPass(scene, camera)); composer.addPass(vmPass); composer.addPass(vmPassAk); composer.addPass(bloomPass); composer.addPass(new OutputPass()); composer.addPass(gradePass);
 // ===== 6-g01: engasgos do Alto (resolução de MSAA do composer) =====
 // Medido na fase 6 (g01, Vila no Alto): o caminho do composer custava ~15-20 ms de placa a mais que o desenho direto da mesma
 // cena (mesma sombra de 4096), com picos de 100+ ms. A cena e a arma vão para o alvo com MSAA (readBuffer = renderTarget2) e
@@ -19089,6 +19091,7 @@ function armIK(s, target, pole) {
 }
 function armsIK(ud) {
   const g = ud.armsGun; if (!g) return;
+  ARMS.ik.l.up.scale.setScalar(ud.akimbo ? 1e-4 : 1); // Pistolas Duplas: o braço esquerdo some (o espelho do direito segura a outra pistola)
   // O4-CPU2: sem vmRoot.updateMatrixWorld(true) aqui: o updateViewmodel acabou de atualizar o vmRoot (só chama daqui) e, entre um e
   // outro, nada embaixo dele muda (o clarão é do vmScene); a passada repetida dava as mesmas matrizes
   for (const [s, t] of [['r', g.rt], ['l', g.lt]]) {
@@ -19756,6 +19759,7 @@ function vmSetWeapon(id) {
   if (ARMS.knife) { ARMS.knife.removeFromParent(); ARMS.knife = null; } // a faca antiga sai do soquete dos braços
   if (ARMS.gunC) ARMS.gunC.removeFromParent();
   const vck = vmcChave(id); if (vck && vmcUsar(vck)) return; // 6-w17: arma já montada (troca sem refazer modelo, mãos e enquadramento)
+  if (ARMS.ik?.l) ARMS.ik.l.up.scale.setScalar(1); // Pistolas Duplas: o braço esquerdo volta
   vmGun = new THREE.Group();
   const mid = knifeModelOf(id, PROF.data?.equipped), gun = (GM_VM = true, gunModel(mid, true, skinOf(mid))), ud = gun.userData, A = armMats(); vmGun.add(gun);
   const tp0 = attOn(mid).length ? armsTipPts(gun) : null; // (a13) ponta da arma antes dos acessórios (enquadramento)
@@ -19821,6 +19825,7 @@ function vmSetWeapon(id) {
     ud.lhG = lh; ud.lhRest = lh.position.clone(); ud.handShell = sh;
     if (ud.rig === 'revolver') pistolaRapido(ud, lh, A); // pistolas (a1): carregador rápido do revólver na mão esquerda
   }
+  if (attHas(mid, 'akimbo') && akOK(mid)) { ud.akimbo = true; if (ud.lhG) ud.lhG.visible = false; } // Pistolas Duplas: a mão de apoio sai (a outra mão é o espelho da direita)
   if (ud.boltAction && rh && rh.parent === gun) { ud.rhG = rh; ud.rhRest = rh.position.clone(); } // ferrolho manual: a mão vai até a bola do ferrolho
   vmGun.scale.setScalar(1.18); ud.baseYaw = vmGun.rotation.y = ud.armsGun ? (W[mid]?.slot === 'primary' ? GRIP.yaw : GRIP.yawP) : .05; // arma maior e virada para dentro (com os braços, bem mais, como no CS: guarda-mão à esquerda da mão do gatilho)
   vmRoot.add(vmGun);
@@ -19851,6 +19856,7 @@ function vmcSoltar(k) {
 }
 function vmcUsar(k) {
   const g = VMC.m.get(k); if (!g) return false;
+  if (ARMS.ik?.l) ARMS.ik.l.up.scale.setScalar(1);
   VMC.m.delete(k); VMC.m.set(k, g); // usado agora: vai para o fim da fila
   vmGun = g; const ud = g.userData;
   vmFlash.material.color.setHex(ud.flashC ?? 0xffd27a); // (o gunModel fazia isso ao montar)
@@ -20584,7 +20590,7 @@ function updateViewmodel(dt) {
   if (me.onGround) bobT += dt * hs * 1.5;
   const bob = (me.onGround ? Math.min(1, hs / RUN) : 0) * (1 - .8 * (G.ads || 0)), breathe = Math.sin(now * 1.7) * .003 * (1 - bob);
   const o = { x: .165 + vo[0] + Math.cos(bobT) * .012 * bob - mouseDX * .0004, y: -.145 + vo[1] + Math.abs(Math.sin(bobT)) * .014 * bob + breathe, z: -.43 + vo[2], rx: breathe * 2, ry: 0, rz: 0 };
-  G.kick = Math.max(0, G.kick - dt * 10);
+  G.kick = Math.max(0, G.kick - dt * 10); G.kickL = Math.max(0, (G.kickL || 0) - dt * 10);
   o.z += G.kick * .06; o.rx += G.kick * .1;
   const pist = pistolaVM(ud); if (pist) pistolaPose(o, ud);
   if (now < G.switchEnd && !pist && !ud.armsKnife && !ud.fps2?.clips.draw) { const k = smooth((G.switchEnd - now) / (G.switchDur || .35)); o.y -= k * .22; o.rx -= k * .9; o.rz += k * .35; if (ud.scopeEye || ud.boltAction) { o.rx += k * .5; o.y -= k * .08; } } // precisão (a6): arma comprida sobe de baixo sem apontar a luneta para o olho // sacando a arma (os braços do Blender têm animação própria)
@@ -20681,6 +20687,7 @@ const ATT = {
   barrel_short: { slot: 'barrel', name: 'Cano Curto', d: 'Mira 15% mais rápida e anda atirando melhor; alcance menor', adsSpd: 1.15, moveX: .8, rangeX: .8, vis: 0 },
   stock_none: { slot: 'stock', name: 'Sem Coronha', d: 'Mira 25% mais rápida; mais tranco', adsSpd: 1.25, kick: 1.2, vis: 0 },
   mag_drum: { slot: 'mag', name: 'Tambor', d: 'Dobro de munição no carregador; recarga 30% mais lenta', magX: 2, reloadX: 1.3, vis: 'mag_ext2' },
+  akimbo: { slot: 'under', name: 'Pistolas Duplas', d: 'Uma pistola em cada mão: botão esquerdo atira com a direita, botão direito com a esquerda. Dobro de munição; sem mirar, recarga mais lenta', magX: 2, reloadX: 1.35, akimbo: 1, pistol: 1, vis: 0 },
 };
 const ATT_ORDER = Object.keys(ATT); // um acessório por nível, do nível 2 ao 14
 const ATT_SLOTS = { optic: 'Mira', muzzle: 'Boca', barrel: 'Cano', under: 'Sob o cano', mag: 'Carregador', rgrip: 'Empunhadura', stock: 'Coronha', laser: 'Laser' };
@@ -20698,11 +20705,13 @@ function wLevel(id) {
   return { l, xp, need: l < WLV_MAX ? wlvNeed(l) : 0 };
 }
 const attUnlocked = id => ATT_ORDER.slice(0, wLevel(id).l - 1);
+const akOK = id => attOK(id) && ['pistol', 'deagle', 'revolver'].includes(W[attBase(id)]?.model); // Pistolas Duplas: só nas pistolas
+const attCabe = (id, a) => !ATT[a].pistol || akOK(id);
 function attOn(id) { // acessórios valendo agora (só no modo Zumbi)
   if (ATT_PV) return ATT_PV.list; // prévia do Arsenal (menu): os acessórios escolhidos, sem mexer no jogo
   if (!ZC.on || !attOK(id) || fpw(id)) return []; // só nas armas feitas no código (modo Zumbi), nunca nas baixadas
   const un = new Set(attUnlocked(id));
-  return (PROF.data?.att?.[attBase(id)] || []).filter(a => un.has(a) && ATT[a] && !(ATT[a].slot === 'optic' && fabLuneta(id))); // luneta de fábrica: sem outra mira
+  return (PROF.data?.att?.[attBase(id)] || []).filter(a => un.has(a) && ATT[a] && attCabe(id, a) && !(ATT[a].slot === 'optic' && fabLuneta(id))); // luneta de fábrica: sem outra mira
 }
 function attStat(id, k) { let v = 1; for (const a of attOn(id)) if (ATT[a][k] != null) v *= ATT[a][k]; return v; }
 const attHas = (id, k) => attOn(id).some(a => ATT[a][k]);
@@ -20714,7 +20723,7 @@ function wxpAdd(id, n) {
   PROF.data.wxp = PROF.data.wxp || {}; PROF.data.wxp[b] = (PROF.data.wxp[b] || 0) + n;
   const after = wLevel(b).l;
   if (after > before) {
-    const un = ATT[ATT_ORDER[after - 2]];
+    const un = attCabe(b, ATT_ORDER[after - 2]) ? ATT[ATT_ORDER[after - 2]] : null;
     centerMsg(`${W[b].name} · NÍVEL ${after}`, un ? 'Desbloqueado no Armeiro: ' + un.name : '', 3); play('kaching'); profSave();
   } else if (++WXP_SAVE % 25 === 0) profSave();
 }
@@ -21090,21 +21099,43 @@ function remoteCands() {
   for (const rp of R.values()) if (rp.alive) out.push({ id: rp.id, pos: rp.pos, crouch: rp.crouch });
   return out;
 }
-function muzzleWorld() {
-  // boca do cano de verdade: a cena da arma usa a mesma orientação da câmera
-  if (vmGun?.userData.muzzle && vmRoot.visible) return w19Boca(vmGun.userData, new V3()).applyQuaternion(camera.quaternion).add(camera.position); // 6-w19
+function muzzleWorld(esq) {
+  // boca do cano de verdade: a cena da arma usa a mesma orientação da câmera (esq: pistola da esquerda, espelhada)
+  if (vmGun?.userData.muzzle && vmRoot.visible) return w19Boca(vmGun.userData, _akB).multiply(_akE.set(esq ? -1 : 1, 1, 1)).applyQuaternion(camera.quaternion).add(camera.position); // 6-w19
   const f = new V3(0, 0, -1).applyQuaternion(camera.quaternion), r = new V3(1, 0, 0).applyQuaternion(camera.quaternion), u = new V3(0, 1, 0).applyQuaternion(camera.quaternion);
   return camera.position.clone().addScaledVector(f, .7).addScaledVector(r, .18).addScaledVector(u, -.14);
 }
+const _akB = new V3(), _akE = new V3();
 function showHitmarker(hs) { const h = $('#hitmark'); h.className = hs ? 'hs' : ''; h.style.transition = 'none'; h.style.opacity = 1; requestAnimationFrame(() => { h.style.transition = 'opacity .35s'; h.style.opacity = 0; }); }
-function shoot() {
+// ===== Pistolas Duplas (acessório do Armeiro, só pistolas no modo Zumbi) =====
+// Uma pistola em cada mão, cada botão do mouse com a sua (cadência própria, pente dividido). A da esquerda é a mesma arma na mão
+// desenhada de novo espelhada (vmScene com escala x = -1, ver akPassada): braço, recarga e animações saem iguais, sem modelo a mais.
+// O braço esquerdo de verdade some (osso do braço com escala ~0) e o espelho do direito faz o papel dele.
+const akOn = () => !!vmGun?.userData.akimbo && attHas(G.cur, 'akimbo');
+const AK = { flash: 0 };
+function akPassada(desenha) { // segunda passada da arma na mão, espelhada (pistola da esquerda), com o coice e o clarão dela
+  if (!akOn() || !vmRoot.visible) return;
+  const d = (G.kickL || 0) - G.kick, fv = vmFlash.visible, ud = vmGun.userData;
+  vmRoot.position.z += d * .06; vmRoot.rotation.x += d * .1; vmRoot.updateMatrixWorld();
+  if (now < AK.flash && ud.muzzle) { w19Boca(ud, vmFlash.position); vmFlash.visible = true; } else vmFlash.visible = false; // (medido antes do espelho: a cena espelha o clarão junto)
+  vmScene.scale.x = -1;
+  desenha();
+  vmScene.scale.x = 1; vmRoot.position.z -= d * .06; vmRoot.rotation.x -= d * .1; vmFlash.visible = fv; vmScene.updateMatrixWorld();
+  if (fv) w19Boca(ud, vmFlash.position);
+}
+function shoot(esq) {
   const w = W[G.cur], a = G.ammo[G.cur];
   if (!a) return;
+  if (esq) { // pistola da esquerda: cadência própria
+    if (a.mag <= 0) { play('empty'); G.nextFire2 = now + .25; if (a.res > 0) startReload(); return; }
+    a.mag--; C.protEnd = 0; G.nextFire2 = now + w.rate * (zPerk('dt') ? .75 : 1); G.lastShot = now; G.lastShotW = G.cur; G.shots++;
+  } else {
   if (a.mag <= 0) { play('empty'); G.nextFire = now + .25; G.burstN = 0; if (a.res > 0) startReload(); return; }
   if (w.burst) G.burstN = G.burstN > 0 && G.burstW === G.cur ? G.burstN - 1 : w.burst - 1, G.burstW = G.cur; // rajada: os tiros seguintes saem sozinhos (frameWeapon)
   a.mag--; if (!a.mag) G.burstN = 0; C.protEnd = 0; // atirou: perde a proteção de quem acabou de nascer
   G.nextFire = now + (G.burstN > 0 ? w.brate : w.rate) * (zPerk('dt') ? .75 : 1); G.lastShot = now; G.lastShotW = G.cur; G.shots++;
-  const mz = muzzleWorld();
+  }
+  const mz = muzzleWorld(esq);
   if (w.thunder) thunderBlast(w, mz);
   else if (w.frost) frostBlast(w, mz);
   else {
@@ -21137,8 +21168,8 @@ function shoot() {
     if (C.ms && !ZC.on) { C.ms.s++; if (dmgBy.size) C.ms.h++; if (hs) C.ms.hh = (C.ms.hh || 0) + 1; }
     sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: ends, sup: attHas(G.cur, 'sup') ? 1 : undefined });
   }
-  if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); muzzleFlash(mz); vmFlashUntil = now + .05; } // supressor: sem clarão, tiro abafado
-  G.kick = (vmGun?.userData.fps2 ? .25 : 1) * attStat(G.cur, 'kick') * (w.zw ? ZBAL.armas.coice[w.base || G.cur] ?? 1 : 1); // zumbi-v2 (Etapa 2): coice por arma (zumbi_config.js), só nas armas do modo zumbi (zv2-R2: as do CS herdam base)
+  if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); muzzleFlash(mz); if (esq) AK.flash = now + .05; else vmFlashUntil = now + .05; } // supressor: sem clarão, tiro abafado
+  G[esq ? 'kickL' : 'kick'] = (vmGun?.userData.fps2 ? .25 : 1) * attStat(G.cur, 'kick') * (w.zw ? ZBAL.armas.coice[w.base || G.cur] ?? 1 : 1); // zumbi-v2 (Etapa 2): coice por arma (zumbi_config.js), só nas armas do modo zumbi (zv2-R2: as do CS herdam base)
   if (vmGun?.userData.fps2) fpPlay(vmGun.userData, 'fire');
   if (!['shotgun', 'launcher', 'dbarrel', 'revolver', 'scout', 'awp'].includes(w.model) || w.rate < .6 && w.model === 'shotgun') ejectShell(w); // bomba/ferrolho ejetam na hora da ação
   if (w.scope && G.scope && w.model !== 'dmr') { G.rezoom = G.scope; G.scope = 0; } // ferrolho manual sai da luneta; Dragunov/PSG1 (semiautomáticas) ficam
@@ -21190,19 +21221,19 @@ function updateWeapon(dt) {
       if (a && a.res > 0 && a.mag < wMag(G.cur)) { a.mag++; a.res--; play('shellin'); }
       S_.t0 = now; if (!a || a.mag >= wMag(G.cur) || a.res <= 0) S_.stage = 'end';
     } else if (S_.stage === 'end' && now - S_.t0 >= .45 * S_.sp) { G.reload = null; G.reloadEnd = 0; }
-    if (G.reload && S_.stage !== 'end' && (G.trigger || mouseDown) && a?.mag > 0 && locked()) { G.reload = null; G.reloadEnd = 0; } // atirar interrompe
+    if (G.reload && S_.stage !== 'end' && (G.trigger || mouseDown || G.trigger2) && a?.mag > 0 && locked()) { G.reload = null; G.reloadEnd = 0; } // atirar interrompe
     if (G.reload && S_.stage !== 'start') rldFimBala(S_, a); // 6-w16
   } else if (G.reloadEnd && now >= G.reloadEnd) { const a = G.ammo[G.cur]; if (a) { const take = Math.min(wMag(G.cur) - a.mag, a.res); a.mag += take; a.res -= take; } G.reloadEnd = 0; }
-  if (G.reloadEnd) G.trigger = false; // decisão do dono (13/10): clique durante a recarga não fica guardado (atirava sozinho no fim); a escopeta com bala no tubo já saiu da recarga acima
+  if (G.reloadEnd) G.trigger = G.trigger2 = false; // decisão do dono (13/10): clique durante a recarga não fica guardado (atirava sozinho no fim); a escopeta com bala no tubo já saiu da recarga acima
   if (G.rezoom && now >= G.nextFire) { G.scope = G.rezoom; G.rezoom = 0; }
   const since = now - G.lastShot;
   if (since > .08) { const k = Math.exp(-dt * (since > .3 ? 9 : 4)); G.punchP *= k; G.punchY *= k; }
   if (since > .35) G.shots = 0;
-  if (!me.alive || C.bombAct || C.bombHand || C.chatOpen || C.buyOpen || !locked() || C.phase === 'freeze') { G.trigger = false; return; }
+  if (!me.alive || C.bombAct || C.bombHand || C.chatOpen || C.buyOpen || !locked() || C.phase === 'freeze') { G.trigger = G.trigger2 = false; return; }
   if (ZC.on && keys.KeyF && ZC.act?.k === 'rev') { G.trigger = false; return; } // reanimando: mãos ocupadas
   if (me.sprinting) { // correndo a arma fica abaixada; apertar o gatilho interrompe a corrida (como no CoD)
     G.burstN = 0;
-    if (G.trigger || mouseDown) { me.noSprintUntil = now + .6; me.sprinting = false; G.raiseEnd = now + .18; }
+    if (G.trigger || mouseDown || G.trigger2) { me.noSprintUntil = now + .6; me.sprinting = false; G.raiseEnd = now + .18; }
     return;
   }
   if (G.burstN > 0 && G.burstW === G.cur && now >= G.nextFire && now >= G.switchEnd && !G.reloadEnd) { shoot(); return; } // resto da rajada
@@ -21212,6 +21243,8 @@ function updateWeapon(dt) {
     else if (w.slot === 'nade') throwNade(true);
     else shoot();
   }
+  if (akOn() && (G.trigger2 || (G.mouse2 && w.auto)) && now >= (G.nextFire2 || 0) && now >= G.switchEnd && now >= (G.raiseEnd || 0) && !G.reloadEnd) { G.trigger2 = false; shoot(true); }
+  else if (!akOn()) G.trigger2 = false;
 }
 function altFire() {
   const w = W[G.cur]; if (!me.alive || C.bombAct || C.bombHand || now < G.switchEnd) return;
@@ -31153,7 +31186,7 @@ addEventListener('keydown', e => {
   }
 });
 addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'Tab') C.showBoard = false; if (e.code === 'KeyE' && C.st?.mode === 'rounds') sendToHost({ t: 'bomb', on: 0 }); });
-function releaseInput() { for (const k in keys) keys[k] = false; mouseDown = false; G.adsHold = false; C.showBoard = false; }
+function releaseInput() { for (const k in keys) keys[k] = false; mouseDown = false; G.adsHold = false; G.mouse2 = false; C.showBoard = false; }
 addEventListener('blur', releaseInput);
 // Tecla presa: se o navegador engoliu o "soltar" (o aviso "Sair do site?" do Ctrl+W congela a página e as teclas
 // soltas nesse meio-tempo nunca chegam), o próximo evento com o estado real dos modificadores corrige.
@@ -31168,9 +31201,10 @@ canvas.addEventListener('mousedown', e => {
   audioInit();
   if (e.button === 0) { mouseDown = true; G.trigger = true; if (!me.alive) cycleSpec(); }
   if (e.button === 1) { e.preventDefault(); sendMark(); }
+  if (e.button === 2 && akOn()) { G.trigger2 = true; G.mouse2 = true; return; } // Pistolas Duplas: o botão direito atira com a pistola da esquerda
   if (e.button === 2) { const w = W[G.cur]; if (w && !w.scope && (w.slot === 'primary' || w.slot === 'secondary')) { G.adsHold = true; if (zPerk('ds') && me.alive && !me.downed) zAimAssist(); } else altFire(); }
 });
-addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; if (e.button === 2) G.adsHold = false; });
+addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; if (e.button === 2) { G.adsHold = false; G.mouse2 = false; } });
 addEventListener('contextmenu', e => { if (inGame) e.preventDefault(); });
 let mouseAvg = 0;
 addEventListener('mousemove', e => {
@@ -31919,7 +31953,7 @@ function arsenalUI() {
     if (AR.slot) {
       const cur = eq.find(a => ATT[a].slot === AR.slot) || '';
       const fab = AR.slot === 'optic' && fabOptic(w), trava = AR.slot === 'optic' && fabLuneta(w);
-      h += `<div class="arph">${ATT_SLOTS[AR.slot]}</div><div class="aropts"><button class="aropt${cur ? '' : ' on'}" data-opt=""><b>${fab || 'Nenhum'}</b><small>${fab ? 'Já vem montada na arma' : 'Encaixe vazio'}</small></button>` + (trava ? '<div class="hint" style="margin-top:6px">Esta arma já vem com luneta de fábrica: não aceita outra mira.</div>' : ATT_ORDER.filter(a => ATT[a].slot === AR.slot).map(a => {
+      h += `<div class="arph">${ATT_SLOTS[AR.slot]}</div><div class="aropts"><button class="aropt${cur ? '' : ' on'}" data-opt=""><b>${fab || 'Nenhum'}</b><small>${fab ? 'Já vem montada na arma' : 'Encaixe vazio'}</small></button>` + (trava ? '<div class="hint" style="margin-top:6px">Esta arma já vem com luneta de fábrica: não aceita outra mira.</div>' : ATT_ORDER.filter(a => ATT[a].slot === AR.slot && attCabe(w, a)).map(a => {
         const o = un.includes(a); return `<button class="aropt${a === cur ? ' on' : ''}${o ? '' : ' lock'}" data-opt="${a}"><b>${esc(ATT[a].name)}</b><small>${o ? esc(ATT[a].d) : 'Libera no nível ' + (ATT_ORDER.indexOf(a) + 2)}</small></button>`;
       }).join('')) + '</div>';
     } else h += `<div class="hint">Clique numa etiqueta em volta da arma para trocar o acessório daquele encaixe (até ${ATT_MAX}, um por encaixe). Valem no modo Zumbi, também na arma do Pack-a-Punch. Mate zumbis com esta arma para subir de nível e liberar mais.</div>`;
@@ -32347,7 +32381,7 @@ function menuFundo(dt) { // menu: um mapa de verdade passando devagar atrás dos
 function renderScene() {
   sky.position.copy(camera.position); if (CULL.length) zCull(); b10Quadro(); vjQuadro(); // O1-B10, O4-D04
   if (CFG.gfx === 'alto') { gradePass.uniforms.time.value = now % 100; g01Composer(); composer.render(); } // 6-g01
-  else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); if (posLeve()) gradeMedio(); } // Médio no Sanatório: cor da área com cópia; na Vila ela vem no shader dos materiais (O1-B10)
+  else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); akPassada(() => renderer.render(vmScene, vmCam)); if (posLeve()) gradeMedio(); } // Médio no Sanatório: cor da área com cópia; na Vila ela vem no shader dos materiais (O1-B10)
 }
 function tick(dt) {
   if (R1.q || R1.rq) r1Fecha(); // (sobra de um quadro que parou no meio)
