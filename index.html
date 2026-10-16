@@ -31090,6 +31090,15 @@ function zmmRevela(dt) {
 }
 function zmmScene(g, toS, edge, big) { // aliados sempre; zumbis só os que você vê (perto)
   const eye = camera.position.clone(), u = big ? 1 : 2;
+  try { if (campCliOn()) for (const id of CAMP.c.ordem || []) { // objetivo ativo: marca amarela (na borda do radar quando longe), com o nome no mapa grande
+    const o = CAMP.c.obj[id], D = CAMP_OBJ[id]; if (!D || o?.st !== 'ativo') continue; const P = campObjPos(id); if (!P || P.x == null) continue;
+    edge(toS(P.x, P.z), (x, y, a) => {
+      const s = (big ? 8 : 9) * u, pul = 1 + .15 * Math.sin(now * 5); g.globalAlpha = a; g.save(); g.translate(x, y); g.scale(pul, pul);
+      g.fillStyle = '#ffd23a'; g.strokeStyle = '#000'; g.lineWidth = 2 * u; g.beginPath(); g.moveTo(0, -s); g.lineTo(s, 0); g.lineTo(0, s); g.lineTo(-s, 0); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#000'; g.font = `800 ${10 * u}px Rajdhani,sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('!', 0, u); g.restore(); g.globalAlpha = 1;
+      if (big) { const t = (D.marca || D.titulo || '').toUpperCase(); g.font = '700 13px Rajdhani,sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(t, x, y - 16); g.fillStyle = '#ffd23a'; g.fillText(t, x, y - 16); }
+    });
+  } } catch (e) { }
   for (const rp of R.values()) {
     if (!rp.alive) continue; const info = C.players.get(rp.id); edge(toS(rp.pos.x, rp.pos.z), (x, y, a) => {
       g.globalAlpha = a; g.fillStyle = '#4ad0ff'; g.strokeStyle = '#000'; g.lineWidth = 1.5 * u; g.beginPath(); g.arc(x, y, 6 * u, 0, 7); g.fill(); g.stroke(); g.globalAlpha = 1;
