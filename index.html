@@ -504,7 +504,9 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 #arsenalPane .artabs button{background:none;border:0;font-family:Teko,Rajdhani,sans-serif;font-size:25px;font-weight:400;letter-spacing:2px;text-transform:uppercase;color:#7d8692;padding:0 0 1px;border-bottom:3px solid transparent;margin-bottom:-1px}
 #arsenalPane .artabs button.on{color:#fff;border-bottom-color:var(--acc)}
 #arsenalPane .artabs button:disabled{opacity:.3;cursor:default}
-#arPanel{flex:1;min-height:0;overflow:hidden}
+#arPanel{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+#arSmith .arleft{max-height:100%;min-height:0;box-sizing:border-box}
+#arPanel>*{flex:none}
 .arlv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:baseline;margin-bottom:10px}
 .arlv b{font-family:Teko,Rajdhani,sans-serif;font-size:22px;font-weight:500;color:#fff;letter-spacing:1px}
 .arlv span{font-size:12px;color:#8d97a5;text-align:right}
@@ -529,7 +531,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 .armini{font-size:12px;color:#8d97a5;margin-top:7px}
 .arskh{display:flex;justify-content:space-between;align-items:baseline;font-family:Teko,Rajdhani,sans-serif;font-size:20px;letter-spacing:2px;color:#aab3be;text-transform:uppercase;margin-bottom:5px}
 .arskh b{color:#fff;font-weight:500}
-.arsks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.arsks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;flex:1 1 auto!important;min-height:0;overflow-y:auto;align-content:start;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--acc) transparent} /* 36+ skins: a grade rola com a roda do mouse */
 .arsk{position:relative;cursor:pointer;background:rgba(14,17,23,.85);border:1px solid rgba(255,255,255,.07);border-bottom:2px solid var(--rc);padding:3px}
 .arsk .sw{height:28px;background-size:110px;background-position:center}
 .arsk .sw.def{background:repeating-linear-gradient(135deg,#2a2d33 0 6px,#33373f 6px 12px)}
