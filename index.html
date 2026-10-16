@@ -532,6 +532,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 .armini{font-size:12px;color:#8d97a5;margin-top:7px}
 .arskh{display:flex;justify-content:space-between;align-items:baseline;font-family:Teko,Rajdhani,sans-serif;font-size:20px;letter-spacing:2px;color:#aab3be;text-transform:uppercase;margin-bottom:5px}
 .arskh b{color:#fff;font-weight:500}
+.aropts{flex:1 1 auto!important;min-height:0;overflow-y:auto;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--acc) transparent}
 .arsks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;flex:1 1 auto!important;min-height:0;overflow-y:auto;align-content:start;padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--acc) transparent} /* 36+ skins: a grade rola com a roda do mouse */
 .arsk{position:relative;cursor:pointer;background:rgba(14,17,23,.85);border:1px solid rgba(255,255,255,.07);border-bottom:2px solid var(--rc);padding:3px}
 .arsk .sw{height:28px;background-size:110px;background-position:center}
@@ -31918,9 +31919,9 @@ function arsenalUI() {
     if (AR.slot) {
       const cur = eq.find(a => ATT[a].slot === AR.slot) || '';
       const fab = AR.slot === 'optic' && fabOptic(w), trava = AR.slot === 'optic' && fabLuneta(w);
-      h += `<div class="arph">${ATT_SLOTS[AR.slot]}</div><button class="aropt${cur ? '' : ' on'}" data-opt=""><b>${fab || 'Nenhum'}</b><small>${fab ? 'Já vem montada na arma' : 'Encaixe vazio'}</small></button>` + (trava ? '<div class="hint" style="margin-top:6px">Esta arma já vem com luneta de fábrica: não aceita outra mira.</div>' : ATT_ORDER.filter(a => ATT[a].slot === AR.slot).map(a => {
+      h += `<div class="arph">${ATT_SLOTS[AR.slot]}</div><div class="aropts"><button class="aropt${cur ? '' : ' on'}" data-opt=""><b>${fab || 'Nenhum'}</b><small>${fab ? 'Já vem montada na arma' : 'Encaixe vazio'}</small></button>` + (trava ? '<div class="hint" style="margin-top:6px">Esta arma já vem com luneta de fábrica: não aceita outra mira.</div>' : ATT_ORDER.filter(a => ATT[a].slot === AR.slot).map(a => {
         const o = un.includes(a); return `<button class="aropt${a === cur ? ' on' : ''}${o ? '' : ' lock'}" data-opt="${a}"><b>${esc(ATT[a].name)}</b><small>${o ? esc(ATT[a].d) : 'Libera no nível ' + (ATT_ORDER.indexOf(a) + 2)}</small></button>`;
-      }).join(''));
+      }).join('')) + '</div>';
     } else h += `<div class="hint">Clique numa etiqueta em volta da arma para trocar o acessório daquele encaixe (até ${ATT_MAX}, um por encaixe). Valem no modo Zumbi, também na arma do Pack-a-Punch. Mate zumbis com esta arma para subir de nível e liberar mais.</div>`;
     setHTMLm('arPanel', h);
   } else {
