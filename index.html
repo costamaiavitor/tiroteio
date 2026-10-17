@@ -937,10 +937,10 @@ Object.assign(W, {
   aug2:     CSW('m14', { name: 'AUG', price: 3300, dmg: 28, rate: .09, auto: 1, mag: 30, res: 90, reload: 3.8, spread: .0035, sspread: .0018, scope: [55], move: .1, air: .25, pen: .9, rm: .98, speed: .88, snd: 'rifle2' }),
   g3sg1:    CSW('dragunov', { name: 'G3SG1', price: 5000, dmg: 80, rate: .25, auto: 1, mag: 20, res: 90, reload: 4.7, spread: .045, sspread: .0015, scope: [40, 15], move: .2, air: .3, pen: .83, rm: .99, speed: .86, snd: 'sniper' }),
   scar20:   CSW('dragunov', { name: 'SCAR-20', price: 5000, dmg: 80, rate: .25, auto: 1, mag: 20, res: 90, reload: 3.1, spread: .045, sspread: .0015, scope: [40, 15], move: .2, air: .3, pen: .83, rm: .99, speed: .86, snd: 'sniper' }),
-  flash:    { name: 'Flashbang', slot: 'nade', price: 200, model: 'smoke', speed: 1 },
-  molotov:  { name: 'Molotov', slot: 'nade', price: 400, model: 'nade', speed: 1 },
-  inc:      { name: 'Incendiária', slot: 'nade', price: 500, model: 'nade', speed: 1 },
-  decoy:    { name: 'Decoy', slot: 'nade', price: 50, model: 'nade', speed: 1 },
+  flash:    { name: 'Flashbang', slot: 'nade', price: 200, model: 'flashb', speed: 1 },
+  molotov:  { name: 'Molotov', slot: 'nade', price: 400, model: 'molotov', speed: 1 },
+  inc:      { name: 'Incendiária', slot: 'nade', price: 500, model: 'inc', speed: 1 },
+  decoy:    { name: 'Decoy', slot: 'nade', price: 50, model: 'decoy', speed: 1 },
   fire:     { name: 'Fogo', pen: 1, reward: 300 },
 });
 W.karambit = { ...W.knife, name: 'Butterfly', model: 'karambit' }; // faca alternativa (só visual: escolhida na coleção). Era a karambit e virou a butterfly; o id ficou para não perder as skins já ganhas
@@ -18490,15 +18490,39 @@ function gunModel(id, fp = false, skin = null) {
     }
     case 'nade': {
       const s = add(g, new THREE.SphereGeometry(.042, 16, 12), mk3(fp, 0x3f5a2a, .3, .6)); s.scale.y = 1.15;
-      for (let i = 0; i < 4; i++) add(g, new THREE.TorusGeometry(.042, .002, 4, 20), M.dark, 0, -.02 + i * .014, 0, Math.PI / 2);
+      for (let i = 0; i < 4; i++) { const y = -.02 + i * .014; add(g, new THREE.TorusGeometry(.042 * Math.sqrt(1 - (y / .0483) ** 2) + .0006, .002, 4, 20), M.dark, 0, y, 0, Math.PI / 2); } // frisos colados na casca (antes todos com o raio do meio: sobravam fora)
       add(g, RB(.022, .02, .022, .004), M.steel, 0, .052, 0); add(g, EX([[-.01, .0], [.01, .0], [.012, -.06], [.004, -.065]], .012), M.steel, .014, .06, 0);
-      add(g, new THREE.TorusGeometry(.011, .0018, 6, 14), M.steel, -.018, .06, 0, 0, Math.PI / 2);
+      ud.pino = add(g, new THREE.TorusGeometry(.011, .0018, 6, 14), M.steel, -.018, .06, 0, 0, Math.PI / 2);
       ud.rig = 'none'; mz = 0; my = 0; nadeHold(g, ud, 'over', NADE8.he); break;
     }
     case 'smoke': {
       add(g, new THREE.CylinderGeometry(.034, .034, .11, 16), mk3(fp, 0x8a9096, .5, .5)); add(g, RB(.022, .02, .022, .004), M.steel, 0, .064, 0);
       add(g, new THREE.CylinderGeometry(.035, .035, .012, 16), M.dark, 0, .02, 0); add(g, new THREE.CylinderGeometry(.035, .035, .006, 16), M.dark, 0, -.03, 0);
-      ud.rig = 'none'; mz = 0; my = 0; break;
+      ud.pino = nadeTopo(g, add, EX, M, .064); // alavanca e pino (antes a fumaça não tinha, e ficava na mão depois do arremesso: sem ud.item)
+      ud.rig = 'none'; mz = 0; my = 0; nadeHold(g, ud, 'over', NADE8.smoke); break;
+    }
+    // cada granada do CS com o seu modelo (antes a flash era a lata da fumaça, e molotov, incendiária e decoy eram a HE)
+    case 'flashb': { // flashbang: corpo fino de alumínio com faixas claras
+      add(g, new THREE.CylinderGeometry(.026, .026, .112, 16), mk3(fp, 0x6f7f8c, .6, .4)); add(g, RB(.022, .02, .022, .004), M.steel, 0, .064, 0);
+      for (const y of [-.034, .03]) add(g, new THREE.CylinderGeometry(.0268, .0268, .012, 16), mk3(fp, 0xdedcd2, .1, .6), 0, y, 0);
+      ud.pino = nadeTopo(g, add, EX, M, .064); ud.rig = 'none'; mz = 0; my = 0; nadeHold(g, ud, 'over', NADE8.smoke); break;
+    }
+    case 'molotov': { // garrafa com o pano enfiado no gargalo, já acesa
+      const vd = mk3(fp, 0x4f6a2c, .2, .15); add(g, new THREE.CylinderGeometry(.03, .03, .09, 14), vd); add(g, new THREE.CylinderGeometry(.011, .03, .03, 14), vd, 0, .06, 0);
+      add(g, new THREE.CylinderGeometry(.011, .011, .04, 10), vd, 0, .094, 0); add(g, new THREE.CylinderGeometry(.013, .009, .035, 8), mk3(fp, 0xcfc4a4, 0, .95), 0, .126, 0);
+      add(g, new THREE.ConeGeometry(.014, .04, 8), new THREE.MeshBasicMaterial({ color: 0xffa040 }), 0, .16, 0);
+      ud.rig = 'none'; mz = 0; my = 0; nadeHold(g, ud, 'over', NADE8.molotov); break;
+    }
+    case 'inc': { // incendiária: lata cinza-escura com faixa vermelha
+      add(g, new THREE.CylinderGeometry(.03, .03, .105, 16), mk3(fp, 0x3d4247, .5, .5)); add(g, RB(.022, .02, .022, .004), M.steel, 0, .062, 0);
+      add(g, new THREE.CylinderGeometry(.0305, .0305, .02, 16), mk3(fp, 0xa82820, .2, .6), 0, .018, 0);
+      ud.pino = nadeTopo(g, add, EX, M, .062); ud.rig = 'none'; mz = 0; my = 0; nadeHold(g, ud, 'over', NADE8.smoke); break;
+    }
+    case 'decoy': { // decoy: corpo curto com a grade do alto-falante e faixa verde
+      add(g, new THREE.CylinderGeometry(.032, .032, .085, 16), mk3(fp, 0x55585a, .5, .5)); add(g, RB(.022, .02, .022, .004), M.steel, 0, .052, 0);
+      add(g, new THREE.CylinderGeometry(.0325, .0325, .012, 16), mk3(fp, 0x3f9a4a, .1, .6), 0, .022, 0);
+      for (let i = 0; i < 4; i++) add(g, new THREE.TorusGeometry(.0325, .002, 4, 18), M.dark, 0, -.03 + i * .01, 0, Math.PI / 2);
+      ud.pino = nadeTopo(g, add, EX, M, .052); ud.rig = 'none'; mz = 0; my = 0; nadeHold(g, ud, 'over', NADE8.smoke); break;
     }
     case 'semtex': {
       add(g, RB(.07, .032, .05, .006), mk3(fp, 0x3a3f2a, .2, .7)); add(g, RB(.052, .012, .034, .003), mk3(fp, 0xc8b878, .1, .6), 0, .021, 0);
@@ -18568,7 +18592,8 @@ function r8Reload(ud, t, o, ev) {
   M.position.copy(h).sub(R.H); // a peça nova vem na mão
 }
 // granadas, Semtex, macaco e Claymore na mão: o objeto fica num grupo (ud.item) encaixado no punho; ud.toss = jeito de lançar
-const NADE8 = { he: [0, -.024, .014], semtex: [0, -.03, .02], monkey: [0, -.035, .005], clay: [0, -.03, .012] }; // onde o objeto fica em relação à arma (mão em ud.rh)
+const NADE8 = { smoke: [0, -.03, .014], molotov: [0, -.045, .014], he: [0, -.024, .014], semtex: [0, -.03, .02], monkey: [0, -.035, .005], clay: [0, -.03, .012] }; // onde o objeto fica em relação à arma (mão em ud.rh)
+function nadeTopo(g, add, EX, M, y) { add(g, EX([[-.01, .0], [.01, .0], [.012, -.06], [.004, -.065]], .012), M.steel, .014, y + .008, 0); return add(g, new THREE.TorusGeometry(.011, .0018, 6, 14), M.steel, -.018, y + .008, 0, 0, Math.PI / 2); } // alavanca e argola do pino
 function nadeHold(g, ud, toss, p) {
   ud.toss = toss; if (!GM_VM) return;
   const it = new THREE.Group(); it.position.fromArray(p); while (g.children.length) it.add(g.children[0]); g.add(it); ud.item = it;
@@ -18679,7 +18704,12 @@ function tpPose(g, tp, pitch, k) {
   const ud = g.userData, P = TP_POSE[tp?.cls || 'pistol'], ka = k?.aim || 0, kr = k?.run || 0, sw = k?.sw || 0;
   const mix = f => { const i = P.idle[f], a = P.aim[f], r = P.run[f]; return Array.isArray(i) ? [0, 1, 2].map(n => lerp(lerp(i[n], a[n], ka), r[n], kr)) : lerp(lerp(i, a, ka), r, kr); };
   const T = mix('T'), sR = TPV.sR.fromArray(P.sh[0]), sL = TPV.sL.fromArray(P.sh[1]);
-  TPV.eu.set(mix('p') * (pitch < 0 ? Math.max(0, 1 + pitch / .8) : 1) - .9 * sw, mix('y'), 0); const q = TPV.q.setFromEuler(TPV.eu); // olhando para baixo, a arma já desce com os braços: tira a inclinação da pose
+  let dp = 0, dy = 0; // golpe de faca (kn 0..1; kv 0/1 = corte para um lado e para o outro, 2 = estocada) e arremesso (th 0..1)
+  if (k?.kn >= 0 && k.kn < 1) { const e = Math.sin(k.kn * Math.PI), u = smooth(k.kn), s = k.kv === 1 ? -1 : 1;
+    if (k.kv === 2) { T[1] += .1 * e; T[2] -= .3 * e; dp = .6 * e; } else { T[0] += s * lerp(.14, -.3, u) * e; T[1] += lerp(.18, -.1, u) * e; T[2] -= .22 * e; dy = s * lerp(.9, -.9, u) * e; dp = -.3 * e; } }
+  if (k?.th >= 0 && k.th < 1) { const a = seg(k.th, 0, .18), b = seg(k.th, .18, .55), c = seg(k.th, .55, 1); // mão vai para trás da cabeça, passa por cima para a frente e volta
+    T[0] += -.06 * a + .02 * b; T[1] += (.34 * a - .4 * b) * (1 - c); T[2] += (.26 * a - .62 * b) * (1 - c); dp = (.9 * a - 1.6 * b) * (1 - c); }
+  TPV.eu.set(mix('p') * (pitch < 0 ? Math.max(0, 1 + pitch / .8) : 1) - .9 * sw + dp, mix('y') + dy, 0); const q = TPV.q.setFromEuler(TPV.eu); // olhando para baixo, a arma já desce com os braços: tira a inclinação da pose
   // arma: âncora (no espaço da arma) cai em T; saque/troca = arma vem de baixo
   const A = tp ? TPV.a.copy(tp.anc).applyQuaternion(q) : TPV.a.set(0, 0, 0);
   ud.gh.quaternion.copy(q); ud.gh.position.set(T[0] - A.x, T[1] - A.y - .22 * sw, T[2] - A.z);
@@ -18690,6 +18720,13 @@ function tpPose(g, tp, pitch, k) {
   if (two) H.copy(tp.lh).applyQuaternion(q).add(ud.gh.position);
   else { const [x, y, z] = TP_POSE.L, c = Math.cos(pitch), s = Math.sin(pitch); H.set(x, y * c + z * s, -y * s + z * c); } // mão solta pendurada (desfaz a inclinação dos braços)
   tpArm(ud.tpL, sL, H, two ? q : null);
+}
+// plantando (k 'p': digita o código) ou desarmando ('d': mexe nos fios): ajoelhado, olhando para baixo, as duas mãos à frente
+function tpAct(g, kk, t) {
+  const ud = g.userData, P = TP_POSE.pistol, H = TPV.b, f = kk === 'p' ? Math.max(0, Math.sin(t * 22)) * .035 : Math.sin(t * 9) * .03;
+  ud.arms.rotation.x = 0; ud.head.rotation.x = -.55;
+  H.set(.08, -.5 + f, -.36); tpArm(ud.tpR, TPV.sR.fromArray(P.sh[0]), H, null);
+  H.set(-.08, -.5 + (kk === 'p' ? 0 : -f), -.36); tpArm(ud.tpL, TPV.sL.fromArray(P.sh[1]), H, null);
 }
 // dados de terceira pessoa de um molde de arma (uma vez por molde): classe, âncora, mãos e boca do cano, já na escala do molde
 function tpInfo(t, w) {
@@ -19806,9 +19843,9 @@ function vmSetWeapon(id) {
     else rh = knifeHand(A);
     if (rh) { rh.quaternion.copy(qz).multiply(new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), -.45)); rh.position.copy(ud.rh).applyQuaternion(gun.quaternion); vmGun.add(rh); } // mão de 3/4, lâmina de perfil
   } else { rh = vmMao(rightHand, A); rh.position.copy(ud.rh); gun.add(rh); }
-  const armsOn = ARMS.root && !['knife', 'karambit', 'nade', 'smoke', 'monkey', 'semtex', 'clay'].includes(m);
+  const armsOn = ARMS.root && !['knife', 'karambit', 'nade', 'smoke', 'flashb', 'molotov', 'inc', 'decoy', 'monkey', 'semtex', 'clay'].includes(m);
   if (armsOn) rh.traverse(o => { if (o.isMesh) o.visible = false; }); // a mão procedural vira só o alvo do IK
-  if (!['knife', 'karambit', 'nade', 'smoke', 'monkey', 'semtex', 'clay'].includes(m)) {
+  if (!['knife', 'karambit', 'nade', 'smoke', 'flashb', 'molotov', 'inc', 'decoy', 'monkey', 'semtex', 'clay'].includes(m)) {
     const lh = vmMao(leftHand, A); lh.position.copy(ud.lh); gun.add(lh);
     if (armsOn) {
       lh.traverse(o => { if (o.isMesh) o.visible = false; });
@@ -19848,7 +19885,7 @@ function vmSetWeapon(id) {
 // molde (clone: geometria e material compartilhados, marcados keep para o descarte não apagar o molde). As armas do inventário que
 // ainda não estão no cache são montadas num momento ocioso, uma por vez (vmcAquecer), e não no meio da troca.
 const VMC = { m: new Map(), dono: new Map(), max: 6, fila: 0 }; // m: chave → arma montada (ordem = uso, LRU); dono: arma → chave
-const VMC_FORA = ['knife', 'karambit', 'nade', 'smoke', 'monkey', 'semtex', 'clay']; // facas (braços/pacote próprios) e itens de arremesso: sempre montados na hora
+const VMC_FORA = ['knife', 'karambit', 'nade', 'smoke', 'flashb', 'molotov', 'inc', 'decoy', 'monkey', 'semtex', 'clay']; // facas (braços/pacote próprios) e itens de arremesso: sempre montados na hora
 function vmcChave(id) {
   if (!ZC.on || !id || !W[id]) return null; const mid = knifeModelOf(id, PROF.data?.equipped);
   if (VMC_FORA.includes(W[mid]?.model) || fpw(mid)) return null;
@@ -20607,6 +20644,7 @@ function updateViewmodel(dt) {
   if (ud.fps2) fpUpdate(ud, dt);
   if (G.swing > 0) { G.swing = Math.max(0, G.swing - dt * 4); if (ud.toss) nadeToss(ud, o, 1 - G.swing); else { const s = Math.sin(G.swing * Math.PI); o.ry += s * 1.1; o.x -= s * .12; o.z -= s * .1; } } // (a8) arremesso/colocação
   if (ud.tossFim) nadeVolta(ud, o); // 6-w11: o próximo objeto sobe na mão
+  { const k = G.pin ? smooth(clamp((now - G.pin.t0) / NADE_PINO, 0, 1)) : 0; if (k) { o.y += .05 * k; o.z += .06 * k; o.x -= .02 * k; o.rx += .4 * k; o.rz -= .15 * k; } if (ud.pino) ud.pino.visible = k < .6; } // pino puxado: prepara o arremesso
   if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model) && !ud.armsKnife && !ud.fps2) knifeAnim(o, ud);
   armaInspectPose(o); // inspeção da arma de fogo (F)
   if (me.downed) { o.y -= .04; o.rz += .35; }
@@ -20648,9 +20686,9 @@ const bestW = () => G.inv.primary || G.inv.secondary || 'knife';
 function equip(id, force) {
   if (C.bombHand) { C.bombHand = false; G.switchEnd = Math.max(G.switchEnd, now + .35); } // trocou de arma: guarda a bomba
   if (!hasW(id) || (id === G.cur && !force)) return;
-  if (id !== G.cur) G.last = G.cur;
+  if (id !== G.cur && hasW(G.cur)) G.last = G.cur; // Q: a granada que acabou de sair não vira a "última arma"
   G.ads = 0;
-  G.swing = 0; // 6-w18: o balanço do arremesso/colocação (G.swing, só visual) ficava para a arma nova, que girava até 63° logo depois do saque
+  G.swing = 0; G.pin = null; // 6-w18: o balanço do arremesso/colocação (G.swing, só visual) ficava para a arma nova, que girava até 63° logo depois do saque
   G.cur = id; G.reloadEnd = 0; G.reload = null; G.scope = 0; G.rezoom = 0; G.burstN = 0; G.switchDur = W[id]?.model === 'awp' ? .6 : id === 'knife' ? .55 : .35; G.kan = null; G.gin = null; G.switchEnd = now + G.switchDur; G.shots = 0;
   vmSetWeapon(id); play('draw');
 }
@@ -21204,12 +21242,19 @@ function knifeAttack(heavy) {
     else { play('knife'); if (res.t < w.range) impact(res.p, res.n); }
     return;
   }
+  if (W[G.cur]?.slot === 'knife') sendToHost({ t: 'shot', w: G.cur, o: [r3(o.x), r3(o.y), r3(o.z)], e: [], hv: heavy ? 1 : undefined }); // os outros veem o golpe (3ª pessoa)
   const res = trace(o, d, w.range, remoteCands());
   if (res.id) {
     const rp = R.get(res.id); const back = rp && Math.abs(angDiff(rp.yaw, me.yaw)) < 1.1;
     const dmg = heavy ? (back ? 180 : w.alt) : (back ? 90 : w.dmg);
     sendToHost({ t: 'hit', v: res.id, dmg, z: 'body', w: 'knife' }); showHitmarker(false); play('stab'); puff(res.p, 0xa01010, .35, .3, 0);
   } else { play('knife'); if (res.t < w.range) impact(res.p, res.n); }
+}
+// granada como no CS: apertar puxa o pino (mão sobe e a argola sai), soltar o botão arremessa (esquerdo forte, direito fraco); Claymore é na hora
+const NADE_PINO = .22;
+function nadePino(forte, btn) {
+  if (G.cur === 'clay' || G.pin || G.inv[G.cur] <= 0) { if (!G.pin) throwNade(forte); return; }
+  G.pin = { t0: now, forte, btn, w: G.cur, up: false, solta: false }; play('empty');
 }
 function throwNade(strong) {
   const type = G.cur; if (G.inv[type] <= 0) return;
@@ -21226,7 +21271,7 @@ function throwNade(strong) {
   const pa = [r3(p.x), r3(p.y), r3(p.z)], va = [r3(v.x), r3(v.y), r3(v.z)];
   spawnNade(C.myId, type, pa, va); sendToHost({ t: 'nade', k: type, p: pa, v: va });
   play('knife');
-  setTimeout(() => { if (!hasW(G.cur)) equip(hasW(type) ? type : bestW(), true); }, 300);
+  setTimeout(() => { if (!hasW(G.cur)) equip(hasW(type) ? type : hasW(G.last) && G.last !== type ? G.last : bestW(), true); }, 300); // acabou: volta para a arma de antes (como no CS)
 }
 function updateWeapon(dt) {
   const w = W[G.cur];
@@ -21245,7 +21290,8 @@ function updateWeapon(dt) {
   const since = now - G.lastShot;
   if (since > .08) { const k = Math.exp(-dt * (since > .3 ? 9 : 4)); G.punchP *= k; G.punchY *= k; }
   if (since > .35) G.shots = 0;
-  if (!me.alive || C.bombAct || C.bombHand || C.chatOpen || C.buyOpen || !locked() || C.phase === 'freeze') { G.trigger = G.trigger2 = false; return; }
+  if (!me.alive || C.bombAct || C.bombHand || C.chatOpen || C.buyOpen || !locked() || C.phase === 'freeze') { G.trigger = G.trigger2 = false; G.pin = null; return; }
+  if (G.pin) { if (w?.slot !== 'nade' || G.pin.w !== G.cur) G.pin = null; else { if (G.pin.btn === 0 ? !mouseDown : G.pin.up) G.pin.solta = true; if (G.pin.solta && now - G.pin.t0 >= NADE_PINO) { const f = G.pin.forte; G.pin = null; throwNade(f); } G.trigger = false; return; } } // pino puxado: joga ao soltar o botão
   if (ZC.on && keys.KeyF && ZC.act?.k === 'rev') { G.trigger = false; return; } // reanimando: mãos ocupadas
   if (me.sprinting) { // correndo a arma fica abaixada; apertar o gatilho interrompe a corrida (como no CoD)
     G.burstN = 0;
@@ -21256,7 +21302,7 @@ function updateWeapon(dt) {
   if ((G.trigger || (mouseDown && w.auto)) && now >= G.nextFire && now >= G.switchEnd && now >= (G.raiseEnd || 0) && !G.reloadEnd) {
     G.trigger = false;
     if (w.slot === 'knife') knifeAttack(false);
-    else if (w.slot === 'nade') throwNade(true);
+    else if (w.slot === 'nade') nadePino(true, 0);
     else shoot();
   }
   if (akOn() && (G.trigger2 || (G.mouse2 && w.auto)) && now >= (G.nextFire2 || 0) && now >= G.switchEnd && now >= (G.raiseEnd || 0) && !G.reloadEnd) { G.trigger2 = false; shoot(true); }
@@ -21266,7 +21312,7 @@ function altFire() {
   const w = W[G.cur]; if (!me.alive || C.bombAct || C.bombHand || now < G.switchEnd) return;
   if (w.scope && !G.reloadEnd) { G.scope = (G.scope + 1) % (w.scope.length + 1); G.rezoom = 0; play('empty'); }
   else if (w.slot === 'knife' && now >= G.nextFire && C.phase !== 'freeze') knifeAttack(true);
-  else if (w.slot === 'nade' && now >= G.nextFire && C.phase !== 'freeze') throwNade(false);
+  else if (w.slot === 'nade' && now >= G.nextFire && C.phase !== 'freeze') nadePino(false, 2);
 }
 function cycleWeapon(dir) {
   if (me.downed || (G.cur === 'dmach' && hasW('dmach'))) return;
@@ -21420,16 +21466,22 @@ function updateRemotes(dt) {
     const sp = Math.hypot(rp.pos.x - rp.last.x, rp.pos.z - rp.last.z) / Math.max(dt, 1e-3), vy = Math.abs(rp.pos.y - rp.last.y) / Math.max(dt, 1e-3);
     rp.last.copy(rp.pos); rp.spd = lerp(rp.spd, Math.min(sp, 12), .25);
     rp.model.position.copy(rp.pos); rp.model.rotation.y = rp.yaw;
+    const ac = rp.ac && rp.alive && !rp.dead; // plantando / desarmando: ajoelha (como no CS)
     // agachado: só as pernas encolhem e o corpo desce (antes o boneco inteiro achatava, e a arma junto) (a14)
-    const ck = rp.ck = lerp(rp.ck || 0, rp.crouch ? 1 : 0, .3); ud.inner.position.y = -.42 * ck; ud.legL.scale.y = ud.legR.scale.y = 1 - .49 * ck;
+    const ck = rp.ck = lerp(rp.ck || 0, rp.crouch || ac ? 1 : 0, .3); ud.inner.position.y = -.42 * ck; ud.legL.scale.y = ud.legR.scale.y = 1 - .49 * ck;
     const dn = rp.downed && !rp.dead ? 1.25 : 0; // caído (zumbis): o corpo deita, mas braços e cabeça continuam olhando para a frente
     ud.arms.rotation.x = rp.pitch + dn; ud.head.rotation.x = rp.pitch * .5 + dn * .8;
     { const K = rp.tk ||= { aim: 0, run: 0, sw: 0 }, f = 1 - Math.exp(-dt * 10);
       K.aim = lerp(K.aim, now - (rp.shotT ?? -9) < TP_POSE.aimT || dn ? 1 : 0, f); K.run = lerp(K.run, !dn && rp.spd > (ZC.on ? 6 : 7.2) && K.aim < .5 ? 1 : 0, f);
       K.sw = clamp(1 - (now - (rp.swT ?? -9)) / TP_POSE.swapT, 0, 1); K.sw *= K.sw;
-      if (rp.alive || rp.dead) tpPose(rp.model, rp.tp, rp.pitch + dn, K); }
+      K.kn = rp.tp?.cls === 'knife' ? (now - (rp.knT ?? -9)) / (rp.kv === 2 ? .55 : .32) : -1; K.kv = rp.kv; // golpe de faca
+      K.th = (now - (rp.thT ?? -9)) / .5; // arremesso de granada: o objeto sai da mão no meio do arco e o próximo sobe no saque
+      if (rp.gun) rp.gun.visible = !(K.th > .3 && K.th < 1) && !rp.dead; // morto: a arma cai no chão (não fica também na mão do corpo)
+      if (ac) tpAct(rp.model, rp.ac, now); else if (rp.alive || rp.dead) tpPose(rp.model, rp.tp, rp.pitch + dn, K); }
     rp.anim += dt * rp.spd * 1.7; const la = Math.sin(rp.anim) * .6 * Math.min(1, rp.spd / 5);
-    ud.legL.rotation.x = la; ud.legR.rotation.x = -la;
+    // no ar (pulo / queda): pernas dobradas para a frente em vez de seguir andando
+    rp.air = lerp(rp.air || 0, vy > 2.2 && !dn && !rp.dead ? 1 : 0, 1 - Math.exp(-dt * (vy > 2.2 ? 14 : 6)));
+    ud.legL.rotation.x = lerp(la, .55, rp.air); ud.legR.rotation.x = lerp(-la, .15, rp.air);
     if (rp.dead) { const k = clamp((now - rp.deadT) / .45, 0, 1); rp.model.rotation.x = -k * Math.PI / 2 * .98; rp.model.position.y = rp.pos.y + k * .15; }
     else if (rp.downed) { rp.model.rotation.x = -1.25; rp.model.position.y = rp.pos.y + .25; }
     else rp.model.rotation.x = 0;
@@ -21444,6 +21496,7 @@ function updateRemotes(dt) {
 }
 function remoteShot(m) {
   const rp = R.get(m.id), o = new V3(m.o[0], m.o[1], m.o[2]), w = W[m.w];
+  if (w?.slot === 'knife') { if (rp) { setRemoteGun(rp, m.w); rp.kv = m.hv ? 2 : now - (rp.knT ?? -9) < 1 && rp.kv === 0 ? 1 : 0; rp.knT = now; } play('knife', o); return; } // faca: golpe em 3ª pessoa (alterna o lado), sem rastro nem clarão
   if (rp) { setRemoteGun(rp, m.w); rp.shotT = now; } // terceira pessoa: arma certa na mão e pose de mira (a14)
   const mo = tpMuzzle(rp, o, m.sup); // efeitos visuais saem da boca do cano do modelo dele (o = boca da arma na primeira pessoa dele, perto do rosto)
   if (w?.thunder) { const e = m.e[0]; if (e) thunderFx(mo, new V3(e[0] - mo.x, e[1] - mo.y, e[2] - mo.z).normalize(), w.pap ? 18 : 14); }
@@ -22154,7 +22207,7 @@ function srvHandle(pid, m) {
       if (!fichaOk(p.sb ||= {}, m.w, armaIv(m.w, wd) * .6)) return srvAnom(p, 'shot:cadencia');
       const e = (Array.isArray(m.e) ? m.e : []).slice(0, wd.pellets || 1).filter(vec3);
       p.shotT = now; p.shotW = m.w; if (S.st.mode === 'zombies' && Z.on && Z.zint?.length && e.length) zintTiro(p, m.o, e); // O2-C04: tiro no barril
-      broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e, sup: m.sup ? 1 : undefined }, pid); break;
+      broadcast({ t: 'shot', id: pid, w: m.w, o: m.o, e, sup: m.sup ? 1 : undefined, hv: m.hv && m.w === 'knife' ? 1 : undefined }, pid); break;
     }
     case 'zhit': {
       // o cliente decide o acerto, mas o host confere: arma que ele tem, dano que a arma pode dar
@@ -22736,7 +22789,7 @@ function botBombAct(p) {
 function botShoot(p, tgt, D, wid, eye, dist) {
   p.prot = 0;
   const w = W[wid], b = p.bot;
-  if (wid === 'knife') { if (dist < 2.2) { b.nextFire = now + .5; srvDamage(tgt.id, p.id, 40, 'body', 'knife'); } return; }
+  if (wid === 'knife') { if (dist < 2.2) { b.nextFire = now + .5; broadcast({ t: 'shot', id: p.id, w: 'knife', o: [r3(eye.x), r3(eye.y), r3(eye.z)], e: [] }); srvDamage(tgt.id, p.id, 40, 'body', 'knife'); } return; } // golpe visível nos outros (3ª pessoa)
   if (b.mag <= 0) { b.reloadEnd = now + w.reload; b.mag = w.mag; return; }
   b.mag--; b.burst++;
   b.nextFire = now + (w.auto ? w.rate : w.rate * rand(1, 1.6));
@@ -30691,7 +30744,7 @@ function onMsgInner(m) {
           C.actEnd = pl.ac ? now + pl.ac[0] : 0; C.actDur = pl.ac ? pl.ac[1] : 1;
           me.hp = pl.hp; me.armor = pl.ar; me.helmet = !!pl.hm; me.money = pl.m; if (!pl.al && me.alive) { me.alive = false; me.downed = false; C.deadAt = now; }
           if (zmode) { if (me.alive && pl.al && !!pl.dn !== me.downed) zSetDowned(!!pl.dn); ZC.perks = pl.pk; ZC.bowie = !!pl.bw; if (pl.dn && pl.bl) ZC.bleedEnd = now + pl.bl; }
-        } else { const rp = getRemote(pl.id); refreshRemoteInfo(rp); rp.model.userData.gh.visible = !pl.ac; rp.downed = !!pl.dn; if (!pl.al) rp.alive = false; else if (!rp.alive && rp.buf.length) { rp.alive = true; rp.dead = false; } }
+        } else { const rp = getRemote(pl.id); refreshRemoteInfo(rp); rp.model.userData.gh.visible = !pl.ac; rp.ac = pl.ac ? (pl.ac[1] === BOMB.plant ? 'p' : 'd') : null; rp.downed = !!pl.dn; if (!pl.al) rp.alive = false; else if (!rp.alive && rp.buf.length) { rp.alive = true; rp.dead = false; } }
       }
       for (const id of [...C.players.keys()]) if (!ids.has(id)) C.players.delete(id);
       for (const id of [...R.keys()]) if (!ids.has(id)) removeRemote(id);
@@ -30837,7 +30890,7 @@ function onMsgInner(m) {
     case 'start': NET.lastHost = performance.now() + GRACE_MAPA; LB.on = false; C.st = saneSt(m.st); ZC.snapTs = 0; buildMap(C.st.map); MAPA_CLI = curMapId; enterGame(); lobbyUI(); break; // 6-g07: MAPA_CLI
     case 'deny': toast(m.txt, 4); LB.on = false; lobbyUI(); $('#joinStatus').textContent = m.txt; setTimeout(leaveGame, 2500); break;
     case 'bboom': { const p = new V3(m.p[0], m.p[1] + .6, m.p[2]); boomFx(p); for (let i = 0; i < 6; i++) puff(p.clone().add(new V3(rand(-3, 3), rand(0, 3), rand(-3, 3))), 0x555555, 4, 3); break; }
-    case 'nade': spawnNade(m.id, m.k, m.p, m.v); break;
+    case 'nade': { spawnNade(m.id, m.k, m.p, m.v); const rp = R.get(m.id); if (rp && isW(m.k)) { setRemoteGun(rp, m.k); rp.thT = now; } break; } // arremesso em 3ª pessoa
     case 'msg': centerMsg(String(m.txt ?? '').slice(0, 80), String(m.sub ?? '').slice(0, 160), finN(m.dur) ? clamp(m.dur, 0, 30) : 3); if (typeof m.snd === 'string') play(m.snd); break;
     case 'err': toast(String(m.txt ?? '').slice(0, 160), 2); play('empty'); break;
     case 'info': toast(String(m.txt ?? '').slice(0, 160), 3); break;
@@ -30990,7 +31043,7 @@ function updateHud(dt) {
   if ($('#net').textContent !== net) $('#net').textContent = net;
 }
 // ---------- modo Rodadas no cliente: bomba (modelo, bipe, aviso e barra) e mini mapa ----------
-let BHAND = null, BMESH = null, beepT = 0, mmT = 0;
+let BHAND = null, BMESH = null, BBACK = null, beepT = 0, mmT = 0;
 const DROPM = new Map(), MARKS = [];
 function dropsDraw() { // armas e kits no chão (modelo realista deitado)
   const list = C.st?.mode !== 'zombies' && inGame ? C.drops || [] : [], ids = new Set(list.map(d => d[0]));
@@ -31016,6 +31069,19 @@ function addMark(id, p) {
 }
 
 const MM = { key: null, bg: null };
+function c4Maos() { // C4 do CS: tijolos de explosivo com fita, o painel com teclado e visor em cima, segurada pelas duas mãos
+  const g = new THREE.Group(), c4 = new THREE.Group(), A = armMats(), M = (c, m = .1, r = .8) => new THREE.MeshStandardMaterial({ color: c, metalness: m, roughness: r });
+  bx(c4, .2, .05, .12, 0, 0, 0, M(0x9a8a62, 0, .95)); for (const z of [-.036, .036]) bx(c4, .204, .053, .016, 0, 0, z, M(0x2c2b29, .05, .6)); // explosivo e fita
+  bx(c4, .1, .022, .085, .03, .036, 0, M(0x232528, .3, .5)); bx(c4, .064, .003, .022, .03, .048, -.024, new THREE.MeshBasicMaterial({ color: 0x3a8a4a })); // painel e visor
+  const tk = M(0x6a6e72, .3, .5); for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) bx(c4, .014, .006, .012, .012 + i * .018, .049, .004 + j * .016, tk); // teclado
+  const fio = new THREE.MeshStandardMaterial({ color: 0xb02020, roughness: .6 }); bx(c4, .006, .006, .07, -.03, .03, 0, fio); bx(c4, .006, .006, .07, -.04, .03, .005, M(0x2050c0, 0, .6)); // fios
+  const led = bx(c4, .008, .006, .008, -.012, .049, -.03, new THREE.MeshBasicMaterial({ color: 0xff2020 }));
+  g.add(c4);
+  const lh = vmMao(leftHand, A), rh = vmMao(rightHand, A); lh.position.set(-.08, -.004, .035); lh.rotation.set(0, 0, .35); rh.position.set(.075, .05, .03); rh.rotation.set(0, 0, -1.35); g.add(lh, rh);
+  g.visible = false; vmScene.add(g);
+  Object.assign(g.userData, { c4, led, lh, rh, lh0: lh.position.clone(), rh0: rh.position.clone(), t0: 0 });
+  return g;
+}
 function bombHud(dt) {
   const B = C.st?.mode === 'rounds' && inGame ? C.bomb : null;
   if (!BMESH) { BMESH = new THREE.Group(); bx(BMESH, .36, .14, .24, 0, .07, 0, new THREE.MeshLambertMaterial({ color: 0x4a3a28 })); BMESH.userData.led = bx(BMESH, .06, .03, .06, .1, .155, .06, new THREE.MeshBasicMaterial({ color: 0xff2020 })); scene.add(BMESH); }
@@ -31038,10 +31104,32 @@ function bombHud(dt) {
   if (!acting && C.bombAct) G.switchEnd = Math.max(G.switchEnd, now + .35); // larga a bomba/o alicate e saca a arma de novo
   C.bombAct = acting;
   const carry = !!(B && me.alive && B.s === 'carried' && B.by === C.myId); if (!carry) C.bombHand = false;
-  if (!BHAND) { BHAND = new THREE.Group(); bx(BHAND, .26, .1, .17, 0, 0, 0, new THREE.MeshLambertMaterial({ color: 0x4a3a28 })); bx(BHAND, .2, .02, .12, 0, .06, 0, new THREE.MeshLambertMaterial({ color: 0x1a1a1a })); BHAND.userData.led = bx(BHAND, .03, .02, .03, .07, .075, .04, new THREE.MeshBasicMaterial({ color: 0xff2020 })); scene.add(BHAND); }
-  BHAND.visible = carry && (C.bombHand || C.bombAct);
-  if (BHAND.visible) { BHAND.position.set(.16, -.24, -.5).applyQuaternion(camera.quaternion).add(camera.position); BHAND.quaternion.copy(camera.quaternion); BHAND.rotateX(-.35); BHAND.userData.led.visible = (now * 2 | 0) % 2 === 0; }
+  // primeira pessoa (na cena das mãos, não atravessa parede): C4 nas duas mãos (5 / plantando: desce, digita o código e some no chão);
+  // desarmando: as mãos descem até a bomba e mexem nos fios. Antes era uma caixa escura solta na frente da câmera, sem mãos
+  if (!BHAND) BHAND = c4Maos();
+  const U = BHAND.userData, def = C.bombAct && !carry, vis = me.alive && (carry && (C.bombHand || C.bombAct) || def);
+  if (vis && !BHAND.visible) U.t0 = now; BHAND.visible = vis;
+  if (vis) {
+    const pr = C.actEnd > now ? clamp(1 - (C.actEnd - now) / C.actDur, 0, 1) : C.bombAct ? 0 : -1, sa = 1 - smooth(clamp((now - U.t0) / .3, 0, 1));
+    const hs = Math.hypot(me.vel.x, me.vel.z), bob = Math.sin(bobT) * .01 * Math.min(1, hs / RUN), dig = pr > .15 && pr < .85;
+    let y = -.14 - .24 * sa + bob, z = -.38, rx = .5;
+    if (def) { y = -.15 - .24 * sa; z = -.36; rx = .9; } // desarmando: olha para baixo, mãos na bomba
+    else if (pr >= 0) { y -= .07 * seg(pr, 0, .15) + .4 * seg(pr, .85, 1); rx += .25 * seg(pr, 0, .15); } // plantando: abaixa, digita e põe no chão
+    BHAND.position.set(.03, y, z); BHAND.rotation.set(rx, -.12, 0);
+    U.c4.visible = !def; U.led.visible = (now * (dig ? 6 : 2) | 0) % 2 === 0;
+    U.rh.position.copy(U.rh0); U.lh.position.copy(U.lh0);
+    if (dig) U.rh.position.y -= Math.max(0, Math.sin(now * 22)) * .014; // digita
+    if (def) { U.rh.position.x += Math.sin(now * 9) * .015; U.lh.position.z += Math.sin(now * 7 + 1) * .012; } // mexe nos fios
+  }
   C.carry = carry;
+  // 3ª pessoa: a bomba vai nas costas de quem carrega (por cima da mochila); plantando, desce para as mãos
+  if (!BBACK) { BBACK = new THREE.Group(); bx(BBACK, .26, .1, .17, 0, 0, 0, new THREE.MeshLambertMaterial({ color: 0x4a3a28 })); bx(BBACK, .2, .02, .12, 0, .06, 0, new THREE.MeshLambertMaterial({ color: 0x1a1a1a })); BBACK.userData.led = bx(BBACK, .03, .02, .03, .07, .075, .04, new THREE.MeshBasicMaterial({ color: 0xff2020 })); }
+  const crp = B?.s === 'carried' && B.by !== C.myId ? R.get(B.by) : null;
+  if (crp?.alive) {
+    const ud = crp.model.userData, mao = crp.ac === 'p', par = mao ? ud.arms : ud.inner; if (BBACK.parent !== par) par.add(BBACK);
+    if (mao) { BBACK.position.set(0, -.55, -.38); BBACK.rotation.set(.1, 0, 0); } else { BBACK.position.set(0, 1.22, .37); BBACK.rotation.set(Math.PI / 2, 0, 0); }
+    BBACK.userData.led.visible = mao && (now * 4 | 0) % 2 === 0;
+  } else if (BBACK.parent) BBACK.parent.remove(BBACK);
   C.eTip = !!tip;
   if (!tip && me.alive && C.st?.mode !== 'zombies') { let best = null, bd = 2.2; for (const d of C.drops || []) { const dd = Math.hypot(me.pos.x - d[2], me.pos.z - d[4]); if (d[1] !== 'kit' && dd < bd) { bd = dd; best = d; } }
     if (best) { const sl = W[best[1]].slot; tip = G.inv[sl] ? `<b>E</b>: trocar ${esc(W[G.inv[sl]].name)} por ${esc(W[best[1]].name)}` : `Ande por cima para pegar ${esc(W[best[1]].name)}`; } }
@@ -31276,7 +31364,7 @@ canvas.addEventListener('mousedown', e => {
   if (e.button === 2 && akOn()) { mouseDown = true; G.mdBtn = 2; G.trigger = true; return; } // Pistolas Duplas: o botão direito atira com a pistola da direita
   if (e.button === 2) { const w = W[G.cur]; if (w && !w.scope && (w.slot === 'primary' || w.slot === 'secondary')) { G.adsHold = true; if (zPerk('ds') && me.alive && !me.downed) zAimAssist(); } else altFire(); }
 });
-addEventListener('mouseup', e => { if (e.button === (G.mdBtn ?? 0)) mouseDown = false; if (e.button === 0) G.mouse2 = false; if (e.button === 2) G.adsHold = false; }); // solta o que aquele botão segurava, mesmo se a arma trocou (Pistolas Duplas)
+addEventListener('mouseup', e => { if (e.button === (G.mdBtn ?? 0)) mouseDown = false; if (e.button === 0) G.mouse2 = false; if (e.button === 2) G.adsHold = false; if (G.pin && e.button === G.pin.btn) G.pin.up = true; }); // solta o que aquele botão segurava, mesmo se a arma trocou (Pistolas Duplas)
 addEventListener('contextmenu', e => { if (inGame) e.preventDefault(); });
 let mouseAvg = 0;
 addEventListener('mousemove', e => {
@@ -32494,7 +32582,7 @@ function tick(dt) {
   } else {
     const deadFor = now - C.deadAt;
     const rp = C.spec && R.get(C.spec);
-    if (rp && rp.alive) { camera.position.set(rp.pos.x, rp.pos.y + (rp.downed ? .55 : rp.crouch ? EYE_CROUCH : EYE_STAND), rp.pos.z); camera.rotation.set(rp.pitch, rp.yaw, 0); }
+    if (rp && rp.alive) { camera.position.set(rp.pos.x, rp.pos.y + (rp.downed ? .55 : lerp(EYE_STAND, EYE_CROUCH, rp.ck || 0)), rp.pos.z); camera.rotation.set(rp.pitch, rp.yaw, 0); } // espectador: agachar suave (antes pulava de um quadro para o outro)
     else {
       const kr = C.killer && C.killer !== C.myId && !ZC.on && deadFor < 3 ? R.get(C.killer) : null; // kill cam: mostra quem te matou
       if (kr && kr.pos.distanceTo(me.pos) > 1) {
