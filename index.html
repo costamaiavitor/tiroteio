@@ -3589,12 +3589,12 @@ function A_mtx(O, x, y, z, sx, sy, sz) { O.position.set(x, y, z); O.scale.set(sx
   // PEDREIRA (F): a turma de cavouqueiros ficou do lado de dentro da quarentena. Isolamento.
   // ================================================================
   let g2LP = null, g2Seco = null, g2LPt = 0, g2LPon = false;
-  const g2LpOff = () => { clearTimeout(g2LPt); if (!g2LPon) return; try { MASTER.disconnect(); g2LP.disconnect(); MASTER.connect(AC.destination); } catch (e) { } g2LPon = false; };
+  const g2LpOff = () => { clearTimeout(g2LPt); if (!g2LPon) return; try { MASTER.disconnect(); g2LP.disconnect(); MASTER.connect(MOUT); } catch (e) { } g2LPon = false; };
   const g2LpIn = () => { // passa-baixa em todo o som do jogo (o que é nítido vai por g2Seco)
     if (!AC || !MASTER) return;
-    if (!g2LP) { g2LP = AC.createBiquadFilter(); g2LP.type = 'lowpass'; g2LP.Q.value = .5; g2Seco = AC.createGain(); g2Seco.connect(AC.destination); }
+    if (!g2LP) { g2LP = AC.createBiquadFilter(); g2LP.type = 'lowpass'; g2LP.Q.value = .5; g2Seco = AC.createGain(); g2Seco.connect(MOUT); }
     const t = AC.currentTime, f = g2LP.frequency;
-    if (!g2LPon) { f.cancelScheduledValues(t); f.setValueAtTime(20000, t); MASTER.disconnect(); MASTER.connect(g2LP); g2LP.connect(AC.destination); g2LPon = true; }
+    if (!g2LPon) { f.cancelScheduledValues(t); f.setValueAtTime(20000, t); MASTER.disconnect(); MASTER.connect(g2LP); g2LP.connect(MOUT); g2LPon = true; }
     f.cancelScheduledValues(t); f.setValueAtTime(f.value, t); f.exponentialRampToValueAtTime(600, t + 4);
     g2Seco.gain.value = MASTER.gain.value; clearTimeout(g2LPt); g2LPt = setTimeout(g2LpOff, 45000); // segurança: nunca fica abafado
   };
@@ -17291,13 +17291,49 @@ function losClear(a, b) {
 // ================================================================
 // Áudio (sintetizado)
 // ================================================================
-let AC = null, MASTER = null, NOISE = null;
+// Caminho de cada som: voz (ganho com variação) → [passa-baixa do ar/parede] → painel 3D → MASTER (volume do CFG) → limitador suave (MOUT)
+// → saída. A voz manda também um pouco para o reverb (impulsos sintéticos de sala fechada e de lugar aberto, gerados uma vez e
+// misturados pelo lugar onde você está), que volta no MASTER. Tiros, passos, recarga e acertos são renderizados uma vez
+// (OfflineAudioContext, 2 a 6 variações) e tocam como buffer: um nó por disparo, com tom e volume sorteados (rajada não soa igual e não pesa).
+let AC = null, MASTER = null, NOISE = null, MOUT = null, AUD = null;
+let SOFF = 0, SOFF0 = 0, _vEnd = 0, SPOS = null, SDIST = 0; // SOFF: atraso do som montado agora (s); SOFF0: base (render dos testes); _vEnd: quando ele acaba; SPOS/SDIST: de onde vem
+const REV_F = .5, REV_A = .42; // volta dos reverbs (sala fechada / lugar aberto)
+let _limC = null;
+function limCurve() { // limitador suave: linear até .6, depois curva até ~.98 (entra com 1/4: aguenta +12 dB sem estourar)
+  if (_limC) return _limC; const n = 4096, c = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const x = (i / (n - 1) * 2 - 1) * 4, a = Math.abs(x); c[i] = Math.sign(x) * (a < .6 ? a : .6 + .38 * Math.tanh((a - .6) / .38)); }
+  return _limC = c;
+}
+const _irC = {};
+function sndIR(ac, tipo) { // impulso do reverb: ruído estéreo com queda exponencial que escurece com o tempo + reflexões discretas
+  const k = tipo + ac.sampleRate; if (_irC[k]) return _irC[k];
+  const F = tipo === 'F', sr = ac.sampleRate, dur = F ? 1 : 2.4, dec = F ? .13 : .42, pre = F ? .003 : .018, fa = F ? 7000 : 3200, fb = F ? 2200 : 700, dif = F ? 1 : .35;
+  const ecos = F ? [[.007, .55], [.012, .45], [.019, .4], [.027, .32], [.038, .25], [.052, .18]] : [[.11, .5], [.19, .32], [.31, .38], [.47, .22], [.68, .2], [.95, .12], [1.3, .08]]; // fechado: paredes perto; aberto: prédios/morros ao longe
+  const n = Math.ceil(sr * dur), b = ac.createBuffer(2, n, sr);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch); let y = 0, a = 0;
+    for (let i = 0; i < n; i++) { const t = i / sr; if (t < pre) continue; if ((i & 255) === 0) { const f = fa + (fb - fa) * Math.min(1, t / (dur * .6)); a = 1 - Math.exp(-2 * Math.PI * f / sr); } y += a * (Math.random() * 2 - 1 - y); d[i] = y * Math.exp(-(t - pre) / dec) * dif; }
+    for (const [te, g] of ecos) { const i0 = Math.floor((te * (ch ? 1.06 : 1)) * sr), L = Math.floor(sr * .025); let z = 0; for (let j = 0; j < L && i0 + j < n; j++) { z += (F ? .5 : .18) * (Math.random() * 2 - 1 - z); d[i0 + j] += z * g * 2.5 * Math.exp(-j / (sr * .005)); } }
+    let e = 0; for (let i = 0; i < n; i++) e += d[i] * d[i]; const s = 1 / Math.sqrt(e || 1); for (let i = 0; i < n; i++) d[i] *= s; // energia 1: a volta dá o nível
+  }
+  return _irC[k] = b;
+}
+function audioBus(ac) { // master (volume) → limitador suave → saída; reverbs fechado/aberto voltam no master
+  // (sem DynamicsCompressor: no Chrome ele esmaga o transiente do tiro em ~12 dB qualquer que seja o limiar; o limitador é instantâneo e transparente até .6)
+  const m = ac.createGain(), c = ac.createGain(), t = ac.createGain(), l = ac.createWaveShaper();
+  m.gain.value = CFG.vol; t.gain.value = .25; l.curve = limCurve(); m.connect(c); c.connect(t); t.connect(l); l.connect(ac.destination);
+  const rin = ac.createGain(), cF = ac.createConvolver(), cA = ac.createConvolver(), gF = ac.createGain(), gA = ac.createGain();
+  cF.normalize = cA.normalize = false; cF.buffer = sndIR(ac, 'F'); cA.buffer = sndIR(ac, 'A');
+  rin.connect(cF); rin.connect(cA); cF.connect(gF); cA.connect(gA); gF.connect(m); gA.connect(m); gF.gain.value = REV_F * .35; gA.gain.value = REV_A * .65;
+  return { m, c, rin, gF, gA, fech: .35 };
+}
 function audioInit() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
-  MASTER = AC.createGain(); MASTER.gain.value = CFG.vol; MASTER.connect(AC.destination);
   const len = AC.sampleRate * 2; NOISE = AC.createBuffer(1, len, AC.sampleRate);
   const d = NOISE.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  AUD = audioBus(AC); MASTER = AUD.m; MOUT = AUD.c;
+  setTimeout(sbankInit, 30);
 }
 const _ocA = new THREE.Vector3(), _ocD = new THREE.Vector3();
 function abafado(pos) { // tem parede entre você e o som? (modos CS: dá para saber se o passo/tiro está do outro lado)
@@ -17305,62 +17341,199 @@ function abafado(pos) { // tem parede entre você e o som? (modos CS: dá para s
   const a = camera.position, dist = _ocD.set(pos.x, pos.y + 1, pos.z).sub(a).length(); if (dist < 2 || dist > 90) return false;
   _ocD.divideScalar(dist); return rayBlocked(_ocA.copy(a), _ocD, dist, dist - .4);
 }
-function sdest(pos) {
+// alcance por tipo de som: ref/roll do modelo inverso, rev = envio ao reverb, pri = prioridade no limite de vozes, max = alcance (m),
+// dl = atrasa pela velocidade do som (tiro a 100 m chega 0,3 s depois), v = volume, vv = variação sorteada do volume
+const SCP = {
+  arma: { ref: 7, roll: 1, rev: .45, pri: 3, max: 420, dl: 1, v: 1, vv: .08 },
+  boom: { ref: 10, roll: .9, rev: .7, pri: 4, max: 520, dl: 1, v: 1, vv: .06 },
+  passo: { ref: 2, roll: 1.6, rev: .05, pri: 2, max: 45, v: 1, vv: .15 },
+  foley: { ref: 2, roll: 1.4, rev: .1, pri: 2, max: 50, v: 1, vv: .08 },
+  ui: { ref: 3, roll: 1, rev: 0, pri: 5, max: 300, v: 1, vv: 0 },
+  voz: { ref: 3, roll: 1.1, rev: .2, pri: 1, max: 70, v: 1, vv: .1 },
+  def: { ref: 3, roll: 1, rev: .12, pri: 2, max: 300, v: 1, vv: .04 },
+};
+const SCAT = {};
+for (const [cat, L] of Object.entries({
+  arma: { pistol: .85, silenced: .55, silenced2: .6, deagle: 1.15, revolver: 1.15, smg: .8, rifle: 1.1, rifle2: 1.05, mg: 1.1, shotgun: 1.25, sniper: 1.25, awp: 1.4, ray: .75, thunder: .8, launcher: .7, waffe: .85, frost: .8, xbow: .7 },
+  boom: { boom: 1.6, c4: .9, molotov: .9, flash: .8, lightning: .9, slam: .9 },
+  passo: { step: .35, land: .4, jump: .25 },
+  foley: { magout: .55, magin: .6, bolt: .6, slide: .6, pump: .65, shellin: .5, shell: .3, draw: .45, empty: .5, knife: .4, stab: .8, reload: .5, bounce: .55, throw: .8, plant: .8, defuse: .8, fogo: .45, smoke: .7, whiz: 1.2, beep: .9, hammer: .6, crack: .7, door: .7, cymbal: .7, dive: .8, zap: .7 },
+  ui: { hit: .5, hs: .6, kill: .5, buy: .9, chat: 1, kaching: .5, round: .8, win: .8, perk: .5, pwr: .5, zumbido: .5, hurt: .7, death: .45, breath: .5, drop: .5, revive: .5, down: .6 },
+  voz: { groan: 1, groan2: 1, groan3: 1, snarl: 1, dog: 1, howl: 1, brute: 1, hiss: 1, gurgle: 1, scream: 1, boss: 1 },
+})) for (const [nm, v] of Object.entries(L)) SCAT[nm] = { ...SCP[cat], v };
+SCAT.beep.max = 80; SCAT.beep.ref = 3; SCAT.smoke.max = 120; SCAT.smoke.ref = 5; SCAT.fogo.max = 60;
+function atenua(P, d) { return P.ref / (P.ref + P.roll * (Math.max(d, P.ref) - P.ref)); }
+function sdest(pos, P, d) {
   if (!pos) return MASTER;
-  const p = AC.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = 3; p.rolloffFactor = 1; p.maxDistance = 300;
+  P = P || SCP.def; if (d === undefined) d = camera.position.distanceTo(pos);
+  const p = AC.createPanner(); p.panningModel = d < 30 ? 'HRTF' : 'equalpower'; p.distanceModel = 'inverse'; p.refDistance = P.ref; p.rolloffFactor = P.roll; p.maxDistance = 1e4;
   if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = pos.y; p.positionZ.value = pos.z; } else p.setPosition(pos.x, pos.y, pos.z);
   p.connect(MASTER);
-  try { if (abafado(pos)) { const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 650; const g = AC.createGain(); g.gain.value = .6; lp.connect(g); g.connect(p); return lp; } } catch (e) { }
-  return p;
+  let parede = false; try { parede = abafado(pos); } catch (e) { }
+  const fc = Math.min(d > 6 ? 22000 / (1 + (d - 6) / 10) : 22000, parede ? 650 : 22000); // ar come os agudos: 40 m ~5 kHz, 100 m ~2 kHz
+  if (fc >= 20000) return p;
+  const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = .5; lp.frequency.value = fc;
+  if (parede) { const g = AC.createGain(); g.gain.value = .6; lp.connect(g); g.connect(p); } else lp.connect(p);
+  return lp;
 }
+function _ve(t) { if (t > _vEnd) _vEnd = t; }
 function nz(out, dur, f1, f2, vol, type = 'lowpass', q = .8, delay = 0) {
-  const t = AC.currentTime + delay, s = AC.createBufferSource(); s.buffer = NOISE;
+  const t = AC.currentTime + SOFF + delay, s = AC.createBufferSource(); s.buffer = NOISE; s.loop = true;
   const f = AC.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f1, t); f.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t + dur);
   const g = AC.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
-  s.connect(f); f.connect(g); g.connect(out); s.start(t, Math.random() * 1.5); s.stop(t + dur + .03);
+  s.connect(f); f.connect(g); g.connect(out); s.start(t, Math.random() * 1.5); s.stop(t + dur + .03); _ve(t + dur);
 }
 function tn(out, dur, f1, f2, vol, type = 'sine', delay = 0) {
-  const t = AC.currentTime + delay, o = AC.createOscillator(); o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t + dur);
+  const t = AC.currentTime + SOFF + delay, o = AC.createOscillator(); o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t + dur);
   const g = AC.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
-  o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + .03);
+  o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + .03); _ve(t + dur);
+}
+function ns(out, d, f1, f2, v, ty = 'lowpass', q = .7, dl = 0, at = 0) { // ruído filtrado com ataque (at) e queda exponencial até -80 dB
+  const t = AC.currentTime + SOFF + dl, s = AC.createBufferSource(); s.buffer = NOISE; s.loop = true;
+  const f = AC.createBiquadFilter(); f.type = ty; f.Q.value = q; f.frequency.setValueAtTime(f1, t); if (f2 !== f1) f.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t + at + d);
+  const g = AC.createGain(); if (at > 0) { g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(v, t + at); } else g.gain.setValueAtTime(v, t);
+  g.gain.exponentialRampToValueAtTime(.0001, t + at + d);
+  s.connect(f); f.connect(g); g.connect(out); s.start(t, Math.random() * 1.9); s.stop(t + at + d + .02); _ve(t + at + d);
+}
+function os(out, d, f1, f2, v, ty = 'sine', dl = 0, at = 0) { // oscilador com glissando, ataque e queda exponencial
+  const t = AC.currentTime + SOFF + dl, o = AC.createOscillator(); o.type = ty; o.frequency.setValueAtTime(f1, t); if (f2 !== f1) o.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t + at + d);
+  const g = AC.createGain(); if (at > 0) { g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(v, t + at); } else g.gain.setValueAtTime(v, t);
+  g.gain.exponentialRampToValueAtTime(.0001, t + at + d);
+  o.connect(g); g.connect(out); o.start(t); o.stop(t + at + d + .02); _ve(t + at + d);
+}
+function ring(out, fs, d, v, dl = 0) { for (const f of fs) os(out, d * (.6 + Math.random() * .5), f, f * .996, v / fs.length, 'sine', dl); } // metal: parciais inarmônicos
+const _satC = {};
+function sat(out, k) { // saturação (tanh): engrossa corpo e grave sem estourar
+  const c = _satC[k] || (_satC[k] = (() => { const n = 1024, a = new Float32Array(n), m = Math.tanh(k); for (let i = 0; i < n; i++) a[i] = Math.tanh(k * (i / (n - 1) * 2 - 1)) / m; return a; })());
+  const w = AC.createWaveShaper(); w.curve = c; w.connect(out); return w;
+}
+const _r = a => 1 + (Math.random() * 2 - 1) * a, rr = (a, b) => a + Math.random() * (b - a);
+// tiro em camadas: estalo (transiente), corpo (gases, saturado), grave (soco), mecanismo (ferrolho/metal) e cauda curta; a cauda da sala vem do reverb
+// ck [dur, vol] · body [dur, f ini, f fim, vol] · th [dur, f ini, f fim, vol] · mec [atraso, vol, f] · tail [dur, f ini, f fim, vol] · sat
+function gunSyn(o, P) {
+  const s = sat(o, P.sat), [cd, cv] = P.ck, [bd, b1, b2, bv] = P.body, [hd, h1, h2, hv] = P.th;
+  ns(o, cd * _r(.2), 9000 * _r(.1), 4500, cv, 'highpass', .6);
+  ns(o, cd * 2.5, 2600 * _r(.15), 1300, cv * .8, 'bandpass', 1);
+  ns(s, bd * _r(.15), b1 * _r(.1), b2 * _r(.1), bv, 'lowpass', 1);
+  os(s, hd * _r(.15), h1 * _r(.06), h2, hv);
+  os(s, hd * .5, h1 * 2.03, h2 * 2, hv * .35, 'triangle');
+  if (P.mec) { const [md, mv, mf] = P.mec; ns(o, .016, mf * _r(.1), mf * .7, mv, 'bandpass', 3, md); ring(o, [mf * 1.13, mf * 1.71, mf * 2.37], .05, mv * .6, md); }
+  if (P.tail) { const [td, t1, t2, tv] = P.tail; ns(o, td * _r(.15), t1, t2, tv, 'lowpass', .5, .008, .015); }
+  if (P.x) P.x(o, s);
+}
+const GUN = {
+  pistol: { ck: [.012, 1.1], body: [.09, 7000, 1500, 1], th: [.06, 200, 90, .6], mec: [.022, .3, 3200], tail: [.35, 1800, 250, .16], sat: 2.5 },
+  deagle: { ck: [.014, 1], body: [.17, 4500, 500, 1.2], th: [.22, 130, 38, 1.3], mec: [.03, .25, 2600], tail: [.7, 1400, 150, .28], sat: 3.5 },
+  revolver: { ck: [.012, .9], body: [.15, 4200, 450, 1.2], th: [.2, 120, 40, 1.25], tail: [.8, 1300, 140, .3], sat: 3.5, x: o => ring(o, [2300, 3500], .08, .08, .01) }, // tambor girando: só um tinido
+  smg: { ck: [.01, 1], body: [.07, 8000, 1800, .9], th: [.05, 220, 100, .55], mec: [.016, .22, 3800], tail: [.28, 2000, 300, .14], sat: 2.2 },
+  rifle: { ck: [.012, 1], body: [.13, 4200, 600, 1.15], th: [.13, 115, 42, 1.2], mec: [.02, .18, 2400], tail: [.8, 1500, 180, .28], sat: 3.5 }, // AK: grave e "sujo"
+  rifle2: { ck: [.01, 1.2], body: [.11, 5500, 850, 1.05], th: [.11, 140, 52, 1], mec: [.018, .2, 3000], tail: [.7, 1700, 220, .25], sat: 3 }, // M4: mais seco e brilhante
+  mg: { ck: [.012, .9], body: [.12, 3800, 500, 1.2], th: [.14, 100, 38, 1.3], mec: [.025, .28, 2000], tail: [.75, 1300, 160, .3], sat: 4 },
+  shotgun: { ck: [.012, .7], body: [.22, 3600, 300, 1.35], th: [.26, 95, 32, 1.5], tail: [1, 1200, 120, .38], sat: 3.5, x: (o, s) => ns(s, .3, 600, 80, .6, 'lowpass', .8, .01) },
+  sniper: { ck: [.016, 1.2], body: [.18, 4000, 450, 1.2], th: [.22, 95, 32, 1.3], tail: [1.3, 1400, 130, .36], sat: 3.8 },
+  awp: { ck: [.02, 1.3], body: [.26, 3600, 300, 1.35], th: [.36, 80, 26, 1.6], tail: [2, 1200, 90, .42], sat: 4.5, x: (o, s) => { ns(s, .5, 900, 70, .5, 'lowpass', .7, .02); ns(o, .05, 3000, 900, .25, 'bandpass', 1, .12); } }, // segundo estalo: o eco batendo de volta
+};
+const SYN = {};
+for (const k in GUN) SYN[k] = o => gunSyn(o, GUN[k]);
+Object.assign(SYN, {
+  silenced: o => { const s = sat(o, 2); ns(s, .05, 1800 * _r(.1), 450, .9, 'lowpass', 1); os(s, .06, 220 * _r(.06), 90, .6); ns(o, .07, 6000, 3000, .1, 'highpass', .7); // "pft" seco + gás
+    ns(o, .02, 3500, 2500, .45, 'bandpass', 3, .008); ring(o, [4200, 5600, 7300], .04, .3, .008); }, // ferrolho batendo (é o que mais se ouve)
+  silenced2: o => { const s = sat(o, 2.5); ns(s, .07, 1400 * _r(.1), 350, .95, 'lowpass', 1); os(s, .09, 160 * _r(.06), 60, .8); ns(o, .08, 5500, 2500, .1, 'highpass', .7);
+    ns(o, .015, 3000, 2200, .45, 'bandpass', 3, .01); ring(o, [2900, 4400, 6100], .05, .25, .01); ns(o, .02, 2600, 1800, .35, 'bandpass', 3, .045); ring(o, [2500, 3900], .04, .2, .045); },
+  boom: o => { const s = sat(o, 2.5); ns(o, .03, 8000, 2000, 1, 'highpass', .5); ns(s, .5 * _r(.15), 3000, 120, 1.2, 'lowpass', .8); os(s, 1.2, 70 * _r(.1), 24, 1.3); os(s, .4, 140, 40, .5, 'triangle');
+    ns(o, 2.4, 900, 60, .45, 'lowpass', .6, .05, .08); for (let i = 0; i < 9; i++) ns(o, rr(.02, .06), rr(2000, 6000), 1500, rr(.05, .14), 'bandpass', 2, rr(.15, 1.2)); }, // detritos caindo
+  c4: o => { const s = sat(o, 3); ns(o, .04, 7000, 1500, 1, 'highpass', .5); ns(s, .8, 2500, 90, 1.3, 'lowpass', .8); os(s, 2, 55, 20, 1.5); os(s, .6, 110, 30, .6, 'triangle');
+    ns(o, 3.5, 700, 45, .55, 'lowpass', .6, .05, .1); for (let i = 0; i < 14; i++) ns(o, rr(.02, .08), rr(1500, 6000), 1200, rr(.05, .15), 'bandpass', 2, rr(.2, 2)); },
+  molotov: o => { for (let i = 0; i < 14; i++) os(o, rr(.05, .25), rr(2500, 7500), rr(2400, 7000), rr(.03, .07), 'sine', rr(0, .12)); ns(o, .15, 6000, 3500, .5, 'highpass', .7); // vidro quebrando
+    const s = sat(o, 2); ns(s, .7, 300, 1600, .7, 'lowpass', .8, .03, .15); os(s, .5, 60, 38, .5, 'sine', .05); for (let i = 0; i < 6; i++) ns(o, .015, rr(1500, 4000), 1000, rr(.1, .2), 'bandpass', 2, rr(.2, 1.2)); }, // "fuuum" do fogo
+  fogo: o => { ns(o, 1, 700, 500, .25, 'lowpass', .5, 0, .2); for (let i = 0; i < 7; i++) ns(o, rr(.006, .02), rr(1500, 5000), 1000, rr(.15, .35), 'bandpass', 2, rr(0, 1)); },
+  flash: o => { const s = sat(o, 3); ns(o, .05, 9000, 3000, 1.3, 'highpass', .5); ns(s, .22, 5000, 700, 1.1, 'lowpass', 1); os(s, .25, 160, 50, .7); ns(o, 1, 1500, 200, .2, 'lowpass', .6, .03, .05); },
+  zumbido: o => { os(o, 3.5, 3500, 3460, .08, 'sine', 0, .05); os(o, 2.5, 7010, 6950, .015, 'sine', 0, .05); }, // ouvido zunindo (só quem ficou cego)
+  smoke: o => { const s = sat(o, 2); ns(s, .08, 800, 100, .6); os(s, .1, 140, 60, .4); ns(o, 2.4, 4200, 2500, .35, 'bandpass', 1.2, .05, .25); ns(o, 1.6, 1500, 900, .15, 'bandpass', 1, .1, .3); },
+  bounce: o => { ns(o, .03, 1800, 600, .5, 'lowpass', 1); ring(o, [1150 * _r(.05), 2730, 3970, 5310], .14, .4); },
+  throw: o => { ring(o, [2600, 3900, 5800], .12, .2); ns(o, .02, 4000, 3000, .25, 'bandpass', 3, .05); ns(o, .25, 500, 1600, .35, 'bandpass', 1.2, .08, .08); }, // pino, colher e o braço
+  plant: o => { const f = [1209, 1336, 1477, 1633][Math.random() * 4 | 0]; os(o, .06, f, f, .15, 'sine', 0, .003); os(o, .06, f * .6, f * .6, .1, 'sine', 0, .003); ns(o, .01, 5000, 4000, .2, 'highpass'); }, // teclado da bomba
+  defuse: o => { ns(o, .02, 3500, 2500, .3, 'bandpass', 3); ring(o, [3100, 4700], .04, .15); ns(o, .12, 1200, 900, .08, 'bandpass', 1, .03); },
+  whiz: o => { ns(o, .006, 8000, 6000, .4, 'highpass'); ns(o, .1, 1800, 4500, .4, 'bandpass', 3, 0, .04); }, // bala passando perto
+  knife: o => { ns(o, .14, 500 * _r(.1), 2600, .5, 'bandpass', 1.6, 0, .07); ns(o, .1, 2600, 900, .2, 'bandpass', 2, .12); ring(o, [5200, 6900], .1, .03, .04); },
+  stab: o => { const s = sat(o, 2.5); ns(s, .09, 900, 250, .9, 'lowpass', 1.5); os(o, .1, 180, 70, .6); ns(o, .12, 700, 400, .3, 'bandpass', 5, .01); ring(o, [3300, 4900], .06, .06, .005); },
+  step: o => { ns(o, .05, 700 * _r(.15), 200, .7, 'lowpass', 1.2); os(o, .04, 110 * _r(.1), 60, .35); ns(o, .06, 2200 * _r(.2), 1400, .18, 'bandpass', 1.4, .018); ns(o, .008, 6000, 5000, .12, 'highpass', .7, .002); }, // concreto: calcanhar + raspada
+  stepT: o => { ns(o, .06, 450 * _r(.15), 150, .7, 'lowpass', 1); os(o, .04, 90, 50, .3); for (let i = 0; i < 4; i++) ns(o, .012, rr(2000, 5000), 1500, rr(.04, .09), 'bandpass', 2, rr(0, .05)); }, // terra/grama: abafado e crocante
+  land: o => { ns(o, .14, 600, 90, 1, 'lowpass', 1); os(o, .12, 90, 40, .8); ring(o, [2800, 4100], .06, .08, .02); ns(o, .1, 1800, 1100, .2, 'bandpass', 1.2, .03); },
+  jump: o => { ns(o, .1, 1500, 2500, .15, 'bandpass', 1, 0, .03); ns(o, .05, 500, 200, .4, 'lowpass', 1); },
+  hit: o => { ns(o, .025, 3000, 2000, .6, 'bandpass', 2); os(o, .03, 1900, 1700, .3, 'triangle'); os(o, .05, 160, 90, .08); }, // "tique" seco com um leve baque
+  hs: o => { ring(o, [2950, 4720, 6830, 8900], .28, .6); ns(o, .02, 7000, 5000, .4, 'highpass'); os(o, .06, 3400, 3300, .2, 'triangle'); }, // "dink" do capacete
+  kill: o => { os(o, .18, 1760, 1760, .18, 'sine', 0, .004); os(o, .25, 2637, 2637, .12, 'sine', .07, .004); ns(o, .01, 5000, 4000, .1, 'highpass'); },
+  hurt: o => { const s = sat(o, 2); ns(s, .12, 700, 150, .9, 'lowpass', 1.2); os(o, .12, 120, 55, .7); os(o, .16, 180, 120, .06, 'sawtooth', .02, .02); },
+  death: o => { ns(o, .5, 400, 60, .9, 'lowpass', 1); os(o, 1.2, 70, 30, .8); os(o, 2.5, 200, 140, .05, 'sine', .1, .3); os(o, 3, 1500, 1480, .03, 'sine', .2, .2); },
+  empty: o => { os(o, .012, 3200, 2600, .25, 'square'); ns(o, .01, 6000, 4000, .25, 'highpass', .7); ns(o, .015, 2400, 2000, .18, 'bandpass', 3, .018); }, // gatilho + cão batendo no vazio
+  draw: o => { ns(o, .14, 1200, 2400, .18, 'bandpass', .8, 0, .04); ring(o, [3300, 5100], .04, .15, .1); ns(o, .015, 4500, 3500, .2, 'bandpass', 3, .1); },
+  magout: o => { ns(o, .012, 3800, 3000, .35, 'bandpass', 3); ring(o, [2900, 4400], .04, .15); ns(o, .07, 1500, 2600, .18, 'bandpass', 2, .015, .02); },
+  magin: o => { ns(o, .06, 1800, 2600, .15, 'bandpass', 2); const s = sat(o, 2); ns(s, .03, 2500, 900, .7, 'lowpass', 1.5, .06); os(o, .04, 420, 250, .3, 'triangle', .06); ring(o, [2400, 3700, 5200], .06, .2, .06); },
+  bolt: o => { ns(o, .08, 1400, 2800, .25, 'bandpass', 2); ring(o, [3100, 4600], .04, .12); const s = sat(o, 2); ns(s, .03, 4000, 1500, .8, 'bandpass', 1.2, .11); ring(o, [2200, 3500, 5100], .08, .35, .11); os(o, .05, 300, 150, .3, 'triangle', .11); },
+  slide: o => { ns(o, .025, 2600, 2000, .4, 'bandpass', 2); ring(o, [3400, 5200], .05, .2); const s = sat(o, 2); ns(s, .03, 5000, 1800, .7, 'bandpass', 1.3, .07); ring(o, [2800, 4300, 6100], .07, .3, .07); },
+  pump: o => { ns(o, .06, 1800, 900, .5, 'bandpass', 1.5); os(o, .05, 260, 160, .35, 'triangle'); ring(o, [1900, 3100], .05, .15); ns(o, .05, 2200, 1100, .6, 'bandpass', 1.5, .16); os(o, .05, 300, 180, .4, 'triangle', .16); ring(o, [2300, 3600, 5200], .07, .3, .16); },
+  shellin: o => { ns(o, .025, 2200, 1200, .45, 'bandpass', 2); os(o, .04, 520, 330, .3, 'triangle'); ring(o, [2900, 4300], .04, .12, .01); },
+  shell: o => { let t = 0, v = .3; for (let i = 0; i < 3; i++) { ring(o, [3800 * _r(.06), 6100 * _r(.05), 8700], .09, v, t); ns(o, .006, 7000, 6000, v * .5, 'highpass', .7, t); t += rr(.07, .12); v *= .45; } }, // cápsula quicando
+  buy: o => { ns(o, .008, 5000, 4000, .15, 'highpass'); os(o, .08, 1050, 1050, .12, 'triangle', 0, .003); os(o, .1, 1575, 1575, .08, 'triangle', .05, .003); },
+  chat: o => { os(o, .07, 1400, 1250, .1, 'sine', 0, .003); os(o, .05, 2100, 2000, .04, 'sine', .03, .003); },
+  kaching: o => { ns(o, .08, 1200, 900, .2, 'bandpass', 1.5); ring(o, [2093, 2637, 3136, 4186], .5, .3, .05); ns(o, .01, 6000, 5000, .15, 'highpass', .7, .05); }, // gaveta + campainha da caixa
+  round: o => { [523, 659, 784].forEach((f, i) => { os(o, .5, f, f, .09, 'triangle', i * .12, .01); os(o, .5, f * 2, f * 2, .03, 'sine', i * .12, .01); }); },
+  win: o => { [523, 659, 784, 1046].forEach((f, i) => { os(o, .35, f, f, .09, 'triangle', i * .13, .01); os(o, .35, f * 2, f * 2, .025, 'sine', i * .13, .01); }); [523, 659, 784].forEach(f => os(o, 1.1, f, f, .05, 'triangle', .55, .05)); },
+  beep: o => { os(o, .08, 2350, 2350, .25, 'sine', 0, .003); os(o, .06, 2350, 2350, .04, 'square', 0, .003); },
+  // modo zumbis: armas especiais
+  ray: o => { os(o, .22, 1800 * _r(.05), 380, .3, 'square'); os(o, .25, 900, 190, .22, 'sawtooth'); os(o, .18, 3200, 1200, .1); ns(o, .12, 3000, 1000, .2, 'bandpass', 2); os(sat(o, 2), .15, 120, 60, .4); },
+  thunder: o => { const s = sat(o, 3); os(s, 1, 55, 22, 1.5); ns(s, .9, 2500, 120, 1.2, 'lowpass', .8); ns(o, 1.1, 300, 3000, .5, 'bandpass', .7, .05, .15); for (let i = 0; i < 6; i++) ns(o, .02, rr(2000, 6000), 1500, .1, 'bandpass', 2, rr(.1, .8)); },
+  launcher: o => { const s = sat(o, 2.5); os(s, .25, 140, 50, 1); ns(s, .18, 1200, 200, .9, 'lowpass', 1); ring(o, [2400, 3600], .05, .15, .02); ns(o, .4, 500, 1500, .2, 'bandpass', 1, .05, .05); },
+  waffe: o => { os(o, .5, 110, 100, .2, 'sawtooth'); for (let i = 0; i < 8; i++) ns(o, rr(.02, .05), rr(3000, 7000), 2000, .3, 'bandpass', 4, rr(0, .4)); os(o, .4, 2400, 150, .25, 'sawtooth'); os(sat(o, 2), .2, 90, 40, .7); },
+  frost: o => { ns(o, .6, 7000, 2500, .5, 'highpass', .7, 0, .05); for (let i = 0; i < 5; i++) { const f = rr(2600, 3600); os(o, .4, f, f * 1.05, .05, 'sine', i * .03, .02); } ns(o, .5, 900, 400, .4, 'bandpass', 1.5); },
+  xbow: o => { os(o, .25, 220, 180, .45, 'triangle'); os(o, .15, 440, 360, .12, 'sawtooth'); ns(o, .12, 1800, 600, .4, 'bandpass', 2); ring(o, [2600, 3900], .04, .12); },
+});
+// os que tocam muito: renderizados uma vez ([variações, duração em s])
+const SBAKE = {
+  pistol: [4, .8], silenced: [4, .45], silenced2: [4, .5], deagle: [3, 1.2], revolver: [3, 1.3], smg: [4, .7], rifle: [4, 1.1], rifle2: [4, 1], mg: [4, 1.1],
+  shotgun: [3, 1.4], sniper: [3, 1.6], awp: [3, 2.2], boom: [3, 3], step: [6, .2], stepT: [6, .2], land: [3, .35], jump: [2, .3], hit: [3, .12], hs: [2, .35],
+  empty: [2, .1], shell: [4, .45], knife: [3, .35], stab: [2, .3], magout: [2, .22], magin: [2, .28], bolt: [2, .35], slide: [2, .25], pump: [2, .4], shellin: [3, .18],
+  draw: [2, .3], bounce: [3, .25], fogo: [3, 1.2],
+};
+const SBANK = {}; let SBANK_P = null;
+function sbankInit() {
+  if (SBANK_P || !AC) return SBANK_P;
+  const L = Object.keys(SBAKE); // de 4 em 4 (cada render roda fora da thread principal; montar o grafo custa ~1 ms)
+  return SBANK_P = (async () => { for (let i = 0; i < L.length; i += 4) await Promise.all(L.slice(i, i + 4).map(nm => sbake(nm).then(B => { SBANK[nm] = B; }, () => { }))); })();
+}
+async function sbake(nm) { // renderiza as variações em sequência num contexto offline e corta o silêncio do fim; tiro/explosão: iguala o "soco" (RMS da janela
+  // de 30 ms mais alta) e arredonda os picos de 1 amostra (como numa gravação saturada); os demais: pico em .97
+  const [nv, dur] = SBAKE[nm], ac0 = AC, sr = ac0.sampleRate, n = Math.ceil(dur * sr), off = new OfflineAudioContext(1, n * nv, sr);
+  AC = off; try { for (let v = 0; v < nv; v++) { SOFF = v * dur; SYN[nm](off.destination); } } finally { AC = ac0; SOFF = 0; }
+  const all = (await off.startRendering()).getChannelData(0), out = [], fade = Math.floor(sr * .006);
+  for (let v = 0; v < nv; v++) {
+    const d = all.subarray(v * n, v * n + n), w = Math.floor(sr * .03); let pk = 0, end = 0, rm = 0;
+    for (let i = 0; i < n; i++) { const a = Math.abs(d[i]); if (a > pk) pk = a; }
+    if (!(pk > 0)) continue;
+    for (let i = n - 1; i >= 0; i--) if (Math.abs(d[i]) > pk * .0005) { end = i + 1; break; }
+    const forte = SCAT[nm] && SCAT[nm].dl; if (forte) for (let s0 = 0; s0 + w <= n; s0 += w >> 1) { let q = 0; for (let i = s0; i < s0 + w; i++) q += d[i] * d[i]; if (q > rm) rm = q; }
+    const k = forte ? .32 / Math.sqrt(rm / w) : .97 / pk, L = Math.min(n, end + fade), b = AC.createBuffer(1, L, sr), o = b.getChannelData(0);
+    for (let i = 0; i < L; i++) { let y = d[i] * k; if (forte) { const a = Math.abs(y); if (a > .6) y = Math.sign(y) * (.6 + .37 * Math.tanh((a - .6) / .37)); } o[i] = y * (i > L - fade ? (L - i) / fade : 1); }
+    out.push(b);
+  }
+  return out;
+}
+function sbuf(o, nm, vol = 1, rate = 1) { // toca uma variação pré-renderizada (nunca a mesma duas vezes seguidas), com tom sorteado
+  const B = SBANK[nm]; if (!B || !B.length) return false;
+  let i = Math.random() * B.length | 0; if (B.length > 1 && i === B.last) i = (i + 1) % B.length; B.last = i;
+  const s = AC.createBufferSource(), t = AC.currentTime + SOFF; s.buffer = B[i]; s.playbackRate.value = rate * _r(.035);
+  if (vol !== 1) { const g = AC.createGain(); g.gain.value = vol; s.connect(g); g.connect(o); } else s.connect(o);
+  s.start(t); _ve(t + B[i].duration / s.playbackRate.value); return true;
 }
 const SND = {
-  pistol: o => { nz(o, .16, 5000, 900, .8); tn(o, .09, 170, 60, .5); },
-  silenced: o => { nz(o, .12, 2200, 500, .45); tn(o, .05, 300, 120, .15); },
-  deagle: o => { nz(o, .35, 3500, 400, 1.1); tn(o, .25, 120, 40, .9); },
-  smg: o => { nz(o, .12, 3800, 900, .7); tn(o, .08, 150, 60, .4); },
-  rifle: o => { nz(o, .26, 3200, 500, 1); tn(o, .18, 110, 45, .8); },
-  rifle2: o => { nz(o, .22, 4200, 700, .9); tn(o, .15, 130, 50, .6); },
-  shotgun: o => { nz(o, .42, 2600, 300, 1.3); tn(o, .3, 90, 35, 1); },
-  sniper: o => { nz(o, .45, 2600, 250, 1.2); tn(o, .4, 80, 30, 1); },
-  awp: o => { nz(o, .75, 2200, 150, 1.5); tn(o, .6, 70, 25, 1.3); nz(o, .6, 600, 100, .4, 'lowpass', .8, .12); },
-  knife: o => nz(o, .18, 1200, 3500, .35, 'bandpass', 2),
-  stab: o => { nz(o, .1, 900, 200, .7); tn(o, .08, 200, 90, .4); },
-  step: o => nz(o, .08, 500, 150, .5),
-  land: o => nz(o, .14, 400, 80, .8),
-  empty: o => tn(o, .03, 1800, 1500, .25, 'square'),
-  reload: o => { tn(o, .04, 900, 700, .2, 'square', 0); tn(o, .05, 600, 400, .25, 'square', .35); tn(o, .04, 1200, 900, .2, 'square', .8); },
-  draw: o => tn(o, .05, 700, 500, .12, 'triangle'),
-  hit: o => tn(o, .05, 1400, 1200, .25, 'square'),
-  hs: o => { tn(o, .12, 2400, 1800, .35, 'triangle'); nz(o, .08, 5000, 3000, .3, 'highpass'); },
-  kill: o => { tn(o, .1, 880, 880, .25, 'triangle'); tn(o, .15, 1320, 1320, .25, 'triangle', .08); },
-  hurt: o => { tn(o, .15, 220, 90, .5, 'sawtooth'); nz(o, .1, 800, 200, .4); },
-  boom: o => { nz(o, 1.3, 1500, 50, 2); tn(o, .9, 70, 20, 1.6); },
-  bounce: o => tn(o, .05, 800, 600, .2, 'triangle'),
-  smoke: o => nz(o, 1.4, 800, 200, .5, 'bandpass', .5),
-  buy: o => tn(o, .07, 900, 1100, .2, 'triangle'),
-  round: o => { tn(o, .15, 523, 523, .25, 'triangle'); tn(o, .15, 659, 659, .25, 'triangle', .15); tn(o, .3, 784, 784, .25, 'triangle', .3); },
-  win: o => { [523, 659, 784, 1046].forEach((f, i) => tn(o, .25, f, f, .25, 'triangle', i * .14)); },
-  chat: o => tn(o, .06, 1200, 1200, .12, 'sine'),
-  flash: o => { nz(o, .3, 7000, 1500, 1.3); tn(o, 2.2, 3300, 3200, .06, 'sine', .15); },
-  beep: o => tn(o, .07, 2100, 2100, .25, 'square'),
+  step: o => { // piso pelo modo (Zumbi: terra/grama; CS: concreto); correndo bate mais forte; o dos outros soa cheio (dá para ouvir de onde vem, como no CS)
+    const nm = ZC.on ? 'stepT' : 'step', k = SPOS ? 1 : me.sprinting ? 1.2 : .8;
+    if (!sbuf(o, nm, k, SPOS ? 1 : me.sprinting ? 1.05 : .96)) SYN[nm](o);
+  },
+  reload: o => { SYN.magout(o); SOFF += .35; SYN.magin(o); SOFF -= .35; },
+  slam: o => { const s = sat(o, 2.5); ns(s, .8, 900, 60, 1.4); os(s, .6, 60, 22, 1.4); },
   // modo zumbis
-  ray: o => { tn(o, .18, 1400, 300, .3, 'square'); tn(o, .2, 700, 200, .25, 'sawtooth'); nz(o, .1, 3000, 1000, .2, 'bandpass', 2); },
-  thunder: o => { nz(o, .9, 300, 60, 1.6); tn(o, .7, 60, 25, 1.4); nz(o, .5, 2500, 300, .6, 'bandpass', 1); },
-  launcher: o => { nz(o, .2, 900, 200, .7); tn(o, .15, 160, 60, .6); },
-  waffe: o => { tn(o, .35, 2200, 180, .35, 'sawtooth'); nz(o, .4, 4000, 600, .5, 'bandpass', 3); tn(o, .2, 90, 40, .6, 'square'); },
-  frost: o => { nz(o, .5, 6000, 1500, .55, 'highpass'); tn(o, .3, 1600, 2600, .15, 'sine'); nz(o, .3, 900, 300, .4, 'bandpass', 2); },
-  xbow: o => { tn(o, .08, 260, 90, .5, 'triangle'); nz(o, .12, 1800, 600, .35, 'bandpass', 2); },
   groan: o => vox(o, rand(75, 110), rand(.7, 1.2), rand(.6, 1.1), .3),
   snarl: o => { vox(o, rand(140, 190), 1.4, .35, .45); nz(o, .3, 1400, 500, .2, 'bandpass', 3); },
   dog: o => { vox(o, rand(220, 300), .6, .25, .4); nz(o, .2, 1800, 600, .2, 'bandpass', 3); },
@@ -17371,11 +17544,9 @@ const SND = {
   hiss: o => nz(o, .45, 3400, 1800, .3, 'bandpass', 4),
   gurgle: o => { vox(o, rand(60, 90), 1.3, .7, .35); nz(o, .5, 500, 200, .25, 'bandpass', 6); },
   scream: o => { vox(o, rand(500, 620), 1.6, 1.3, .55); vox(o, rand(700, 820), 1.4, 1.1, .35); },
-  slam: o => { nz(o, .8, 900, 60, 1.6); tn(o, .6, 60, 22, 1.4); },
   boss: o => { [98, 92, 87, 73].forEach((f, i) => tn(o, 1.2, f, f * .97, .35, 'sawtooth', i * .5)); vox(o, 70, .6, 2.2, .5); nz(o, 2.5, 400, 60, .35, 'lowpass', .7); },
-  crack: o => { nz(o, .12, 2500, 500, .8, 'bandpass', 1.5); tn(o, .08, 300, 120, .4, 'triangle'); },
-  hammer: o => { tn(o, .05, 500, 300, .4, 'triangle'); nz(o, .05, 2000, 800, .3, 'bandpass', 2); },
-  kaching: o => { tn(o, .08, 1800, 1800, .2, 'triangle'); tn(o, .25, 2400, 2400, .18, 'triangle', .07); },
+  crack: o => { nz(o, .12, 2500, 500, .8, 'bandpass', 1.5); tn(o, .08, 300, 120, .4, 'triangle'); ns(o, .3, 1200, 300, .15, 'lowpass', .7, .03); },
+  hammer: o => { tn(o, .05, 500, 300, .4, 'triangle'); nz(o, .05, 2000, 800, .3, 'bandpass', 2); ring(o, [1900, 3100], .08, .12); },
   perk: o => [659, 784, 988, 784, 1175].forEach((f, i) => tn(o, .18, f, f, .16, 'square', i * .12)),
   boxmusic: o => [1568, 1319, 1175, 1047, 1175, 1319, 1568, 1760, 1568, 1319, 1175, 1047].forEach((f, i) => tn(o, .3, f, f, .14, 'sine', i * .32)),
   teddy: o => [392, 330, 262].forEach((f, i) => tn(o, .3, f, f * .9, .25, 'sawtooth', i * .25)),
@@ -17388,37 +17559,91 @@ const SND = {
   over: o => [220, 208, 196, 147].forEach((f, i) => tn(o, 1.4, f, f * .97, .3, 'sawtooth', i * .6)),
   down: o => tn(o, 1, 300, 80, .4, 'sawtooth'),
   revive: o => tn(o, .4, 400, 900, .3, 'triangle'),
-  lightning: o => { nz(o, .9, 4000, 200, 1.2); tn(o, .6, 80, 30, .8); },
+  lightning: o => { const s = sat(o, 2.5); ns(o, .05, 9000, 3000, 1, 'highpass', .5); ns(s, .9, 4000, 200, 1.1); os(s, .6, 80, 30, .8); ns(o, 2.2, 600, 60, .35, 'lowpass', .6, .1, .2); },
   zap: o => { nz(o, .3, 6000, 1500, .5, 'bandpass', 3); tn(o, .25, 120, 90, .25, 'sawtooth'); tn(o, .08, 1800, 600, .15, 'square', .12); },
   dive: o => { nz(o, .35, 900, 200, .6); tn(o, .2, 160, 60, .4, 'triangle'); },
-  cymbal: o => nz(o, .25, 7000, 4000, .35, 'highpass', .7),
+  cymbal: o => { nz(o, .25, 7000, 4000, .35, 'highpass', .7); ring(o, [3150, 4420, 5870, 7340], .3, .1); },
   door: o => { nz(o, .6, 600, 120, .7); tn(o, .4, 90, 50, .5); },
   breath: o => { nz(o, .5, 900, 500, .25, 'bandpass', 1.5); nz(o, .6, 700, 400, .2, 'bandpass', 1.5, .7); },
-  magout: o => { tn(o, .04, 1100, 800, .2, 'square'); nz(o, .08, 3000, 1200, .25, 'bandpass', 3); },
-  magin: o => { tn(o, .05, 700, 500, .3, 'square'); nz(o, .06, 2500, 900, .3, 'bandpass', 3); tn(o, .03, 1400, 1200, .15, 'square', .05); },
-  bolt: o => { nz(o, .07, 4000, 1500, .3, 'bandpass', 2); tn(o, .04, 900, 600, .2, 'square'); nz(o, .06, 3500, 1200, .3, 'bandpass', 2, .12); tn(o, .04, 1200, 800, .25, 'square', .12); },
-  slide: o => { nz(o, .06, 4500, 2000, .35, 'bandpass', 2); tn(o, .04, 1300, 900, .25, 'square'); },
-  shellin: o => { tn(o, .04, 600, 400, .25, 'square'); nz(o, .05, 2000, 800, .2, 'bandpass', 3); },
-  pump: o => { nz(o, .08, 2500, 900, .35, 'bandpass', 2); tn(o, .05, 500, 300, .3, 'square'); nz(o, .08, 2800, 1000, .35, 'bandpass', 2, .15); tn(o, .05, 650, 400, .3, 'square', .15); },
-  shell: o => { tn(o, .04, 3200, 2800, .06, 'triangle'); tn(o, .03, 2600, 2400, .04, 'triangle', .08); },
 };
-// "voz" de zumbi: serra com filtro de formante e glissando
+for (const k in SYN) if (!SND[k]) SND[k] = SBAKE[k] ? (o => sbuf(o, k) || SYN[k](o)) : SYN[k];
+function wSnd(w) { // família do som do tiro pela arma (metralhadora e revólver têm timbre próprio; supressor de fuzil/SMG é mais grave)
+  if (!w) return 'pistol'; const s = w.snd || 'pistol';
+  if ((s === 'rifle' || s === 'rifle2') && w.model === 'lmg') return 'mg';
+  if (s === 'deagle' && w.model === 'revolver') return 'revolver';
+  if (s === 'silenced' && w.slot === 'primary') return 'silenced2';
+  return s;
+}
+// "voz" de zumbi: serra rouca (vibrato irregular) por dois formantes e um bafo
 function vox(out, f0, bend, dur, vol) {
-  const t = AC.currentTime, o = AC.createOscillator(); o.type = 'sawtooth';
+  const t = AC.currentTime + SOFF, o = AC.createOscillator(); o.type = 'sawtooth';
   o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f0 * bend, t + dur);
-  const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = rand(450, 800); f.Q.value = 4;
+  const l = AC.createOscillator(), lg = AC.createGain(); l.frequency.value = rand(5, 11); lg.gain.value = f0 * .05; l.connect(lg); lg.connect(o.frequency);
   const g = AC.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .08); g.gain.exponentialRampToValueAtTime(.001, t + dur);
-  o.connect(f); f.connect(g); g.connect(out); o.start(t); o.stop(t + dur + .05);
+  const fm = rand(450, 800); for (const [fc, q, k] of [[fm, 4, 1.2], [fm * 2.4, 6, .6]]) { const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = fc; f.Q.value = q; const fg = AC.createGain(); fg.gain.value = k; o.connect(f); f.connect(fg); fg.connect(g); }
+  g.connect(out); o.start(t); l.start(t); o.stop(t + dur + .05); l.stop(t + dur + .05); _ve(t + dur);
+  ns(out, dur * .8, fm * 1.6, fm, vol * .2, 'bandpass', 1.5, 0, dur * .2);
 }
-// mesmo som muitas vezes no mesmo instante (chumbo acertando vários zumbis, Thundergun, Wunderwaffe) soa igual a 3
-// e cada um cria filtro, ganho e painel 3D novos: além de 3 no mesmo quadro (40 ms) o resto é pulado
-const SNDN = new Map();
-function play(name, pos) {
+// mesmo som muitas vezes no mesmo instante (chumbo acertando vários zumbis, Thundergun, Wunderwaffe) soa igual a 3: além de 3 em 40 ms o resto
+// é pulado. Limite de vozes: com VOZ_MAX tocando, rouba a mais velha de prioridade menor ou igual (fade de 5 ms) ou pula a nova.
+const SNDN = new Map(), VOZ = [], VOZ_MAX = 40;
+function vozLivre(pri) {
+  const t = AC.currentTime; let j = 0; for (let i = 0; i < VOZ.length; i++) if (VOZ[i].end > t) VOZ[j++] = VOZ[i]; VOZ.length = j;
+  if (j < VOZ_MAX) return true;
+  let k = -1; for (let i = 0; i < j; i++) if (VOZ[i].pri <= pri && (k < 0 || VOZ[i].pri < VOZ[k].pri)) k = i;
+  if (k < 0) return false;
+  const v = VOZ.splice(k, 1)[0]; try { v.g.gain.setTargetAtTime(0, t, .005); setTimeout(() => { try { v.g.disconnect(); } catch (e) { } }, 60); } catch (e) { }
+  return true;
+}
+function play(name, pos, vol = 1) {
   if (!AC || !SND[name]) return;
-  const t = performance.now(), r = SNDN.get(name);
+  const t = (AC.currentTime + SOFF0) * 1000, r = SNDN.get(name);
   if (r && t - r.t < 40) { if (++r.n > 3) return; } else if (r) { r.t = t; r.n = 1; } else SNDN.set(name, { t, n: 1 });
-  try { SND[name](sdest(pos)); } catch (e) { }
+  const P = SCAT[name] || SCP.def; let d = 0;
+  if (pos) { d = camera.position.distanceTo(pos); if (!(d <= P.max)) return; }
+  if (!vozLivre(P.pri)) return;
+  try {
+    const g = AC.createGain(); g.gain.value = vol * P.v * _r(P.vv);
+    g.connect(sdest(pos, P, d));
+    if (P.rev && AUD) { const s = AC.createGain(); s.gain.value = P.rev * (pos ? Math.sqrt(atenua(P, d)) : .6); g.connect(s); s.connect(AUD.rin); } // longe: proporcionalmente mais eco (estrondo)
+    SOFF = SOFF0 + (P.dl && d > 15 ? d / 343 : 0); SPOS = pos || null; SDIST = d; _vEnd = 0;
+    SND[name](g);
+    VOZ.push({ g, end: _vEnd || AC.currentTime + SOFF + 1.5, pri: P.pri });
+  } catch (e) { } finally { SOFF = 0; SPOS = null; SDIST = 0; }
 }
+const _wzA = new THREE.Vector3(), _wzB = new THREE.Vector3();
+function sndWhiz(o, ends) { // bala dos outros passando a menos de 2 m: zunido/estalo no ponto da trajetória mais perto de você
+  if (!AC || !me.alive || !ends) return; const c = camera.position;
+  for (const e of ends) {
+    _wzB.set(e[0] - o.x, e[1] - o.y, e[2] - o.z); const L = _wzB.length(); if (!(L > 4)) continue; _wzB.divideScalar(L);
+    const tt = _wzA.copy(c).sub(o).dot(_wzB); if (tt < 4 || tt > L + 1) continue;
+    _wzA.copy(o).addScaledVector(_wzB, tt); if (_wzA.distanceTo(c) < 2) { play('whiz', _wzA.clone()); return; }
+  }
+}
+const _amD = new THREE.Vector3(); let _amT = 0;
+function sndAmb() { // fechado (0..1): teto em cima e paredes perto puxam o reverb de sala; senão vale o eco de lugar aberto
+  if (!AUD || AC.currentTime < _amT) return; _amT = AC.currentTime + .4;
+  let k = .35;
+  try { if (inGame && COL.length) { const a = camera.position; let n = 0; const up = rayBlocked(a, _amD.set(0, 1, 0), 14, 14);
+    for (let i = 0; i < 6; i++) { const an = i * Math.PI / 3; if (rayBlocked(a, _amD.set(Math.cos(an), 0, Math.sin(an)), 9, 9)) n++; }
+    k = up ? .55 + .45 * n / 6 : .3 * n / 6; } } catch (e) { }
+  if (Math.abs(k - AUD.fech) < .02) return; AUD.fech = k;
+  const t = AC.currentTime; AUD.gF.gain.setTargetAtTime(REV_F * k, t, .3); AUD.gA.gain.setTargetAtTime(REV_A * (1 - k), t, .3);
+}
+// testes: toca [nome, pos?, t (s)] num contexto offline com o grafo inteiro (compressor, reverb) e devolve os canais e o tempo de montagem
+async function sndRender(evs, dur = 2, op = {}) {
+  audioInit(); await sbankInit();
+  const s0 = { AC, MASTER, AUD, MOUT }, v0 = VOZ.splice(0), n0 = new Map(SNDN), off = new OfflineAudioContext(2, Math.ceil(dur * AC.sampleRate), AC.sampleRate);
+  AC = off; AUD = audioBus(off); MASTER = AUD.m; MOUT = AUD.c; if (op.vol != null) MASTER.gain.value = op.vol;
+  const Ls = off.listener, c = camera.position; if (Ls.positionX) { Ls.positionX.value = c.x; Ls.positionY.value = c.y; Ls.positionZ.value = c.z; } else Ls.setPosition(c.x, c.y, c.z); // ouvido na câmera, olhando para -Z
+  if (op.fech != null) { AUD.gF.gain.value = REV_F * op.fech; AUD.gA.gain.value = REV_A * (1 - op.fech); }
+  if (op.seco) { AUD.gF.gain.value = AUD.gA.gain.value = 0; }
+  SNDN.clear(); let ms = 0;
+  try { const t0 = performance.now(); for (const [nm, p, t] of evs) { SOFF0 = t || 0; play(nm, p ? new THREE.Vector3(p[0], p[1], p[2]) : undefined, op.v ?? 1); } ms = performance.now() - t0; }
+  finally { SOFF0 = 0; ({ AC, MASTER, AUD, MOUT } = s0); VOZ.splice(0, VOZ.length, ...v0); SNDN.clear(); for (const [k, v] of n0) SNDN.set(k, v); }
+  const b = await off.startRendering(); return { sr: b.sampleRate, L: b.getChannelData(0), R: b.getChannelData(1), ms };
+}
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { sndRender, SND, SYN, SBANK, SBAKE, SCAT, sbankInit, wSnd, sndAmb, aud: () => AUD, acx: () => AC, audioBus }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
 // O4-CPU5: cada escrita em AudioParam custa (mesmo com o valor igual): só escreve o que mudou desde a última (câmera parada: nada).
 // O ouvinte só é mexido aqui, então o valor que ele tem é sempre o último escrito; up é fixo (0, 1, 0).
 const _ulF = new V3(), _ulV = new Float64Array(6); let _ulL = null;
@@ -17430,6 +17655,7 @@ function updateListener() {
   if (L.positionX) { if (_ulL !== L) { _ulL = L; _ulV.fill(NaN); L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
     _ulSet(L.positionX, 0, p.x); _ulSet(L.positionY, 1, p.y); _ulSet(L.positionZ, 2, p.z); _ulSet(L.forwardX, 3, f.x); _ulSet(L.forwardY, 4, f.y); _ulSet(L.forwardZ, 5, f.z); }
   else { L.setPosition(p.x, p.y, p.z); L.setOrientation(f.x, f.y, f.z, 0, 1, 0); }
+  sndAmb(); // sala fechada ou lugar aberto (reverb)
 }
 
 // ================================================================
@@ -20736,9 +20962,8 @@ function wxpAdd(id, n) {
     centerMsg(`${W[b].name} · NÍVEL ${after}`, un ? 'Desbloqueado no Armeiro: ' + un.name : '', 3); play('kaching'); profSave();
   } else if (++WXP_SAVE % 25 === 0) profSave();
 }
-function playQ(name, vol, pos) { // som abafado (supressor); com pos (tiro de outro jogador) sai do lugar dele e sem os agudos
-  if (!AC || !SND[name]) return;
-  try { const g = AC.createGain(); g.gain.value = vol; if (pos) { const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1800; g.connect(f); f.connect(sdest(pos)); } else g.connect(sdest()); SND[name](g); } catch (e) { }
+function playQ(name, vol, pos) { // supressor: tiro abafado próprio (pistola: "pft" seco com o ferrolho; fuzil/SMG: baque grave); com pos sai do lugar do outro jogador
+  play(name === 'pistol' || name === 'deagle' || name === 'revolver' || name === 'silenced' ? 'silenced' : 'silenced2', pos, vol / .3);
 }
 // ---------- acessórios do Armeiro (a11): peças montadas medindo a arma feita no código ----------
 // A arma é medida pelos vértices (espaço da arma: metros, cano para -Z, x para a direita; a câmera vê o lado esquerdo) e cada peça vai no lugar dela:
@@ -21184,7 +21409,7 @@ function shoot(esq) {
     if (C.ms && !ZC.on) { C.ms.s++; if (dmgBy.size) C.ms.h++; if (hs) C.ms.hh = (C.ms.hh || 0) + 1; }
     sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: ends, sup: attHas(G.cur, 'sup') ? 1 : undefined });
   }
-  if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); muzzleFlash(mz); if (esq) AK.flash = now + .05; else vmFlashUntil = now + .05; } // supressor: sem clarão, tiro abafado
+  if (attHas(G.cur, 'sup')) playQ(wSnd(w), .3); else { play(wSnd(w)); muzzleFlash(mz); if (esq) AK.flash = now + .05; else vmFlashUntil = now + .05; } // supressor: sem clarão, tiro abafado
   G[esq ? 'kickL' : 'kick'] = (vmGun?.userData.fps2 ? .25 : 1) * attStat(G.cur, 'kick') * (w.zw ? ZBAL.armas.coice[w.base || G.cur] ?? 1 : 1); // zumbi-v2 (Etapa 2): coice por arma (zumbi_config.js), só nas armas do modo zumbi (zv2-R2: as do CS herdam base)
   if (vmGun?.userData.fps2) fpPlay(vmGun.userData, 'fire');
   if (!['shotgun', 'launcher', 'dbarrel', 'revolver', 'scout', 'awp'].includes(w.model) || w.rate < .6 && w.model === 'shotgun') ejectShell(w); // bomba/ferrolho ejetam na hora da ação
@@ -21225,7 +21450,7 @@ function throwNade(strong) {
   const v = d.clone().multiplyScalar(strong ? 17 : 8).addScaledVector(me.vel, .6); v.y += strong ? 2 : 1;
   const pa = [r3(p.x), r3(p.y), r3(p.z)], va = [r3(v.x), r3(v.y), r3(v.z)];
   spawnNade(C.myId, type, pa, va); sendToHost({ t: 'nade', k: type, p: pa, v: va });
-  play('knife');
+  play('throw'); // pino, colher e o arremesso
   setTimeout(() => { if (!hasW(G.cur)) equip(hasW(type) ? type : bestW(), true); }, 300);
 }
 function updateWeapon(dt) {
@@ -21311,7 +21536,7 @@ function updateMe(dt) {
   else if (me.slideEnd && me.onGround) { const k = (me.slideEnd - now) / .6, v = 3.5 + 6 * k; me.vel.x = me.slideX * v; me.vel.z = me.slideZ * v; }
   else if (me.onGround) { const k = Math.min(1, dt * (wish.lengthSq() ? 12 : 9)); me.vel.x += (wish.x * spd - me.vel.x) * k; me.vel.z += (wish.z * spd - me.vel.z) * k; }
   else if (wish.lengthSq()) { const k = Math.min(1, dt * 2); me.vel.x += (wish.x * spd - me.vel.x) * k; me.vel.z += (wish.z * spd - me.vel.z) * k; }
-  if (keys.Space && me.onGround && !frozen && !C.chatOpen && !me.downed) { me.vel.y = JUMP_V; me.onGround = false; }
+  if (keys.Space && me.onGround && !frozen && !C.chatOpen && !me.downed) { me.vel.y = JUMP_V; me.onGround = false; play('jump'); }
   const wasAir = !me.onGround, vy = me.vel.y;
   moveBody(me, dt);
   if (ZC.on) zPush();
@@ -21453,7 +21678,8 @@ function remoteShot(m) {
     if (w?.splash) m.e.forEach(e => zBoomFx(new V3(e[0], e[1], e[2]), w));
     else if (w?.pellets) m.e.forEach(e => puff(new V3(e[0], e[1], e[2]), 0xbbb5a8, .3, .3, .3)); else m.e.forEach(e => impact(new V3(e[0], e[1], e[2]), null));
   }
-  if (m.sup) playQ(w?.snd || 'pistol', .25, o); else { play(w?.snd || 'pistol', o); muzzleFlash(mo, true, .34); } // supressor (Armeiro): sem clarão, abafado e com posição
+  if (m.sup) playQ(wSnd(w), .25, o); else { play(wSnd(w), o); muzzleFlash(mo, true, .34); } // supressor (Armeiro): sem clarão, abafado e com posição
+  if (!w?.thunder && !w?.frost) sndWhiz(o, m.e); // bala passando perto zune
   if (ZC.on && !w?.thunder && !w?.frost) zShotReact(o, m.e);
 }
 // boca do cano do jogador remoto no mundo (com o supressor dele à mostra); sem modelo visível ou longe demais do o, fica o o
@@ -21553,13 +21779,13 @@ function flashBang(n) {
     const dot = fwd.dot(p.clone().sub(eye).normalize()), k = dot > .6 ? 1 : dot > .1 ? .55 : .12;
     return Math.max(.2, 4.8 * k * Math.sqrt(1 - d / 40));
   };
-  if (me.alive && inGame) { const t = blind(camera.position.clone(), new V3(0, 0, -1).applyQuaternion(camera.quaternion)); if (t > .2 && now + t > (C.blindEnd || 0)) { C.blindEnd = now + t; C.blindDur = t; } }
+  if (me.alive && inGame) { const t = blind(camera.position.clone(), new V3(0, 0, -1).applyQuaternion(camera.quaternion)); if (t > .2 && now + t > (C.blindEnd || 0)) { C.blindEnd = now + t; C.blindDur = t; play('zumbido', undefined, Math.min(1, t / 3)); } }
   if (NET.isHost && !Z.on) for (const q of S.players.values()) if (q.isBot && q.alive) { const b = q.bot, t = blind(new V3(q.pos[0], q.pos[1] + 1.6, q.pos[2]), new V3(-Math.sin(b.yaw), 0, -Math.cos(b.yaw))); if (t > .3) { b.blindEnd = now + t; b.target = null; } }
 }
 function startFire(n) { // molotov / incendiária: fogo no chão por 7 s (a fumaça apaga)
   const p = n.pos.clone(); p.y = Math.max(0, p.y - .05);
   if (smokeAt(p)) { puff(p.clone().add(new V3(0, .5, 0)), 0x777777, 2, 1); play('smoke', p); return; }
-  play('boom', p);
+  play('molotov', p); // vidro quebrando e o fogo pegando
   const f = { pos: p, t0: now, end: now + 7, owner: n.owner, sp: [], tick: 0 };
   for (let i = 0; i < 18; i++) {
     const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 2.9;
@@ -21574,6 +21800,7 @@ function updateFires(dt) {
     if (smokeAt(f.pos, 1)) f.end = Math.min(f.end, now); // fumaça em cima apaga o fogo
     const k = Math.min(1, (now - f.t0) * 4) * Math.min(1, Math.max(0, f.end - now));
     f.sp.forEach((sp, j) => { const fl = .75 + .25 * Math.sin(now * 13 + sp.userData.ph); sp.material.opacity = .85 * k * fl; sp.scale.set(1.3 * fl, 1.9 * fl, 1); sp.position.y = f.pos.y + .45 + .15 * Math.sin(now * 7 + j); });
+    if (k > .2 && now > (f.snd || 0)) { f.snd = now + rand(.6, 1); play('fogo', f.pos); } // fogo crepitando
     if (k > 0 && Math.random() < dt * 6) puff(f.pos.clone().add(new V3(rand(-2.5, 2.5), 1.2, rand(-2.5, 2.5))), 0x333333, 1.8, 1.6, 1.5);
     if (NET.isHost && !Z.on && now < f.end && (f.tick -= dt) <= 0) { // dano: 10 a cada 0,25 s em quem está dentro (40 por segundo)
       f.tick = .25;
@@ -21587,7 +21814,7 @@ function updateFires(dt) {
     if (now > d.end) { puff(d.pos.clone().add(new V3(0, .3, 0)), 0x888888, 1.2, .8); play('bounce', d.pos); decoys.splice(i, 1); }
   }
 }
-function startDecoy(n) { const ow = C.players.get(n.owner), w = W[R.get(n.owner)?.w] || W.ak47; decoys.push({ pos: n.pos.clone(), end: now + 15, next: now + .3, snd: w.snd || 'rifle' }); }
+function startDecoy(n) { const ow = C.players.get(n.owner), w = W[R.get(n.owner)?.w] || W.ak47; decoys.push({ pos: n.pos.clone(), end: now + 15, next: now + .3, snd: wSnd(w) }); }
 function startSmoke(n) {
   play('smoke', n.pos);
   const s = { pos: n.pos.clone().add(new V3(0, 1.2, 0)), t0: now, sprites: [] };
@@ -30819,7 +31046,7 @@ function onMsgInner(m) {
     case 'kill': {
       feedAdd(m.k, m.v, m.w, m.hs, m.as, m.tk);
       if (C.st?.mode !== 'zombies') { if (m.k === C.myId && m.v !== C.myId) { stat('k'); if (m.hs) stat('hs'); if (C.ms) { C.ms.k++; if (m.hs) C.ms.hk++; if (isW(m.w)) C.ms.byW[m.w] = (C.ms.byW[m.w] || 0) + 1; } } if (m.v === C.myId) { stat('d'); if (C.ms) C.ms.d++; } }
-      if (m.v === C.myId) { me.alive = false; C.deadAt = now; C.killer = m.k; C.killW = isW(m.w) ? m.w : null; C.killHS = !!m.hs; G.scope = 0; G.reloadEnd = 0; C.spec = null; C.buyOpen = false; renderBuy(); }
+      if (m.v === C.myId) { play('death'); me.alive = false; C.deadAt = now; C.killer = m.k; C.killW = isW(m.w) ? m.w : null; C.killHS = !!m.hs; G.scope = 0; G.reloadEnd = 0; C.spec = null; C.buyOpen = false; renderBuy(); }
       else { const rp = R.get(m.v); if (rp) { rp.alive = false; rp.dead = true; rp.deadT = now; } }
       if (m.k === C.myId && m.v !== C.myId) { play('kill'); grantXP((m.hs ? 15 : 10) * (C.players.get(m.v)?.b ? .5 : 1)); } // XP: abate (metade contra bot)
       const info = C.players.get(m.v); if (info) info.al = 0;
@@ -30836,7 +31063,7 @@ function onMsgInner(m) {
     case 'tolobby': LB.on = true; toMenu(); lobbyUI(); break;
     case 'start': NET.lastHost = performance.now() + GRACE_MAPA; LB.on = false; C.st = saneSt(m.st); ZC.snapTs = 0; buildMap(C.st.map); MAPA_CLI = curMapId; enterGame(); lobbyUI(); break; // 6-g07: MAPA_CLI
     case 'deny': toast(m.txt, 4); LB.on = false; lobbyUI(); $('#joinStatus').textContent = m.txt; setTimeout(leaveGame, 2500); break;
-    case 'bboom': { const p = new V3(m.p[0], m.p[1] + .6, m.p[2]); boomFx(p); for (let i = 0; i < 6; i++) puff(p.clone().add(new V3(rand(-3, 3), rand(0, 3), rand(-3, 3))), 0x555555, 4, 3); break; }
+    case 'bboom': { const p = new V3(m.p[0], m.p[1] + .6, m.p[2]); boomFx(p); play('c4', p); for (let i = 0; i < 6; i++) puff(p.clone().add(new V3(rand(-3, 3), rand(0, 3), rand(-3, 3))), 0x555555, 4, 3); break; }
     case 'nade': spawnNade(m.id, m.k, m.p, m.v); break;
     case 'msg': centerMsg(String(m.txt ?? '').slice(0, 80), String(m.sub ?? '').slice(0, 160), finN(m.dur) ? clamp(m.dur, 0, 30) : 3); if (typeof m.snd === 'string') play(m.snd); break;
     case 'err': toast(String(m.txt ?? '').slice(0, 160), 2); play('empty'); break;
@@ -31047,6 +31274,7 @@ function bombHud(dt) {
     if (best) { const sl = W[best[1]].slot; tip = G.inv[sl] ? `<b>E</b>: trocar ${esc(W[G.inv[sl]].name)} por ${esc(W[best[1]].name)}` : `Ande por cima para pegar ${esc(W[best[1]].name)}`; } }
   dropsDraw();
   const prog = C.actEnd > now ? clamp(1 - (C.actEnd - now) / C.actDur, 0, 1) : 0;
+  if (prog && B && now > (C.actSnd || 0)) { C.actSnd = now + (B.s === 'planted' ? rand(.35, .6) : rand(.18, .3)); play(B.s === 'planted' ? 'defuse' : 'plant'); } // teclado da bomba / alicate
   setHTML('bombui', tip + (prog ? `<div class="bar"><i style="width:${(prog * 100) | 0}%"></i></div>` : ''));
   for (let i = MARKS.length - 1; i >= 0; i--) if (now > MARKS[i].end || !inGame) { scene.remove(MARKS[i].s); MARKS.splice(i, 1); }
   drawMinimap(dt); // radar do Rodadas e minimapa com névoa do Zumbi
