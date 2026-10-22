@@ -933,7 +933,7 @@ Object.assign(W, {
   m249:     CSW('hk21', { name: 'M249', price: 5200, dmg: 32, rate: .08, auto: 1, mag: 100, res: 200, reload: 5.7, spread: .012, move: .15, air: .3, pen: .8, rm: .97, speed: .78, snd: 'rifle' }),
   galilar:  CSW('galil', { name: 'Galil AR', price: 1800, dmg: 30, rate: .09, auto: 1, mag: 35, res: 90, reload: 3, spread: .005, move: .1, air: .25, pen: .775, rm: .98, speed: .86, snd: 'rifle' }),
   famas2:   CSW('commando', { name: 'FAMAS', price: 2050, dmg: 30, rate: .09, auto: 1, mag: 25, res: 90, reload: 3.3, spread: .005, move: .1, air: .25, pen: .7, rm: .96, speed: .88, snd: 'rifle2' }),
-  m4a1s:    CSW('m4', { name: 'M4A1-S', price: 2900, dmg: 38, rate: .1, auto: 1, mag: 20, res: 80, reload: 3.1, spread: .0025, move: .09, air: .25, pen: .7, rm: .99, speed: .9, snd: 'silenced' }),
+  m4a1s:    CSW('m4', { name: 'M4A1-S', sil: 1, price: 2900, dmg: 38, rate: .1, auto: 1, mag: 20, res: 80, reload: 3.1, spread: .0025, move: .09, air: .25, pen: .7, rm: .99, speed: .9, snd: 'silenced' }),
   sg553:    CSW('fal', { name: 'SG 553', price: 3000, dmg: 30, rate: .09, auto: 1, mag: 30, res: 90, reload: 2.8, spread: .004, sspread: .0018, scope: [55], move: .11, air: .25, pen: 1, rm: .98, speed: .84, snd: 'rifle' }),
   aug2:     CSW('m14', { name: 'AUG', price: 3300, dmg: 28, rate: .09, auto: 1, mag: 30, res: 90, reload: 3.8, spread: .0035, sspread: .0018, scope: [55], move: .1, air: .25, pen: .9, rm: .98, speed: .88, snd: 'rifle2' }),
   g3sg1:    CSW('dragunov', { name: 'G3SG1', price: 5000, dmg: 80, rate: .25, auto: 1, mag: 20, res: 90, reload: 4.7, spread: .045, sspread: .0015, scope: [40, 15], move: .2, air: .3, pen: .83, rm: .99, speed: .86, snd: 'sniper' }),
@@ -19232,7 +19232,7 @@ const FPM = {
   m4: { T: [-20, -3, null], fwd: '+x', up: '+y', L: .84 , lhf: .5, magBase: 1 },
   commando: { T: [-44, -1, null], fwd: '+x', up: '+y', L: .85 , lhf: .5, magBase: 1 },
   fal: { T: [-16.5, 2.3, null], fwd: '+x', up: '+y', L: 1.09 , lhf: .5 , tint: { Material: 0x2b2b2b, 'Material.003': 0x2b2b2b }, brass: ['Material.001', 'Material.002'], mat: 1 }, // a13 mat: modelo sem textura (cinza chapado) leva o aço/polímero das armas do jogo
-  m14: { T: [-1.885, -.055, null], fwd: '+x', up: '+y', L: 1.118 , lhf: .5, magBase: 1, tint: { Material: 0x3d2516, 'Material.002': 0x3d2516, ...Object.fromEntries('004 005 006 007 008 009 010 012 013 014'.split(' ').map(n => ['Material.' + n, 0x2c2d2e])), bolt1: 0x2c2d2e, bolt2: 0x2c2d2e } }, // a4: coronha salmão e aço quase branco (cores claras demais no modelo): madeira e aço escuros como os do M4
+  m14: { T: [-1.885, -.055, null], fwd: '+x', up: '+y', L: 1.118 , lhf: .5, magBase: 1, tint: { Material: 0x3b4130, 'Material.002': 0x3b4130, ...Object.fromEntries('004 005 006 007 008 009 010 012 013 014'.split(' ').map(n => ['Material.' + n, 0x2c2d2e])), bolt1: 0x2c2d2e, bolt2: 0x2c2d2e } }, // (só a AUG usa este modelo: coronha verde-oliva como o polímero da AUG, não madeira) a4: coronha salmão e aço quase branco (cores claras demais no modelo): madeira e aço escuros como os do M4
   thundergun: { T: [-17.5, null, -6.2], fwd: '+x', up: '+z', L: .85, vo: [.04, -.04, -.2] },
   scout: { T: [-97, -19, null], fwd: '+x', up: '+y', L: 1.2, lens: ['Material.019'] },
   awp: { T: [-94, 5.5, null], fwd: '+x', up: '+y', L: 1.2, lens: ['Material.019'] },
@@ -19468,6 +19468,11 @@ function fpBuild(id, ud) {
       if (yp < 1e8 && ym < 1e8) lh = { hl, L0, d: new V3(0, ym - yp, zT - L0.z) };
     }
     if (F2) follow.push(F2);
+    if (W[id]?.sil) { // M4A1-S: o modelo baixado é o da M4 sem nada no cano; o silenciador entra na boca e a boca (clarão, traçante) vai para a ponta dele
+      const u = tips.L / D.L, S = FZSIL, sg = new THREE.Group(), cil = new THREE.Mesh(new THREE.CylinderGeometry(S.r * u, S.r * u, S.len * u, 20), new THREE.MeshStandardMaterial({ color: S.cor, metalness: .55, roughness: .5 }));
+      cil.rotation.x = Math.PI / 2; cil.position.copy(tips.muzzle); cil.position.z += (S.len / 2 - S.dentro) * u; sg.matrixAutoUpdate = false; sg.matrix.copy(C); sg.add(cil); body.add(sg);
+      tips.muzzle.z += (S.len - S.dentro) * u;
+    }
   } else {
     C = new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A);
     tips = ptips;
@@ -19677,6 +19682,29 @@ function fpUpdate(ud, dt) {
     for (const f of F.follow) fpFollow(F, f);
   }
   if (F.cv) fpCover(F); // a7: tampa da metralhadora abre na recarga
+  if (FZS.ids.has(G.cur)) fzSons(ud);
+}
+// Fuzis, snipers, escopetas e metralhadoras com braços prontos: o gunAnim (das armas feitas no código) não roda nelas, então a recarga
+// ficava muda e a AWP/SSG 08 e as escopetas de bomba não tocavam o ferrolho/bomba nem soltavam a cápsula (o tiro deixa para "a hora da
+// ação"). Frações da recarga (0..1): sai o carregador, entra, ferrolho (vazia); acao: fração do ciclo do tiro em que o ferrolho/bomba volta.
+const FZS = { ids: new Set('ak47 m4 m4a1s galilar famas2 sg553 aug2 negev m249 awp scout g3sg1 scar20 nova xm1014 mag7 sawedoff'.split(' ')),
+  rec: { sai: .2, entra: .6, ferrolho: .82 }, lmg: { abre: .06, sai: .25, entra: .6, fecha: .88 }, acao: { bolt: .45, pump: .3 } };
+const FZSIL = { r: .017, len: .19, dentro: .01, cor: 0x1e1f21 }; // silenciador da M4A1-S (m: raio, comprimento, quanto entra no cano)
+const FZSAQ = { x: .03, y: -.26, rx: -.35, rz: .3 }; // saque sem clipe (AWP, SSG 08, escopetas): começo do saque (m, rad), giro em volta do gatilho
+function fzSons(ud) {
+  const w = W[G.cur], a = G.ammo[G.cur]; if (!w || !a) return;
+  const ev = (k, at, t, fn) => { if (t >= at && !G.rEv[k]) { G.rEv[k] = 1; fn(); } };
+  if (G.reloadEnd && !G.reload && G.rEv) { // recarga de carregador (as de bala por bala já tocam 'shellin' a cada cartucho)
+    const t = (now - G.reloadStart) / (G.reloadEnd - G.reloadStart), R = FZS.rec, L = FZS.lmg;
+    if (ud.fps2.cv) { ev('fz0', L.abre, t, () => play('slide')); ev('fz1', L.sai, t, () => play('magout')); ev('fz2', L.entra, t, () => play('magin')); ev('fz3', L.fecha, t, () => play('slide')); }
+    else { ev('fz1', R.sai, t, () => play('magout')); ev('fz2', R.entra, t, () => play('magin')); if (G.reloadEmpty) ev('fz3', R.ferrolho, t, () => play(['awp', 'scout'].includes(w.model) ? 'bolt' : 'slide')); }
+  }
+  const bolt = ['awp', 'scout'].includes(w.model), pump = !bolt && w.pellets && w.rate >= .6; // bomba: Nova, MAG-7, Sawed-Off (a XM1014 é semiautomática)
+  if (!bolt && !pump) return;
+  const since = now - G.lastShot, cyc = Math.max(.4, G.nextFire - G.lastShot);
+  if (G.lastShotW === G.cur && a.mag > 0 && !G.reloadEnd && since < cyc && since >= cyc * FZS.acao[bolt ? 'bolt' : 'pump'] && G.pumpEv !== G.lastShot) {
+    G.pumpEv = G.lastShot; play(bolt ? 'bolt' : 'pump'); ejectShell(w.model === 'dbarrel' ? W.nova : w, true); // a Sawed-Off (modelo de cano duplo) ejeta pela janela, como a de bomba
+  }
 }
 // IK dos braços: recua os ombros, leva a mão esquerda ao guarda-mão do modelo e gira braço e antebraço (dois ossos, cotovelo no mesmo
 // plano de antes) até cada pulso chegar ao alvo
@@ -20567,13 +20595,14 @@ ADS.recuo.mg42 = .04; ADS.recuo.stoner = .03; // zv2-A07: na mira a tampa de ali
 // a arma some em some; a tela da luneta aparece entre luz[0] e luz[1]; o zoom chega entre zoom[0] e zoom[1]; olho: distância olho→ocular (m);
 // sombra: quanto a vinheta corre ao andar (px); ret: retícula de cada arma (sem o _pap).
 const SCOPE = { ent: .17, sai: .1, some: .74, luz: [.58, .92], zoom: [.4, 1], olho: .07, cresce: .14, sombra: 8,
-  ret: { awp: 'duplex', l96: 'mil', scout: 'fino', dragunov: 'pso', psg1: 'psg' } };
+  ret: { awp: 'duplex', l96: 'mil', scout: 'fino', dragunov: 'pso', psg1: 'psg', g3sg1: 'duplex', scar20: 'duplex', sg553: 'fuzil', aug2: 'fuzil' } }; // (pelo id antes da base: G3SG1/SCAR-20 não usam a PSO da Dragunov; SG 553/AUG: mira de fuzil com ponto)
 const RET = { // SVG, raio 100 = borda da lente
   duplex: '<path d="M-100 0H-32M32 0H100M0 32V100M0-100V-32" stroke-width="2.6"/><path d="M-32 0H32M0-32V32" stroke-width=".42"/>',
   fino: '<path d="M-100 0H100M0-100V100" stroke-width=".5"/><path d="M-100 0H-48M48 0H100M0 48V100" stroke-width="1.6"/>',
   mil: '<path d="M-100 0H-36M36 0H100M0 36V100M0-100V-36" stroke-width="2.4"/><path d="M-36 0H36M0-36V36" stroke-width=".4"/>' + [-30, -24, -18, -12, -6, 6, 12, 18, 24, 30].map(d => `<circle cx="${d}" r=".9"/><circle cy="${d}" r=".9"/>`).join(''),
   pso: '<g fill="none" stroke-width=".55"><path d="M-2.4 5L0 0L2.4 5M-1.9 15L0 11L1.9 15M-1.6 23L0 19.5L1.6 23M-1.4 30L0 27L1.4 30"/><path d="M-42 0H-6M6 0H42"/>' + [-40, -32, -24, -16, -8, 8, 16, 24, 32, 40].map(d => `<path d="M${d} 0V${d % 16 ? -2 : -3.5}"/>`).join('') + '<path d="M-44 44Q-30 34 -12 32M-44 44H-12" stroke-dasharray="1.2 1.6"/></g>',
   psg: '<path d="M-100 0H-16M16 0H100M0 16V100" stroke-width="3"/><path d="M0-100V-16M-16 0H16M0-16V16" stroke-width=".42"/><circle r="9" fill="none" stroke-width=".55"/>',
+  fuzil: '<path d="M-100 0H-14M14 0H100M0 14V100M0-100V-14" stroke-width=".6"/><circle r="6" fill="none" stroke="#d01818" stroke-width="1.1"/><circle r="1.1" fill="#d01818" stroke="none"/>',
 };
 let SC_ID = '', SC_OP = -1, SC_TF = '';
 function scopeTick(dt, w) {
@@ -20582,7 +20611,7 @@ function scopeTick(dt, w) {
   if (on) { const f = w.scope[G.scope - 1]; G.scF = G.scR < .05 || !G.scF ? f : lerp(G.scF, f, Math.min(1, dt * 18)); } // troca de zoom (AWP 2x) desliza
   const el = $('#scope'); if (!on) return;
   const wb = W[G.cur]?.base || G.cur, id = wb + (W[G.cur]?.pap ? '+' : '');
-  if (SC_ID !== id) { SC_ID = id; el.innerHTML = `<div class="sl"></div><svg viewBox="-100 -100 200 200" fill="#000" stroke="#000">${RET[SCOPE.ret[wb]] || RET.duplex}${W[G.cur]?.pap ? '<circle class="pap" r="1.3" stroke="none"/>' : ''}</svg>`; SC_TF = ''; }
+  if (SC_ID !== id) { SC_ID = id; el.innerHTML = `<div class="sl"></div><svg viewBox="-100 -100 200 200" fill="#000" stroke="#000">${RET[SCOPE.ret[G.cur] || SCOPE.ret[wb]] || RET.duplex}${W[G.cur]?.pap ? '<circle class="pap" r="1.3" stroke="none"/>' : ''}</svg>`; SC_TF = ''; }
   const k = seg(G.scR, SCOPE.luz[0], SCOPE.luz[1]), op = Math.round(k * 50) / 50;
   if (op !== SC_OP) el.style.opacity = SC_OP = op;
   const mv = me.onGround ? Math.min(1, Math.hypot(me.vel.x, me.vel.z) / RUN) : 0, sx = Math.round(Math.sin(bobT) * SCOPE.sombra * mv), sy = Math.round(Math.abs(Math.cos(bobT)) * SCOPE.sombra * .6 * mv);
@@ -20660,7 +20689,10 @@ function updateViewmodel(dt) {
   G.kick = Math.max(0, G.kick - dt * 10); G.kickL = Math.max(0, (G.kickL || 0) - dt * 10);
   o.z += G.kick * .06; o.rx += G.kick * .1;
   const pist = pistolaVM(ud); if (pist) pistolaPose(o, ud);
-  if (now < G.switchEnd && !pist && !ud.armsKnife && !ud.fps2?.clips.draw) { const k = smooth((G.switchEnd - now) / (G.switchDur || .35)); o.y -= k * .22; o.rx -= k * .9; o.rz += k * .35; if (ud.scopeEye || ud.boltAction) { o.rx += k * .5; o.y -= k * .08; } } // precisão (a6): arma comprida sobe de baixo sem apontar a luneta para o olho // sacando a arma (os braços do Blender têm animação própria)
+  if (now < G.switchEnd && !pist && ud.fps2?.P && !ud.fps2.knife && !ud.fps2.clips.draw) { // pacote sem clipe de saque (sniper, bomba): sobe de baixo girando em volta do gatilho (em volta do olho a luneta/coronha enchia a tela)
+    const k = smooth((G.switchEnd - now) / (G.switchDur || .35)), S = FZSAQ; o.x += S.x * k; o.y += S.y * k;
+    _pQ.setFromEuler(_pE.set(S.rx * k, 0, S.rz * k)); _pV.fromArray(ud.fps2.P.v?.p || FPV.long.p); _pV2.copy(_pV).applyQuaternion(_pQ); o.x += _pV.x - _pV2.x; o.y += _pV.y - _pV2.y; o.z += _pV.z - _pV2.z; o.rx += S.rx * k; o.rz += S.rz * k;
+  } else if (now < G.switchEnd && !pist && !ud.armsKnife && !ud.fps2?.clips.draw) { const k = smooth((G.switchEnd - now) / (G.switchDur || .35)); o.y -= k * .22; o.rx -= k * .9; o.rz += k * .35; if (ud.scopeEye || ud.boltAction) { o.rx += k * .5; o.y -= k * .08; } } // precisão (a6): arma comprida sobe de baixo sem apontar a luneta para o olho // sacando a arma (os braços do Blender têm animação própria)
   if (ud.armsKnife) ARMS.mixer.update(dt);
   if (ud.fps2) fpUpdate(ud, dt);
   if (G.swing > 0) { G.swing = Math.max(0, G.swing - dt * 4); if (ud.toss) nadeToss(ud, o, 1 - G.swing); else { const s = Math.sin(G.swing * Math.PI); o.ry += s * 1.1; o.x -= s * .12; o.z -= s * .1; } } // (a8) arremesso/colocação
@@ -21243,12 +21275,12 @@ function shoot(esq) {
     if (C.ms && !ZC.on) { C.ms.s++; if (dmgBy.size) C.ms.h++; if (hs) C.ms.hh = (C.ms.hh || 0) + 1; }
     sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: ends, sup: attHas(G.cur, 'sup') ? 1 : undefined });
   }
-  if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); if (w.snd !== 'silenced') { muzzleFlash(mz); if (esq) AK.flash = now + .05; else vmFlashUntil = now + .05; } } // supressor: sem clarão, tiro abafado (rp1: USP-S e MP5-SD, de supressor de fábrica, também)
+  if (w.sil) play(w.snd); /* M4A1-S: silenciador de fábrica, sem clarão */ else if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); if (w.snd !== 'silenced') { muzzleFlash(mz); if (esq) AK.flash = now + .05; else vmFlashUntil = now + .05; } } // supressor: sem clarão, tiro abafado (USP-S e MP5-SD, de supressor de fábrica, também)
   G[esq ? 'kickL' : 'kick'] = (vmGun?.userData.fps2 ? .25 : 1) * attStat(G.cur, 'kick') * (w.zw ? ZBAL.armas.coice[w.base || G.cur] ?? 1 : 1); // zumbi-v2 (Etapa 2): coice por arma (zumbi_config.js), só nas armas do modo zumbi (zv2-R2: as do CS herdam base)
   if (vmGun?.userData.fps2) fpPlay(vmGun.userData, 'fire');
   if (!['shotgun', 'launcher', 'dbarrel', 'revolver', 'scout', 'awp'].includes(w.model) || w.rate < .6 && w.model === 'shotgun') ejectShell(w); // bomba/ferrolho ejetam na hora da ação
-  if (w.scope && G.scope && w.model !== 'dmr') { G.rezoom = G.scope; G.scope = 0; } // ferrolho manual sai da luneta; Dragunov/PSG1 (semiautomáticas) ficam
-  if ((esq ? a.magL : a.mag) === 0 && a.res > 0) { const id = G.cur; setTimeout(() => { if (G.cur === id) startReload(); }, w.model === 'shotgun' && w.rate >= .6 ? 550 : 250); } // zumbi-v2 (Etapa 2): não corta a bomba da escopeta no último cartucho; zv2-R2: só recarrega se a arma continua na mão
+  if (w.scope && G.scope && ['awp', 'scout'].includes(w.model)) { G.rezoom = G.scope; G.scope = 0; } // ferrolho manual sai da luneta; Dragunov/PSG1/G3SG1/SCAR-20 (semiautomáticas) e SG 553/AUG (luneta de fuzil) ficam
+  if ((esq ? a.magL : a.mag) === 0 && a.res > 0) { const id = G.cur; setTimeout(() => { if (G.cur === id) startReload(); }, ['shotgun', 'dbarrel'].includes(w.model) && w.rate >= .6 ? 550 : 250); } // zumbi-v2 (Etapa 2): não corta a bomba da escopeta no último cartucho; zv2-R2: só recarrega se a arma continua na mão
 }
 function knifeAttack(heavy) {
   const w = W.knife; G.nextFire = now + (heavy ? w.altRate : w.rate); G.swing = 0; G.kan = { type: heavy ? 'stab' : G.lastSlash?.type === 'slash' && now - G.lastSlash.t0 < 1 ? 'slash2' : 'slash', t0: now }; if (!heavy) G.lastSlash = G.kan; // golpes seguidos alternam o lado
