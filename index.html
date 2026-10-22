@@ -916,15 +916,16 @@ W.clay = { name: 'Claymore', slot: 'nade', model: 'clay', speed: 1 }; // mina po
 W.dmach = { name: 'Máquina da Morte', slot: 'special', pu: 1, dmg: 150, rate: .055, auto: 1, mag: 9999, res: 0, reload: 1, spread: .018, move: .02, air: .1, head: 3, rm: 1, pen: 1, speed: .9, model: 'lmg', snd: 'rifle', tracer: 0xffd040 };
 // Armas do CS2 (Rodadas e Mata-mata): números do CS2 (dano, perfuração de colete, cadência, pente, preço, recompensa, velocidade).
 // Cada uma usa o modelo realista baixado de uma arma parecida (base); no modo Zumbis elas não aparecem.
+// rp1: MAC-10 na MP5K (compacta, sem coronha; era a MP40, comprida e de coronha) e UMP-45 na MP5 (caixa de polímero; era a AK-74u)
 const CSW = (base, o) => ({ slot: 'primary', air: .2, move: .05, recoil: .02, rm: .9, speed: .9, reward: 300, head: 4, ...o, base, model: W[base].model, cs: 1 });
 Object.assign(W, {
   tec9:     CSW('m1911', { name: 'Tec-9', slot: 'secondary', price: 500, dmg: 33, rate: .12, mag: 18, res: 90, reload: 2.5, spread: .008, move: .035, air: .1, pen: .9, rm: .83, speed: .96, snd: 'pistol' }),
   five7:    CSW('p250', { name: 'Five-SeveN', slot: 'secondary', price: 500, dmg: 32, rate: .12, mag: 20, res: 100, reload: 2.2, spread: .007, move: .03, air: .1, pen: .91, rm: .81, speed: .96, snd: 'pistol' }),
   cz75a:    CSW('cz75', { name: 'CZ75-Auto', slot: 'secondary', price: 500, dmg: 31, rate: .1, auto: 1, mag: 12, res: 12, reload: 2.7, spread: .01, move: .035, air: .1, pen: .78, rm: .85, speed: .96, reward: 100, snd: 'pistol' }),
   r8:       CSW('python', { name: 'R8 Revolver', slot: 'secondary', price: 600, dmg: 86, rate: .5, mag: 8, res: 8, reload: 2.3, spread: .006, move: .08, air: .2, pen: .93, rm: .94, speed: .96, snd: 'deagle' }),
-  mac10:    CSW('mp40', { name: 'MAC-10', price: 1050, dmg: 29, rate: .075, auto: 1, mag: 30, res: 100, reload: 2.6, spread: .013, move: .02, air: .12, pen: .58, rm: .8, speed: .96, reward: 600, snd: 'smg' }),
+  mac10:    CSW('mp5k', { name: 'MAC-10', price: 1050, dmg: 29, rate: .075, auto: 1, mag: 30, res: 100, reload: 2.6, spread: .013, move: .02, air: .12, pen: .58, rm: .8, speed: .96, reward: 600, snd: 'smg' }),
   mp9:      CSW('mp5k', { name: 'MP9', price: 1250, dmg: 26, rate: .07, auto: 1, mag: 30, res: 120, reload: 2.1, spread: .012, move: .02, air: .12, pen: .6, rm: .87, speed: .96, reward: 600, snd: 'smg' }),
-  ump45:    CSW('ak74u', { name: 'UMP-45', price: 1200, dmg: 35, rate: .09, auto: 1, mag: 25, res: 100, reload: 3.5, spread: .011, move: .025, air: .12, pen: .65, rm: .75, speed: .92, reward: 600, snd: 'smg' }),
+  ump45:    CSW('mp5', { name: 'UMP-45', price: 1200, dmg: 35, rate: .09, auto: 1, mag: 25, res: 100, reload: 3.5, spread: .011, move: .025, air: .12, pen: .65, rm: .75, speed: .92, reward: 600, snd: 'smg' }),
   xm1014:   CSW('spas', { name: 'XM1014', price: 2000, dmg: 20, pellets: 6, rate: .35, auto: 1, mag: 7, res: 32, reload: 3, shellTime: .45, spread: .045, move: .02, air: .05, pen: .8, rm: .7, speed: .86, reward: 900, snd: 'shotgun' }),
   mag7:     CSW('stakeout', { name: 'MAG-7', price: 1300, dmg: 30, pellets: 8, rate: .85, mag: 5, res: 32, reload: 2.5, spread: .04, move: .02, air: .05, pen: .75, rm: .45, speed: .9, reward: 900, snd: 'shotgun' }),
   sawedoff: CSW('olympia', { name: 'Sawed-Off', price: 1100, dmg: 32, pellets: 8, rate: .85, mag: 7, res: 32, reload: 3, shellTime: .5, spread: .07, move: .02, air: .05, pen: .75, rm: .45, speed: .84, reward: 900, snd: 'shotgun' }),
@@ -17541,7 +17542,8 @@ function w19Capsula(w) {
   const geo = W19C.geo[k] ||= new THREE.CylinderGeometry(shotgun ? .0105 : big ? .02 : .005, shotgun ? .0105 : big ? .02 : .005, shotgun ? .05 : big ? .05 : .026, 8);
   const f = P.pop() || { m: new THREE.Mesh(geo, null), v: new V3(), t: 0, pool: P }; f.m.material = shotgun ? A.shell : A.brass; f.t = 0;
   const ud = vmGun.userData, mz = ud.muzzle, g = w19Arma(ud), p = f.m.position;
-  if (g === vmRoot) { p.copy(mz); p.z *= .4; p.x += .025; } // estilo CS / braços prontos: como antes
+  if (ud.fps2?.ej) { ud.fps2.ej.updateMatrixWorld(true); vmRoot.worldToLocal(p.setFromMatrixPosition(ud.fps2.ej.matrixWorld)); } // rp1: braços prontos: da janela de ejeção (antes nascia a 20 cm do olho, atrás da mão)
+  else if (g === vmRoot) { p.copy(mz); p.z *= .4; p.x += .025; } // estilo CS: como antes
   else p.set(.03, mz.y + .018, ud.slide || !ud.magRest || ud.magRest.z > 0 ? mz.z * .4 : Math.max(mz.z * .5, ud.magRest.z - .02)); // janela de ejeção: lado direito, em cima, sobre o carregador (pistola: no ferrolho; bullpup: na frente do rosto, senão nasce fora da tela)
   p.applyMatrix4(g.matrixWorld); f.m.rotation.set(rand(0, 3), rand(0, 3), 0);
   if (w.model === 'revolver' || w.model === 'dbarrel') f.v.set(rand(-.2, .2), rand(-1.2, -.6), rand(0, .3)); else f.v.set(rand(.9, 1.4), rand(.9, 1.5), rand(-.2, .3));
@@ -19174,7 +19176,7 @@ const FPK = {
 // vo = deslocamento extra na tela (armas grossas ficam mais longe do olho), ve = giro extra [guinada, arfagem, rolagem]
 const FPM = {
   glock: { T: [null, .505, .431], fwd: '+z', up: '+y', L: .186 },
-  usp: { T: [-.014, .082, null], fwd: '+x', up: '+y', L: .194, hide: ['Object_4', 'Object_5', 'Object_7', 'Object_12', 'Object_13', 'Object_14', 'Object_15'] },
+  usp: { T: [-.014, .082, null], fwd: '+x', up: '+y', L: .194, hide: ['Object_4', 'Object_5', 'Object_7', 'Object_12', 'Object_13', 'Object_14', 'Object_15'], parts: { mag: /^usp9_15rnd_empty/, slide: /^usp9_slide_\d/ } }, // rp1: sem ossos; carregador e ferrolho são nós (o carregador não saía na recarga nem o ferrolho no tiro)
   p250: { T: [-.008, .005, null], fwd: '+x', up: '+y', L: .196 },
   deagle: { T: [-31, 11, null], fwd: '+x', up: '+y', L: .27 },
   cz75: { T: [-.08, .18, null], fwd: '+x', up: '+y', L: .207 },
@@ -19326,6 +19328,18 @@ function fpTips(c) {
   return { L, muzzle: tip, sight: new V3(tip.x, sy, 0), rail: new V3(tip.x, ry > -1e8 ? ry : sy, L * .02) };
 }
 const fpArm = m => /arm/i.test(m.material?.name || '') || m.material?.name === 'material';
+// rp1 (revisão de pistolas e SMGs nos braços prontos): ej = janela de ejeção, à frente do gatilho (fração do comprimento da arma);
+// sup = supressor (m) das armas de som abafado, cujo modelo baixado não tem: raio (fica abaixo da linha de mira), comprimento e
+// quanto entra na boca; recarga = desvio (x, y em m) da pistola na recarga; insp = a inspeção (F) gira em volta do gatilho (em volta do olho o braço enchia a tela)
+const RP1 = { recarga: [-.015, .05], ej: .12, sup: { r: .016, L: .15, dentro: .006, folga: .003, cor: 0x1b1c1e } };
+let rp1Geo = null;
+function rp1Supressor(tips, C, body, mz, u) { // u: unidades do modelo por metro
+  const S = RP1.sup, r = Math.max(.008, Math.min(S.r, (tips.sight.y - tips.muzzle.y) / u - S.folga)) * u, L = S.L * u, z0 = tips.muzzle.z - S.dentro * u;
+  const m = new THREE.Mesh(rp1Geo ||= new THREE.CylinderGeometry(1, 1, 1, 24), new THREE.MeshStandardMaterial({ color: S.cor, metalness: .55, roughness: .5 }));
+  rp1Geo.userData.keep = true; m.matrixAutoUpdate = false; m.frustumCulled = false; m.castShadow = false;
+  m.matrix.copy(C).multiply(new THREE.Matrix4().makeTranslation(tips.muzzle.x, tips.muzzle.y, z0 + L / 2)).multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2)).multiply(new THREE.Matrix4().makeScale(r, L, r));
+  body.add(m); mz.position.set(tips.muzzle.x, tips.muzzle.y, z0 + L).applyMatrix4(C); // a boca (traçante) passa para a ponta do supressor
+}
 // monta os braços + arma para a arma id; devolve false se ainda não carregou (aí usa o modelo antigo até carregar)
 function fpBuild(id, ud) {
   const W2 = fpw(id), P = FPK[W2.pack], D = W2.m && FPM[W2.m], pk = 'p:' + W2.pack, mk = W2.m && 'm:' + W2.m;
@@ -19366,9 +19380,9 @@ function fpBuild(id, ud) {
     model = new THREE.Group(); model.matrixAutoUpdate = false; model.matrix.copy(C).multiply(Mi); model.add(ms); body.add(model);
     root.updateMatrixWorld(true);
     // peças móveis do modelo seguem as do pacote (carregador na recarga, ferrolho da pistola, ferrolho do fuzil)
-    for (const [pb, re] of [[P.mag, /^mag(_\d+|_armature)?$/i], [P.slide, /^slide(_\d+)?$/i], [P.bolt, /^boltmove(_\d+)?$/i]]) {
+    for (const [pb, re, pn] of [[P.mag, /^mag(_\d+|_armature)?$/i, D.parts?.mag], [P.slide, /^slide(_\d+)?$/i, D.parts?.slide], [P.bolt, /^boltmove(_\d+)?$/i]]) {
       const a = pb && fpBone(root, pb); let b = null; if (!a) continue;
-      ms.traverse(o => { if (!b && o.isBone && re.test(o.name)) b = o; });
+      ms.traverse(o => { if (!b && (pn ? pn.test(o.name) : o.isBone && re.test(o.name))) b = o; }); // pn: modelo sem ossos, a peça é um nó (D.parts)
       if (!b) continue;
       const f = { a, b, d: a.matrixWorld.clone().invert().multiply(b.matrixWorld) };
       if (pb === P.mag) { // carregador: fora da arma, o centro do carregador do modelo vai para o centro do do pacote (senão fica no ar, longe da mão)
@@ -19437,6 +19451,8 @@ function fpBuild(id, ud) {
   if (D?.brass) model.traverse(o => { if (o.isMesh && D.brass.includes(o.material.name)) Object.assign(o.material, { metalness: .9, roughness: .35 }).color.set(0xb08d3c); }); // balas brancas sem textura viram latão
   if (D?.lens) model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) Object.assign(o.material, { roughness: .08, metalness: .4 }).color.set(0x14232c); }); // vidro da luneta
   const mz = new THREE.Object3D(); mz.position.copy(tips.muzzle).applyMatrix4(C); body.add(mz);
+  const ej = new THREE.Object3D(); ej.position.set(tips.muzzle.x, lerp(tips.muzzle.y, tips.sight.y, .6), tips.L * RP1.ej).applyMatrix4(C); body.add(ej); // rp1: janela de ejeção (cápsula)
+  if (D && W[id]?.snd === 'silenced') rp1Supressor(tips, C, body, mz, tips.L / D.L); // rp1: USP-S e MP5-SD: o modelo baixado vem sem o supressor
   // pacote → tela: o gatilho da arma vai para o mesmo ponto da tela em todas as armas (FPV), com o cano no mesmo giro; os braços vêm junto
   const V = P.v || FPV[P.view || 'long'], k = FPH / P.hr, de = D?.ve || [0, 0, 0], tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1] + de[1], Math.PI + V.e[0] + de[0], V.e[2] + de[2], 'YXZ'));
   const holder = new THREE.Group(); holder.matrixAutoUpdate = false;
@@ -19446,6 +19462,7 @@ function fpBuild(id, ud) {
   const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)).multiply(tq.clone().invert()), sp = tips.sight.clone().applyMatrix4(Gv).applyQuaternion(aq);
   holder.add(root);
   Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, mz, follow, ik, body, C, aq, sl: tips.sight.clone().applyMatrix4(C), ap: new V3(0, 0, -(P.view === 'pistol' ? ADS.csPistola : ADS.csLonga)).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
+  ud.fps2.ej = ej;
   ud.fab = null; ud.fabLens = null; // a holográfica da arma feita no código não vale aqui (a M4 baixada usa a mira de ferro dela)
   if (D?.lens && !W[id]?.scope) { // mira de fábrica do modelo baixado (P90: colimador; HK21/M249: luneta): no ADS a lente fica transparente, com retícula e zoom (FABM)
     ud.fab = FAB_HOLO.includes(attBase(id)) ? 'holo' : 'luneta'; ud.fabLens = [];
@@ -20221,6 +20238,7 @@ function gunAnim(ud, w, o) {
   if (G.reloadEnd && !G.reload && pistolaVM(ud)) { // pistola: na recarga sobe e deita mais, a boca do carregador (e a mão que traz o novo) aparece na tela
     const t = clamp((now - G.reloadStart) / (G.reloadEnd - G.reloadStart), 0, 1), k = seg(t, 0, .14) * (1 - seg(t, .84, 1)), R = PIST.recarga;
     o.x += R.x * k; o.y += R.y * k; o.rx += R.rx * k; o.rz += R.rz * k;
+    if (ud.fps2) { o.x += RP1.recarga[0] * k; o.y += RP1.recarga[1] * k; } // rp1: braços prontos: a animação do pacote baixa a pistola e a troca do carregador ficava fora da tela
     if (ud.spdl) ud.spdl.visible = t > PIST.rapido.de && t < PIST.rapido.ate;
   } else if (ud.spdl) ud.spdl.visible = false;
   if (ud.hammer) { // cão do revólver: cai para a frente no tiro e volta armado (dupla ação) até o próximo
@@ -20363,6 +20381,9 @@ function armaInspectPose(o) {
   const t = (now - S.t0) / GINSP.dur, fr = GINSP.fr; let i = 1; while (i < fr.length - 1 && t > fr[i][0]) i++;
   const A = fr[i - 1], B = fr[i], k = smooth(clamp((t - A[0]) / (B[0] - A[0]), 0, 1)), v = j => lerp(A[j], B[j], k);
   o.x += v(1); o.y += v(2); o.z += v(3); o.rx += v(4); o.ry += v(5); o.rz += v(6);
+  const P = vmGun?.userData.fps2?.P; if (P?.v || P?.view) { // rp1: braços prontos: gira em volta do gatilho, o + (P - R·P) (em volta do olho a arma saía da tela e o braço a enchia)
+    _vmQ.setFromEuler(_vmE.set(v(4), v(5), v(6))); _vmV.fromArray(P.v?.p || FPV[P.view === 'pistol' ? 'pistol' : 'long'].p); _vmV2.copy(_vmV).applyQuaternion(_vmQ);
+    o.x += _vmV.x - _vmV2.x; o.y += _vmV.y - _vmV2.y; o.z += _vmV.z - _vmV2.z; }
 }
 function knifeInspect() {
   if (vmGun?.userData.armsKnife) { if (ARMS.cur === 'idle') armsPlay('inspect'); return; }
@@ -21184,7 +21205,7 @@ function shoot(esq) {
     if (C.ms && !ZC.on) { C.ms.s++; if (dmgBy.size) C.ms.h++; if (hs) C.ms.hh = (C.ms.hh || 0) + 1; }
     sendToHost({ t: 'shot', w: G.cur, o: [r3(mz.x), r3(mz.y), r3(mz.z)], e: ends, sup: attHas(G.cur, 'sup') ? 1 : undefined });
   }
-  if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); muzzleFlash(mz); if (esq) AK.flash = now + .05; else vmFlashUntil = now + .05; } // supressor: sem clarão, tiro abafado
+  if (attHas(G.cur, 'sup')) playQ(w.snd, .3); else { play(w.snd); if (w.snd !== 'silenced') { muzzleFlash(mz); if (esq) AK.flash = now + .05; else vmFlashUntil = now + .05; } } // supressor: sem clarão, tiro abafado (rp1: USP-S e MP5-SD, de supressor de fábrica, também)
   G[esq ? 'kickL' : 'kick'] = (vmGun?.userData.fps2 ? .25 : 1) * attStat(G.cur, 'kick') * (w.zw ? ZBAL.armas.coice[w.base || G.cur] ?? 1 : 1); // zumbi-v2 (Etapa 2): coice por arma (zumbi_config.js), só nas armas do modo zumbi (zv2-R2: as do CS herdam base)
   if (vmGun?.userData.fps2) fpPlay(vmGun.userData, 'fire');
   if (!['shotgun', 'launcher', 'dbarrel', 'revolver', 'scout', 'awp'].includes(w.model) || w.rate < .6 && w.model === 'shotgun') ejectShell(w); // bomba/ferrolho ejetam na hora da ação
@@ -21453,7 +21474,7 @@ function remoteShot(m) {
     if (w?.splash) m.e.forEach(e => zBoomFx(new V3(e[0], e[1], e[2]), w));
     else if (w?.pellets) m.e.forEach(e => puff(new V3(e[0], e[1], e[2]), 0xbbb5a8, .3, .3, .3)); else m.e.forEach(e => impact(new V3(e[0], e[1], e[2]), null));
   }
-  if (m.sup) playQ(w?.snd || 'pistol', .25, o); else { play(w?.snd || 'pistol', o); muzzleFlash(mo, true, .34); } // supressor (Armeiro): sem clarão, abafado e com posição
+  if (m.sup) playQ(w?.snd || 'pistol', .25, o); else { play(w?.snd || 'pistol', o); if (w?.snd !== 'silenced') muzzleFlash(mo, true, .34); } // supressor (Armeiro): sem clarão, abafado e com posição
   if (ZC.on && !w?.thunder && !w?.frost) zShotReact(o, m.e);
 }
 // boca do cano do jogador remoto no mundo (com o supressor dele à mostra); sem modelo visível ou longe demais do o, fica o o
