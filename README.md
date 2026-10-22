@@ -232,11 +232,15 @@ Na primeira vez, o jogo escolhe sozinho: Alto para placa de vídeo dedicada, Mé
 
 ## Tecnologia
 
-Um único arquivo `index.html`. Usa [three.js](https://threejs.org) para o 3D e [PeerJS](https://peerjs.com) para a conexão (as duas bibliotecas ficam em `vendor/`, com os hashes em `vendor/HASHES.md`; abrindo o arquivo direto do disco elas vêm da CDN). Sons e mapas são gerados por código; os braços em primeira pessoa e os modelos das armas são arquivos glTF em `assets/` (veja os créditos abaixo).
+Um único arquivo `index.html`. Usa [three.js](https://threejs.org) para o 3D e [PeerJS](https://peerjs.com) para a conexão (as duas bibliotecas ficam em `vendor/`, com os hashes em `vendor/HASHES.md`; abrindo o arquivo direto do disco elas vêm da CDN). Mapas e a maior parte dos sons são gerados por código; os tiros usam gravações reais de armas (CC0) em `assets/sfx/`, com o som sintetizado de reserva se os arquivos não carregarem; os braços em primeira pessoa e os modelos das armas são arquivos glTF em `assets/` (veja os créditos abaixo).
 
 ## Segurança
 
 O host confere o que cada cliente manda (posição, tiros, acertos, compras, cadência, limite de mensagens) e avisa quando alguém sai do esperado; na pausa o host pode expulsar. A auditoria completa, as correções e o que ainda depende de configuração manual (TURN, regras do Firestore, chave de API, App Check, GitHub) estão em `docs/seguranca/` (`relatorio_final.md` e `acoes_manuais.md`). Testes: `pnpm install` e `pnpm test` (abre um Chromium por arquivo; precisa de internet). Ao mudar armas, mapas ou mensagens de rede, subir `PROTO` no `index.html`.
+
+## Créditos dos sons
+
+Os tiros gravados (Free Firearm Sound Library) e o foley da escopeta são CC0; a lista por arquivo (autor, origem e licença) está em [`assets/sfx/CREDITOS.md`](assets/sfx/CREDITOS.md).
 
 ## Créditos dos modelos 3D
 
