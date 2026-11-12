@@ -19512,7 +19512,7 @@ const FPM = {
   galil: { T: [-130, 39, null], fwd: '+x', up: '+y', L: .98, brass: ['Material.007', 'Material.008', 'Material.009'], lhf: .32 }, // a3: mão esquerda no guarda-mão, não no tubo de gás
   rpk: { T: [-116, 20, null], fwd: '+x', up: '+y', L: 1.04, lhf: .3, tint: { 'Material.008': 0x3a2014, 'Material.003': 0x3a2014, 'Material.002': 0x45281a, 'Material.007': 0x2e1a10 } }, // a3: madeira chapada rosada vira madeira escura; mão no guarda-mão
   hk21: { T: [-1.0, -.30, null], fwd: '+x', up: '+y', L: 1.02, lens: ['Material.015'], lhf: .78, cover: 'topcover', coverA: 1.1 }, // mão esquerda à frente da caixa de munição; a7: tampa abre na recarga
-  dragunov: { T: [-93, -6.7, null], fwd: '+x', up: '+y', L: 1.225, noMag2: 1 }, // carregador curto: a cópia na mão ficava solta
+  dragunov: { T: [-93, -6.7, null], fwd: '+x', up: '+y', L: 1.225, magBase: 1 }, // fz2: carregador curto: o fundo dele vai para o fundo do do pacote (a cópia na mão ficava solta)
   m4: { T: [-20, -3, null], fwd: '+x', up: '+y', L: .84 , lhf: .5, magBase: 1 },
   commando: { T: [-44, -1, null], fwd: '+x', up: '+y', L: .85 , lhf: .5, magBase: 1 },
   fal: { T: [-16.5, 2.3, null], fwd: '+x', up: '+y', L: 1.09 , lhf: .5 , tint: { Material: 0x2b2b2b, 'Material.003': 0x2b2b2b }, brass: ['Material.001', 'Material.002'], mat: 1 }, // a13 mat: modelo sem textura (cinza chapado) leva o aço/polímero das armas do jogo
@@ -19853,7 +19853,7 @@ function fpBuild(id, ud) {
   const Tw = new V3().setFromMatrixPosition(Aw), e = Aw.elements;
   const A = fpFrame(Tw, new V3(e[8], e[9], e[10]), new V3(e[4], e[5], e[6]));
   const Ai = A.clone().invert(), pc = pp.map(p => p.applyMatrix4(Ai)), ptips = fpTips(pc); // arma do pacote no referencial da arma
-  let C, tips, model = null, follow = [], ik = null, lh = null, F2 = null;
+  let C, tips, model = null, follow = [], ik = null, lh = null, F2 = null, z2r = null;
   if (D) { // modelo baixado no lugar da arma do pacote
     const mg = FPC[mk], ms = SkeletonUtils.clone(mg.scene);
     ms.traverse(o => { if (o.isMesh && D.hide?.includes(o.name)) o.visible = false; });
@@ -19870,7 +19870,8 @@ function fpBuild(id, ud) {
     model = new THREE.Group(); model.matrixAutoUpdate = false; model.matrix.copy(C).multiply(Mi); model.add(ms); body.add(model);
     root.updateMatrixWorld(true);
     // peças móveis do modelo seguem as do pacote (carregador na recarga, ferrolho da pistola, ferrolho do fuzil)
-    for (const [pb, re, pn] of [[P.mag, /^mag(_\d+|_armature)?$/i, D.parts?.mag], [P.slide, /^slide(_\d+)?$/i, D.parts?.slide], [P.bolt, /^boltmove(_\d+)?$/i]]) {
+    z2r = FZ2R[W2.m] && fz2Recorte0(ms, FZ2R[W2.m], body); // fz2: carregador misturado nas outras malhas (MP5) ganha um nó próprio
+    for (const [pb, re, pn] of [[P.mag, /^mag(_\d+|_armature)?$/i, D.parts?.mag ?? (z2r?.R.topo ? null : z2r?.re)], [P.slide, /^slide(_\d+)?$/i, D.parts?.slide], [P.bolt, /^boltmove(_\d+)?$/i]]) {
       const a = pb && fpBone(root, pb); let b = null; if (!a) continue;
       ms.traverse(o => { if (!b && (pn ? pn.test(o.name) : o.isBone && re.test(o.name))) b = o; }); // pn: modelo sem ossos, a peça é um nó (D.parts)
       if (!b) continue;
@@ -19883,6 +19884,8 @@ function fpBuild(id, ud) {
       }
       follow.push(f);
     }
+    const fz = z2r && follow.find(f => f.b === z2r.no), cz = fz && fpBoneCenter(root, fz.a, m => !fpArm(m)); // fz2: fora da arma, o centro do carregador vai para o do pacote
+    if (cz) { fz.t0 = new V3().setFromMatrixPosition(fz.d); fz.t1 = cz.sub(z2r.cB.clone().applyMatrix3(new THREE.Matrix3().setFromMatrix4(fz.d))); }
     // segundo carregador do pacote (o novo, que a mão esquerda traz na recarga da AK): cópia do modelo em que só o carregador aparece
     const a2 = P.mag2 && !D.noMag2 && fpBone(root, P.mag2), fm = follow.find(f => f.rest), hl2 = fpBone(root, 'Hand_L');
     if (a2 && fm && hl2) {
@@ -19910,6 +19913,7 @@ function fpBuild(id, ud) {
         // na mão (longe do encaixe), o centro do carregador do modelo vai para o centro do carregador novo do pacote
         const cA2 = fpBoneCenter(root, a2, m => !fpArm(m)), cB2 = fpBoneCenter(ms, fm.b, m => m.visible);
         if (cA2 && cB2) { F2.t0 = new V3().setFromMatrixPosition(d2); F2.t1 = cA2.clone().sub(cB2.applyMatrix3(new THREE.Matrix3().setFromMatrix4(d2))); }
+        if (D.magBase && F2.t1) fpMagBase(F2, root, ms, a2, fm.b, A, D.magBase); // fz2: carregador curto (G3SG1/SCAR-20): o fundo dele na mão
       }
     }
     // mão esquerda: no pacote ela segura o guarda-mão da arma dele; no modelo vai para o guarda-mão do modelo (mesma folga embaixo dele)
@@ -19940,6 +19944,7 @@ function fpBuild(id, ud) {
   if (D?.brass) model.traverse(o => { if (o.isMesh && D.brass.includes(o.material.name)) Object.assign(o.material, { metalness: .9, roughness: .35 }).color.set(0xb08d3c); }); // balas brancas sem textura viram latão
   if (D?.lens) model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) Object.assign(o.material, { roughness: .08, metalness: .4 }).color.set(0x14232c); }); // vidro da luneta
   vxArma(root, P, D, b8 + (W[id]?.sil ? '|sil' : '')); // vx: a arma vira voxel fino (peça por peça, presa ao osso dela: animações, carregador e ferrolho continuam); skin entra por cima
+  if (z2r && (VX.on || z2r.nos)) fz2Recorte(z2r); // fz2: os voxels do carregador (MP5) passam para o nó dele
   const sk = SKIN_BY[skinOf(id)], pap = W[id]?.pap | 0;
   if (sk || pap || D?.mat) { // (a13: D.mat = modelo sem textura usa os materiais das armas do jogo, mesmo sem skin) skin: no modelo baixado ou, nas armas do próprio pacote (AK-47, Nova), nas peças da arma do pacote (cartucho fica)
     const M = gunMats(pap, true, skinOf(id)), mats = { a: M.metal, b: M.polymer };
@@ -19965,7 +19970,9 @@ function fpBuild(id, ud) {
     if (ud.fab === 'luneta') model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name) && !ud.fabLens.includes(o.material)) { o.material.transparent = true; ud.fabLens.push(o.material); } });
   }
   // a15: o saque do pacote cabe no tempo do jogo (G.switchDur); modelo que chega depois entra no ponto do saque em que a troca está (ou parado)
-  const sw = G.switchEnd - now, dr = clips.draw && sw > .02; mixer.stopAllAction(); fpPlay(ud, dr ? 'draw' : 'idle', dr ? G.switchDur : undefined); mixer.update(dr ? Math.max(0, G.switchDur - sw) : 0); if (dr) ud.fps2.until = G.switchEnd;
+  const z2 = FZ2F.includes(W2.pack); // fz2: saque procedural (sobe girando com mola, a mão esquerda chega depois) sobre a pose parada
+  const sw = G.switchEnd - now, dr = clips.draw && sw > .02 && !z2; mixer.stopAllAction(); fpPlay(ud, dr ? 'draw' : 'idle', dr ? G.switchDur : undefined); mixer.update(dr ? Math.max(0, G.switchDur - sw) : 0); if (dr) ud.fps2.until = G.switchEnd;
+  if (z2) { fz2Monta(ud.fps2, id, W2, D ? model.children[0] : null); if (z2r?.R.topo) ud.fps2.z2.topo = { no: z2r.no, c0: z2r.c0, pc: new V3(), q: new THREE.Quaternion(), on: false }; }
   if (D?.cover) fpCoverInit(ud.fps2, model.children[0], D); // a7: tampa de alimentação do modelo (metralhadora de fita)
   return holder;
 }
@@ -20112,22 +20119,24 @@ function fpFollow(F, f) {
     else if (f.st === 0 && f.main.w > .99) f.st = 1;
     else if (f.st === 1 && f.main.w < .01) f.st = 2;
     const near = _fv.setFromMatrixPosition(f.a.matrixWorld).distanceTo(_fv2.setFromMatrixPosition(f.hl.matrixWorld)) < .14 * f.hr;
-    f.g.visible = near && f.st < 2; if (!f.g.visible) return;
+    f.g.visible = F.z2?.r ? fz2Fant(F) : near && f.st < 2; if (!f.g.visible) return; // fz2: pelo roteiro da recarga
     for (const o of f.tiny) o.scale.setScalar(1e-4);
   }
   _fm2.copy(f.d); if (f.t1) _fm2.setPosition(_fv.copy(f.t0).lerp(f.t1, w));
   if (f.ghost) f.g.updateMatrixWorld(true);
   _fm2.premultiply(f.a.matrixWorld);
   const pl = F.ik?.pushL; if (pl && f.rest) { _fv.setFromMatrixPosition(_fm2).addScaledVector(pl, f.ghost ? 1 : w); _fm2.setPosition(_fv); } // fora da arma, o carregador vai junto com a mão desviada
+  const zm = F.ik?.zm; if (zm && f.rest) { _fv.setFromMatrixPosition(_fm2).addScaledVector(zm, f.ghost ? 1 : w); _fm2.setPosition(_fv); } // fz2: idem com o desvio do roteiro
   _fm.copy(f.b.parent.matrixWorld).invert().multiply(_fm2); _fm.decompose(f.b.position, f.b.quaternion, f.b.scale);
 }
 function fpUpdate(ud, dt) {
   const F = ud.fps2, hs = Math.hypot(me.vel.x, me.vel.z);
-  if (G.reloadEnd && !F.reloading) { F.reloading = true; fpPlay(ud, G.reloadEmpty && F.clips.reloadE ? 'reloadE' : 'reload', G.reloadEnd - now); }
+  if (G.reloadEnd && !F.reloading) { F.reloading = true; fpPlay(ud, (G.reloadEmpty || F.z2 && FZ2.arma[G.cur]?.sempreE) && F.clips.reloadE ? 'reloadE' : 'reload', G.reloadEnd - now); if (F.z2) fz2Inicio(F); } // fz2: roteiro da recarga
   if (!G.reloadEnd) F.reloading = false;
   if (F.until && now >= F.until) F.until = 0;
   if (!F.until && !F.reloading) fpPlay(ud, me.sprinting && F.clips.run && !F.P?.semCorrida ? 'run' : hs > 1.5 && me.onGround && F.clips.walk ? 'walk' : 'idle');
   if (F.ik?.sv) { F.ik.arms.forEach((a, i) => { const v = F.ik.sv[i]; a.cl.position.copy(v[0]); a.ua.quaternion.copy(v[1]); a.fa.quaternion.copy(v[2]); if (a.hand) a.hand.position.copy(v[3]); }); if (F.ik.hp) F.ik.hl.position.copy(F.ik.hp); } // desfaz o IK do quadro anterior (ossos sem chave na animação)
+  if (F.z2) fz2Tempo(F); // fz2: tempo do clipe da recarga pelo roteiro
   F.mixer.update(dt);
   if (F.kf) knFollow(F); // faca (a9)
   if (F.hideL) F.hideL.scale.setScalar(1e-3); // faca: a mão esquerda do pacote fica parada no canto da tela, então some (como no CS)
@@ -20137,7 +20146,8 @@ function fpUpdate(ud, dt) {
     for (const f of F.follow) fpFollow(F, f);
   }
   if (F.cv) fpCover(F); // a7: tampa da metralhadora abre na recarga
-  if (FZS.ids.has(G.cur)) fzSons(ud);
+  if (F.z2) fz2Pecas(F, dt); // fz2: eventos (sons, munição, trancos), carregadores e ferrolho
+  else if (FZS.ids.has(G.cur)) fzSons(ud);
 }
 // Fuzis, snipers, escopetas e metralhadoras com braços prontos: o gunAnim (das armas feitas no código) não roda nelas, então a recarga
 // ficava muda e a AWP/SSG 08 e as escopetas de bomba não tocavam o ferrolho/bomba nem soltavam a cápsula (o tiro deixa para "a hora da
@@ -20161,6 +20171,267 @@ function fzSons(ud) {
     G.pumpEv = G.lastShot; play(bolt ? 'bolt' : 'pump'); ejectShell(w.model === 'dbarrel' ? W.nova : w, true); // a Sawed-Off (modelo de cano duplo) ejeta pela janela, como a de bomba
   }
 }
+// ===== fz2: recarga e saque dos fuzis, SMGs e metralhadoras com braços prontos (pacotes ak, rifle e smg) =====
+// Recarga: o clipe do pacote vira um roteiro de trechos [início, fim] (s do clipe) com elasticidade e: a duração da recarga (W.reload)
+// se reparte entre eles na proporção de e × duração (o que acontece fora da tela, como a mão no colete, estica ou encolhe mais; o que se
+// vê fica perto da velocidade original) e a curva u → tempo é monótona e suave (sem tranco de velocidade entre os trechos). Pausa: trecho
+// com início = fim e duração própria (o clipe para e a camada procedural age). Eventos e quadros em "s do roteiro" (o tempo do clipe mais
+// as pausas que vêm antes). Camadas: giro da arma em volta do gatilho (g), desvio da mão esquerda (m, referencial da arma), molas
+// (tranco do encaixe e do ferrolho, assentamento da mão), tremor da câmera; o carregador velho cai (cópia dos voxels) na vazia, o novo
+// só aparece na mão, e a munição entra no instante em que o carregador encaixa (o tiro continua liberado só no fim, W.reload).
+// seg: [início, fim, e, duração (pausa), esticamento máximo (padrão 1,6; fora da tela mais)]
+// ev: pega (o novo aparece na mão), sai (solta o velho: magout), larga (o velho cai), novo (o único carregador volta à mão como novo),
+// encaixa (magin, munição, tranco, câmera), puxa / solta (ferrolho: slide / bolt e tranco), mao (mão de volta ao guarda-mão: assenta)
+// g: [s, rx, ry, rz, x, y, z] (rad e m, somados à pose; em volta do gatilho); m: [s, x, y, z] (cm no referencial da arma: x direita,
+// y cima, z para trás); fer: [s, cm] ferrolho/alavanca puxado para trás (sem o osso do pacote); larga: velocidade inicial da cópia (m/s, câmera)
+const FZ2 = {
+  ak: { // AK do pacote (Pmag + Pmag2): o novo bate no velho, que cai; na vazia a mão passa por baixo e puxa a alavanca do lado direito
+    P: { seg: [[0, .43, .6], [.43, .8, 3, 0, 9], [.8, 1.14, .8], [1.14, 1.38, .35], [1.38, 1.66, .45], [1.66, 1.9, 1.2, 0, 3], [1.9, 2.648, .7]],
+      ev: { pega: .5, sai: 1.2, larga: 1.385, encaixa: 1.64, mao: 2.17 }, cai: 1, larga: [.1, -.6, -.5],
+      g: [[0, 0, 0, 0, 0, 0, 0], [.4, .02, -.04, -.1, -.008, .006, 0], [1.1, .03, -.06, -.16, -.012, .01, .004], [1.75, .03, -.05, -.14, -.01, .008, .004], [2.3, 0, 0, 0, 0, 0, 0]] },
+    E: { seg: [[0, .47, .6], [.47, .75, 3, 0, 9], [.75, 1.13, .8], [1.13, 1.38, .35], [1.38, 1.7, .45], [1.7, 1.97, 1.2, 0, 3], [1.97, 2.44, .7], [2.44, 2.66, .25], [2.66, 3.498, .7]],
+      ev: { pega: .5, sai: 1.2, larga: 1.385, encaixa: 1.69, puxa: 2.47, solta: 2.6, mao: 3.1 }, cai: 1, larga: [.1, -.7, -.4],
+      g: [[0, 0, 0, 0, 0, 0, 0], [.45, .02, -.04, -.1, -.008, .006, 0], [1.1, .03, -.06, -.16, -.012, .01, .004], [1.85, .03, -.05, -.14, -.01, .008, .004], [2.3, .05, .1, .1, -.01, .01, 0], [2.75, .04, .08, .08, -.008, .008, 0], [3.25, 0, 0, 0, 0, 0, 0]] } },
+  rifle: { // fuzil do pacote (um carregador só): o velho cai do encaixe e o mesmo osso volta como o novo; a vazia bate no retém do ferrolho
+    P: { seg: [[0, .36, .8], [.36, .47, 1.2], [.47, .62, 6, 0, 9], [.62, .98, .7], [.98, .98, 2, .22, 3], [.98, 1.652, .9]],
+      ev: { sai: .4, larga: .445, novo: .52, encaixa: .93, tapa: 1.04, mao: 1.4 }, cai: 1, larga: [0, -.5, .1],
+      g: [[0, 0, 0, 0, 0, 0, 0], [.3, .03, -.05, -.14, -.01, .01, 0], [.9, .04, -.06, -.18, -.012, .012, .004], [1.25, .03, -.04, -.12, -.008, .008, .002], [1.6, 0, 0, 0, 0, 0, 0]],
+      m: [[.98, 0, 0, 0], [1.04, 0, -1.6, 0], [1.12, 0, 0, 0]] },
+    E: { seg: [[0, .36, .8], [.36, .47, 1.2], [.47, .62, 6, 0, 9], [.62, .98, .7], [.98, .98, 1.5, .42, 2.5], [.98, 1.652, .9]],
+      ev: { sai: .4, larga: .445, novo: .52, encaixa: .93, solta: 1.2, mao: 1.62 }, cai: 1, larga: [0, -.7, .15],
+      g: [[0, 0, 0, 0, 0, 0, 0], [.3, .03, -.05, -.14, -.01, .01, 0], [.9, .04, -.06, -.18, -.012, .012, .004], [1.12, .05, .02, -.2, -.014, .012, .004], [1.3, .04, 0, -.15, -.01, .01, .002], [1.85, 0, 0, 0, 0, 0, 0]],
+      m: [[.98, 0, 0, 0], [1.14, 5, 7, 2], [1.2, 5.6, 6.2, 2], [1.26, 5, 7, 2], [1.4, 0, 0, 0]] } },
+  smg: { // SMG do pacote: a mão tira o carregador e o leva ao colete (na vazia ele cai), volta com o novo e empurra; a vazia puxa a alavanca
+    P: { seg: [[0, .3, .6], [.3, .71, 1.5, 0, 3], [.71, 1.02, .6], [1.02, 1.63, 3, 0, 9], [1.63, 2.14, .7], [2.14, 2.55, 1.5, 0, 3], [2.55, 2.75, .4], [2.75, 3, 1], [3, 3.4, .7], [3.4, 3.948, 4, 0, 9]],
+      ev: { sai: .75, encaixa: 2.7, mao: 3.24 },
+      g: [[0, 0, 0, 0, 0, 0, 0], [.3, 0, -.03, -.06, -.006, .004, 0], [2.6, 0, -.03, -.06, -.006, .004, 0], [3.3, 0, 0, 0, 0, 0, 0]] },
+    E: { seg: [[0, .34, .6], [.34, .79, 1.5, 0, 3], [.79, 1.14, .6], [1.14, 1.7, 3, 0, 9], [1.7, 2.157, .7], [2.157, 2.5, 1.5, 0, 3], [2.5, 2.72, .4], [2.72, 3.29, .8], [3.29, 3.63, .3], [3.63, 3.86, .7], [3.86, 4.398, 3, 0, 9]],
+      ev: { sai: .78, larga: .93, novo: 1.42, encaixa: 2.7, puxa: 3.28, solta: 3.55, mao: 3.8 }, cai: 1, larga: [-.3, -.6, .2],
+      g: [[0, 0, 0, 0, 0, 0, 0], [.34, 0, -.03, -.06, -.006, .004, 0], [2.6, 0, -.03, -.06, -.006, .004, 0], [3.3, 0, .06, .1, 0, .006, 0], [3.7, 0, .03, .05, 0, .003, 0], [4.1, 0, 0, 0, 0, 0, 0]] } },
+  // molas: f (Hz), z (amortecimento), a: amplitude [rx, ry, rz, x, y, z] (rad, m) — tranco do encaixe, do ferrolho e assentamento da mão
+  mola: { encaixa: { f: 6.5, z: .3, a: [.045, .01, -.03, 0, .006, .004] }, solta: { f: 8, z: .35, a: [-.03, -.012, .02, 0, -.003, .006] }, mao: { f: 4.2, z: .45, a: [-.016, 0, .012, 0, -.003, 0] }, tapa: { f: 8, z: .4, a: [.02, 0, -.01, 0, .003, 0] } },
+  cam: { encaixa: [-.0035, .0012], solta: [-.0022, -.0008], tapa: [-.0012, 0] }, // tremor da câmera (rad: arfagem, guinada)
+  // saque: começo [rx, ry, rz, x, y, z] em volta do gatilho, mola (f, z) e a mão esquerda que chega depois (desvio na câmera, m; fração do saque em que fecha no guarda-mão)
+  saque: { ak: { p: [-.55, .25, .5, .04, -.2, .04], f: 2.3, z: .7, mao: [-.09, -.13, .05], fecha: .78 }, rifle: { p: [-.5, .28, .45, .04, -.19, .04], f: 2.3, z: .7, mao: [-.1, -.12, .05], fecha: .78 },
+    smg: { p: [-.6, .3, .55, .05, -.18, .03], f: 2.5, z: .68, mao: [-.08, -.12, .04], fecha: .75 } },
+  // por arma: mais tempo (metralhadoras) e peças do modelo (fer: osso do ferrolho/alavanca do modelo; rif: o ferrolho do modelo segue o do pacote)
+  arma: {},
+};
+// metralhadoras (Negev, M249; 5,7 s): sempre com a alavanca no fim, a caixa velha cai e a mão assenta a nova (pausa) antes de puxar
+const FZ2L = { seg: [[0, .47, 1], [.47, .75, 3, 0, 7], [.75, 1.13, 1.2], [1.13, 1.38, .6], [1.38, 1.7, .8], [1.7, 1.7, 1, .4, 2.5], [1.7, 1.97, 1.5, 0, 3], [1.97, 2.44, 1], [2.44, 2.66, .5], [2.66, 3.498, 1]],
+  ev: { pega: .5, sai: 1.2, larga: 1.385, encaixa: 1.69, tapa: 1.86, puxa: 2.87, solta: 3, mao: 3.5 }, cai: 1, larga: [.1, -.7, -.4],
+  g: [[0, 0, 0, 0, 0, 0, 0], [.45, .03, -.05, -.14, -.01, .008, 0], [1.1, .04, -.07, -.2, -.014, .012, .004], [2.25, .04, -.06, -.18, -.012, .01, .004], [2.7, .05, .1, .1, -.01, .01, 0], [3.15, .04, .08, .08, -.008, .008, 0], [3.65, 0, 0, 0, 0, 0, 0]] };
+FZ2.arma.negev = FZ2.arma.m249 = { sempreE: 1, E: FZ2L };
+// P90: os tempos da SMG do pacote, com o carregador saindo e entrando por cima (ver fz2Topo)
+FZ2.arma.p90 = { P: { ...FZ2.smg.P, pega: [-7, 3, 2], top: [[.3, 0, 0, 0, 0, 0, 0], [.62, 1, 0, 0, 0, 0, 0], [.75, 1, 0, 0, 0, 0, 0], [.95, 1, 1, 0, 5, 4, .35], [1.2, 0, 1, 0, 5, 4, .35], [1.9, 0, 1, 0, 5, 4, .35], [2.3, 1, 1, 0, 6, 3, .3], [2.55, 1, 1, 0, 4, 2, .25], [2.7, 1, 1, 0, 0, 0, 0], [2.75, 1, 0, 0, 0, 0, 0], [3, 1, 0, 0, 0, 0, 0], [3.35, 0, 0, 0, 0, 0, 0]] },
+  E: { ...FZ2.smg.E, pega: [-7, 3, 2], top: [[.34, 0, 0, 0, 0, 0, 0], [.66, 1, 0, 0, 0, 0, 0], [.78, 1, 0, 0, 0, 0, 0], [.92, 1, 1, 0, 5, 4, .35], [1.2, 0, 1, 0, 5, 4, .35], [1.95, 0, 1, 0, 5, 4, .35], [2.3, 1, 1, 0, 6, 3, .3], [2.55, 1, 1, 0, 4, 2, .25], [2.7, 1, 1, 0, 0, 0, 0], [2.75, 1, 0, 0, 0, 0, 0], [3, 1, 0, 0, 0, 0, 0], [3.2, 0, 0, 0, 0, 0, 0]] } };
+const FZ2F = ['ak', 'rifle', 'smg']; // pacotes com o roteiro
+const _z2 = { v: new V3(), v2: new V3(), v3: new V3(), m: new THREE.Matrix4(), m2: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler() };
+function fz2Pchip(X, Y) { // inclinações da curva monótona (Fritsch–Carlson)
+  const n = X.length, h = [], D = [], m = new Array(n);
+  for (let k = 0; k < n - 1; k++) { h[k] = X[k + 1] - X[k]; D[k] = (Y[k + 1] - Y[k]) / h[k]; }
+  m[0] = D[0]; m[n - 1] = D[n - 2];
+  for (let k = 1; k < n - 1; k++) m[k] = D[k - 1] * D[k] <= 0 ? 0 : 3 * (h[k - 1] + h[k]) / ((2 * h[k] + h[k - 1]) / D[k - 1] + (h[k] + 2 * h[k - 1]) / D[k]);
+  return m;
+}
+function fz2Herm(X, Y, M, x) {
+  let k = 0; while (k < X.length - 2 && x > X[k + 1]) k++;
+  const h = X[k + 1] - X[k], t = clamp((x - X[k]) / h, 0, 1), t2 = t * t, t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * Y[k] + (t3 - 2 * t2 + t) * h * M[k] + (-2 * t3 + 3 * t2) * Y[k + 1] + (t3 - t2) * h * M[k + 1];
+}
+function fz2Mapa(R, T) { // reparte T segundos entre os trechos; devolve a curva u (0..1) → s do roteiro
+  const d = R.seg.map(s => s[3] || (s[1] - s[0])), e = R.seg.map(s => s[2]), mx = R.seg.map(s => s[4] || 1.6), g = d.slice(), livre = d.map(() => true);
+  for (let it = 0; it < 6; it++) {
+    const sobra = T - g.reduce((a, b) => a + b, 0); if (Math.abs(sobra) < 1e-4) break;
+    let pe = 0; for (let i = 0; i < d.length; i++) if (livre[i]) pe += e[i] * d[i];
+    if (pe <= 0) { const k = T / g.reduce((a, b) => a + b, 0); for (let i = 0; i < d.length; i++) g[i] *= k; break; }
+    for (let i = 0; i < d.length; i++) if (livre[i]) {
+      g[i] += sobra * e[i] * d[i] / pe;
+      if (g[i] < d[i] * .45) { g[i] = d[i] * .45; livre[i] = false; } else if (g[i] > d[i] * mx[i]) { g[i] = d[i] * mx[i]; livre[i] = false; }
+    }
+  }
+  const U = [0], S = [0]; let su = 0, ss = 0, tot = g.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < d.length; i++) { su += g[i]; ss += d[i]; U.push(su / tot); S.push(ss); }
+  return { U, S, M: fz2Pchip(U, S), d };
+}
+function fz2Clipe(R, s) { // s do roteiro → tempo do clipe (pausa: parado)
+  let s0 = 0;
+  for (const g of R.seg) { const d = g[3] || (g[1] - g[0]); if (s <= s0 + d) return g[0] + (g[3] ? 0 : s - s0); s0 += d; }
+  return R.seg[R.seg.length - 1][1];
+}
+function fz2Kf(fr, s, n) { // quadros [s, ...n valores], curva suave entre eles (fora: o primeiro/último)
+  const out = _z2.k || (_z2.k = []); out.length = n;
+  if (!fr || !fr.length) { out.fill(0); return out; }
+  if (s <= fr[0][0]) { for (let j = 0; j < n; j++) out[j] = fr[0][j + 1]; return out; }
+  for (let i = 1; i < fr.length; i++) if (s <= fr[i][0]) { const A = fr[i - 1], B = fr[i], k = smooth((s - A[0]) / Math.max(1e-4, B[0] - A[0])); for (let j = 0; j < n; j++) out[j] = lerp(A[j + 1], B[j + 1], k); return out; }
+  const L = fr[fr.length - 1]; for (let j = 0; j < n; j++) out[j] = L[j + 1]; return out;
+}
+// resposta de mola: degrau (1 → 0, passa um pouco do zero) e impulso (0 → pico 1 → volta oscilando)
+function fz2Degrau(t, f, z) { if (t <= 0) return 1; const w = 2 * Math.PI * f, wd = w * Math.sqrt(1 - z * z); return Math.exp(-z * w * t) * (Math.cos(wd * t) + z * w / wd * Math.sin(wd * t)); }
+function fz2Pulso(t, f, z) { if (t <= 0) return 0; const w = 2 * Math.PI * f, wd = w * Math.sqrt(1 - z * z), tp = Math.atan(wd / (z * w)) / wd; return Math.exp(-z * w * (t - tp)) * Math.sin(wd * t) / Math.sin(wd * tp); }
+const fz2Cfg = id => { const f = fpw(id); return f && FZ2F.includes(f.pack) ? f : null; };
+// carregador que não é peça própria no modelo baixado (MP5: as malhas são por material e o carregador está misturado nelas): um nó
+// 'mag_fz2' no lugar dele segue o carregador do pacote, e depois dos voxels os cubos dentro da caixa (espaço das malhas) passam para ele
+const FZ2R = { mp5: { malhas: [0, 2], caixa: [-82, -40, -76, -4, -10, 10] }, // malhas (ordem no modelo) e caixa [x0, x1, y0, y1, z0, z1]
+  p90: { nos: /^(MagazineLPB001|MagBody)$/, topo: 1 } }; // P90: o carregador são dois nós soltos, em cima da arma (topo: a mão o tira por cima, ver fz2Topo)
+const FZ2C = new WeakMap(); // geometria de voxels → [fora da caixa, dentro] (uma vez por sessão)
+function fz2Recorte0(ms, R, body) {
+  if (R.nos) { // nós soltos: vão para dentro de um nó só depois dos voxels (a ordem das malhas é a do arquivo pré-calculado)
+    const nos = []; ms.traverse(o => { if (R.nos.test(o.name)) nos.push(o); }); if (!nos.length) return null;
+    const no = new THREE.Object3D(); no.name = 'mag_fz2'; nos[0].parent.add(no); ms.updateMatrixWorld(true);
+    const bb = new THREE.Box3(); for (const n of nos) bb.expandByObject(n);
+    const cW = bb.getCenter(new V3());
+    return { no, nos, R, re: /^mag_fz2$/, cB: cW.clone().applyMatrix4(no.matrixWorld.clone().invert()), c0: cW.applyMatrix4(body.matrixWorld.clone().invert()) };
+  }
+  const ml = []; ms.traverse(o => { if (o.isMesh) ml.push(o); });
+  const alvo = R.malhas.map(i => ml[i]).filter(Boolean); if (!alvo.length) return null;
+  const no = new THREE.Object3D(); no.name = 'mag_fz2'; alvo[0].parent.add(no); ms.updateMatrixWorld(true);
+  const B = R.caixa, cB = new V3((B[0] + B[1]) / 2, (B[2] + B[3]) / 2, (B[4] + B[5]) / 2).applyMatrix4(alvo[0].matrixWorld).applyMatrix4(no.matrixWorld.clone().invert());
+  return { no, alvo, R, re: /^mag_fz2$/, cB };
+}
+function fz2Corta(geo, h, B) { // separa as faces (quadradas: 4 vértices e 6 índices cada) pelo centro, dentro ou fora da caixa
+  const P = geo.attributes.position.array, N = geo.attributes.normal.array, C = geo.attributes.color.array, I = geo.index.array, nq = I.length / 6;
+  const out = [{ p: [], n: [], c: [], i: [] }, { p: [], n: [], c: [], i: [] }];
+  for (let q = 0; q < nq; q++) {
+    const b = q * 4; let cx = 0, cy = 0, cz = 0; for (let k = 0; k < 4; k++) { cx += P[(b + k) * 3]; cy += P[(b + k) * 3 + 1]; cz += P[(b + k) * 3 + 2]; }
+    cx *= h / 4; cy *= h / 4; cz *= h / 4;
+    const g = out[cx >= B[0] && cx <= B[1] && cy >= B[2] && cy <= B[3] && cz >= B[4] && cz <= B[5] ? 1 : 0], nb = g.p.length / 3;
+    for (let k = 0; k < 12; k++) { g.p.push(P[b * 3 + k]); g.n.push(N[b * 3 + k]); g.c.push(C[b * 3 + k]); }
+    for (let k = 0; k < 6; k++) g.i.push(I[q * 6 + k] - b + nb);
+  }
+  return out.map(g => { if (!g.i.length) return null; const ge = new THREE.BufferGeometry(); ge.setAttribute('position', new THREE.Float32BufferAttribute(g.p, 3)); ge.setAttribute('normal', new THREE.Float32BufferAttribute(g.n, 3));
+    ge.setAttribute('color', new THREE.Float32BufferAttribute(g.c, 3)); ge.setIndex(g.p.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(g.i, 1) : new THREE.Uint16BufferAttribute(g.i, 1)); ge.computeBoundingSphere(); ge.userData.keep = true; return ge; });
+}
+function fz2Recorte(z) { // depois do vxArma: os cubos do carregador vão para o nó dele
+  if (z.nos) { for (const n of z.nos) z.no.attach(n); return; }
+  z.no.updateWorldMatrix(true, false); const inv = z.no.matrixWorld.clone().invert();
+  for (const o of z.alvo) for (const vm of o.children.filter(c => c.isMesh && c.userData.vox)) {
+    let par = FZ2C.get(vm.geometry); if (!par) { par = fz2Corta(vm.geometry, vm.scale.x, z.R.caixa); FZ2C.set(vm.geometry, par); }
+    if (!par[1]) continue;
+    if (par[0]) vm.geometry = par[0]; else vm.visible = false;
+    const m = new THREE.Mesh(par[1], vm.material); m.userData.vox = 1; m.frustumCulled = false; m.name = 'vox';
+    vm.updateWorldMatrix(true, false); inv.clone().multiply(vm.matrixWorld).decompose(m.position, m.quaternion, m.scale); z.no.add(m);
+  }
+}
+// montagem (fpBuild): peças do pacote e do modelo que o roteiro usa
+function fz2Monta(F, id, W2, ms) {
+  F.z2 = { pk: W2.pack, molas: [], mao: new V3(), b: null };
+  const bone = n => fpBone(F.root, n), A = FZ2.arma[id] || {};
+  F.root.updateMatrixWorld(true);
+  if (!ms) { // arma do próprio pacote (AK-47): os dois carregadores são ossos do pacote (somem com escala ~0)
+    const a = F.P.mag && bone(F.P.mag), b = F.P.mag2 && bone(F.P.mag2);
+    if (a) F.z2.pm = { a, b, rest: F.body.matrixWorld.clone().invert().multiply(a.matrixWorld) };
+    return;
+  }
+  // ferrolho/alavanca do modelo: segue o quanto o ferrolho do pacote (AK e SMG) anda ao longo do cano, ou o quadro 'fer' do roteiro
+  let fb = null; const re = new RegExp('^(' + (A.fer || 'bolt|charginghandle') + ')(_\\d+|_armature)?$', 'i');
+  ms.traverse(o => { if (!fb && o.isBone && re.test(o.name)) fb = o; });
+  const rif = W2.pack !== 'rifle' ? bone('Rif') : null;
+  if (fb) F.z2.b = { o: fb, rest: fb.position.clone(), rif, r0: rif && F.body.matrixWorld.clone().invert().multiply(rif.matrixWorld) };
+}
+// começo da recarga: escolhe o roteiro (vazia/com bala) e calcula a curva para a duração desta recarga
+function fz2Inicio(F) {
+  const Z = F.z2; if (!Z) return;
+  const A = FZ2.arma[G.cur], k = G.reloadEmpty || A?.sempreE ? 'E' : 'P', R = A?.[k] || FZ2[Z.pk][k], T = Math.max(.3, G.reloadEnd - G.reloadStart);
+  Z.r = { R, mp: fz2Mapa(R, T), a: F.act, ev: {}, s: 0, u: 0, t0: G.reloadStart, T };
+  if (F.act) F.act.timeScale = 0;
+}
+// a cada quadro (antes do mixer): tempo do clipe pela curva
+function fz2Tempo(F) {
+  const r = F.z2?.r; if (!r) return;
+  if (!G.reloadEnd || F.act !== r.a) { F.z2.r = null; return; } // terminou, trocou de animação ou de arma
+  const u = clamp((now - r.t0) / r.T, 0, 1), m = r.mp; r.s = fz2Herm(m.U, m.S, m.M, u); r.u = u;
+  r.a.time = Math.min(fz2Clipe(r.R, r.s), r.a.getClip().duration - 1e-4);
+}
+// cópia do carregador (voxels presos ao osso) que cai e some, no espaço da câmera dos braços
+function fz2Larga(F, o, v) {
+  if (CFG.gfx === 'baixo') return;
+  const g = new THREE.Group(); o.updateWorldMatrix(true, true); o.matrixWorld.decompose(g.position, g.quaternion, g.scale);
+  const inv = o.matrixWorld.clone().invert(); let n = 0;
+  o.traverse(m => { if (m.isMesh && m.userData.vox && m.visible) { const c = new THREE.Mesh(m.geometry, m.material); c.frustumCulled = false; inv.clone().multiply(m.matrixWorld).decompose(c.position, c.quaternion, c.scale); g.add(c); n++; } });
+  if (!n) return;
+  vmScene.add(g); vmFx.push({ m: g, v: new V3(...v).add(F.z2.vel || _z2.v.set(0, 0, 0)), t: 0, shared: 1 });
+}
+function fz2Mola(F, k) { const M = FZ2.mola[k]; if (M) F.z2.molas.push({ t0: now, ...M }); const c = FZ2.cam[k]; if (c) { G.punchP += c[0]; G.punchY += c[1] * (Math.random() < .5 ? -1 : 1); } }
+// fantasma (segundo carregador do pacote AK): na mão desde 'pega' até o velho voltar ao encaixe (aí ele já é o da arma)
+function fz2Fant(F) { const r = F.z2?.r, E = r?.R.ev; return !!r && r.s >= (E.pega ?? 0) && !(r.ev.larga && !F.z2.fora); }
+// a cada quadro (depois do IK e das peças): eventos, carregadores que somem/aparecem e ferrolho do modelo
+function fz2Pecas(F, dt) {
+  const Z = F.z2, r = Z.r, fm = F.follow.find(f => f.rest && !f.ghost);
+  const om = fm ? fm.b : Z.pm?.a; // carregador velho (o do modelo ou o osso do pacote)
+  Z.fora = om ? (fm ? fm.w > .02 : fz2Fora(F, Z.pm.a, Z.pm.rest)) : false;
+  if (Z.topo) fz2TopoPoe(F); // P90: carregador por cima
+  if (r) {
+    const E = r.R.ev, fire = (k, fn) => { if (E[k] != null && r.s >= E[k] && !r.ev[k]) { r.ev[k] = 1; fn(); } };
+    if (om) { om.getWorldPosition(_z2.v2); if (Z.pv && dt > 0) Z.vel = (Z.vel || new V3()).copy(_z2.v2).sub(Z.pv).multiplyScalar(1 / Math.max(.008, dt)).clampLength(0, 2.5); Z.pv = (Z.pv || new V3()).copy(_z2.v2); }
+    fire('sai', () => play('magout'));
+    fire('larga', () => { if (om && r.R.cai) fz2Larga(F, om, r.R.larga || [0, -.5, 0]); });
+    fire('encaixa', () => { play('magin'); fz2Mola(F, 'encaixa'); const a = G.ammo[G.cur]; if (a) { const take = Math.min(wMag(G.cur) - a.mag, a.res); if (take > 0) { a.mag += take; a.res -= take; } } });
+    fire('tapa', () => { play('shellin', null, .6); fz2Mola(F, 'tapa'); });
+    if (F.cv) for (const [k, at] of [['abre', FZS.lmg.abre], ['fecha', FZS.lmg.fecha]]) if (r.u >= at && !r.ev[k]) { r.ev[k] = 1; play('slide'); } // tampa da M249
+    fire('puxa', () => play('slide'));
+    fire('solta', () => { play('bolt'); fz2Mola(F, 'solta'); });
+    fire('mao', () => fz2Mola(F, 'mao'));
+    // o velho some de quando cai até voltar ao encaixe (pacote AK: o osso dele volta como o novo); com um carregador só, o mesmo osso volta
+    // como o novo quando a mão já está fora da tela ('novo')
+    const caiu = r.R.cai && r.ev.larga, some = caiu && (Z.pk === 'ak' ? Z.fora : !(E.novo != null && r.s >= E.novo));
+    if (some && om) om.scale.setScalar(1e-4);
+    if (Z.pm?.b) Z.pm.b.scale.setScalar(fz2Fant(F) ? 1 : 1e-4); // AK-47: o novo só na mão, até o velho voltar ao encaixe
+  } else if (Z.pm?.b) Z.pm.b.scale.setScalar(1e-4); // fora da recarga o segundo carregador do pacote não aparece (fica estacionado embaixo da câmera)
+  const B = Z.b; if (B) { // ferrolho do modelo (cm para trás no referencial da arma)
+    _z2.m.copy(F.body.matrixWorld).multiply(F.C); const ax = _z2.v3.setFromMatrixColumn(_z2.m, 2).normalize(); // cano (para a frente), no mundo
+    let dW = 0; // m no mundo, para a frente
+    if (B.rif && B.r0) { _z2.m2.copy(F.body.matrixWorld).multiply(B.r0); dW = _z2.v.setFromMatrixPosition(B.rif.matrixWorld).sub(_z2.v2.setFromMatrixPosition(_z2.m2)).dot(ax); }
+    if (r?.R.fer) dW -= fz2Kf(r.R.fer, r.s, 1)[0] / 100 * FPG * FPH;
+    B.o.position.copy(B.rest);
+    if (Math.abs(dW) > 1e-5) { B.o.parent.updateWorldMatrix(true, false); _z2.v.copy(B.rest).applyMatrix4(B.o.parent.matrixWorld).addScaledVector(ax, dW); B.o.position.copy(B.o.parent.worldToLocal(_z2.v)); }
+  }
+}
+function fz2Fora(F, o, rest) { _z2.m.copy(F.body.matrixWorld).invert().multiply(o.matrixWorld); return _z2.v.setFromMatrixPosition(_z2.m).distanceTo(_z2.v2.setFromMatrixPosition(rest)) > .02 * F.P.hr; }
+// camada da pose (updateViewmodel): saque com mola, giro da recarga e trancos; tudo em volta do gatilho
+function fz2Pose(o, ud) {
+  const F = ud.fps2, Z = F?.z2; if (!Z) return;
+  let rx = 0, ry = 0, rz = 0, x = 0, y = 0, z = 0;
+  const S = FZ2.saque[Z.pk], ts = now - (G.switchEnd - (G.switchDur || .35));
+  if (S && ts < (G.switchDur || .35) + .6 && ts >= 0) { // saque: sobe de baixo girando e assenta com mola (passa um pouco e volta)
+    const k = fz2Degrau(ts, S.f * .35 / (G.switchDur || .35), S.z);
+    rx += S.p[0] * k; ry += S.p[1] * k; rz += S.p[2] * k; x += S.p[3] * k; y += S.p[4] * k; z += S.p[5] * k;
+  }
+  const r = Z.r; if (r) { const g = fz2Kf(r.R.g, r.s, 6); rx += g[0]; ry += g[1]; rz += g[2]; x += g[3]; y += g[4]; z += g[5]; }
+  for (let i = Z.molas.length - 1; i >= 0; i--) { const M = Z.molas[i], t = now - M.t0; if (t > 1.5) { Z.molas.splice(i, 1); continue; } const v = fz2Pulso(t, M.f, M.z); rx += M.a[0] * v; ry += M.a[1] * v; rz += M.a[2] * v; x += M.a[3] * v; y += M.a[4] * v; z += M.a[5] * v; }
+  const na = 1 - smooth(G.ads || 0); rx *= na; ry *= na; rz *= na; x *= na; y *= na; z *= na;
+  o.rx += rx; o.ry += ry; o.rz += rz; o.x += x; o.y += y; o.z += z;
+  _z2.q.setFromEuler(_z2.e.set(rx, ry, rz)); _z2.v.fromArray(F.P.v?.p || FPV.long.p); _z2.v2.copy(_z2.v).applyQuaternion(_z2.q); o.x += _z2.v.x - _z2.v2.x; o.y += _z2.v.y - _z2.v2.y; o.z += _z2.v.z - _z2.v2.z;
+}
+// carregador por cima (P90): o pacote tira o carregador por baixo, então a mão é levada ao carregador de verdade (em cima da arma),
+// levanta a traseira dele, puxa e o leva junto; na volta assenta por cima. Quadros 'top' do roteiro: [s, mão no carregador (0..1),
+// carregador na mão (0..1), levantado x, y, z (cm reais no referencial da arma), giro (rad, traseira para cima)]; pega: onde fica o
+// pulso em relação ao centro do carregador (cm). Devolve o desvio da mão (mundo dos braços) e guarda onde o carregador fica.
+function fz2Topo(F, out) {
+  const Z = F.z2, T = Z.topo, r = Z.r, K = r?.R.top; T.on = false; if (!K) return;
+  const k = fz2Kf(K, r.s, 6), wh = k[0] * (r.R.wTopo ?? .6) /* a mão só se aproxima: inteira, o braço cruzava a tela */, wm = k[1], lx = k[2], ly = k[3], lz = k[4], ang = k[5]; if (wh < .001 && wm < .001) return;
+  const G = _z2.m.copy(F.body.matrixWorld).multiply(F.C), X = new V3().setFromMatrixColumn(G, 0).normalize(), Y = new V3().setFromMatrixColumn(G, 1).normalize(), Zc = new V3().setFromMatrixColumn(G, 2).normalize(), u = FPG * FPH / 100;
+  const v = (x, y, z) => new V3().addScaledVector(X, -x * u).addScaledVector(Y, y * u).addScaledVector(Zc, -z * u); // x direita, y cima, z para trás
+  const c0 = T.c0.clone().applyMatrix4(F.body.matrixWorld), sobe = c0.clone().add(v(lx, ly, lz)), pg = r.R.pega || [-6, 4, 2], grip = v(pg[0], pg[1], pg[2]);
+  const h = _z2.v.setFromMatrixPosition(F.ik.hl.matrixWorld).add(out), d = sobe.clone().add(grip).sub(h).multiplyScalar(wh);
+  out.add(d); h.add(d);
+  T.pc.copy(sobe).lerp(h.sub(grip), wm); T.q.setFromAxisAngle(X, ang); T.c0w = c0; T.on = true;
+}
+function fz2TopoPoe(F) { // depois das peças: o nó do carregador no lugar calculado (gira em volta do centro dele)
+  const T = F.z2.topo, no = T.no; no.position.set(0, 0, 0); no.quaternion.identity(); no.scale.setScalar(1); if (!T.on) return;
+  no.parent.updateWorldMatrix(true, false); const P = no.parent.matrixWorld;
+  _z2.m.makeTranslation(T.pc.x, T.pc.y, T.pc.z).multiply(_z2.m2.makeRotationFromQuaternion(T.q)).multiply(_z2.m2.makeTranslation(-T.c0w.x, -T.c0w.y, -T.c0w.z)).multiply(P);
+  _z2.m2.copy(P).invert().multiply(_z2.m).decompose(no.position, no.quaternion, no.scale);
+}
+// desvio da mão esquerda (no mundo dos braços) para o IK: saque (chega depois e fecha no guarda-mão) e quadros 'm' do roteiro
+function fz2Mao(F) {
+  const Z = F.z2, out = Z.mao.set(0, 0, 0), S = FZ2.saque[Z.pk], sd = G.switchDur || .35, ts = now - (G.switchEnd - sd);
+  if (S && ts >= 0 && ts < sd) { const k = 1 - smooth(clamp(ts / (sd * S.fecha), 0, 1)); out.set(S.mao[0] * k, S.mao[1] * k, S.mao[2] * k); }
+  const r = Z.r; if (r?.R.m) { const m = fz2Kf(r.R.m, r.s, 3); if (m[0] || m[1] || m[2]) { _z2.m.copy(F.body.matrixWorld).multiply(F.C); _z2.v.set(-m[0], m[1], -m[2]).transformDirection(_z2.m).multiplyScalar(Math.hypot(m[0], m[1], m[2]) / 100 * FPG * FPH); out.add(_z2.v); } }
+  if (Z.topo && F.ik?.hl) fz2Topo(F, out);
+  return out.lengthSq() > 1e-10 ? out : null;
+}
+// ===== fz2 fim =====
 // IK dos braços: recua os ombros, leva a mão esquerda ao guarda-mão do modelo e gira braço e antebraço (dois ossos, cotovelo no mesmo
 // plano de antes) até cada pulso chegar ao alvo
 const _ik = { G: new THREE.Matrix4(), Gi: new THREE.Matrix4(), h: new V3(), t: new V3(), dl: new V3(), s: new V3(), e: new V3(), w: new V3(), u: new V3(), n: new V3(), q: new THREE.Quaternion(), pq: new THREE.Quaternion(), bq: new THREE.Quaternion(), a: new V3(), b: new V3(), c: new V3() };
@@ -20183,12 +20454,14 @@ function fpIK(F) {
       K.hl.position.copy(K.hl.parent.worldToLocal(I.t.clone())); K.hl.updateMatrixWorld(true);
     }
   }
+  K.zm = F.z2 ? fz2Mao(F) : null; // fz2: mão esquerda desviada (saque e roteiro da recarga), no mundo dos braços
+  if (K.zm && K.hl) { I.t.setFromMatrixPosition(K.hl.matrixWorld).add(K.zm); K.hl.position.copy(K.hl.parent.worldToLocal(I.t.clone())); K.hl.updateMatrixWorld(true); I.dl.add(K.zm); }
   for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.sd < 0) a.tw.add(I.dl); }
   // mão que vem para perto do olho (pegar carregador no colete): desce e vai para a frente, senão o braço passa colado na câmera
   // (a câmera fica na origem, olhando para -Z)
   K.pushL = null;
   for (const a of K.arms) {
-    const s = (F.cur === 'reload' || F.cur === 'reloadE') && !(a.sd > 0 && F.P.view === 'pistol') ? clamp((a.tw.z + .25) / .15, 0, 1) : 0; if (!s || !a.hand) continue; // só na recarga (as pistolas ficam perto do olho de propósito)
+    const s = (F.cur === 'reload' || F.cur === 'reloadE') && !(a.sd > 0 && (F.P.view === 'pistol' || F.z2)) ? clamp((a.tw.z + .25) / .15, 0, 1) : 0; if (!s || !a.hand) continue; // só na recarga (as pistolas ficam perto do olho de propósito; fz2: a mão direita não sai do punho)
     if (a.sd < 0) K.pushL = new V3(0, -.16 * s, -.1 * s);
     I.c.set(0, -.16 * s, -.1 * s); a.tw.add(I.c);
     I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true);
@@ -21155,6 +21428,7 @@ function updateViewmodel(dt) {
   { const k = G.pin ? smooth(clamp((now - G.pin.t0) / NADE_PINO, 0, 1)) : 0; if (k) { o.y += .05 * k; o.z += .06 * k; o.x -= .02 * k; o.rx += .4 * k; o.rz -= .15 * k; } if (ud.pino) ud.pino.visible = k < .6; } // pino puxado: prepara o arremesso
   if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model) && !ud.armsKnife && !ud.fps2) knifeAnim(o, ud);
   armaInspectPose(o); // inspeção da arma de fogo (F)
+  if (ud.fps2?.z2) fz2Pose(o, ud); // fz2: saque com mola, giro da recarga e trancos (fuzis, SMGs e metralhadoras)
   if (me.downed) { o.y -= .04; o.rz += .35; }
   // correndo: arma abaixada e de lado, balançando mais; deslize, pulo, pouso e agachar (a13, ver vmMove)
   w18Mola(me, 'sprintK', 'sprintV', me.sprinting ? 1 : 0, W18.corrida, dt, 0, 1); // 6-w18: mola (era lerp dt * 10)
