@@ -20041,7 +20041,7 @@ function fpBuild(id, ud) {
     C = new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A);
     tips = ptips;
     const am = P.mag && fpBone(root, P.mag), am2 = P.mag2 && fpBone(root, P.mag2), hlm = fpBone(root, 'Hand_L'); // pb1: carregadores do próprio pacote
-    if (am && hlm) { const rest = body.matrixWorld.clone().invert().multiply(am.matrixWorld); magP = { hl: hlm, l: [{ a: am, rest, s0: am.scale.clone() }, ...(am2 ? [{ a: am2, rest, s0: am2.scale.clone(), novo: 1 }] : [])] }; }
+    if (am && hlm) { const rest = body.matrixWorld.clone().invert().multiply(am.matrixWorld); magP = { hl: hlm, l: [{ a: am, rest }, ...(am2 ? [{ a: am2, novo: 1 }] : [])] }; }
   }
   // braços: IK de dois ossos nos dois lados, com os ombros recuados (P.sh: para fora, para cima, para trás, em metros do jogo) para o corte
   // das mangas ficar fora da tela; as mãos ficam onde a animação põe (a esquerda vai para o guarda-mão do modelo)
@@ -20182,7 +20182,7 @@ function fpPlay(ud, name, dur) {
   if (F.act && F.act !== a) F.act.crossFadeTo(a, name === 'fire' ? .04 : name === 'draw' ? 0 : .15, false);
   F.act = a; F.cur = name; F.until = once && !loop ? now + c.duration / a.timeScale : 0;
 }
-const _fm = new THREE.Matrix4(), _fm2 = new THREE.Matrix4(), _fv = new V3(), _fv2 = new V3(), _fm3 = new V3();
+const _fm = new THREE.Matrix4(), _fm2 = new THREE.Matrix4(), _fv = new V3(), _fv2 = new V3(), _fv3 = new V3();
 // centro (no espaço do osso) dos vértices que se movem com o osso b (peso principal nele)
 function fpBoneCenter(root, b, filt) { // (filt decide as malhas; as escondidas também contam)
   const c = new V3(), v = new V3(), inv = b.matrixWorld.clone().invert(); let n = 0;
@@ -20244,14 +20244,16 @@ function fpMagProprio(F) {
   _fv2.setFromMatrixPosition(M.hl.matrixWorld); if (pl) _fv2.sub(pl); // mão antes do desvio da recarga
   for (const e of M.l) {
     let vis = !e.novo;
-    if (!rec) { if (!e.novo) { _fm.copy(e.a.parent.matrixWorld).invert().multiply(F.body.matrixWorld).multiply(e.rest); _fm.decompose(e.a.position, e.a.quaternion, _fm3); } }
+    if (!rec) { if (!e.novo) { _fm.copy(e.a.parent.matrixWorld).invert().multiply(F.body.matrixWorld).multiply(e.rest); _fm.decompose(e.a.position, e.a.quaternion, _fv3); } }
     else {
       _fv.setFromMatrixPosition(e.a.matrixWorld);
-      const naMao = _fv.distanceTo(_fv2) < FPIK.magMao, noLugar = !e.novo && _fv.distanceTo(_fm3.setFromMatrixPosition(_fm.copy(F.body.matrixWorld).multiply(e.rest))) < FPIK.magNoLugar;
-      vis = naMao || noLugar || _fv.z < FPIK.magZ;
+      const naMao = _fv.distanceTo(_fv2) < FPIK.magMao, noLugar = !e.novo && _fv.distanceTo(_fv3.setFromMatrixPosition(_fm.copy(F.body.matrixWorld).multiply(e.rest))) < FPIK.magNoLugar;
+      const maoNaTela = _fv3.setFromMatrixPosition(M.hl.matrixWorld).project(vmCam).y > FPIK.maoTela; // mão esquerda abaixo do quadro: o carregador nela não fica sozinho no pé da tela
+      vis = (naMao && maoNaTela) || noLugar || _fv.z < FPIK.magZ;
       if (vis && pl && naMao && !noLugar) e.a.position.copy(e.a.parent.worldToLocal(_fv.add(pl)));
     }
-    e.a.scale.copy(e.s0); if (!vis) e.a.scale.multiplyScalar(1e-4);
+    if (!vis) { if (!e.oculto) e.sv = e.a.scale.clone(); e.a.scale.copy(e.sv).multiplyScalar(1e-4); } else if (e.oculto) e.a.scale.copy(e.sv); // escondido: encolhe a cada quadro (a trilha de escala do clipe repõe); visível: só devolve a escala quando volta
+    e.oculto = !vis;
     e.a.updateMatrixWorld(true);
   }
 }
@@ -20303,7 +20305,7 @@ function fzSons(ud) {
 // magZ: carregador do próprio pacote (AK-47) estacionado mais perto do olho que isso (m), fora da arma e da mão, não aparece (o pacote
 // guarda o carregador novo/velho em pontos que só ficavam fora da tela na câmera dele). Fora da recarga o carregador fica preso ao encaixe
 // (no saque o osso dele não acompanha a arma: a caixa da M249 aparecia solta no canto da tela).
-const FPIK = { solta: [.04, .08], magZ: -.3, magMao: .12, magNoLugar: .04 }; // magMao, magNoLugar: m do jogo (na mão / encaixado)
+const FPIK = { solta: [.04, .08], magZ: -.3, magMao: .12, magNoLugar: .04, maoTela: -.9 }; // magMao, magNoLugar: m do jogo (na mão / encaixado); maoTela: y da mão na tela (-1 = borda de baixo)
 const _ik = { G: new THREE.Matrix4(), Gi: new THREE.Matrix4(), h: new V3(), t: new V3(), dl: new V3(), s: new V3(), e: new V3(), w: new V3(), u: new V3(), n: new V3(), q: new THREE.Quaternion(), pq: new THREE.Quaternion(), bq: new THREE.Quaternion(), a: new V3(), b: new V3(), c: new V3() };
 function fpRot(bone, from, to) { // gira o osso (no mundo) levando a direção from para to
   _ik.q.setFromUnitVectors(_ik.a.copy(from).normalize(), _ik.b.copy(to).normalize());
