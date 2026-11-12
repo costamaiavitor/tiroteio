@@ -19996,7 +19996,7 @@ function fpSkin(root, mats, L, keep = [], all = false, filt = null) { // all: pi
   root.updateMatrixWorld(true);
   const Ri = root.matrixWorld.clone().invert(), cache = {};
   root.traverse(o => {
-    if (!o.isMesh || (filt && !filt(o)) || keep.includes(o.material.name) || (!all && o.material.emissive?.getHex())) return;
+    if (!o.isMesh || o.userData.voxOrig || (filt && !filt(o)) || keep.includes(o.material.name) || (!all && o.material.emissive?.getHex())) return;
     const c = o.material.color, wood = c.r > c.b * 1.6 && c.r > .08; // madeira / marrom
     const sc = +(2.5 / L * fpMeshScale(o, Ri)).toPrecision(3), k = (wood ? 'b' : 'a') + sc; // a malha pode ter escala própria
     const sm = wood ? mats.b || mats.a : mats.a;
