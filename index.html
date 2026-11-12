@@ -17020,6 +17020,8 @@ function warmUp(M) {
   warm.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(), new V3(0, 1, 0)]), new THREE.LineBasicMaterial({ transparent: true })));
   warm.add(new THREE.Mesh(new THREE.SphereGeometry(.1), new THREE.MeshBasicMaterial({ transparent: true })));
   const vmWarm = new THREE.Group(); for (const id of ['m4', 'ak47', 'm1911_pap', 'awp', 'raygun', 'knife']) vmWarm.add(gunModel(id, true)); // armas PBR da primeira pessoa
+  { const vg = new THREE.BoxGeometry(.01, .01, .01); vg.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(vg.attributes.position.count * 3).fill(1), 3)); // vx2: materiais dos voxels (3ª e 1ª pessoa) já compilados
+    for (const m of vxMats3()) { const o = new THREE.Mesh(vg, m); o.castShadow = true; warm.add(o); } for (const m of vxMats()) vmWarm.add(new THREE.Mesh(vg.clone(), m)); }
   warm.visible = vmWarm.visible = false; scene.add(warm); vmScene.add(vmWarm);
   const espelhos = a34Espelhos(warm); // O1-A34
   const items = [], seen = new Set(), par = renderer.extensions.has('KHR_parallel_shader_compile');
@@ -18834,6 +18836,7 @@ function gunModel(id, fp = false, skin = null) {
   if (!GM_VM && !GM_PROC && model !== 'knife' && model !== 'karambit') try { dlGun(g, id, pap || skin ? M : null); } catch (e) { console.warn(e); } // modelo baixado (mundo, mãos dos outros, vitrine)
   if (model === 'knife' || model === 'karambit') try { knifeSwap(g, model, M.blade !== gunMats(false, fp, null).blade ? { a: M.blade, b: M.polymer } : null); } catch (e) { } // faca baixada no lugar da procedural (se já carregou)
   if (pap) papUV(g); // 6-w13
+  if (GM_VM && VX2_ITENS.has(model)) vxItem(g, id, model, skin, hi, pap || skin ? M : null); // vx2: faca e explosivos da própria mão em voxel fino
   return g;
 }
 let ATT_PV = null, GM_PROC = false; // Arsenal (menu): prévia dos acessórios e arma feita no código (sem a baixada)
@@ -19574,7 +19577,7 @@ function b08Itens(id) { // malhas que vão ser desenhadas: 'c|m:x' arma na mão 
   return L;
 }
 const b08Chaves = id => id.split('|').slice(1).filter(Boolean);
-function b08Fim(j, ok) { if (ok) { if (!b08Ok(j.id)) B08.n++; B08.ok.set(j.id, j.mapa); } else if (B08.job.get(j.id) === j) B08.job.delete(j.id); B08.aq.delete(j); j.r(); }
+function b08Fim(j, ok) { if (ok) { if (!b08Ok(j.id)) B08.n++; B08.ok.set(j.id, j.mapa); if (VX.on && j.id.startsWith('c|m:') && W[j.id.slice(4)]) setTimeout(() => { if (inGame && C.st?.mode !== 'zombies') remoteGunTpl(j.id.slice(4), null); }); } else if (B08.job.get(j.id) === j) B08.job.delete(j.id); B08.aq.delete(j); j.r(); } // vx2: o molde da arma dos bots já vai para a fila de voxel no aquecimento
 function b08Pedir(id) { // prepara no ócio; j.p resolve quando ficar pronta (ou quando o mapa mudar)
   if (VX.on && id.startsWith('v|')) vxLoad(vxNome(id)); // vx: o arquivo de voxels também vem no aquecimento
   let j = B08.job.get(id); if (j && j.mapa === B08.mapa) return j;
@@ -19602,6 +19605,7 @@ function b08Passo() { // aos poucos (~6 ms; 12 no aquecimento): compila sem espe
 function b08Agenda(ms) { if (!B08.tm) B08.tm = setTimeout(() => { B08.tm = (window.requestIdleCallback ? requestIdleCallback(b08Passo, { timeout: 100 }) : setTimeout(b08Passo, 0)) || 1; }, ms) || 1; }
 function b08Aquecer(M) { // aquecimento do mapa: refaz tudo (luzes e névoa mudam a chave dos programas) e pede as armas da partida
   B08.mapa++; B08.aq.clear(); B08.job.clear(); for (const j of B08.fila.splice(0)) j.r();
+  vxAquecer(M); // vx2: faca e granadas da própria mão em voxel (no ócio)
   if (M.zombie) return; // no modo Zumbis as armas são as feitas no código
   const dm = C.st?.mode === 'dm', ids = B08_BOTS[dm ? 'dm' : 'rounds'].map(m => 'c|m:' + m), inv = G.inv || {};
   for (const w of [inv.primary || (dm ? 'ak47' : null), inv.secondary || (dm ? 'deagle' : 'glock')]) { const f = w && fpw(w), P = f && FPK[f.pack]; if (P) ids.push('v|p:' + f.pack + '|' + (f.m ? 'm:' + f.m : '') + '|' + (P.armsFrom ? 'p:' + P.armsFrom : '')); }
@@ -19673,11 +19677,12 @@ function vxMats() {
   return VX.mats ||= [new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .5, metalness: 0, clearcoat: .2, clearcoatRoughness: .45, envMapIntensity: .8, name: 'vox' }),
     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .34, metalness: .68, envMapIntensity: .9, name: 'vox' })];
 }
-function vxTex(t) { // pixels da textura (uma vez por textura)
-  if (!t?.image) return null; let d = VX.tex.get(t); if (d) return d;
-  const im = t.image, w = im.width, h = im.height; if (!w || !h) return null;
-  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0);
-  d = { w, h, px: x.getImageData(0, 0, w, h).data, fy: t.flipY }; VX.tex.set(t, d); return d;
+function vxTex(t, L) { // pixels da textura (uma vez por textura); vx2: L = lado máximo (lê reduzida: 4096 px travavam a conta no ócio)
+  if (!t?.image) return null; const C = L ? (VX.tex2 ||= new WeakMap()) : VX.tex; let d = C.get(t); if (d) return d;
+  const im = t.image, w0 = im.width, h0 = im.height; if (!w0 || !h0) return null;
+  const f = L ? Math.min(1, L / Math.max(w0, h0)) : 1, w = Math.max(1, Math.round(w0 * f)), h = Math.max(1, Math.round(h0 * f));
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, w, h);
+  d = { w, h, px: x.getImageData(0, 0, w, h).data, fy: t.flipY }; C.set(t, d); return d;
 }
 function vxSamp(d, u, v, out) { u -= Math.floor(u); v -= Math.floor(v); if (d.fy) v = 1 - v; const i = ((Math.min(d.h - 1, v * d.h | 0)) * d.w + Math.min(d.w - 1, u * d.w | 0)) * 4; out[0] = d.px[i] / 255; out[1] = d.px[i + 1] / 255; out[2] = d.px[i + 2] / 255; return out; }
 function vxEscala(m) { const e = m.elements; return Math.cbrt(Math.abs(e[0] * (e[5] * e[10] - e[6] * e[9]) - e[4] * (e[1] * e[10] - e[2] * e[9]) + e[8] * (e[1] * e[6] - e[2] * e[5]))) || 1; }
@@ -19722,20 +19727,25 @@ function vxMiolo(V) {
   for (let c = 0; c < g.length; c++) if (!g[c]) { const i = c % nx + x0, j = ((c / nx) | 0) % ny + y0, k = ((c / (nx * ny)) | 0) + z0; V.set(((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024), { ...cinza, i, j, k }); }
 }
 // uma malha: triângulos (no espaço do osso/da própria malha) -> voxels; devolve Map osso(ou null) -> [geos]
-function vxPeca(o, passoRaiz) {
+// vx2: com U = { inv, h, V } todos os triângulos vão para um conjunto só (U.V), no espaço de U.inv (sem inv: no da própria malha),
+// a partir do índice U.a e até gastar U.orc amostras (U.a fica onde parou): a conta vai em pedaços no ócio
+function vxPeca(o, passoRaiz, U) {
   const geo = o.geometry, pos = geo.attributes.position, uv = geo.attributes.uv, idx = geo.index, mat = o.material, sk = o.isSkinnedMesh;
-  const tx = vxTex(mat.map), mr = vxTex(mat.metalnessMap), cor = mat.color.clone().convertLinearToSRGB(), metal0 = (mat.metalness ?? 0) > .5;
+  const tx = vxTex(mat.map, U?.L), mr = vxTex(mat.metalnessMap, U?.L), cor = mat.color.clone().convertLinearToSRGB(), metal0 = (mat.metalness ?? 0) > .5;
   const si = sk && geo.attributes.skinIndex, sw = sk && geo.attributes.skinWeight, n = idx ? idx.count : pos.count;
   const grupos = new Map(), v3 = [new V3(), new V3(), new V3()], tmp = [0, 0, 0], mrc = [0, 0, 0];
-  const grupo = b => { let gr = grupos.get(b); if (!gr) { const M = b ? b.matrixWorld : o.matrixWorld, inv = b ? b.matrixWorld.clone().invert() : null, h = passoRaiz / vxEscala(M); grupos.set(b, gr = { inv, h, V: new Map() }); } return gr; };
-  for (let t = 0; t < n; t += 3) {
+  const grupo = b => { if (U) return U; let gr = grupos.get(b); if (!gr) { const M = b ? b.matrixWorld : o.matrixWorld, inv = b ? b.matrixWorld.clone().invert() : null, h = passoRaiz / vxEscala(M); grupos.set(b, gr = { inv, h, V: new Map() }); } return gr; };
+  let ns = 0;
+  for (let t = U?.a || 0; t < n; t += 3) {
+    if (U?.orc && ns > U.orc) { U.a = t; return U; } // vx2: o resto fica para o próximo pedaço
     const ii = [0, 1, 2].map(qq => idx ? idx.getX(t + qq) : t + qq);
     let bone = null;
-    if (sk) { const w = new Map(); for (const i of ii) for (let c = 0; c < 4; c++) { const bi = si.getComponent(i, c), ww = sw.getComponent(i, c); if (ww > 0) w.set(bi, (w.get(bi) || 0) + ww); } let best = -1; for (const [bi, ww] of w) if (ww > best) { best = ww; bone = o.skeleton.bones[bi]; } }
+    if (sk && !U) { const w = new Map(); for (const i of ii) for (let c = 0; c < 4; c++) { const bi = si.getComponent(i, c), ww = sw.getComponent(i, c); if (ww > 0) w.set(bi, (w.get(bi) || 0) + ww); } let best = -1; for (const [bi, ww] of w) if (ww > best) { best = ww; bone = o.skeleton.bones[bi]; } }
     const gr = grupo(bone);
-    for (let c = 0; c < 3; c++) { if (sk) { o.getVertexPosition(ii[c], v3[c]); v3[c].applyMatrix4(o.matrixWorld).applyMatrix4(gr.inv); } else v3[c].fromBufferAttribute(pos, ii[c]); }
+    for (let c = 0; c < 3; c++) { if (sk && !U) { o.getVertexPosition(ii[c], v3[c]); v3[c].applyMatrix4(o.matrixWorld).applyMatrix4(gr.inv); } else if (U && (sk || U.inv)) { o.getVertexPosition(ii[c], v3[c]); if (U.inv) v3[c].applyMatrix4(o.matrixWorld).applyMatrix4(U.inv); } else v3[c].fromBufferAttribute(pos, ii[c]); }
     const [p0, p1, p2] = v3, h = gr.h, e1x = p1.x - p0.x, e1y = p1.y - p0.y, e1z = p1.z - p0.z, e2x = p2.x - p0.x, e2y = p2.y - p0.y, e2z = p2.z - p0.z;
     const n1 = Math.min(400, Math.max(1, Math.ceil(Math.hypot(e1x, e1y, e1z) / (h * .45)))), n2 = Math.min(400, Math.max(1, Math.ceil(Math.hypot(e2x, e2y, e2z) / (h * .45))));
+    ns += n1 * n2 / 2;
     for (let a = 0; a <= n1; a++) for (let b = 0; b <= n2; b++) {
       const u = a / n1, w = b / n2; if (u + w > 1.0001) continue;
       const x = p0.x + e1x * u + e2x * w, y = p0.y + e1y * u + e2y * w, z = p0.z + e1z * u + e2z * w;
@@ -19748,13 +19758,12 @@ function vxPeca(o, passoRaiz) {
       e.mt += mr && uv ? vxSamp(mr, uv.getX(ii[0]) * w0 + uv.getX(ii[1]) * su + uv.getX(ii[2]) * sv, uv.getY(ii[0]) * w0 + uv.getY(ii[1]) * su + uv.getY(ii[2]) * sv, mrc)[2] * (mat.metalness ?? 1) : (metal0 ? 1 : 0);
     }
   }
+  if (U) { U.a = n; return U; } // a cor sai depois de todas as malhas (vxGeo)
   const out = new Map();
-  for (const [b, gr] of grupos) {
-    for (const e of gr.V.values()) { e.c = e.s.map(x => x / e.n); const l = e.c[0] * .3 + e.c[1] * .59 + e.c[2] * .11; if (l > .7) e.c = e.c.map(x => x * .7 / l); e.m = e.mt / e.n > .45 ? 1 : 0; }
-    out.set(b, { V: gr.V, h: gr.h });
-  }
+  for (const [b, gr] of grupos) { vxCor(gr.V); out.set(b, { V: gr.V, h: gr.h }); }
   return out;
 }
+function vxCor(V) { for (const e of V.values()) { e.c = e.s.map(x => x / e.n); const l = e.c[0] * .3 + e.c[1] * .59 + e.c[2] * .11; if (l > .7) e.c = e.c.map(x => x * .7 / l); e.m = e.mt / e.n > .45 ? 1 : 0; } }
 // arquivo pré-calculado (assets/vox/*.bin.gz, feito por tools/vox-bake.mjs): por peça, índice da malha, osso, passo e os voxels da casca
 // (i, j, k em int16 e r, g, b, metal em bytes). Sem o arquivo (arma nova), a arma é voxelizada na hora.
 function vxPack(partes) {
@@ -19813,6 +19822,235 @@ function vxArma(root, P, D, b8) {
 }
 // para o tools/vox-bake.mjs: o arquivo da última arma montada (base64 do binário, antes do gzip)
 function vxExport() { const u = VX.ult; if (!u) return null; const b = new Uint8Array(vxPack(u.partes)); let s = ''; for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768)); return { nome: u.nome, b64: btoa(s) }; }
+// ===== vx2: facas, granadas, C4 e armas dos outros em voxel fino =====
+// Mesmo padrão das armas dos modos CS (vxPeca): casca de voxels com a cor da textura (ou do material, nas peças feitas no código),
+// oclusão de canto por vértice e um grão leve por voxel (as peças de cor lisa também mostram o voxel). Mãos e braços não entram, nem
+// vidro, chama, LED e visor (material básico ou transparente): esses ficam como estão.
+// - 1ª pessoa (VX2.p1 = 2,2 mm): faca do pacote da faca (knBuild), faca/karambit e granadas/Semtex/macaco/Claymore feitas no código
+//   (gunModel da própria mão): as peças paradas juntas numa malha no grupo do item (some no arremesso), o pino à parte, preso a ele
+//   (some quando é puxado); a faca do pacote numa grade que segue a lâmina. C4 nas mãos (c4Maos): uma malha só (a fita não duplica
+//   as faces do tijolo). Peças com esqueleto (vxGen1) ficam presas ao osso, como nas armas.
+// - 3ª pessoa (VX2.p3 = 4,5 mm): o molde da arma na mão dos outros e no chão (remoteGunTpl) vira UMA malha (duas: fosca e metal) no
+//   espaço do molde; os jogadores recebem cópias que dividem a geometria (2 chamadas de desenho por arma).
+// A conta é feita no ócio, aos poucos (fila de geradores: ~6 ms por vez, 14 no aquecimento; a 1ª pessoa passa na frente). Enquanto
+// isso fica o modelo de antes; quando fica pronta os voxels entram no próprio modelo (1ª pessoa) ou a cópia na mão é trocada (3ª; o
+// molde feito no código de uma arma que tem modelo baixado não é voxelizado: é provisório, e a cópia troca quando o baixado chega). O
+// aquecimento do mapa (vxAquecer / B08) já põe na fila a faca, as granadas, a C4 e as armas dos bots. Cache por nome em VX.cache:
+// cada coisa é voxelizada uma vez por sessão. O miolo das peças fechadas fica numa grade (não vira voxel): só sai a casca de fora.
+// Na 3ª pessoa as faces lisas vizinhas de mesma cor juntam num retângulo (junção gulosa): bem menos triângulos por arma. As texturas
+// são lidas reduzidas (VX2.tex px de lado).
+const VX2 = { on: true, p1: .0022, p3: .0045, ruido: .05, tex: 512, orc: 6000, fila: [], tm: 0, max: 0, log: [], aq: false, mats3: null };
+const vxK = (i, j, k) => ((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024);
+const vxSkinK = s => !s ? '' : typeof s === 'string' ? s : s.a?.uuid ? s.a.uuid + (s.b?.uuid || '') : JSON.stringify(s);
+function vxAlvos(root, fora) { // malhas que viram voxel (visíveis em relação à raiz, opacas, com cor; o KA-BAR vem como BLEND mas é opaco)
+  const L = [], vis = o => { for (let p = o; p && p !== root; p = p.parent) if (!p.visible) return false; return true; };
+  root.traverse(o => { const m = o.material; if (!o.isMesh || o.userData.vox || Array.isArray(m) || !m?.color || m.isMeshBasicMaterial || m.isShaderMaterial || (m.transparent && m.opacity < .95) || !o.geometry?.attributes.position || (fora && fora(o)) || !vis(o)) return; L.push(o); });
+  return L;
+}
+// casca -> malha, aos poucos: cor final (+ grão), miolo numa grade (o ar de fora por inundação a partir do canto) e as faces de fora com AO
+function* vxGeo(V, h, cor = true, gul = false) {
+  let q = 0, x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
+  for (const e of V.values()) {
+    if (cor) { e.c = [e.s[0] / e.n, e.s[1] / e.n, e.s[2] / e.n]; const l = e.c[0] * .3 + e.c[1] * .59 + e.c[2] * .11; if (l > .7) e.c = e.c.map(x => x * .7 / l); e.m = e.mt / e.n > .45 ? 1 : 0; }
+    if (gul) e.c = e.c.map(x => Math.round(x * 40) / 40); // junção gulosa: cor em degraus (vizinhos iguais juntam), sem grão
+    else { let x = (e.i * 73856093 ^ e.j * 19349663 ^ e.k * 83492791) >>> 0; x = Math.imul(x ^ (x >>> 13), 1274126177) >>> 0; const f = 1 + ((x & 1023) / 1023 - .5) * VX2.ruido;
+      e.c = [Math.min(1, e.c[0] * f), Math.min(1, e.c[1] * f), Math.min(1, e.c[2] * f)]; }
+    if (e.i < x0) x0 = e.i; if (e.j < y0) y0 = e.j; if (e.k < z0) z0 = e.k; if (e.i > x1) x1 = e.i; if (e.j > y1) y1 = e.j; if (e.k > z1) z1 = e.k;
+    if (++q % 3000 === 0) yield;
+  }
+  if (x0 > x1) return [null, null];
+  x0--; y0--; z0--; x1++; y1++; z1++;
+  const nx = x1 - x0 + 1, ny = y1 - y0 + 1, nz = z1 - z0 + 1, N = nx * ny * nz, L = nx * ny;
+  let g = null;
+  if (N <= 3e7) {
+    g = new Uint8Array(N); for (const e of V.values()) g[(e.i - x0) + nx * ((e.j - y0) + ny * (e.k - z0))] = 1; yield;
+    const st = new Int32Array(N); let sp = 0, w = 0; st[sp++] = 0; g[0] = 2;
+    while (sp) { const c = st[--sp], i = c % nx, j = ((c / nx) | 0) % ny, k = (c / L) | 0;
+      if (i > 0 && !g[c - 1]) { g[c - 1] = 2; st[sp++] = c - 1; } if (i < nx - 1 && !g[c + 1]) { g[c + 1] = 2; st[sp++] = c + 1; }
+      if (j > 0 && !g[c - nx]) { g[c - nx] = 2; st[sp++] = c - nx; } if (j < ny - 1 && !g[c + nx]) { g[c + nx] = 2; st[sp++] = c + nx; }
+      if (k > 0 && !g[c - L]) { g[c - L] = 2; st[sp++] = c - L; } if (k < nz - 1 && !g[c + L]) { g[c + L] = 2; st[sp++] = c + L; }
+      if (++w % 200000 === 0) yield; }
+  }
+  // cheio = casca ou miolo (o que o ar de fora não alcançou)
+  const has = g ? (i, j, k) => i >= x0 && i <= x1 && j >= y0 && j <= y1 && k >= z0 && k <= z1 && g[(i - x0) + nx * ((j - y0) + ny * (k - z0))] !== 2 : (i, j, k) => V.has(vxK(i, j, k));
+  const F = [[[1, 0, 0], [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]]], [[-1, 0, 0], [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]]], [[0, 1, 0], [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]]],
+    [[0, -1, 0], [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]]], [[0, 0, 1], [[1, 0, 1], [1, 1, 1], [0, 1, 1], [0, 0, 1]]], [[0, 0, -1], [[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 0, 0]]]];
+  const G = [{ p: [], n: [], c: [], i: [] }, { p: [], n: [], c: [], i: [] }], ao = [0, 0, 0, 0], o = [0, 0, 0], r = [0, 0, 0], liso = gul ? new Map() : null;
+  q = 0;
+  for (const v of V.values()) {
+    const gg = G[v.m], cl = [Math.pow(v.c[0], 2.2), Math.pow(v.c[1], 2.2), Math.pow(v.c[2], 2.2)];
+    for (let d = 0; d < 6; d++) {
+      const [n, cs] = F[d];
+      if (has(v.i + n[0], v.j + n[1], v.k + n[2])) continue;
+      const ax = n[0] ? [1, 2] : n[1] ? [0, 2] : [0, 1]; o[0] = v.i + n[0]; o[1] = v.j + n[1]; o[2] = v.k + n[2];
+      for (let c = 0; c < 4; c++) {
+        const cr = cs[c], d0 = cr[ax[0]] ? 1 : -1, d1 = cr[ax[1]] ? 1 : -1;
+        r[0] = o[0]; r[1] = o[1]; r[2] = o[2]; r[ax[0]] += d0; const a = has(r[0], r[1], r[2]) ? 1 : 0;
+        r[ax[0]] -= d0; r[ax[1]] += d1; const b = has(r[0], r[1], r[2]) ? 1 : 0; r[ax[0]] += d0; const k = has(r[0], r[1], r[2]) ? 1 : 0;
+        ao[c] = 1 - (a && b ? 3 : a + b + k) * .16;
+      }
+      if (liso && ao[0] === 1 && ao[1] === 1 && ao[2] === 1 && ao[3] === 1) { // face lisa: junta depois com as vizinhas de mesma cor
+        const vc = [v.i, v.j, v.k], pk = d * 4096 + vc[d >> 1] + 2048; let L = liso.get(pk); if (!L) liso.set(pk, L = new Map());
+        L.set((vc[ax[0]] + 2048) * 4096 + vc[ax[1]] + 2048, ((Math.round(v.c[0] * 40) * 41 + Math.round(v.c[1] * 40)) * 41 + Math.round(v.c[2] * 40)) * 2 + v.m); continue;
+      }
+      const base = gg.p.length / 3;
+      for (let c = 0; c < 4; c++) { const cr = cs[c], sh = ao[c]; gg.p.push((v.i + cr[0]) * h, (v.j + cr[1]) * h, (v.k + cr[2]) * h); gg.n.push(n[0], n[1], n[2]); gg.c.push(cl[0] * sh, cl[1] * sh, cl[2] * sh); }
+      if (ao[0] + ao[2] < ao[1] + ao[3]) gg.i.push(base + 1, base + 2, base + 3, base + 1, base + 3, base); else gg.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+    if (++q % 1500 === 0) yield;
+  }
+  if (liso) { // junção gulosa por plano: retângulos da mesma cor (sem sombra de canto) viram um quadrado só
+    q = 0;
+    for (const [pk, L] of liso) {
+      const d = Math.floor(pk / 4096), w = pk % 4096 - 2048, [n, cs] = F[d], a = d >> 1, ax = n[0] ? [1, 2] : n[1] ? [0, 2] : [0, 1], feito = new Set();
+      const cel = [...L.keys()].sort((x, y) => (x % 4096) - (y % 4096) || x - y); // por v, depois u
+      for (const c0 of cel) {
+        if (feito.has(c0)) continue; const key = L.get(c0), u0 = Math.floor(c0 / 4096), v0 = c0 % 4096;
+        let du = 1; while (L.get((u0 + du) * 4096 + v0) === key && !feito.has((u0 + du) * 4096 + v0)) du++;
+        let dv = 1; for (;; dv++) { let ok = true; for (let x = 0; x < du && ok; x++) { const cc = (u0 + x) * 4096 + v0 + dv; if (L.get(cc) !== key || feito.has(cc)) ok = false; } if (!ok) break; }
+        for (let x = 0; x < du; x++) for (let y = 0; y < dv; y++) feito.add((u0 + x) * 4096 + v0 + y);
+        const m = key & 1, k3 = key >> 1, cb = k3 % 41, cg = Math.floor(k3 / 41) % 41, crr = Math.floor(k3 / 1681), cl = [Math.pow(crr / 40, 2.2), Math.pow(cg / 40, 2.2), Math.pow(cb / 40, 2.2)], gg = G[m], base = gg.p.length / 3;
+        for (let c = 0; c < 4; c++) { const cr = cs[c], P = [0, 0, 0]; P[a] = w + cr[a]; P[ax[0]] = (cr[ax[0]] ? u0 + du : u0) - 2048; P[ax[1]] = (cr[ax[1]] ? v0 + dv : v0) - 2048;
+          gg.p.push(P[0] * h, P[1] * h, P[2] * h); gg.n.push(n[0], n[1], n[2]); gg.c.push(cl[0], cl[1], cl[2]); }
+        gg.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        if (++q % 1500 === 0) yield;
+      }
+    }
+  }
+  return G.map(gg => { if (!gg.i.length) return null; const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(gg.p, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(gg.n, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(gg.c, 3)); geo.setIndex(gg.i.length > 65535 ? new THREE.Uint32BufferAttribute(gg.i, 1) : new THREE.Uint16BufferAttribute(gg.i, 1)); geo.computeBoundingSphere(); geo.userData.keep = true; return geo; });
+}
+// triângulos de uma malha para U.V, em pedaços de U.orc amostras
+function* vxCasca(o, U, depois) {
+  const g = o.geometry, n = g.index ? g.index.count : g.attributes.position.count;
+  U.a = 0; U.orc = VX2.orc; while (U.a < n) { depois?.(); vxPeca(o, 0, U); yield; }
+  U.a = 0;
+}
+// 1ª pessoa, peça por peça: voxels no espaço da própria malha (h: passo nela); com esqueleto, cada triângulo vai para o osso dele
+function* vxGen1(alvo, hs, pr) {
+  const partes = [];
+  for (let mi = 0; mi < alvo.length; mi++) {
+    const o = alvo[mi];
+    if (o.isSkinnedMesh) { for (const [b, gr] of vxPeca(o, pr)) partes.push({ malha: mi, osso: b ? b.name : null, h: gr.h, V: gr.V, cor: 1 }); yield; continue; }
+    const U = { inv: null, h: hs[mi], V: new Map(), L: VX2.tex }; yield* vxCasca(o, U); partes.push({ malha: mi, osso: null, h: U.h, V: U.V });
+  }
+  for (const p of partes) { p.geos = yield* vxGeo(p.V, p.h, !p.cor); p.V = null; }
+  return partes;
+}
+// tudo junto numa malha no espaço da raiz (h em unidades da raiz), ou no referencial E (raiz -> grade; rígido) quando a peça não está
+// alinhada aos eixos da raiz (faca do pacote: a grade segue a lâmina, senão o fio vira escada comprida). A matriz de cada pedaço é tirada
+// na hora (a raiz pode estar se mexendo)
+function* vxGenJ(root, alvo, h, E, gul) {
+  const U = { inv: new THREE.Matrix4(), h, V: new Map(), L: VX2.tex }, M = () => { root.updateMatrixWorld(true); U.inv.copy(root.matrixWorld).invert(); if (E) U.inv.premultiply(E); };
+  for (const o of alvo) yield* vxCasca(o, U, M);
+  return [{ junto: 1, h, Ei: E ? E.clone().invert() : null, geos: yield* vxGeo(U.V, h, true, gul) }];
+}
+// eixos próprios das peças (PCA dos vértices, no espaço da raiz) -> matriz raiz -> grade. A faca baixada vem torta no próprio
+// espaço: com a grade nos eixos dela a lâmina vira degraus largos; nos eixos próprios a face da lâmina fica lisa
+function vxEixos(root, alvo) {
+  root.updateMatrixWorld(true); const Ri = root.matrixWorld.clone().invert(), M = new THREE.Matrix4(), v = new V3(), P = [], c = new V3();
+  for (const o of alvo) { const p = o.geometry.attributes.position, st = Math.max(1, Math.floor(p.count / 3000)); M.multiplyMatrices(Ri, o.matrixWorld); for (let i = 0; i < p.count; i += st) { v.fromBufferAttribute(p, i); if (o.isSkinnedMesh) o.applyBoneTransform(i, v); P.push(v.clone().applyMatrix4(M)); } }
+  if (P.length < 4) return null; for (const p of P) c.add(p); c.divideScalar(P.length);
+  const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]; for (const p of P) { const d = [p.x - c.x, p.y - c.y, p.z - c.z]; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) A[i][j] += d[i] * d[j]; }
+  const Vv = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]; // Jacobi (3x3 simétrica)
+  for (let it = 0; it < 24; it++) { let p = 0, q = 1; for (const [a, b] of [[0, 2], [1, 2]]) if (Math.abs(A[a][b]) > Math.abs(A[p][q])) { p = a; q = b; }
+    if (Math.abs(A[p][q]) < 1e-12) break; const th = .5 * Math.atan2(2 * A[p][q], A[q][q] - A[p][p]), cs = Math.cos(th), sn = Math.sin(th);
+    for (let k = 0; k < 3; k++) { const akp = A[k][p], akq = A[k][q]; A[k][p] = cs * akp - sn * akq; A[k][q] = sn * akp + cs * akq; }
+    for (let k = 0; k < 3; k++) { const apk = A[p][k], aqk = A[q][k]; A[p][k] = cs * apk - sn * aqk; A[q][k] = sn * apk + cs * aqk; }
+    for (let k = 0; k < 3; k++) { const vkp = Vv[k][p], vkq = Vv[k][q]; Vv[k][p] = cs * vkp - sn * vkq; Vv[k][q] = sn * vkp + cs * vkq; } }
+  const ord = [0, 1, 2].sort((a, b) => A[b][b] - A[a][a]), ax = ord.map(i => new V3(Vv[0][i], Vv[1][i], Vv[2][i]).normalize());
+  ax[2].crossVectors(ax[0], ax[1]).normalize(); ax[1].crossVectors(ax[2], ax[0]).normalize();
+  return new THREE.Matrix4().makeBasis(ax[0], ax[1], ax[2]).invert(); // raiz -> eixos próprios (rígida)
+}
+// fila: um gerador por nome; quem pede depois da mesma coisa só espera o mesmo resultado
+function vxPede(nome, mk, cb, ja) {
+  let j = VX2.fila.find(q => q.nome === nome);
+  if (!j) { j = { nome, g: mk(), cbs: [], ms: 0, t0: performance.now() }; VX2.fila[ja ? 'unshift' : 'push'](j); }
+  else if (ja && VX2.fila[0] !== j) { VX2.fila.splice(VX2.fila.indexOf(j), 1); VX2.fila.unshift(j); }
+  j.cbs.push(cb); vxAgenda(ja);
+}
+function vxAgenda(ja) { if (!VX2.tm && VX2.fila.length) VX2.tm = setTimeout(() => { VX2.tm = (window.requestIdleCallback ? requestIdleCallback(() => vxPasso(), { timeout: 80 }) : setTimeout(vxPasso, 0)) || 1; }, ja ? 0 : 15) || 1; }
+function vxPasso(fat = WARM ? 14 : 6) {
+  VX2.tm = 0; const t = performance.now();
+  while (VX2.fila.length && performance.now() - t < fat) {
+    const j = VX2.fila[0], t1 = performance.now(); let r;
+    try { r = j.g.next(); } catch (e) { console.warn('vx2', j.nome, e); VX2.fila.shift(); continue; }
+    const dt = performance.now() - t1; j.ms += dt; if (dt > VX2.max) VX2.max = dt; if (dt > (j.max || 0)) j.max = dt;
+    if (!r.done) continue;
+    VX2.fila.shift(); VX.cache.set(j.nome, r.value);
+    VX2.log.push([j.nome, Math.round(j.ms), r.value.reduce((a, p) => a + p.geos.reduce((b, g) => b + (g ? g.index.count / 3 : 0), 0), 0), Math.round(performance.now() - j.t0), Math.round(j.max)]); // nome, ms de conta, triângulos, ms até ficar pronto, maior pedaço
+    for (const cb of j.cbs) try { cb(r.value); } catch (e) { console.warn('vx2', e); }
+  }
+  vxAgenda();
+}
+// voxels prontos -> malhas no modelo; as originais ficam sem geometria (as de esqueleto, escondidas)
+function vxPoe(root, alvo, partes, mats) {
+  for (const p of partes) {
+    if (p.junto) { p.geos.forEach((g, i) => { if (!g) return; const vm = new THREE.Mesh(g, mats[i]); vm.userData.vox = 1; vm.name = 'vox'; vm.frustumCulled = root.userData.vxCull ?? false; if (p.Ei) vm.applyMatrix4(p.Ei); root.add(vm); }); continue; }
+    const o = alvo[p.malha]; if (!o) continue;
+    const pai = p.osso ? (o.isSkinnedMesh ? o.skeleton.bones.find(b => b.name === p.osso) : null) : o; if (!pai) continue;
+    p.geos.forEach((g, i) => { if (!g) return; const vm = new THREE.Mesh(g, mats[i]); vm.userData.vox = 1; vm.frustumCulled = false; vm.name = 'vox'; vm.renderOrder = o.renderOrder; pai.add(vm); });
+  }
+  for (const o of alvo) { if (o.isSkinnedMesh) o.visible = false; else if (o.geometry?.attributes.position) { o.geometry = new THREE.BufferGeometry(); o.layers.mask = 0; o.userData.voxOrig = 1; } } // a original sai pela camada (os filhos, os voxels, continuam); sem geometria ela ainda ia ao desenho (e o material de uv1 nem compilava)
+}
+// 1ª pessoa: passo em unidades da raiz. No cache: entra na hora (true); senão vai para a fila e entra quando ficar pronto.
+// o: { fora (filtro), junto (uma malha só), E (junto, numa grade girada: raiz -> grade, ou 'pca': nos eixos próprios), depois(root) (skin por cima), ja (passa na frente) }
+function vxObj(root, passo, nome, o = {}) {
+  if (!VX.on || !VX2.on) return false;
+  root.updateMatrixWorld(true);
+  const alvo = vxAlvos(root, o.fora), Ri = root.matrixWorld.clone().invert(), _m = new THREE.Matrix4();
+  const poe = partes => { const F = root.userData.vxF ||= []; if (F.includes(nome)) return; F.push(nome); vxPoe(root, alvo, partes, vxMats()); o.depois?.(root); }; // uma vez por modelo
+  if (VX.cache.has(nome)) { poe(VX.cache.get(nome)); return true; }
+  if (!alvo.length) return false;
+  const hs = alvo.map(m => passo / vxEscala(_m.multiplyMatrices(Ri, m.matrixWorld))), pr = passo * vxEscala(root.matrixWorld); // passo em cada malha (escala dela na raiz)
+  vxPede(nome, () => o.junto || o.E ? vxGenJ(root, alvo, passo, o.E === 'pca' ? vxEixos(root, alvo) : o.E) : vxGen1(alvo, hs, pr), poe, o.ja);
+  return false;
+}
+// itens da própria mão feitos no código (gunModel com GM_VM): facas e explosivos. A faca feita no código só quando a do pacote
+// (knBuild) não vai entrar no lugar dela
+const VX2_ITENS = new Set(['knife', 'karambit', 'nade', 'smoke', 'flashb', 'molotov', 'inc', 'decoy', 'semtex', 'clay', 'monkey']);
+const vxSkinM = (model, M) => ({ a: model === 'knife' || model === 'karambit' ? M.blade : M.metal, b: M.polymer });
+function vxItem(g, id, model, skin, hi, M, ja = true) {
+  if (model === 'knife' || model === 'karambit') { if (fpReady('k:pack') && fpReady('m:' + model) && fpReady('p:rifle')) return; ja = false; } // a do pacote (knBuild) vai entrar no lugar; senão (carregando, braços do Blender) sem prioridade
+  // as peças paradas juntas numa malha (no grupo do item, que some no arremesso; o espaço dele é o mesmo da arma montada fora da mão);
+  // o pino à parte, preso a ele (some quando é puxado)
+  const ud = g.userData, pino = ud.pino, nome = 'i|' + model + '|' + id + '|' + (hi ? 1 : 0) + '|' + (ud.dl ? 'dl' : 'pr') + '|' + vxSkinK(skin), depois = M ? r => vxSkin(r, vxSkinM(model, M)) : null;
+  try { vxObj(ud.item || g, VX2.p1, nome, { junto: 1, fora: pino ? o => o === pino : null, ja, depois }); if (pino) vxObj(g, VX2.p1, nome + '|pino', { fora: o => o !== pino, ja, depois }); } catch (e) { console.warn('vx2', e); }
+}
+function vxSkin(root, mats) { // skin (e camuflagem do PaP) por cima dos voxels, como nas armas: projeção triplanar no espaço da peça
+  root.updateMatrixWorld(true); const Ri = root.matrixWorld.clone().invert(), b = new THREE.Box3();
+  for (const p of fpPts(root, o => o.userData.vox, 9)) b.expandByPoint(p.applyMatrix4(Ri));
+  if (!b.isEmpty()) { const d = b.getSize(new V3()); fpSkin(root, mats, Math.max(d.x, d.y, d.z), [], true, o => o.userData.vox); }
+}
+// 3ª pessoa: o molde inteiro numa malha só
+function vxMats3() { return VX2.mats3 ||= [new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .6, metalness: 0, name: 'vox3' }), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .38, metalness: .6, name: 'vox3' })]; }
+function vx3Poe(t, partes) {
+  if (t.userData.vx) return; t.userData.vxCull = true; // a arma dos outros pode sair do recorte da câmera
+  vxPoe(t, vxAlvos(t), partes, vxMats3()); if (t.userData.vxM) vxSkin(t, t.userData.vxM); // skin do jogador por cima dos voxels
+  t.userData.vx = 1;
+}
+function vx3(t, nome, M, pca) {
+  if (!VX.on || !VX2.on || !VX2.p3) return; t.userData.vxN = nome; t.userData.vxM = M; t.userData.vxPca = pca;
+  if (VX.cache.has(nome)) return vx3Poe(t, VX.cache.get(nome));
+  vxPede(nome, () => { const a = vxAlvos(t); return vxGenJ(t, a, VX2.p3, t.userData.vxPca ? vxEixos(t, a) : null, true); }, p => vx3Poe(t, p));
+}
+// cópia na mão de um jogador: se o molde ficou em voxel depois (ou foi refeito com o modelo baixado), troca a cópia sem refazer o saque
+function vx3Troca(rp, t) {
+  rp.gunT = t; rp.gunVx = t.userData.vx ? t : null; rp.tp = tpInfo(t, rp.w);
+  const gh = rp.model.userData.gh, v = rp.gun?.visible ?? true; if (rp.gun) gh.remove(rp.gun); gh.add(rp.gun = cloneShared(t)); rp.gun.visible = v;
+}
+// aquecimento do mapa: põe na fila (no ócio) a faca do pacote e as granadas da própria mão (a C4 entra quando c4Maos monta; as armas
+// dos bots, quando o B08 as deixa prontas)
+function vxAquecer(M) {
+  if (!VX.on || !VX2.on) return;
+  setTimeout(() => {
+    for (const id of M.zombie ? ['semtex', 'monkey', 'clay'] : ['he', 'flash', 'smoke', 'molotov', 'inc', 'decoy']) if (W[id]) try { const sk = skinOf(id); vxItem(gunModel(id, true, sk), id, W[id].model, sk, CFG.gfx !== 'baixo', null, false); } catch (e) { console.warn('vx2', e); }
+    const kn = W[knifeModelOf('knife', PROF.data?.equipped)]?.model; let n = 0;
+    const faca = () => { if (!(kn === 'knife' || kn === 'karambit')) return; if (!inGame) { if (++n < 30) setTimeout(faca, 1000); return; } VX2.aq = true; let ok = false; try { ok = !!knBuild(kn, {}, null); } catch (e) { console.warn('vx2', e); } finally { VX2.aq = false; } if (!ok && ++n < 30) setTimeout(faca, 1000); };
+    setTimeout(faca, 200);
+  }, 0);
+}
+// ===== vx2 fim =====
 function fpBuild(id, ud) {
   const W2 = fpw(id), P = FPK[W2.pack], D = W2.m && FPM[W2.m], pk = 'p:' + W2.pack, mk = W2.m && 'm:' + W2.m;
   const ak = P.armsFrom && 'p:' + P.armsFrom;
@@ -20223,7 +20461,8 @@ function knBuild(kind, ud, skin) {
   h.matrix.copy(fpFrame(new V3(...F.Q), new V3(...F.fwd), new V3(...F.up))).multiply(new THREE.Matrix4().makeScale(sc, sc, sc)).multiply(Mi);
   ms.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.material = o.material.clone(); o.material.envMapIntensity = .8; } });
   if (D.dim) ms.traverse(o => { if (o.isMesh) { o.material.color.multiplyScalar(D.dim); o.material.roughness = Math.max(o.material.roughness, .45); } }); // modelo claro demais
-  if (skin) fpSkin(ms, skin, z1 - z0, [], true);
+  try { vxObj(ms, VX2.p1 * (z1 - z0) / (F.len * .01), 'kn|' + kind + (D.dim ? '|d' : '') + (ZC.on && ZC.bowie ? '|bowie' : ''), { E: 'pca', ja: !VX2.aq, depois: skin ? r => fpSkin(r, skin, z1 - z0, [], true, o => !!o.userData.vox) : null }); } catch (e) { console.warn('vx2', e); } // vx2: a faca vira voxel fino (no espaço do modelo: F.len cm = tamanho real); a skin entra por cima
+  if (skin && !(VX.on && VX2.on)) fpSkin(ms, skin, z1 - z0, [], true); // com voxel a skin só entra nos voxels (a conta lê a cor do material do modelo)
   h.add(ms);
   // a faca do jogo vai presa ao osso do pulso, não ao nó da faca do pacote (filho do alvo do IK): nos golpes rápidos o osso fica para trás
   // do alvo e a faca escorregava pelo punho. A posição relativa é a do primeiro quadro parado, em que mão e faca coincidem
@@ -21891,7 +22130,7 @@ function remoteGunTpl(mid, skin) {
   const k = mid + '|' + (skin || '') + (C.st?.mode === 'zombies' ? '|z' : ''), nl = Object.keys(FPC).filter(fpReady).length + B08.n; let t = RGUN.get(k); // O1-B08: + armas que ficaram prontas
   if (t && !t.userData.dl && nl > t.userData.nl) t = null; // chegou modelo baixado depois do molde: refaz
   if (t?.userData.b08 && !b08Ok(t.userData.b08)) t = null; // O1-B08: mapa novo e o modelo baixado ainda não ficou pronto nele: volta à procedural
-  if (!t) { B08.gate = true; try { t = gunModel(mid, false, skin); } finally { B08.gate = false; } t.scale.setScalar(1.1); t.userData.nl = nl; rgJunta(t); RGUN.set(k, t); } // O4-D02
+  if (!t) { B08.gate = true; try { t = gunModel(mid, false, skin); } finally { B08.gate = false; } t.scale.setScalar(1.1); t.userData.nl = nl; rgJunta(t); RGUN.set(k, t); t.userData.rk = k; if (t.userData.dl || !FPM[fpw(mid)?.m]) vx3(t, 't|' + k + '|' + (t.userData.dl ? 'dl' : 'pr'), W[mid]?.pap || skin ? vxSkinM(W[mid]?.model, gunMats(W[mid]?.pap | 0, false, skin)) : null, W[mid]?.slot === 'knife' && t.userData.dl); } // O4-D02; vx2: voxel grosso no ócio
   return t;
 }
 // ===== O4-D01/D02: boneco e arma dos outros jogadores com menos chamadas de desenho (mesmo desenho) =====
@@ -21933,7 +22172,7 @@ function cloneShared(t) { // o three copia userData por JSON (aqui ele guarda ma
 function setRemoteGun(rp, w) {
   if (!w || rp.w === w) return; rp.w = w;
   const gh = rp.model.userData.gh; while (gh.children.length) gh.remove(gh.children[0]); // não descarta: é do molde
-  const mid = knifeModelOf(w, rp.sk), t = remoteGunTpl(mid, rp.sk?.[mid]); gh.add(rp.gun = cloneShared(t));
+  const mid = knifeModelOf(w, rp.sk), t = remoteGunTpl(mid, rp.sk?.[mid]); gh.add(rp.gun = cloneShared(t)); rp.gunT = t; rp.gunVx = t.userData.vx ? t : null; // vx2
   rp.tp = tpInfo(t, w); rp.swT = now; rp.supW = null; // terceira pessoa: pega do jeito da arma nova e saca (a14)
 }
 function removeRemote(id) { const rp = R.get(id); if (!rp) return; scene.remove(rp.model); const gh = rp.model.userData.gh; while (gh.children.length) gh.remove(gh.children[0]); disposeGroup(rp.model); R.delete(id); }
@@ -21946,6 +22185,7 @@ function refreshRemoteInfo(rp) {
 function updateRemotes(dt) {
   for (const rp of R.values()) {
     const ud = rp.model.userData, buf = rp.buf, rt = now - netDelay(rp.id);
+    if (rp.gunT) { const tn = RGUN.get(rp.gunT.userData.rk) || rp.gunT; if (tn !== rp.gunT || (tn.userData.vx && rp.gunVx !== tn)) vx3Troca(rp, tn); } // vx2: o molde ficou em voxel (ou o modelo baixado ficou pronto e o molde foi refeito)
     if (buf.length) { // interpola; sem dado novo ainda, segue a última velocidade por até 200 ms (netPick)
       const s = netPick(buf, rt, .2, 15), a = s.a, b = s.b, k = s.k; netEo(rp.eo ||= new V3(), dt);
       rp.rx = s.x; rp.rz = s.z; rp.rt = rt; rp.xt = s.ext;
@@ -31544,9 +31784,9 @@ function dropsDraw() { // armas e kits no chão (modelo realista deitado)
     let o = DROPM.get(id);
     if (!o) {
       if (w === 'kit') { o = new THREE.Group(); bx(o, .32, .1, .22, 0, .05, 0, new THREE.MeshLambertMaterial({ color: 0x2f8a4a })); }
-      else { o = new THREE.Group(); const g = gunModel(w, false, null); g.rotation.z = Math.PI / 2; g.scale.setScalar(1.1); o.add(g); o.rotation.y = (id * 1.7) % 6.28; }
+      else { o = new THREE.Group(); const t = remoteGunTpl(w, null), g = cloneShared(t); g.rotation.z = Math.PI / 2; o.add(g); o.rotation.y = (id * 1.7) % 6.28; o.userData.t = t; o.userData.vx = t.userData.vx; } // vx2: cópia do molde da 3ª pessoa (já tem escala 1,1)
       DROPM.set(id, o); scene.add(o);
-    }
+    } else if (o.userData.t && !o.userData.vx && o.userData.t.userData.vx) { const g = cloneShared(o.userData.t); g.rotation.z = Math.PI / 2; o.clear(); o.add(g); o.userData.vx = 1; } // vx2: o molde ficou em voxel
     o.position.set(x, y + (w === 'kit' ? 0 : .07), z);
   }
 }
@@ -31568,6 +31808,7 @@ function c4Maos() { // C4 do CS: tijolos de explosivo com fita, o painel com tec
   const tk = M(0x6a6e72, .3, .5); for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) bx(c4, .014, .006, .012, .012 + i * .018, .049, .004 + j * .016, tk); // teclado
   const fio = new THREE.MeshStandardMaterial({ color: 0xb02020, roughness: .6 }); bx(c4, .006, .006, .07, -.03, .03, 0, fio); bx(c4, .006, .006, .07, -.04, .03, .005, M(0x2050c0, 0, .6)); // fios
   const led = bx(c4, .008, .006, .008, -.012, .049, -.03, new THREE.MeshBasicMaterial({ color: 0xff2020 }));
+  try { vxObj(c4, VX2.p1, 'c4|maos', { junto: true }); } catch (e) { console.warn('vx2', e); } // vx2: tijolos, fita, painel, teclado e fios em voxel fino, numa malha só (visor e LED ficam)
   g.add(c4);
   const lh = vmMao(leftHand, A), rh = vmMao(rightHand, A); lh.position.set(-.08, -.004, .035); lh.rotation.set(0, 0, .35); rh.position.set(.075, .05, .03); rh.rotation.set(0, 0, -1.35); g.add(lh, rh);
   g.visible = false; vmScene.add(g);
@@ -33104,6 +33345,7 @@ requestAnimationFrame(frame);
 if (DEBUG) window.__T = { get NOW() { return now; }, vxExport, VX, FPW, fpw, akAnim, akPassada, showPause, attPartsProc, skinSwatch, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade, zKill, zDrop, zEndRound,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
+if (DEBUG) Object.assign(window.__T, { VX2, vxObj, vx3, vxAquecer, knBuild, vxDrena: () => { const t = performance.now(); while (VX2.fila.length) vxPasso(1e9); return performance.now() - t; }, RGUN, remoteGunTpl, setRemoteGun, c4Maos, cloneShared, DROPM, vxBHAND: () => BHAND }); // vx2: medição
 if (DEBUG) Object.assign(window.__T, { R1, R1enc, R1dec, r1PosH, r1PosC, r1FastDec }); // R1: ganchos de teste do formato de fio
 // ===== O2-C01: ganchos de teste para a auditoria de itens (tools/itens/auditoria.mjs); só leitura e as funções do próprio jogo, nada de gameplay =====
 if (DEBUG) Object.assign(window.__T, { zBuildWalk, footFreeR, segClearR, zRoomAt, zActive, zDoorOpen, zBoxPlace, zHigh, colQuery, ffCell, ZPERKS, ZTRAP, ZMAXPERKS, ZWEAP, PR, STEP, ZVAULT, ZTOP });
