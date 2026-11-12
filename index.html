@@ -19987,6 +19987,7 @@ function fpBuild(id, ud) {
       if (!b) continue;
       const f = { a, b, d: a.matrixWorld.clone().invert().multiply(b.matrixWorld) };
       if (pb === P.mag) { // carregador: fora da arma, o centro do carregador do modelo vai para o centro do do pacote (senão fica no ar, longe da mão)
+        if (P.mag2 && D.noMag2) f.hlV = fpBone(root, 'Hand_L'); // pb1: sem a cópia na mão (Dragunov/G3SG1/SCAR-20), o velho voando solto some (ver fpFollow)
         const cA = fpBoneCenter(root, a, m => !fpArm(m)), cB = fpBoneCenter(ms, b, m => m.visible);
         if (cA && cB) { f.t0 = new V3().setFromMatrixPosition(f.d); f.t1 = cA.clone().sub(cB.applyMatrix3(new THREE.Matrix3().setFromMatrix4(f.d))); }
         if (D.magBase && f.t1) fpMagBase(f, root, ms, a, b, A, D.magBase); // a4: na mão, o fundo do carregador (onde a mão segura) no lugar do fundo do do pacote
@@ -20236,6 +20237,10 @@ function fpFollow(F, f) {
   if (preso) _fm2.premultiply(_fm.copy(F.body.matrixWorld).multiply(f.rest)); else _fm2.premultiply(f.a.matrixWorld);
   if (pl && f.rest) { _fv.setFromMatrixPosition(_fm2).addScaledVector(pl, f.ghost ? 1 : w); _fm2.setPosition(_fv); } // fora da arma, o carregador vai junto com a mão desviada
   _fm.copy(f.b.parent.matrixWorld).invert().multiply(_fm2); _fm.decompose(f.b.position, f.b.quaternion, f.b.scale);
+  if (f.hlV && rec && w > .99) { // pb1: o pacote da AK tira o velho com o novo (que este modelo não mostra): fora da arma e longe da mão ele ficava parado no ar perto da mão esquerda
+    _fv2.setFromMatrixPosition(f.hlV.matrixWorld); if (pl) _fv2.sub(pl);
+    if (_fv.setFromMatrixPosition(f.a.matrixWorld).distanceTo(_fv2) > FPIK.magMao) f.b.scale.multiplyScalar(1e-4);
+  }
 }
 // pb1: carregadores da arma do próprio pacote (AK-47: Pmag na arma, Pmag2 o novo). Fora da recarga o da arma fica preso ao encaixe e o
 // novo some; na recarga cada um só aparece encaixado, na mão esquerda ou longe do olho (FPIK.magZ), e o da mão acompanha o desvio dela.
