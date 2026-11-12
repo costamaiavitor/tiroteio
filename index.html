@@ -19829,6 +19829,113 @@ function vxSkinMat(orig, sm, sc) {
 }
 // para o tools/vox-bake.mjs: o arquivo da última arma montada (base64 do binário, antes do gzip)
 function vxExport() { const u = VX.ult; if (!u) return null; const b = new Uint8Array(vxPack(u.partes)); let s = ''; for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768)); return { nome: u.nome, b64: btoa(s) }; }
+// ===== vxb: mãos e braços em voxel (modos CS) =====
+// A malha dos braços tem esqueleto e deforma (dedos, punho, cotovelo). A casca de voxels (mesmo passo da arma) é feita na pose de
+// amarração e vira uma SkinnedMesh ligada ao MESMO esqueleto: cada canto dos cubos leva os pesos de osso da média dos voxels que tocam
+// aquele canto, então a malha continua fechada quando as juntas dobram (sem frestas entre os cubos) e todas as animações do pacote, o IK
+// dos braços e as trocas de pacote (fpArmsSwap) valem como antes. Arquivo pré-calculado: assets/vox/bracos_<pacote>_<n>.bin.gz.
+const VXB = { cache: new Map(), mat: null, ult: new Map() };
+function vxbMat() { return VXB.mat ||= new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .74, metalness: 0, envMapIntensity: .7, name: 'voxPele' }); }
+const vxbK = (i, j, k) => ((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024);
+function vxbVoxels(o, h) { // casca na pose de amarração (posições da geometria), com cor e até 4 pesos de osso por voxel
+  const geo = o.geometry, pos = geo.attributes.position, uv = geo.attributes.uv, idx = geo.index, si = geo.attributes.skinIndex, sw = geo.attributes.skinWeight;
+  const tx = vxTex(o.material.map), cor = o.material.color.clone().convertLinearToSRGB(), n = idx ? idx.count : pos.count, V = new Map(), P = [new V3(), new V3(), new V3()], ii = [0, 0, 0], tmp = [0, 0, 0];
+  for (let t = 0; t < n; t += 3) {
+    for (let c = 0; c < 3; c++) { ii[c] = idx ? idx.getX(t + c) : t + c; P[c].fromBufferAttribute(pos, ii[c]); }
+    const [p0, p1, p2] = P, e1x = p1.x - p0.x, e1y = p1.y - p0.y, e1z = p1.z - p0.z, e2x = p2.x - p0.x, e2y = p2.y - p0.y, e2z = p2.z - p0.z;
+    const n1 = Math.min(400, Math.max(1, Math.ceil(Math.hypot(e1x, e1y, e1z) / (h * .45)))), n2 = Math.min(400, Math.max(1, Math.ceil(Math.hypot(e2x, e2y, e2z) / (h * .45))));
+    for (let a = 0; a <= n1; a++) for (let b = 0; b <= n2; b++) {
+      const u = a / n1, w = b / n2; if (u + w > 1.0001) continue;
+      const x = p0.x + e1x * u + e2x * w, y = p0.y + e1y * u + e2y * w, z = p0.z + e1z * u + e2z * w, i = Math.floor(x / h), j = Math.floor(y / h), k = Math.floor(z / h), key = vxbK(i, j, k);
+      let e = V.get(key); if (!e) V.set(key, e = { i, j, k, s: [0, 0, 0], n: 0, w: {} });
+      if (e.n >= 6) continue;
+      const bar = [1 - u - w, u, w], su = u * .88 + .04, sv = w * .88 + .04, w0 = 1 - su - sv;
+      if (tx && uv) vxSamp(tx, uv.getX(ii[0]) * w0 + uv.getX(ii[1]) * su + uv.getX(ii[2]) * sv, uv.getY(ii[0]) * w0 + uv.getY(ii[1]) * su + uv.getY(ii[2]) * sv, tmp); else tmp[0] = tmp[1] = tmp[2] = 1;
+      e.s[0] += tmp[0] * cor.r; e.s[1] += tmp[1] * cor.g; e.s[2] += tmp[2] * cor.b; e.n++;
+      for (let c = 0; c < 3; c++) for (let q = 0; q < 4; q++) { const ww = sw.getComponent(ii[c], q) * bar[c]; if (ww > 0) { const bi = si.getComponent(ii[c], q); e.w[bi] = (e.w[bi] || 0) + ww; } }
+    }
+  }
+  for (const e of V.values()) { e.c = e.s.map(x => x / e.n); const l = e.c[0] * .3 + e.c[1] * .59 + e.c[2] * .11; if (l > .75) e.c = e.c.map(x => x * .75 / l);
+    const top = Object.entries(e.w).sort((p, q) => q[1] - p[1]).slice(0, 4), tot = top.reduce((a, p) => a + p[1], 0) || 1;
+    e.bi = top.map(p => +p[0]); e.bw = top.map(p => p[1] / tot); while (e.bi.length < 4) { e.bi.push(0); e.bw.push(0); } delete e.w; delete e.s; }
+  // tecido e luva têm textura de detalhe fino (dobras, trama): cor de cada cubo vira a média com os vizinhos (3 passadas) para formar
+  // manchas limpas em vez de chuvisco; costuras e contrastes grandes continuam (a média só pesa vizinhos de cor parecida)
+  for (let it = 0; it < 3; it++) {
+    const nv = new Map();
+    for (const [key, e] of V) { let r = e.c[0] * 2, g = e.c[1] * 2, b = e.c[2] * 2, w = 2;
+      for (const [di, dj, dk] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) { const f = V.get(vxbK(e.i + di, e.j + dj, e.k + dk)); if (!f) continue;
+        const d = Math.abs(f.c[0] - e.c[0]) + Math.abs(f.c[1] - e.c[1]) + Math.abs(f.c[2] - e.c[2]), wt = d < .35 ? 1 : .15; r += f.c[0] * wt; g += f.c[1] * wt; b += f.c[2] * wt; w += wt; }
+      nv.set(key, [r / w, g / w, b / w]); }
+    for (const [key, c] of nv) V.get(key).c = c;
+  }
+  return V;
+}
+function vxbMalha(V0, h) { // casca + miolo -> SkinnedMesh geometry (pesos por canto: média dos voxels em volta)
+  const V = new Map(V0); vxMiolo(V);
+  const has = (i, j, k) => V.has(vxbK(i, j, k)), CW = new Map();
+  const canto = (ci, cj, ck) => { const key = vxbK(ci, cj, ck); let r = CW.get(key); if (r) return r; const acc = {};
+    for (let a = -1; a <= 0; a++) for (let b = -1; b <= 0; b++) for (let c = -1; c <= 0; c++) { const e = V0.get(vxbK(ci + a, cj + b, ck + c)); if (!e) continue; for (let q = 0; q < 4; q++) if (e.bw[q] > 0) acc[e.bi[q]] = (acc[e.bi[q]] || 0) + e.bw[q]; }
+    const top = Object.entries(acc).sort((p, q) => q[1] - p[1]).slice(0, 4), tot = top.reduce((x, p) => x + p[1], 0) || 1;
+    r = [top.map(p => +p[0]), top.map(p => p[1] / tot)]; while (r[0].length < 4) { r[0].push(0); r[1].push(0); } CW.set(key, r); return r; };
+  const F = [[[1, 0, 0], [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]]], [[-1, 0, 0], [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]]], [[0, 1, 0], [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]]],
+    [[0, -1, 0], [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]]], [[0, 0, 1], [[1, 0, 1], [1, 1, 1], [0, 1, 1], [0, 0, 1]]], [[0, 0, -1], [[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 0, 0]]]];
+  const p = [], nr = [], cl = [], si = [], sw = [], ix = [], ao = [0, 0, 0, 0], o = [0, 0, 0], q = [0, 0, 0];
+  for (const v of V0.values()) {
+    const lc = [Math.pow(v.c[0], 2.2), Math.pow(v.c[1], 2.2), Math.pow(v.c[2], 2.2)];
+    for (const [nn, cs] of F) {
+      if (has(v.i + nn[0], v.j + nn[1], v.k + nn[2])) continue;
+      const base = p.length / 3, ax = nn[0] ? [1, 2] : nn[1] ? [0, 2] : [0, 1]; o[0] = v.i + nn[0]; o[1] = v.j + nn[1]; o[2] = v.k + nn[2];
+      for (let c = 0; c < 4; c++) {
+        const cr = cs[c], d0 = cr[ax[0]] ? 1 : -1, d1 = cr[ax[1]] ? 1 : -1;
+        q[0] = o[0]; q[1] = o[1]; q[2] = o[2]; q[ax[0]] += d0; const a = has(q[0], q[1], q[2]) ? 1 : 0;
+        q[ax[0]] -= d0; q[ax[1]] += d1; const b = has(q[0], q[1], q[2]) ? 1 : 0; q[ax[0]] += d0; const k = has(q[0], q[1], q[2]) ? 1 : 0;
+        const sh = 1 - (a && b ? 3 : a + b + k) * .16; ao[c] = sh;
+        const ci = v.i + cr[0], cj = v.j + cr[1], ck = v.k + cr[2], [bi, bw] = canto(ci, cj, ck);
+        p.push(ci * h, cj * h, ck * h); nr.push(nn[0], nn[1], nn[2]); cl.push(lc[0] * sh, lc[1] * sh, lc[2] * sh); si.push(...bi); sw.push(...bw);
+      }
+      if (ao[0] + ao[2] < ao[1] + ao[3]) ix.push(base + 1, base + 2, base + 3, base + 1, base + 3, base); else ix.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nr, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+  g.setIndex(ix.length / 1 > 65535 ? new THREE.Uint32BufferAttribute(ix, 1) : new THREE.Uint16BufferAttribute(ix, 1)); g.computeBoundingSphere(); g.userData.keep = true; return g;
+}
+function vxbPack(h, V) {
+  const buf = new ArrayBuffer(12 + V.size * 17), dv = new DataView(buf); let o = 0;
+  dv.setUint32(0, 0x31425856, true); dv.setFloat32(4, h, true); dv.setUint32(8, V.size, true); o = 12;
+  for (const e of V.values()) { dv.setInt16(o, e.i, true); dv.setInt16(o + 2, e.j, true); dv.setInt16(o + 4, e.k, true); for (let c = 0; c < 3; c++) dv.setUint8(o + 6 + c, Math.round(e.c[c] * 255));
+    for (let q = 0; q < 4; q++) { dv.setUint8(o + 9 + q, e.bi[q]); dv.setUint8(o + 13 + q, Math.round(e.bw[q] * 255)); } o += 17; }
+  return buf;
+}
+function vxbUnpack(buf) {
+  const dv = new DataView(buf); if (dv.getUint32(0, true) !== 0x31425856) return null; const h = dv.getFloat32(4, true), n = dv.getUint32(8, true), V = new Map(); let o = 12;
+  for (let t = 0; t < n; t++, o += 17) { const i = dv.getInt16(o, true), j = dv.getInt16(o + 2, true), k = dv.getInt16(o + 4, true), bi = [], bw = []; let tot = 0;
+    for (let q = 0; q < 4; q++) { bi.push(dv.getUint8(o + 9 + q)); const w = dv.getUint8(o + 13 + q) / 255; bw.push(w); tot += w; } if (tot > 0) for (let q = 0; q < 4; q++) bw[q] /= tot;
+    V.set(vxbK(i, j, k), { i, j, k, c: [dv.getUint8(o + 6) / 255, dv.getUint8(o + 7) / 255, dv.getUint8(o + 8) / 255], bi, bw }); }
+  return { h, V };
+}
+function vxbLoad(nome) {
+  if (nome in VXF) return VXF[nome];
+  return (VXF[nome] = fetch('assets/vox/' + nome + '.bin.gz').then(r => { if (!r.ok) throw 0; return new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer(); })
+    .then(b => { const d = VXF[nome] = vxbUnpack(b); if (d) (window.requestIdleCallback || setTimeout)(() => { if (!VXB.cache.has(nome)) VXB.cache.set(nome, { h: d.h, geo: vxbMalha(d.V, d.h) }); }); return d; }, () => (VXF[nome] = null)));
+}
+const vxbNomes = (P, W2) => ['bracos_' + (P.armsFrom || W2.pack) + '_0'];
+function vxBracos(root, P, W2) { // troca a malha dos braços (com esqueleto) pela de voxels, ligada ao mesmo esqueleto
+  if (!VX.on) return;
+  root.updateMatrixWorld(true);
+  const Ri = root.matrixWorld.clone().invert(), vis = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }, alvo = [];
+  root.traverse(o => { if (fpArmsMesh(o) && vis(o)) alvo.push(o); });
+  alvo.forEach((o, n) => {
+    const nome = 'bracos_' + (P.armsFrom || W2.pack) + '_' + n; let c = VXB.cache.get(nome);
+    if (!c) { const d = vxPronto(nome) ? VXF[nome] : null; let h, V;
+      if (d) ({ h, V } = d); else { h = VX.passo * FPG * P.hr / fpMeshScale(o, Ri); V = vxbVoxels(o, h); VXB.ult.set(nome, { h, V }); }
+      VXB.cache.set(nome, c = { h, geo: vxbMalha(V, h) }); }
+    const vm = new THREE.SkinnedMesh(c.geo, vxbMat()); vm.name = 'voxBraco'; vm.userData.vox = 1; vm.frustumCulled = false;
+    o.parent.add(vm); vm.position.copy(o.position); vm.quaternion.copy(o.quaternion); vm.scale.copy(o.scale); vm.updateMatrixWorld(true);
+    vm.bind(o.skeleton, o.bindMatrix.clone()); o.visible = false;
+  });
+}
+function vxbExport() { const out = []; for (const [nome, { h, V }] of VXB.ult) { const b = new Uint8Array(vxbPack(h, V)); let s = ''; for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768)); out.push({ nome, b64: btoa(s) }); } return out; }
 function fpBuild(id, ud) {
   const W2 = fpw(id), P = FPK[W2.pack], D = W2.m && FPM[W2.m], pk = 'p:' + W2.pack, mk = W2.m && 'm:' + W2.m;
   const ak = P.armsFrom && 'p:' + P.armsFrom;
@@ -19839,6 +19946,7 @@ function fpBuild(id, ud) {
   const b8 = 'v|' + pk + '|' + (mk || '') + '|' + (ak || ''); // O1-B08: só entra pronta (programas e texturas); até lá fica a de antes
   if (!b08Ok(b8)) { b08Pedir(b8).p.then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; }
   const vxn = vxNome(b8 + (W[id]?.sil ? '|sil' : ''));
+  for (const nb of vxbNomes(P, W2)) if (VX.on && !vxPronto(nb)) { vxbLoad(nb).then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; } // vxb: espera o arquivo dos braços
   if (VX.on && !vxPronto(vxn)) { vxLoad(vxn).then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; } // vx: espera o arquivo pré-calculado
   const g = FPC[pk], root = SkeletonUtils.clone(g.scene);
   if (ak) fpArmsSwap(root, FPC[ak].scene);
@@ -19940,6 +20048,7 @@ function fpBuild(id, ud) {
   if (D?.brass) model.traverse(o => { if (o.isMesh && D.brass.includes(o.material.name)) Object.assign(o.material, { metalness: .9, roughness: .35 }).color.set(0xb08d3c); }); // balas brancas sem textura viram latão
   if (D?.lens) model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) Object.assign(o.material, { roughness: .08, metalness: .4 }).color.set(0x14232c); }); // vidro da luneta
   vxArma(root, P, D, b8 + (W[id]?.sil ? '|sil' : '')); // vx: a arma vira voxel fino (peça por peça, presa ao osso dela: animações, carregador e ferrolho continuam); skin entra por cima
+  vxBracos(root, P, W2); // vxb: mãos e braços em voxel, deformando com o mesmo esqueleto
   const sk = SKIN_BY[skinOf(id)], pap = W[id]?.pap | 0;
   if (sk || pap || D?.mat) { // (a13: D.mat = modelo sem textura usa os materiais das armas do jogo, mesmo sem skin) skin: no modelo baixado ou, nas armas do próprio pacote (AK-47, Nova), nas peças da arma do pacote (cartucho fica)
     const M = gunMats(pap, true, skinOf(id)), mats = { a: M.metal, b: M.polymer };
@@ -33118,7 +33227,7 @@ fpLoad('p:ak'); fpLoad('m:knife'); fpLoad('m:karambit'); FPC['k:pack'] = new GLT
 setTimeout(() => { let q = Promise.resolve(); for (const k of Object.keys(FPM)) q = q.then(() => fpLoad('m:' + k)); }, 8000); // modelos das armas aos poucos (mundo e mãos dos outros)
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos); só em desenvolvimento (DEBUG), nunca no site publicado
-if (DEBUG) window.__T = { get NOW() { return now; }, vxExport, VX, FPW, fpw, akAnim, akPassada, showPause, attPartsProc, skinSwatch, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
+if (DEBUG) window.__T = { get NOW() { return now; }, vxExport, vxbExport, VXB, VX, FPW, fpw, akAnim, akPassada, showPause, attPartsProc, skinSwatch, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade, zKill, zDrop, zEndRound,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 if (DEBUG) Object.assign(window.__T, { R1, R1enc, R1dec, r1PosH, r1PosC, r1FastDec }); // R1: ganchos de teste do formato de fio
