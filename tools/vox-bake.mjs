@@ -25,4 +25,7 @@ for (const id of ids) {
   const gz = zlib.gzipSync(Buffer.from(r.b64, 'base64'), { level: 9 }); fs.writeFileSync(REPO + 'assets/vox/' + r.nome + '.bin.gz', gz);
   console.log(id, '->', r.nome, (gz.length / 1024).toFixed(0) + ' KB');
 }
+// braços (mãos) em voxel: um arquivo por malha de braços (iguais em todos os pacotes que pegam os braços do mesmo pacote)
+const br = await p.evaluate(() => window.__T.vxbExport?.() || []);
+for (const r of br) { const gz = zlib.gzipSync(Buffer.from(r.b64, 'base64'), { level: 9 }); fs.writeFileSync(REPO + 'assets/vox/' + r.nome + '.bin.gz', gz); console.log('braços ->', r.nome, (gz.length / 1024).toFixed(0) + ' KB'); }
 await b.close();
