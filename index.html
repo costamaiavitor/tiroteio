@@ -20044,6 +20044,7 @@ function vx3Troca(rp, t) {
 function vxAquecer(M) {
   if (!VX.on || !VX2.on) return;
   setTimeout(() => {
+    if (!inGame) return; // o mapa de fundo do menu também aquece: lá não há mão para voxelizar
     for (const id of M.zombie ? ['semtex', 'monkey', 'clay'] : ['he', 'flash', 'smoke', 'molotov', 'inc', 'decoy']) if (W[id]) try { const sk = skinOf(id); vxItem(gunModel(id, true, sk), id, W[id].model, sk, CFG.gfx !== 'baixo', null, false); } catch (e) { console.warn('vx2', e); }
     const kn = W[knifeModelOf('knife', PROF.data?.equipped)]?.model; let n = 0;
     const faca = () => { if (!(kn === 'knife' || kn === 'karambit')) return; if (!inGame) { if (++n < 30) setTimeout(faca, 1000); return; } VX2.aq = true; let ok = false; try { ok = !!knBuild(kn, {}, null); } catch (e) { console.warn('vx2', e); } finally { VX2.aq = false; } if (!ok && ++n < 30) setTimeout(faca, 1000); };
