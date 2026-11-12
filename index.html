@@ -20084,7 +20084,7 @@ function fpBuild(id, ud) {
   // a15: o saque do pacote cabe no tempo do jogo (G.switchDur); modelo que chega depois entra no ponto do saque em que a troca está (ou parado)
   const z2 = FZ2F.includes(W2.pack); // fz2: saque procedural (sobe girando com mola, a mão esquerda chega depois) sobre a pose parada
   const sw = G.switchEnd - now, dr = clips.draw && sw > .02 && !z2; mixer.stopAllAction(); fpPlay(ud, dr ? 'draw' : 'idle', dr ? G.switchDur : undefined); mixer.update(dr ? Math.max(0, G.switchDur - sw) : 0); if (dr) ud.fps2.until = G.switchEnd;
-  if (z2) { fz2Monta(ud.fps2, id, W2, D ? model.children[0] : null); if (z2r?.R.topo) ud.fps2.z2.topo = { no: z2r.no, c0: z2r.c0, pc: new V3(), q: new THREE.Quaternion(), on: false }; }
+  if (z2) { fz2Monta(ud.fps2, id, W2, D ? model.children[0] : null); if (z2r?.R.topo) ud.fps2.z2.topo = { no: z2r.no, c0: z2r.c0, c0w: new V3(), pc: new V3(), q: new THREE.Quaternion(), on: false }; }
   if (D?.cover) fpCoverInit(ud.fps2, model.children[0], D); // a7: tampa de alimentação do modelo (metralhadora de fita)
   return holder;
 }
@@ -20244,7 +20244,7 @@ function fpFollow(F, f) {
 function fpUpdate(ud, dt) {
   const F = ud.fps2, hs = Math.hypot(me.vel.x, me.vel.z);
   if (G.reloadEnd && !F.reloading) { F.reloading = true; fpPlay(ud, (G.reloadEmpty || F.z2 && FZ2.arma[G.cur]?.sempreE) && F.clips.reloadE ? 'reloadE' : 'reload', G.reloadEnd - now); if (F.z2) fz2Inicio(F); } // fz2: roteiro da recarga
-  if (!G.reloadEnd) F.reloading = false;
+  if (!G.reloadEnd) { if (F.z2?.r) { F.until = 0; F.z2.r = null; if (F.z2.pm) { F.z2.pm.a.scale.setScalar(1); F.z2.pm.b?.scale.setScalar(1e-4); } } F.reloading = false; } // fz2: recarga cancelada (plantar, morrer): volta já à pose parada
   if (F.until && now >= F.until) F.until = 0;
   if (!F.until && !F.reloading) fpPlay(ud, me.sprinting && F.clips.run && !F.P?.semCorrida ? 'run' : hs > 1.5 && me.onGround && F.clips.walk ? 'walk' : 'idle');
   if (F.ik?.sv) { F.ik.arms.forEach((a, i) => { const v = F.ik.sv[i]; a.cl.position.copy(v[0]); a.ua.quaternion.copy(v[1]); a.fa.quaternion.copy(v[2]); if (a.hand) a.hand.position.copy(v[3]); }); if (F.ik.hp) F.ik.hl.position.copy(F.ik.hp); } // desfaz o IK do quadro anterior (ossos sem chave na animação)
@@ -20381,12 +20381,11 @@ function fz2Kf(fr, s, n) { // quadros [s, ...n valores], curva suave entre eles 
 // resposta de mola: degrau (1 → 0, passa um pouco do zero) e impulso (0 → pico 1 → volta oscilando)
 function fz2Degrau(t, f, z) { if (t <= 0) return 1; const w = 2 * Math.PI * f, wd = w * Math.sqrt(1 - z * z); return Math.exp(-z * w * t) * (Math.cos(wd * t) + z * w / wd * Math.sin(wd * t)); }
 function fz2Pulso(t, f, z) { if (t <= 0) return 0; const w = 2 * Math.PI * f, wd = w * Math.sqrt(1 - z * z), tp = Math.atan(wd / (z * w)) / wd; return Math.exp(-z * w * (t - tp)) * Math.sin(wd * t) / Math.sin(wd * tp); }
-const fz2Cfg = id => { const f = fpw(id); return f && FZ2F.includes(f.pack) ? f : null; };
 // carregador que não é peça própria no modelo baixado (MP5: as malhas são por material e o carregador está misturado nelas): um nó
 // 'mag_fz2' no lugar dele segue o carregador do pacote, e depois dos voxels os cubos dentro da caixa (espaço das malhas) passam para ele
-const FZ2R = { mp5: { malhas: [0, 2], caixa: [-82, -40, -76, -4, -10, 10] }, // malhas (ordem no modelo) e caixa [x0, x1, y0, y1, z0, z1]
+const FZ2R = { mp5: { malhas: [0, 2], caixa: [-80, -40, -76, -10, -10, 10] }, // malhas (ordem no modelo) e caixa [x0, x1, y0, y1, z0, z1]
   p90: { nos: /^(MagazineLPB001|MagBody)$/, topo: 1 } }; // P90: o carregador são dois nós soltos, em cima da arma (topo: a mão o tira por cima, ver fz2Topo)
-const FZ2C = new WeakMap(); // geometria de voxels → [fora da caixa, dentro] (uma vez por sessão)
+const FZ2C = new WeakMap(); // peça de voxels → [fora da caixa, dentro] (uma vez por sessão)
 function fz2Recorte0(ms, R, body) {
   if (R.nos) { // nós soltos: vão para dentro de um nó só depois dos voxels (a ordem das malhas é a do arquivo pré-calculado)
     const nos = []; ms.traverse(o => { if (R.nos.test(o.name)) nos.push(o); }); if (!nos.length) return null;
@@ -20401,33 +20400,28 @@ function fz2Recorte0(ms, R, body) {
   const B = R.caixa, cB = new V3((B[0] + B[1]) / 2, (B[2] + B[3]) / 2, (B[4] + B[5]) / 2).applyMatrix4(alvo[0].matrixWorld).applyMatrix4(no.matrixWorld.clone().invert());
   return { no, alvo, R, re: /^mag_fz2$/, cB };
 }
-function fz2Corta(geo, h, B) { // separa as faces (quadradas: 4 vértices e 6 índices cada) pelo centro, dentro ou fora da caixa
-  const P = geo.attributes.position.array, N = geo.attributes.normal.array, C = geo.attributes.color.array, I = geo.index.array, nq = I.length / 6;
-  const out = [{ p: [], n: [], c: [], i: [] }, { p: [], n: [], c: [], i: [] }];
-  for (let q = 0; q < nq; q++) {
-    const b = q * 4; let cx = 0, cy = 0, cz = 0; for (let k = 0; k < 4; k++) { cx += P[(b + k) * 3]; cy += P[(b + k) * 3 + 1]; cz += P[(b + k) * 3 + 2]; }
-    cx *= h / 4; cy *= h / 4; cz *= h / 4;
-    const g = out[cx >= B[0] && cx <= B[1] && cy >= B[2] && cy <= B[3] && cz >= B[4] && cz <= B[5] ? 1 : 0], nb = g.p.length / 3;
-    for (let k = 0; k < 12; k++) { g.p.push(P[b * 3 + k]); g.n.push(N[b * 3 + k]); g.c.push(C[b * 3 + k]); }
-    for (let k = 0; k < 6; k++) g.i.push(I[q * 6 + k] - b + nb);
-  }
-  return out.map(g => { if (!g.i.length) return null; const ge = new THREE.BufferGeometry(); ge.setAttribute('position', new THREE.Float32BufferAttribute(g.p, 3)); ge.setAttribute('normal', new THREE.Float32BufferAttribute(g.n, 3));
-    ge.setAttribute('color', new THREE.Float32BufferAttribute(g.c, 3)); ge.setIndex(g.p.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(g.i, 1) : new THREE.Uint16BufferAttribute(g.i, 1)); ge.computeBoundingSphere(); ge.userData.keep = true; return ge; });
+function fz2Corta(p, B) { // separa os VOXELS da peça (casca do arquivo) pelo centro do cubo: dois conjuntos, cada um com miolo e malha próprios (cascas fechadas)
+  const V = [new Map(), new Map()], h = p.h;
+  for (const [k, v] of p.V) { const x = (v.i + .5) * h, y = (v.j + .5) * h, z = (v.k + .5) * h; V[x >= B[0] && x <= B[1] && y >= B[2] && y <= B[3] && z >= B[4] && z <= B[5] ? 1 : 0].set(k, v); }
+  return V.map(m => { if (!m.size) return null; vxMiolo(m); return vxMalha(m, 1); }); // [fora, dentro]: cada um [plástico, metal]
 }
 function fz2Recorte(z) { // depois do vxArma: os cubos do carregador vão para o nó dele
   if (z.nos) { for (const n of z.nos) z.no.attach(n); return; }
-  z.no.updateWorldMatrix(true, false); const inv = z.no.matrixWorld.clone().invert();
+  z.no.updateWorldMatrix(true, false); const inv = z.no.matrixWorld.clone().invert(), partes = VX.ult?.partes || [];
   for (const o of z.alvo) for (const vm of o.children.filter(c => c.isMesh && c.userData.vox)) {
-    let par = FZ2C.get(vm.geometry); if (!par) { par = fz2Corta(vm.geometry, vm.scale.x, z.R.caixa); FZ2C.set(vm.geometry, par); }
+    const pt = partes.find(q => q.geos?.includes(vm.geometry)); if (!pt?.V) continue;
+    let par = FZ2C.get(pt); if (!par) { par = fz2Corta(pt, z.R.caixa); FZ2C.set(pt, par); }
+    const i = pt.geos.indexOf(vm.geometry), fora = par[0]?.[i], dentro = par[1]?.[i];
     if (!par[1]) continue;
-    if (par[0]) vm.geometry = par[0]; else vm.visible = false;
-    const m = new THREE.Mesh(par[1], vm.material); m.userData.vox = 1; m.frustumCulled = false; m.name = 'vox';
+    if (fora) vm.geometry = fora; else vm.visible = false;
+    if (!dentro) continue;
+    const m = new THREE.Mesh(dentro, vm.material); m.userData.vox = 1; m.frustumCulled = false; m.name = 'vox';
     vm.updateWorldMatrix(true, false); inv.clone().multiply(vm.matrixWorld).decompose(m.position, m.quaternion, m.scale); z.no.add(m);
   }
 }
 // montagem (fpBuild): peças do pacote e do modelo que o roteiro usa
 function fz2Monta(F, id, W2, ms) {
-  F.z2 = { pk: W2.pack, molas: [], mao: new V3(), b: null };
+  F.z2 = { pk: W2.pack, molas: [], mao: new V3(), b: null, vel: new V3(), pv: new V3(), temPv: false, fm: F.follow.find(f => f.rest && !f.ghost) };
   const bone = n => fpBone(F.root, n), A = FZ2.arma[id] || {};
   F.root.updateMatrixWorld(true);
   if (!ms) { // arma do próprio pacote (AK-47): os dois carregadores são ossos do pacote (somem com escala ~0)
@@ -20445,8 +20439,10 @@ function fz2Monta(F, id, W2, ms) {
 function fz2Inicio(F) {
   const Z = F.z2; if (!Z) return;
   const A = FZ2.arma[G.cur], k = G.reloadEmpty || A?.sempreE ? 'E' : 'P', R = A?.[k] || FZ2[Z.pk][k], T = Math.max(.3, G.reloadEnd - G.reloadStart);
-  Z.r = { R, mp: fz2Mapa(R, T), a: F.act, ev: {}, s: 0, u: 0, t0: G.reloadStart, T };
+  Z.r = { R, mp: fz2Mapa(R, T), a: F.act, ev: {}, s: 0, u: 0, t0: G.reloadStart, T }; Z.temPv = false;
   if (F.act) F.act.timeScale = 0;
+  const u0 = clamp((now - G.reloadStart) / T, 0, 1); // modelo que chega no meio da recarga: o que já passou fica feito, sem som (a munição do encaixe também)
+  if (u0 > 0) { const s0 = fz2Herm(Z.r.mp.U, Z.r.mp.S, Z.r.mp.M, u0); for (const k in R.ev) if (R.ev[k] <= s0) Z.r.ev[k] = 1; if (Z.r.ev.encaixa) { const a = G.ammo[G.cur]; if (a) { const tk = Math.min(wMag(G.cur) - a.mag, a.res); if (tk > 0) { a.mag += tk; a.res -= tk; } } } }
 }
 // a cada quadro (antes do mixer): tempo do clipe pela curva
 function fz2Tempo(F) {
@@ -20462,20 +20458,20 @@ function fz2Larga(F, o, v) {
   const inv = o.matrixWorld.clone().invert(); let n = 0;
   o.traverse(m => { if (m.isMesh && m.userData.vox && m.visible) { const c = new THREE.Mesh(m.geometry, m.material); c.frustumCulled = false; inv.clone().multiply(m.matrixWorld).decompose(c.position, c.quaternion, c.scale); g.add(c); n++; } });
   if (!n) return;
-  vmScene.add(g); vmFx.push({ m: g, v: new V3(...v).add(F.z2.vel || _z2.v.set(0, 0, 0)), t: 0, shared: 1 });
+  vmScene.add(g); vmFx.push({ m: g, v: new V3(...v).add(F.z2.vel), t: 0, shared: 1 });
 }
 function fz2Mola(F, k) { const M = FZ2.mola[k]; if (M) F.z2.molas.push({ t0: now, ...M }); const c = FZ2.cam[k]; if (c) { G.punchP += c[0]; G.punchY += c[1] * (Math.random() < .5 ? -1 : 1); } }
 // fantasma (segundo carregador do pacote AK): na mão desde 'pega' até o velho voltar ao encaixe (aí ele já é o da arma)
 function fz2Fant(F) { const r = F.z2?.r, E = r?.R.ev; return !!r && r.s >= (E.pega ?? 0) && !(r.ev.larga && !F.z2.fora); }
 // a cada quadro (depois do IK e das peças): eventos, carregadores que somem/aparecem e ferrolho do modelo
 function fz2Pecas(F, dt) {
-  const Z = F.z2, r = Z.r, fm = F.follow.find(f => f.rest && !f.ghost);
+  const Z = F.z2, r = Z.r, fm = Z.fm;
   const om = fm ? fm.b : Z.pm?.a; // carregador velho (o do modelo ou o osso do pacote)
   Z.fora = om ? (fm ? fm.w > .02 : fz2Fora(F, Z.pm.a, Z.pm.rest)) : false;
   if (Z.topo) fz2TopoPoe(F); // P90: carregador por cima
   if (r) {
     const E = r.R.ev, fire = (k, fn) => { if (E[k] != null && r.s >= E[k] && !r.ev[k]) { r.ev[k] = 1; fn(); } };
-    if (om) { om.getWorldPosition(_z2.v2); if (Z.pv && dt > 0) Z.vel = (Z.vel || new V3()).copy(_z2.v2).sub(Z.pv).multiplyScalar(1 / Math.max(.008, dt)).clampLength(0, 2.5); Z.pv = (Z.pv || new V3()).copy(_z2.v2); }
+    if (om) { om.getWorldPosition(_z2.v2); if (Z.temPv && dt > 0) Z.vel.copy(_z2.v2).sub(Z.pv).multiplyScalar(1 / Math.max(.008, dt)).clampLength(0, 2.5); Z.pv.copy(_z2.v2); Z.temPv = true; }
     fire('sai', () => play('magout'));
     fire('larga', () => { if (om && r.R.cai) fz2Larga(F, om, r.R.larga || [0, -.5, 0]); });
     fire('encaixa', () => { play('magin'); fz2Mola(F, 'encaixa'); const a = G.ammo[G.cur]; if (a) { const take = Math.min(wMag(G.cur) - a.mag, a.res); if (take > 0) { a.mag += take; a.res -= take; } } });
@@ -20522,12 +20518,14 @@ function fz2Pose(o, ud) {
 function fz2Topo(F, out) {
   const Z = F.z2, T = Z.topo, r = Z.r, K = r?.R.top; T.on = false; if (!K) return;
   const k = fz2Kf(K, r.s, 6), wh = k[0] * (r.R.wTopo ?? .6) /* a mão só se aproxima: inteira, o braço cruzava a tela */, wm = k[1], lx = k[2], ly = k[3], lz = k[4], ang = k[5]; if (wh < .001 && wm < .001) return;
-  const G = _z2.m.copy(F.body.matrixWorld).multiply(F.C), X = new V3().setFromMatrixColumn(G, 0).normalize(), Y = new V3().setFromMatrixColumn(G, 1).normalize(), Zc = new V3().setFromMatrixColumn(G, 2).normalize(), u = FPG * FPH / 100;
-  const v = (x, y, z) => new V3().addScaledVector(X, -x * u).addScaledVector(Y, y * u).addScaledVector(Zc, -z * u); // x direita, y cima, z para trás
-  const c0 = T.c0.clone().applyMatrix4(F.body.matrixWorld), sobe = c0.clone().add(v(lx, ly, lz)), pg = r.R.pega || [-6, 4, 2], grip = v(pg[0], pg[1], pg[2]);
-  const h = _z2.v.setFromMatrixPosition(F.ik.hl.matrixWorld).add(out), d = sobe.clone().add(grip).sub(h).multiplyScalar(wh);
-  out.add(d); h.add(d);
-  T.pc.copy(sobe).lerp(h.sub(grip), wm); T.q.setFromAxisAngle(X, ang); T.c0w = c0; T.on = true;
+  const t = _z2.t || (_z2.t = { X: new V3(), Y: new V3(), Z: new V3(), s: new V3(), g: new V3(), d: new V3() }), u = FPG * FPH / 100;
+  _z2.m.copy(F.body.matrixWorld).multiply(F.C); t.X.setFromMatrixColumn(_z2.m, 0).normalize(); t.Y.setFromMatrixColumn(_z2.m, 1).normalize(); t.Z.setFromMatrixColumn(_z2.m, 2).normalize();
+  const v = (o, x, y, z) => o.addScaledVector(t.X, -x * u).addScaledVector(t.Y, y * u).addScaledVector(t.Z, -z * u); // x direita, y cima, z para trás
+  const pg = r.R.pega || [-6, 4, 2];
+  T.c0w.copy(T.c0).applyMatrix4(F.body.matrixWorld); v(t.s.copy(T.c0w), lx, ly, lz); v(t.g.set(0, 0, 0), pg[0], pg[1], pg[2]);
+  const h = _z2.v.setFromMatrixPosition(F.ik.hl.matrixWorld).add(out); t.d.copy(t.s).add(t.g).sub(h).multiplyScalar(wh);
+  out.add(t.d); h.add(t.d);
+  T.pc.copy(t.s).lerp(h.sub(t.g), wm); T.q.setFromAxisAngle(t.X, ang); T.on = true;
 }
 function fz2TopoPoe(F) { // depois das peças: o nó do carregador no lugar calculado (gira em volta do centro dele)
   const T = F.z2.topo, no = T.no; no.position.set(0, 0, 0); no.quaternion.identity(); no.scale.setScalar(1); if (!T.on) return;
