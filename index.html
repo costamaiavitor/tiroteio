@@ -19807,7 +19807,7 @@ function vxArma(root, P, D, b8) {
   for (const p of partes) {
     const o = alvo[p.malha]; if (!o) continue;
     const pai = p.osso ? (o.isSkinnedMesh ? o.skeleton.bones.find(b => b.name === p.osso) : null) : o; if (!pai) continue;
-    p.geos.forEach((g, i) => { if (!g) return; const vm = new THREE.Mesh(g, mats[i]); vm.userData.vox = 1; vm.frustumCulled = false; vm.name = 'vox'; vm.scale.setScalar(p.h); pai.add(vm); }); // malha em unidades de voxel
+    p.geos.forEach((g, i) => { if (!g) return; const vm = new THREE.Mesh(g, mats[i]); vm.userData.vox = 1; vm.userData.vxp = p; vm.frustumCulled = false; vm.name = 'vox'; vm.scale.setScalar(p.h); pai.add(vm); }); // malha em unidades de voxel (vxp: a parte, para o recorte de peças do an)
   }
   for (const o of alvo) { if (o.isSkinnedMesh) o.visible = false; else { o.geometry = new THREE.BufferGeometry(); o.userData.voxOrig = 1; } }
 }
@@ -20080,6 +20080,7 @@ function fpBuild(id, ud) {
   holder.add(root);
   Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, mz, follow, ik, body, C, aq, sl: tips.sight.clone().applyMatrix4(C), ap: new V3(0, 0, -(P.view === 'pistol' ? ADS.csPistola : ADS.csLonga)).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
   ud.fps2.ej = ej; ud.fps2.magP = magP;
+  anMonta(ud.fps2, id, D, model, D ? tips.L / D.L : 1); // an: saque e recarga caprichados (peças recortadas dos voxels, ossos das camadas)
   ud.fab = null; ud.fabLens = null; // a holográfica da arma feita no código não vale aqui (a M4 baixada usa a mira de ferro dela)
   if (D?.lens && !W[id]?.scope) { // mira de fábrica do modelo baixado (P90: colimador; HK21/M249: luneta): no ADS a lente fica transparente, com retícula e zoom (FABM)
     ud.fab = FAB_HOLO.includes(attBase(id)) ? 'holo' : 'luneta'; ud.fabLens = [];
@@ -20272,15 +20273,17 @@ function fpMagProprio(F) {
 }
 function fpUpdate(ud, dt) {
   const F = ud.fps2, hs = Math.hypot(me.vel.x, me.vel.z);
-  if (G.reloadEnd && !F.reloading) { F.reloading = true; fpPlay(ud, (G.reloadEmpty || F.z2 && FZ2.arma[G.cur]?.sempreE) && F.clips.reloadE ? 'reloadE' : 'reload', G.reloadEnd - now); if (F.z2) fz2Inicio(F); } // fz2: roteiro da recarga
+  if (G.reloadEnd && !F.reloading) { F.reloading = true; fpPlay(ud, F.an?.m === 'python' ? 'idle' : (G.reloadEmpty || F.z2 && FZ2.arma[G.cur]?.sempreE) && F.clips.reloadE ? 'reloadE' : 'reload', G.reloadEnd - now); if (F.z2) fz2Inicio(F); } // an: R8 sem o clipe de carregador; fz2: roteiro da recarga
   if (!G.reloadEnd) { if (F.z2?.r) { F.until = 0; F.z2.r = null; if (F.z2.pm) { F.z2.pm.a.scale.setScalar(1); F.z2.pm.b?.scale.setScalar(1e-4); } } F.reloading = false; } // fz2: recarga cancelada (plantar, morrer): volta já à pose parada
   if (F.until && now >= F.until) F.until = 0;
   if (!F.until && !F.reloading) fpPlay(ud, me.sprinting && F.clips.run && !F.P?.semCorrida ? 'run' : hs > 1.5 && me.onGround && F.clips.walk ? 'walk' : 'idle');
   if (F.ik?.sv) { F.ik.arms.forEach((a, i) => { const v = F.ik.sv[i]; a.cl.position.copy(v[0]); a.ua.quaternion.copy(v[1]); a.fa.quaternion.copy(v[2]); if (a.hand) a.hand.position.copy(v[3]); }); if (F.ik.hp) F.ik.hl.position.copy(F.ik.hp); } // desfaz o IK do quadro anterior (ossos sem chave na animação)
+  if (F.an) anDesfaz(F); // an: ossos mexidos pelas camadas voltam ao que a animação deixou
   if (F.z2) fz2Tempo(F); // fz2: tempo do clipe da recarga pelo roteiro
   F.mixer.update(dt);
   if (F.kf) knFollow(F); // faca (a9)
   if (F.hideL) F.hideL.scale.setScalar(1e-3); // faca: a mão esquerda do pacote fica parada no canto da tela, então some (como no CS)
+  if (F.an) anPose(ud, dt); // an: saque, travas, eventos e molas no esqueleto (antes do IK)
   if (F.ik) fpIK(F); // braços antes das peças: o carregador na mão esquerda acompanha o desvio da mão (pushL)
   if (F.follow.length) { // peças móveis do modelo copiam o movimento das peças do pacote
     F.root.updateMatrixWorld(true);
@@ -20301,7 +20304,7 @@ const FZSAQ = { x: .03, y: -.26, rx: -.35, rz: .3 }; // saque sem clipe (AWP, SS
 function fzSons(ud) {
   const w = W[G.cur], a = G.ammo[G.cur]; if (!w || !a) return;
   const ev = (k, at, t, fn) => { if (t >= at && !G.rEv[k]) { G.rEv[k] = 1; fn(); } };
-  if (G.reloadEnd && !G.reload && G.rEv) { // recarga de carregador (as de bala por bala já tocam 'shellin' a cada cartucho)
+  if (G.reloadEnd && !G.reload && G.rEv && !ud.fps2.an) { // recarga de carregador (as de bala por bala já tocam 'shellin' a cada cartucho; pistolas, snipers e escopetas: eventos do an)
     const t = (now - G.reloadStart) / (G.reloadEnd - G.reloadStart), R = FZS.rec, L = FZS.lmg;
     if (ud.fps2.cv) { ev('fz0', L.abre, t, () => play('slide')); ev('fz1', L.sai, t, () => play('magout')); ev('fz2', L.entra, t, () => play('magin')); ev('fz3', L.fecha, t, () => play('slide')); }
     else { ev('fz1', R.sai, t, () => play('magout')); ev('fz2', R.entra, t, () => play('magin')); if (G.reloadEmpty) ev('fz3', R.ferrolho, t, () => play(['awp', 'scout'].includes(w.model) ? 'bolt' : 'slide')); }
@@ -20472,7 +20475,7 @@ function fz2Inicio(F) {
   Z.r = { R, mp: fz2Mapa(R, T), a: F.act, ev: {}, s: 0, u: 0, t0: G.reloadStart, T }; Z.temPv = false;
   if (F.act) F.act.timeScale = 0;
   const u0 = clamp((now - G.reloadStart) / T, 0, 1); // modelo que chega no meio da recarga: o que já passou fica feito, sem som (a munição do encaixe também)
-  if (u0 > 0) { const s0 = fz2Herm(Z.r.mp.U, Z.r.mp.S, Z.r.mp.M, u0); for (const k in R.ev) if (R.ev[k] <= s0) Z.r.ev[k] = 1; if (Z.r.ev.encaixa) { const a = G.ammo[G.cur]; if (a) { const tk = Math.min(wMag(G.cur) - a.mag, a.res); if (tk > 0) { a.mag += tk; a.res -= tk; } } } }
+  if (u0 > 0) { const s0 = fz2Herm(Z.r.mp.U, Z.r.mp.S, Z.r.mp.M, u0); for (const k in R.ev) if (R.ev[k] <= s0) Z.r.ev[k] = 1; if (Z.r.ev.encaixa) anMunicao(G.ammo[G.cur]); }
 }
 // a cada quadro (antes do mixer): tempo do clipe pela curva
 function fz2Tempo(F) {
@@ -20504,7 +20507,7 @@ function fz2Pecas(F, dt) {
     if (om) { om.getWorldPosition(_z2.v2); if (Z.temPv && dt > 0) Z.vel.copy(_z2.v2).sub(Z.pv).multiplyScalar(1 / Math.max(.008, dt)).clampLength(0, 2.5); Z.pv.copy(_z2.v2); Z.temPv = true; }
     fire('sai', () => play('magout'));
     fire('larga', () => { if (om && r.R.cai) fz2Larga(F, om, r.R.larga || [0, -.5, 0]); });
-    fire('encaixa', () => { play('magin'); fz2Mola(F, 'encaixa'); const a = G.ammo[G.cur]; if (a) { const take = Math.min(wMag(G.cur) - a.mag, a.res); if (take > 0) { a.mag += take; a.res -= take; } } });
+    fire('encaixa', () => { play('magin'); fz2Mola(F, 'encaixa'); anMunicao(G.ammo[G.cur]); }); // munição no encaixe (G.rEv.mun: o fim da recarga não soma de novo)
     fire('tapa', () => { play('shellin', null, .6); fz2Mola(F, 'tapa'); });
     if (F.cv) for (const [k, at] of [['abre', FZS.lmg.abre], ['fecha', FZS.lmg.fecha]]) if (r.u >= at && !r.ev[k]) { r.ev[k] = 1; play('slide'); } // tampa da M249
     fire('puxa', () => play('slide'));
@@ -20572,6 +20575,199 @@ function fz2Mao(F) {
   return out.lengthSq() > 1e-10 ? out : null;
 }
 // ===== fz2 fim =====
+// ===== an: saque e recarga caprichados (pistolas, snipers e escopetas nos braços prontos, modos CS) =====
+// O clipe do pacote continua sendo a base; por cima dele entram camadas no ESQUELETO (ossos da arma, do carregador e os controles das
+// mãos; os braços seguem pelo IK com os ombros parados, então nada passa pela câmera e as mãos em voxel com esqueleto continuam valendo):
+// - saque: arma e mão direita sobem de baixo à direita (pistola: do coldre, de cano para baixo e deitada) girando em volta do gatilho e
+//   assentam com mola; a mão esquerda chega depois. Substitui o giro do conjunto inteiro (pistolaPose/FZSAQ: o braço passava pela câmera);
+// - recarga: eventos em segundos do clipe (o clipe é esticado até W.reload): som, mola de assentamento (arma + mãos), tremida da câmera e
+//   a munição entrando no encaixe; pistola: ferrolho travado atrás desde o último tiro até ser solto na recarga vazia;
+// - escopeta: o clipe segue a contagem de verdade (um cartucho a cada G.reload.iv, empurrado no tubo no instante em que entra) e, vazia,
+//   bomba no fim (XM1014, semiautomática: ferrolho);
+// - peças por caixa (ANPEC): modelos de uma peça só (Glock, P250, CZ75) ganham ferrolho e carregador recortando os voxels.
+// Molas: ω (rad/s) e amortecimento; impulsos em rad/s e m/s no espaço da câmera ([rx, ry, rz, x, y, z]).
+const AN = {
+  mola: { w: 24, z: .4 }, cam: { w: 40, z: .32, max: .012 },
+  pistol: {
+    ossos: { mag: 'Pmag', sl: 'Rif' },
+    // eventos (s do clipe): sai = o carregador solta; entra = encaixa (munição, tapa); solta = ferrolho solto (vazia)
+    ev: { reload: { sai: .27, entra: 1.08 }, reloadE: { sai: .27, entra: 1.08, solta: 1.34 } },
+    imp: { sai: [-.6, 0, -.4, 0, -.05, 0], entra: [1.6, .2, .5, 0, .12, .03], solta: [1.1, -.2, .3, 0, .06, .06] }, cam: { entra: [-.3, .1], solta: [-.22, -.12] },
+    trava: [-.001, -.013, -.048], // ferrolho (osso Rif) travado atrás, no espaço do PBody: é onde ele começa no clipe de recarga vazia
+    // saque: [u, x, y, z, rx, ry, rz] (u: fração do G.switchDur; m e rad, câmera; giro em volta do gatilho); esq: mão esquerda [u, x, y, z]
+    saque: [[0, .055, -.19, .05, -1.15, -.3, -.6], [.3, .04, -.1, .03, -.62, -.17, -.4], [.62, .012, -.02, .008, -.1, -.04, -.1], [.84, 0, .004, 0, .05, .006, .02], [1, 0, 0, 0, 0, 0, 0]],
+    esq: [[0, -.06, -.17, .05], [.6, -.045, -.09, .02], [1, 0, 0, 0]], fimSaque: [-.7, .1, 0, 0, -.02, 0],
+    // recarga: a pistola vai um pouco para o meio e para cima e deita (a troca do carregador fica na tela) [x, y, z, rx, ry, rz]; ent/sai: frações
+    vis: { d: [-.03, .04, 0, .06, .12, .2], ent: .16, sai: .86 },
+  },
+  sniper: {
+    ossos: { mag: 'Mag', sl: 'Bolt' },
+    ev: { reload: { sai: .74, entra: 2.24 }, reloadE: { abre: .62, sai: 1.68, entra: 3.22, fecha: 4.08 } },
+    imp: { sai: [-.3, 0, -.2, 0, -.03, 0], entra: [.9, .1, .3, 0, .06, .02], abre: [.3, -.1, .2, 0, .02, -.02], fecha: [.6, .15, -.3, 0, .03, .04] }, cam: { entra: [-.2, .08], fecha: [-.18, -.1] },
+    saque: [[0, .02, -.24, .05, -.55, .12, .45], [.45, .01, -.06, .015, -.16, .04, .15], [.8, 0, .004, 0, .03, 0, -.015], [1, 0, 0, 0, 0, 0, 0]], fimSaque: [-.45, .05, 0, 0, -.015, 0],
+    vis: { d: [-.01, .02, 0, .04, .03, .12], ent: .12, sai: .9 },
+  },
+  pump: {
+    ossos: { cart: '12ge_low', bomba: 'Slide' },
+    // ciclo do clipe de cartucho (s): ins = o 1º cartucho termina de entrar no tubo; per = período; fim: mão até a bomba, bomba, volta
+    ciclo: { ins: 1.32, per: 1.345, n: 4, maoBomba: 6.0, bomba: [6.0, 6.27], fim: 6.82 },
+    extraVazia: 0, // a bomba cabe no fim que já existe (0,45 s): o tempo de recarga não depende da arma na mão
+    imp: { cart: [.35, .05, .12, 0, .015, .01], bomba: [.5, 0, 0, 0, .02, .05] }, cam: { cart: [-.08, .03], bomba: [-.2, .08] },
+    saque: [[0, .02, -.24, .05, -.5, .1, .4], [.45, .01, -.06, .015, -.15, .03, .13], [.8, 0, .004, 0, .03, 0, -.015], [1, 0, 0, 0, 0, 0, 0]], fimSaque: [-.45, .05, 0, 0, -.015, 0],
+  },
+};
+// peças recortadas dos voxels (modelos de uma peça só), em cm no referencial da arma (gatilho na origem, cano +z, topo +y, x à esquerda):
+// c centro, h meia-medida, a: inclinação (graus, em volta de x: o punho deita para trás). O cano fica na armação (o ferrolho travado o
+// mostra) e o carregador ganha a ponta de latão das balas
+const ANPEC = {
+  glock: { ferrolho: { c: [0, 3.55, 0], h: [3, 1.85, 11] }, pente: { c: [.15, -4.4, -5.75], h: [1.05, 4.6, 1.45], a: 18 } },
+  p250: { ferrolho: { c: [0, 3.95, 0], h: [3, 2.05, 12] }, pente: { c: [0, -4, -5.4], h: [1.05, 4.2, 1.5], a: 14 } },
+  cz75: { ferrolho: { c: [0, 3.75, 0], h: [3, 1.75, 12] }, pente: { c: [0, -4.6, -6.3], h: [1.1, 4.6, 1.5], a: 16 } },
+};
+const _an = { M: new THREE.Matrix4(), M2: new THREE.Matrix4(), M3: new THREE.Matrix4(), q: new THREE.Quaternion(), q2: new THREE.Quaternion(), q3: new THREE.Quaternion(), e: new THREE.Euler(), v: new V3(), v2: new V3(), p: new V3() };
+const AN_PECAS = new Map(); // recortes prontos por arquivo de voxels + parte (os voxels são os mesmos a cada saque)
+function anMonta(F, id, D, model, u) {
+  const W2 = fpw(id), A = AN[W2?.pack]; if (!A) return;
+  const b = n => n ? fpBone(F.root, n) : null, an = F.an = { A, pk: W2.pack, m: W2.m, id, sv: new Map(), mol: new Float32Array(12), cam: new Float32Array(4), saq: 0, esq: null, Mg: new THREE.Matrix4(), ML: new THREE.Matrix4(), mag0: 0, nIns: 0,
+    mag: b(A.ossos.mag), sl: b(A.ossos.sl), cart: b(A.ossos.cart), bomba: b(A.ossos.bomba), mR: b('IK_Hand_Cntrl_R'), mL: b('IK_Hand_Cntrl_L') };
+  if (an.sl) an.slP = an.sl.position.clone();
+  vmCam.rotation.x = vmCam.rotation.y = 0;
+  an.pump = W2.pack === 'pump';
+  if (D && model && ANPEC[W2.m] && VX.on) anPecas(F, an, ANPEC[W2.m], model, u);
+}
+function anPecas(F, an, R, model, u) { // ferrolho e carregador por caixa, recortando os voxels de cada parte (e presos aos ossos do pacote)
+  const Gi = _an.M.multiplyMatrices(F.body.matrixWorld, F.C).invert(), k = 100 / u, nome = VX.ult?.nome || '';
+  const mz = _an.v.copy(F.mz.position).applyMatrix4(F.body.matrixWorld).applyMatrix4(Gi).multiplyScalar(k);
+  const cano = { c: [mz.x, mz.y - .2, mz.z / 2 + 1], h: [.6, .65, Math.abs(mz.z / 2) + 1] }; // (até mz.y + .45: a massa de mira anda com o ferrolho) // em volta do eixo do cano, da frente do gatilho à boca
+  const caixa = (B, p) => { const a = (B.a || 0) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), y = p.y - B.c[1], z = p.z - B.c[2];
+    return Math.abs(p.x - B.c[0]) <= B.h[0] && Math.abs(y * c - z * s) <= B.h[1] && Math.abs(y * s + z * c) <= B.h[2]; };
+  const lado = p => caixa(R.pente, p) ? 'pente' : caixa(R.ferrolho, p) && !caixa(cano, p) ? 'ferrolho' : 'resto';
+  const partes = new Map(); model.traverse(o => { const p = o.userData.vxp; if (p) { if (!partes.has(p)) partes.set(p, []); partes.get(p).push(o); } });
+  const lista = VX.cache.get(nome) || [], nos = { ferrolho: [], pente: [] };
+  for (const [p, ms] of partes) {
+    const pai = ms[0].parent, ck = nome + '|' + lista.indexOf(p) + '|' + JSON.stringify(R); let S = AN_PECAS.get(ck);
+    if (!S) {
+      const V = new Map(p.V); vxMiolo(V); const M = _an.M2.multiplyMatrices(Gi, pai.matrixWorld), q = _an.p, sets = { resto: new Map(), ferrolho: new Map(), pente: new Map() };
+      for (const [key, v] of V) { q.set((v.i + .5) * p.h, (v.j + .5) * p.h, (v.k + .5) * p.h).applyMatrix4(M).multiplyScalar(k); sets[lado(q)].set(key, v); }
+      if (sets.pente.size) { // ponta das balas: a camada de cima do carregador (no eixo do punho), longe das paredes, vira latão
+        const B = R.pente, a = (B.a || 0) * Math.PI / 180; let top = -1e9; const al = [];
+        for (const [key, v] of sets.pente) { q.set((v.i + .5) * p.h, (v.j + .5) * p.h, (v.k + .5) * p.h).applyMatrix4(M).multiplyScalar(k); const ax = (q.y - B.c[1]) * Math.cos(a) - (q.z - B.c[2]) * Math.sin(a); al.push([v, ax, Math.abs(q.x - B.c[0]), key]); top = Math.max(top, ax); }
+        for (const [v, ax, lx, key] of al) if (ax > top - .35 && lx < B.h[0] - .25) sets.pente.set(key, { ...v, c: [.72, .55, .28], m: 1 }); // objeto novo: o p.V do cache fica intacto
+      }
+      S = {}; for (const s in sets) S[s] = sets[s].size ? vxMalha(sets[s], 1) : [null, null]; S.vazio = !sets.ferrolho.size && !sets.pente.size; AN_PECAS.set(ck, S);
+    }
+    if (S.vazio) continue;
+    const mats = [0, 1].map(i => (ms.find(o => o.geometry === p.geos[i]) || ms[0]).material); // antes de trocar as geometrias
+    for (const o of ms) { const i = p.geos.indexOf(o.geometry), g = S.resto[i]; if (g) o.geometry = g; else o.visible = false; }
+    for (const s of ['ferrolho', 'pente']) S[s].forEach((geo, i) => { if (geo) nos[s].push([pai, geo, mats[i], p.h]); });
+  }
+  F.root.updateMatrixWorld(true);
+  for (const [s, bn] of [['ferrolho', an.sl], ['pente', an.mag]]) { // uma peça por tipo: um grupo (preso ao pai da 1ª parte) e um follow só
+    const L = nos[s]; if (!L.length || !bn) continue; const pai0 = L[0][0], g = new THREE.Group(); g.name = 'an_' + s; pai0.add(g); g.updateMatrixWorld(true);
+    const inv = pai0.matrixWorld.clone().invert();
+    for (const [pai, geo, mat, h] of L) { const vm = new THREE.Mesh(geo, mat); vm.userData.vox = 1; vm.frustumCulled = false; vm.name = 'vox';
+      inv.clone().multiply(pai.matrixWorld).multiply(_an.M3.makeScale(h, h, h)).decompose(vm.position, vm.quaternion, vm.scale); g.add(vm); }
+    const f = { a: bn, b: g, d: bn.matrixWorld.clone().invert().multiply(g.matrixWorld) };
+    if (s === 'pente') { f.rest = F.body.matrixWorld.clone().invert().multiply(bn.matrixWorld); f.hr = F.P.hr; }
+    F.follow.push(f); }
+}
+// osso: guarda o estado da animação antes de mexer (anDesfaz devolve no quadro seguinte, antes do mixer)
+function anGuarda(an, o) { let s = an.sv.get(o); if (!s) an.sv.set(o, s = { p: new V3(), q: new THREE.Quaternion(), s: new V3(), on: false }); if (!s.on) { s.p.copy(o.position); s.q.copy(o.quaternion); s.s.copy(o.scale); s.on = true; } }
+function anDesfaz(F) { for (const [o, s] of F.an.sv) if (s.on) { o.position.copy(s.p); o.quaternion.copy(s.q); o.scale.copy(s.s); s.on = false; } }
+// M (mundo) = giro e (rad, eixos da câmera) em volta do ponto pw + deslocamento d (m, câmera)
+function anMat(out, pw, qc, e0, e1, e2, d0, d1, d2) {
+  const q = _an.q.setFromEuler(_an.e.set(e0, e1, e2, 'YXZ')); q.premultiply(qc).multiply(_an.q2.copy(qc).invert());
+  out.makeRotationFromQuaternion(q); const t = _an.v.copy(pw).applyQuaternion(q).negate().add(pw).add(_an.v2.set(d0, d1, d2).applyQuaternion(qc));
+  return out.setPosition(t);
+}
+function anAplica(an, o, M) { // o no mundo ← M · o
+  if (!o) return; anGuarda(an, o); _an.M3.multiplyMatrices(M, o.matrixWorld).premultiply(_an.M2.copy(o.parent.matrixWorld).invert()); _an.M3.decompose(o.position, o.quaternion, o.scale); o.updateMatrixWorld(false);
+}
+function anKF(fr, u, out) { // quadros-chave [u, ...valores], suave entre eles
+  let i = 1; while (i < fr.length - 1 && u > fr[i][0]) i++;
+  const A = fr[i - 1], B = fr[i], k = smooth(clamp((u - A[0]) / (B[0] - A[0]), 0, 1)); for (let j = 1; j < A.length; j++) out[j - 1] = lerp(A[j], B[j], k); return out;
+}
+function anMolaPasso(x, n, w, z, dt) { // n canais [valor, velocidade], mola amortecida (passos de 1/240 s)
+  const T = Math.min(dt, .1), m = Math.max(1, Math.ceil(T * 240)), h = T / m;
+  for (let s = 0; s < m; s++) for (let c = 0; c < n; c++) { const i = c * 2; x[i + 1] += (-w * w * x[i] - 2 * z * w * x[i + 1]) * h; x[i] += x[i + 1] * h; }
+}
+function anImpulso(an, im, cm) { if (im) for (let c = 0; c < 6; c++) an.mol[c * 2 + 1] += im[c]; if (cm) { an.cam[1] += cm[0]; an.cam[3] += cm[1]; } }
+const _anO = new Float32Array(6), _anE2 = new Float32Array(3);
+function anPose(ud, dt) {
+  const F = ud.fps2, an = F.an, A = an.A, w = W[G.cur], a = G.ammo[G.cur]; if (!w) return;
+  F.root.updateMatrixWorld(true);
+  // pistola vazia: ferrolho travado atrás desde o último tiro (no clipe de recarga vazia ele já vem travado e é solto)
+  if (an.pk === 'pistol' && an.sl && a && a.mag === 0 && F.cur !== 'reloadE' && !(G.lastShotW === G.cur && now - G.lastShot < .045)) {
+    anGuarda(an, an.sl); an.sl.position.copy(an.slP).add(_an.v.fromArray(A.trava));
+  }
+  // eventos da recarga (s do clipe)
+  const rc = F.cur === 'reload' || F.cur === 'reloadE';
+  if (an.m === 'python' && G.reloadEnd && G.rEv && !G.reload) { const t = (now - G.reloadStart) / (G.reloadEnd - G.reloadStart); // R8: tambor (a recarga própria fica para depois): cartuchos entrando, sem o roteiro de carregador
+    for (const [k, at] of [['r1', .3], ['r2', .45], ['r3', .6]]) if (t >= at && !G.rEv['an_' + k]) { G.rEv['an_' + k] = 1; play('shellin'); if (k === 'r3') { anMunicao(a); anImpulso(an, A.imp.entra, A.cam.entra); } } }
+  else if (rc && F.act && G.reloadEnd && G.rEv && !G.reload && A.ev) {
+    const t = F.act.time, E = A.ev[F.cur];
+    for (const k in E) if (t >= E[k] && !G.rEv['an_' + k]) { G.rEv['an_' + k] = 1; anEvento(an, k, a); }
+  }
+  if (an.pump) anEscopeta(F, an, w, a);
+  // pose: saque + recarga (arma, carregador e mãos juntos) + molas
+  const o = _anO; o.fill(0); 
+  if (now < G.switchEnd && A.saque) {
+    const u = clamp(1 - (G.switchEnd - now) / (G.switchDur || .35), 0, 1); anKF(A.saque, u, o); an.saq = 1;
+    if (A.esq) { anKF(A.esq, u, _anE2); an.esq = _anE2; } else an.esq = null;
+  } else { if (an.saq) { an.saq = 0; anImpulso(an, A.fimSaque); } an.esq = null; }
+  if (A.vis && (rc || an.m === 'python') && G.reloadEnd && !G.reload) { const V = A.vis, t = clamp((now - G.reloadStart) / (G.reloadEnd - G.reloadStart), 0, 1), k = seg(t, 0, V.ent) * (1 - seg(t, V.sai, 1)); for (let j = 0; j < 6; j++) o[j] += V.d[j] * k; }
+  anMolaPasso(an.mol, 6, AN.mola.w, AN.mola.z, dt); anMolaPasso(an.cam, 2, AN.cam.w, AN.cam.z, dt);
+  for (let c = 0; c < 6; c++) o[c < 3 ? c + 3 : c - 3] += an.mol[c * 2]; // mol: [rx, ry, rz, x, y, z] → o: [x, y, z, rx, ry, rz]
+  const qc = F.holder.parent.getWorldQuaternion(_an.q3), pw = _an.p.setFromMatrixPosition(_an.M.multiplyMatrices(F.body.matrixWorld, F.C));
+  let mexe = false; for (let j = 0; j < 6; j++) if (Math.abs(o[j]) > 1e-5) mexe = true;
+  const Mg = anMat(an.Mg, pw, qc, o[3], o[4], o[5], o[0], o[1], o[2]), fora = anMagFora(F, an); // carregador fora da arma: vai com a mão esquerda
+  let ML = mexe ? Mg : null;
+  if (an.esq) { const L = an.esq; ML = an.ML.copy(Mg).premultiply(_an.M2.makeTranslation(_an.v.set(L[0], L[1], L[2]).applyQuaternion(qc))); } // a mão esquerda chega depois
+  if (mexe) { anAplica(an, F.body, Mg); anAplica(an, an.mR, Mg); if (an.mag && !fora) anAplica(an, an.mag, Mg); anAplica(an, an.cart, Mg); }
+  if (ML) { anAplica(an, an.mL, ML); if (an.mag && fora) anAplica(an, an.mag, ML); }
+  if (F.ik) for (const arm of F.ik.arms) arm.anM = arm.sd > 0 ? (mexe ? Mg : null) : ML; // o alvo do pulso vai junto (fpIK)
+  // tremida da câmera (encaixes): só giro, pequeno
+  const cx = clamp(an.cam[0], -AN.cam.max, AN.cam.max), cy = clamp(an.cam[2], -AN.cam.max, AN.cam.max);
+  if (Math.abs(cx) + Math.abs(cy) > 1e-5 && me.alive) { vmCam.rotation.x = cx; vmCam.rotation.y = cy; an.vc = 1; } else if (an.vc) { vmCam.rotation.x = vmCam.rotation.y = 0; an.vc = 0; } // só na câmera da arma: o tiro não herda
+}
+function anMagFora(F, an) { if (F.cur !== 'reload' && F.cur !== 'reloadE') return false; if (an.mag) for (const f of F.follow) if (f.a === an.mag && f.rest && f.w > .5) return true; return false; }
+function anEvento(an, k, a) {
+  const A = an.A;
+  if (k === 'sai') play('magout');
+  else if (k === 'entra') { play('magin'); anMunicao(a); }
+  else if (k === 'solta') play('slide');
+  else if (k === 'abre' || k === 'fecha') play('bolt');
+  anImpulso(an, A.imp?.[k], A.cam?.[k]);
+}
+function anMunicao(a) { // a munição entra no encaixe (o resto da recarga é só o fim do movimento); G.rEv.mun: updateWeapon não soma de novo
+  if (!a || G.rEv.mun || G.reload) return; const take = Math.min(wMag(G.cur) - a.mag, a.res); a.mag += take; a.res -= take; G.rEv.mun = 1;
+}
+// escopeta: o clipe de cartucho segue as etapas de verdade do G.reload (o cartucho termina de entrar no tubo quando a munição sobe);
+// MAG-7 (recarga de tempo fixo): os cartuchos que faltam (até Cc.n) entram um a um dentro do tempo dela
+function anEscFim(an, f, fimT, vazia, semi) { // fim: mão até a bomba; vazia: bomba (ou ferrolho, na semiautomática) em f .25–.6 e volta
+  const Cc = an.A.ciclo; if (vazia && f >= .38 && !G.rEv.an_bomba) { G.rEv.an_bomba = 1; play(semi ? 'slide' : 'pump'); anImpulso(an, an.A.imp.bomba, an.A.cam.bomba); }
+  return vazia ? (f < .25 ? lerp(fimT, Cc.bomba[0], f / .25) : f < .6 ? lerp(Cc.bomba[0], Cc.bomba[1], (f - .25) / .35) : lerp(Cc.bomba[1], Cc.fim, (f - .6) / .4)) : lerp(fimT, Cc.maoBomba, f);
+}
+function anEscopeta(F, an, w, a) {
+  const S = G.reload, Cc = an.A.ciclo; if (!Cc || !F.act || F.cur !== 'reload' || !G.reloadEnd || !a) return;
+  if (!G.rEv.an_ini) { G.rEv.an_ini = 1; an.mag0 = a.mag; an.nIns = 0; }
+  const fimT = Cc.ins + Cc.per * (Cc.n - 1), vazia = G.reloadEmpty, semi = w.rate < .6; let t;
+  if (S) {
+    const iv = S.iv || w.shellTime, ini = .35 * S.sp, n = Math.max(0, a.mag - an.mag0);
+    if (S.stage === 'start') t = Cc.ins * (now - S.t0) / (ini + iv);
+    else if (S.stage === 'load') { const p = clamp((now - S.t0) / iv, 0, 1), c = n < Cc.n ? n : 1 + (n - 1) % (Cc.n - 1), tB = Cc.ins + Cc.per * c; t = n === 0 ? Cc.ins * (ini + p * iv) / (ini + iv) : tB - Cc.per * (1 - p); }
+    else t = anEscFim(an, clamp((now - S.t0) / (S.fim || .45 * S.sp), 0, 1), fimT, vazia, semi);
+    if (n > an.nIns) { an.nIns = n; anImpulso(an, an.A.imp.cart, an.A.cam.cart); } // o cartucho entrou (o som 'shellin' já toca na contagem)
+  } else { // tempo fixo
+    const T = G.reloadEnd - G.reloadStart, f = clamp((now - G.reloadStart) / T, 0, 1), fa = vazia ? .66 : .82, falta = Math.max(1, wMag(G.cur) - an.mag0), k = Math.min(falta, Cc.n);
+    if (f < fa) { const x = f / fa * (Cc.ins + Cc.per * (k - 1)), feitos = x < Cc.ins ? 0 : 1 + Math.floor((x - Cc.ins) / Cc.per + 1e-6); t = x;
+      while (an.nIns < Math.min(feitos, k)) { an.nIns++; const q = an.nIns === k ? Math.min(wMag(G.cur) - a.mag, a.res) : Math.min(1, a.res); a.mag += q; a.res -= q; G.rEv.mun = 1; play('shellin'); anImpulso(an, an.A.imp.cart, an.A.cam.cart); } }
+    else { if (an.nIns < k) { an.nIns = k; const q = Math.min(wMag(G.cur) - a.mag, a.res); a.mag += q; a.res -= q; G.rEv.mun = 1; play('shellin'); } t = anEscFim(an, (f - fa) / (1 - fa), fimT, vazia, semi); }
+  }
+  F.act.timeScale = 0; F.act.time = clamp(t, 0, F.act.getClip().duration - 1e-3);
+}
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AN, ANPEC, AN_PECAS }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+// ===== fim an =====
 // IK dos braços: recua os ombros, leva a mão esquerda ao guarda-mão do modelo e gira braço e antebraço (dois ossos, cotovelo no mesmo
 // plano de antes) até cada pulso chegar ao alvo
 // pb1 (posição dos braços, modos CS). solta: a mão conta como fora da arma a partir de solta[0]·hr do lugar dela, inteira em +solta[1]·hr
@@ -20604,7 +20800,7 @@ function fpIK(F) {
   }
   K.zm = F.z2 ? fz2Mao(F) : null; // fz2: mão esquerda desviada (saque e roteiro da recarga), no mundo dos braços
   if (K.zm && K.hl) { I.t.setFromMatrixPosition(K.hl.matrixWorld).add(K.zm); K.hl.position.copy(K.hl.parent.worldToLocal(I.t.clone())); K.hl.updateMatrixWorld(true); I.dl.add(K.zm); }
-  for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.sd < 0) a.tw.add(I.dl); }
+  for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.anM) a.tw.applyMatrix4(a.anM); /* an: a mão foi levada pelas camadas */ if (a.sd < 0) a.tw.add(I.dl); }
   // mão que vem para perto do olho (pegar carregador no colete): desce e vai para a frente, senão o braço passa colado na câmera
   // (a câmera fica na origem, olhando para -Z)
   K.pushL = null;
@@ -20984,8 +21180,8 @@ function rldFora(ud) { // empurra a palma para fora das peças fixas (na recarga
   ud.lhG.position.add(P);
 }
 function rldFimBala(S_, a) { // bala por bala: o fim (barra do HUD) segue as etapas de verdade (cada etapa começa no quadro seguinte ao tempo)
-  if (S_.stage === 'end') G.reloadEnd = S_.t0 + .45 * S_.sp;
-  else if (a) G.reloadEnd = S_.t0 + Math.min(wMag(G.cur) - a.mag, a.res) * S_.iv + .45 * S_.sp;
+  if (S_.stage === 'end') G.reloadEnd = S_.t0 + (S_.fim || .45 * S_.sp);
+  else if (a) G.reloadEnd = S_.t0 + Math.min(wMag(G.cur) - a.mag, a.res) * S_.iv + (S_.fim || .45 * S_.sp);
 }
 // ---------- a3: recarga da família AK / Galil / FAL: o carregador sai e entra "de bico" ----------
 // Sai: gira para a frente em volta do bico (frente da boca do carregador) e cai. Volta: sobe já inclinado, engata o bico e gira para
@@ -21341,7 +21537,7 @@ const PIST = { saque: { rx: -.7, ry: 0, rz: -.3, x: .02, y: -.1, z: .03 }, corri
 const pistolaVM = ud => ['pistol', 'deagle', 'revolver'].includes(W[G.cur]?.model) && !ud.armsKnife;
 const _pE = new THREE.Euler(), _pQ = new THREE.Quaternion(), _pV = new V3(), _pV2 = new V3();
 function pistolaPose(o, ud) {
-  const k = now < G.switchEnd ? smooth((G.switchEnd - now) / (G.switchDur || .35)) : 0, c = me.sprintK > .01 ? me.sprintK : 0;
+  const k = now < G.switchEnd && !ud.fps2?.an ? smooth((G.switchEnd - now) / (G.switchDur || .35)) : 0, c = me.sprintK > .01 ? me.sprintK : 0; // (an: o saque dos braços prontos é no esqueleto)
   if (!k && !c) return;
   const S = PIST.saque, R = ud.fps2 ? PIST.corridaCS : PIST.corrida, rx = S.rx * k + R.rx * c, ry = S.ry * k + R.ry * c, rz = S.rz * k + R.rz * c;
   o.rx += rx; o.ry += ry; o.rz += rz + Math.sin(bobT) * .05 * c;
@@ -21565,10 +21761,10 @@ function updateViewmodel(dt) {
   G.kick = Math.max(0, G.kick - dt * 10); G.kickL = Math.max(0, (G.kickL || 0) - dt * 10);
   o.z += G.kick * .06; o.rx += G.kick * .1;
   const pist = pistolaVM(ud); if (pist) pistolaPose(o, ud);
-  if (now < G.switchEnd && !pist && ud.fps2?.P && !ud.fps2.knife && !ud.fps2.clips.draw) { // pacote sem clipe de saque (sniper, bomba): sobe de baixo girando em volta do gatilho (em volta do olho a luneta/coronha enchia a tela)
+  if (now < G.switchEnd && !pist && ud.fps2?.P && !ud.fps2.knife && !ud.fps2.clips.draw && !ud.fps2.an) { // pacote sem clipe de saque (sniper, bomba): sobe de baixo girando em volta do gatilho (em volta do olho a luneta/coronha enchia a tela)
     const k = smooth((G.switchEnd - now) / (G.switchDur || .35)), S = FZSAQ; o.x += S.x * k; o.y += S.y * k;
     _pQ.setFromEuler(_pE.set(S.rx * k, 0, S.rz * k)); _pV.fromArray(ud.fps2.P.v?.p || FPV.long.p); _pV2.copy(_pV).applyQuaternion(_pQ); o.x += _pV.x - _pV2.x; o.y += _pV.y - _pV2.y; o.z += _pV.z - _pV2.z; o.rx += S.rx * k; o.rz += S.rz * k;
-  } else if (now < G.switchEnd && !pist && !ud.armsKnife && !ud.fps2?.clips.draw) { const k = smooth((G.switchEnd - now) / (G.switchDur || .35)); o.y -= k * .22; o.rx -= k * .9; o.rz += k * .35; if (ud.scopeEye || ud.boltAction) { o.rx += k * .5; o.y -= k * .08; } } // precisão (a6): arma comprida sobe de baixo sem apontar a luneta para o olho // sacando a arma (os braços do Blender têm animação própria)
+  } else if (now < G.switchEnd && !pist && !ud.armsKnife && !ud.fps2?.clips.draw && !ud.fps2?.an) { const k = smooth((G.switchEnd - now) / (G.switchDur || .35)); o.y -= k * .22; o.rx -= k * .9; o.rz += k * .35; if (ud.scopeEye || ud.boltAction) { o.rx += k * .5; o.y -= k * .08; } } // precisão (a6): arma comprida sobe de baixo sem apontar a luneta para o olho // sacando a arma (os braços do Blender têm animação própria)
   if (ud.armsKnife) ARMS.mixer.update(dt);
   if (ud.fps2) fpUpdate(ud, dt);
   if (G.swing > 0) { G.swing = Math.max(0, G.swing - dt * 4); if (ud.toss) nadeToss(ud, o, 1 - G.swing); else { const s = Math.sin(G.swing * Math.PI); o.ry += s * 1.1; o.x -= s * .12; o.z -= s * .1; } } // (a8) arremesso/colocação
@@ -22047,8 +22243,8 @@ function startReload() {
   if (zPerk('cherry') && !me.downed) sendToHost({ t: 'zfx', k: 'ch', f: r2(1 - a.mag / wMag(G.cur)) }); // Electric Cherry: o host confere a bebida e a recarga
   G.burstN = 0; G.reloadStart = now; G.scope = 0; G.rezoom = 0; G.reloadEmpty = a.mag === 0; G.reloadVazias = wMag(G.cur) - a.mag; G.rEv = {}; // vazias: cápsulas disparadas (revólver e cano duplo ejetam só elas)
   if (w.shellTime) { // escopeta / lança-granadas: uma bala por vez (atirar interrompe)
-    G.reload = { stage: 'start', t0: now, iv: w.shellTime * sp * attStat(G.cur, 'reloadX'), sp };
-    G.reloadEnd = now + .35 * sp + Math.min(wMag(G.cur) - a.mag, a.res) * G.reload.iv + .45 * sp;
+    G.reload = { stage: 'start', t0: now, iv: w.shellTime * sp * attStat(G.cur, 'reloadX'), sp, fim: .45 * sp }; // an: a bomba da vazia cabe nesse fim
+    G.reloadEnd = now + .35 * sp + Math.min(wMag(G.cur) - a.mag, a.res) * G.reload.iv + G.reload.fim;
   } else { G.reload = null; G.reloadEnd = now + w.reload * sp * attStat(G.cur, 'reloadX'); }
 }
 function calcSpread(w) {
@@ -22210,10 +22406,10 @@ function updateWeapon(dt) {
     else if (S_.stage === 'load' && now - S_.t0 >= S_.iv) {
       if (a && a.res > 0 && a.mag < wMag(G.cur)) { a.mag++; a.res--; play('shellin'); }
       S_.t0 = now; if (!a || a.mag >= wMag(G.cur) || a.res <= 0) S_.stage = 'end';
-    } else if (S_.stage === 'end' && now - S_.t0 >= .45 * S_.sp) { G.reload = null; G.reloadEnd = 0; }
+    } else if (S_.stage === 'end' && now - S_.t0 >= (S_.fim || .45 * S_.sp)) { G.reload = null; G.reloadEnd = 0; }
     if (G.reload && S_.stage !== 'end' && (G.trigger || mouseDown || G.trigger2) && a?.mag > 0 && locked()) { G.reload = null; G.reloadEnd = 0; } // atirar interrompe
     if (G.reload && S_.stage !== 'start') rldFimBala(S_, a); // 6-w16
-  } else if (G.reloadEnd && now >= G.reloadEnd) { const a = G.ammo[G.cur]; if (a) { const take = Math.min(wMag(G.cur) - a.mag, a.res); a.mag += take; a.res -= take; if (akOn()) { const tL = Math.min(wMag(G.cur) - akPL(a), a.res); a.magL += tL; a.res -= tL; } } G.reloadEnd = 0; }
+  } else if (G.reloadEnd && now >= G.reloadEnd) { const a = G.ammo[G.cur]; if (a && !G.rEv?.mun) { /* an: munição já entrou no encaixe */ const take = Math.min(wMag(G.cur) - a.mag, a.res); a.mag += take; a.res -= take; if (akOn()) { const tL = Math.min(wMag(G.cur) - akPL(a), a.res); a.magL += tL; a.res -= tL; } } G.reloadEnd = 0; }
   if (G.reloadEnd) G.trigger = G.trigger2 = false; // decisão do dono (13/10): clique durante a recarga não fica guardado (atirava sozinho no fim); a escopeta com bala no tubo já saiu da recarga acima
   if (G.rezoom && now >= G.nextFire) { G.scope = G.rezoom; G.rezoom = 0; }
   const since = now - G.lastShot;
@@ -25580,7 +25776,7 @@ function zSetDowned(on) {
   if (on) {
     if (G.cur === 'dmach') G.cur = C.dmPrev || bestW(); // a Máquina da Morte acaba ao cair
     ZC.dmEnd = 0; if (G.inv.third === G.cur) G.cur = bestW(); // a terceira arma (Mule Kick) se perde ao cair
-    C.downPrev = G.cur; G.scope = 0; G.reloadEnd = 0; ZC.perks = []; G.inv.third = null;
+    C.downPrev = G.cur; G.scope = 0; G.reloadEnd = 0; G.reload = null; ZC.perks = []; G.inv.third = null;
     const pist = zDownGun();
     if (pist === 'm1911_ls') G.ammo.m1911_ls = { mag: 8, res: 24 };
     equip(pist, true);
@@ -31803,7 +31999,7 @@ function onMsgInner(m) {
     case 'kill': {
       feedAdd(m.k, m.v, m.w, m.hs, m.as, m.tk);
       if (C.st?.mode !== 'zombies') { if (m.k === C.myId && m.v !== C.myId) { stat('k'); if (m.hs) stat('hs'); if (C.ms) { C.ms.k++; if (m.hs) C.ms.hk++; if (isW(m.w)) C.ms.byW[m.w] = (C.ms.byW[m.w] || 0) + 1; } } if (m.v === C.myId) { stat('d'); if (C.ms) C.ms.d++; } }
-      if (m.v === C.myId) { play('death'); me.alive = false; C.deadAt = now; C.killer = m.k; C.killW = isW(m.w) ? m.w : null; C.killHS = !!m.hs; G.scope = 0; G.reloadEnd = 0; C.spec = null; C.buyOpen = false; renderBuy(); }
+      if (m.v === C.myId) { play('death'); me.alive = false; C.deadAt = now; C.killer = m.k; C.killW = isW(m.w) ? m.w : null; C.killHS = !!m.hs; G.scope = 0; G.reloadEnd = 0; G.reload = null; C.spec = null; C.buyOpen = false; renderBuy(); }
       else { const rp = R.get(m.v); if (rp) { rp.alive = false; rp.dead = true; rp.deadT = now; } }
       if (m.k === C.myId && m.v !== C.myId) { play('kill'); grantXP((m.hs ? 15 : 10) * (C.players.get(m.v)?.b ? .5 : 1)); } // XP: abate (metade contra bot)
       const info = C.players.get(m.v); if (info) info.al = 0;
