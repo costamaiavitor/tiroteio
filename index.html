@@ -19784,7 +19784,7 @@ function vxLoad(nome) {
 }
 function vxPre(nome, partes) { // monta as malhas no ócio, uma peça por vez (a troca de arma não trava)
   if (VX.cache.has(nome)) return; let i = 0;
-  const passo = () => { if (VX.cache.has(nome)) return; const p = partes[i++]; if (p) { const V = new Map(p.V); vxMiolo(V); p.geos = vxMalha(V, p.h); }
+  const passo = () => { if (VX.cache.has(nome)) return; const p = partes[i++]; if (p) { const V = new Map(p.V); vxMiolo(V); p.geos = vxMalha(V, 1); }
     if (i < partes.length) (window.requestIdleCallback || setTimeout)(passo); else VX.cache.set(nome, partes); };
   (window.requestIdleCallback || setTimeout)(passo);
 }
@@ -19800,16 +19800,32 @@ function vxArma(root, P, D, b8) {
   if (!partes) {
     partes = arq || [];
     if (!arq) alvo.forEach((o, mi) => { for (const [b, gr] of vxPeca(o, passo)) partes.push({ malha: mi, osso: b ? b.name : null, h: gr.h, V: gr.V }); });
-    for (const p of partes) if (!p.geos) { const V = new Map(p.V); vxMiolo(V); p.geos = vxMalha(V, p.h); } // casca + miolo -> malha (a casca fica para exportar)
+    for (const p of partes) if (!p.geos) { const V = new Map(p.V); vxMiolo(V); p.geos = vxMalha(V, 1); } // casca + miolo -> malha (a casca fica para exportar)
     VX.cache.set(nome, partes);
   }
   VX.ult = { nome, partes }; VX.ms = Math.round(performance.now() - t0); VX.arq = !!arq;
   for (const p of partes) {
     const o = alvo[p.malha]; if (!o) continue;
     const pai = p.osso ? (o.isSkinnedMesh ? o.skeleton.bones.find(b => b.name === p.osso) : null) : o; if (!pai) continue;
-    p.geos.forEach((g, i) => { if (!g) return; const vm = new THREE.Mesh(g, mats[i]); vm.userData.vox = 1; vm.frustumCulled = false; vm.name = 'vox'; pai.add(vm); });
+    p.geos.forEach((g, i) => { if (!g) return; const vm = new THREE.Mesh(g, mats[i]); vm.userData.vox = 1; vm.frustumCulled = false; vm.name = 'vox'; vm.scale.setScalar(p.h); pai.add(vm); }); // malha em unidades de voxel
   }
   for (const o of alvo) { if (o.isSkinnedMesh) o.visible = false; else { o.geometry = new THREE.BufferGeometry(); o.userData.voxOrig = 1; } }
+}
+// skin/camuflagem em cima do voxel: cada cubo pega UMA cor da estampa (no centro dele) e o sombreado/cor do próprio voxel modula
+// (a malha está em unidades de voxel; triS converte para a escala da arma, como no triMat/skinOn)
+function vxSkinMat(orig, sm, sc) {
+  const m = orig.clone(), glow = !!sm.emissiveMap, tint = new THREE.Color(sm.color);
+  m.metalness = sm.metalness; m.roughness = sm.roughness; if (glow && m.emissive) m.emissive.copy(sm.emissive);
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, { triS: { value: sc }, skinMap: { value: sm.map }, skinGlow: { value: sm.emissiveMap || sm.map }, skinTint: { value: tint } });
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vTP; varying vec3 vTN;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvTP = position; vTN = normal;');
+    const uv = 'vec3 q = floor(vTP - vTN * .5) + .5; vec3 an = abs(vTN); vec2 tuv = (an.x > .5 ? q.yz : an.y > .5 ? q.xz : q.xy) * triS;';
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vTP; varying vec3 vTN; uniform float triS; uniform sampler2D skinMap; uniform sampler2D skinGlow; uniform vec3 skinTint;')
+      .replace('#include <color_fragment>', `{ ${uv} vec3 sk = ${sm.map ? 'texture2D(skinMap, tuv).rgb' : 'vec3(1.)'} * skinTint;\n float l = dot(pow(max(vColor, vec3(0.)), vec3(1. / 2.2)), vec3(.299, .587, .114)); diffuseColor.rgb *= sk * clamp(.45 + l * 1.4, .35, 1.3); }`)
+      .replace('#include <emissivemap_fragment>', glow ? `{ ${uv} totalEmissiveRadiance *= texture2D(skinGlow, tuv).rgb; }` : '#include <emissivemap_fragment>');
+  };
+  m.customProgramCacheKey = () => 'vxSkin' + (sm.map ? 1 : 0) + (glow ? 1 : 0);
+  return m;
 }
 // para o tools/vox-bake.mjs: o arquivo da última arma montada (base64 do binário, antes do gzip)
 function vxExport() { const u = VX.ult; if (!u) return null; const b = new Uint8Array(vxPack(u.partes)); let s = ''; for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768)); return { nome: u.nome, b64: btoa(s) }; }
@@ -20000,6 +20016,7 @@ function fpSkin(root, mats, L, keep = [], all = false, filt = null) { // all: pi
     const c = o.material.color, wood = c.r > c.b * 1.6 && c.r > .08; // madeira / marrom
     const sc = +(2.5 / L * fpMeshScale(o, Ri)).toPrecision(3), k = (wood ? 'b' : 'a') + sc; // a malha pode ter escala própria
     const sm = wood ? mats.b || mats.a : mats.a;
+    if (o.userData.vox) { const ck = 'vx' + k + o.material.uuid; o.material = cache[ck] || (cache[ck] = vxSkinMat(o.material, sm, sc)); return; } // vx: skin por cubo
     if (sm.userData?.skin) { const ck = k + o.material.uuid; o.material = cache[ck] || (cache[ck] = skinOn(o.material, sm, sc)); return; } // skin: por cima do material do modelo
     o.material = cache[k] || (cache[k] = triMat(sm, sc));
   });
