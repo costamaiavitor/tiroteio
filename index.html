@@ -20124,20 +20124,32 @@ function vxPede(nome, mk, cb, ja) {
   else if (ja && VX2.fila[0] !== j) { VX2.fila.splice(VX2.fila.indexOf(j), 1); VX2.fila.unshift(j); }
   j.cbs.push(cb); vxAgenda(ja);
 }
-function vxAgenda(ja) { if (!VX2.tm && VX2.fila.length) VX2.tm = setTimeout(() => { VX2.tm = (window.requestIdleCallback ? requestIdleCallback(dl => vxPasso(dl), { timeout: 250 }) : setTimeout(vxPasso, 0)) || 1; }, WARM ? 300 : ja ? 0 : 15) || 1; }
-// uma fatia: até ~6 ms e só no tempo ocioso que o navegador der (deadline); no aquecimento do mapa não roda (a tela de carga já é dele)
+// agenda a próxima fatia: no ócio (requestIdleCallback) ou, se o navegador não der ócio (quadros longos), por um setTimeout de reserva,
+// o que vier primeiro. No aquecimento do mapa só espera (volta a olhar a cada 300 ms: quando o WARM acaba a fila anda sozinha)
+function vxAgenda(ja) {
+  if (VX2.tm || !VX2.fila.length) return;
+  if (WARM) { VX2.tm = setTimeout(() => { VX2.tm = 0; vxAgenda(ja); }, 300); return; }
+  let feito = false, ric = 0, tmo = 0; const vai = dl => { if (feito) return; feito = true; if (ric) cancelIdleCallback(ric); clearTimeout(tmo); vxPasso(dl); };
+  ric = window.requestIdleCallback ? requestIdleCallback(vai, { timeout: 120 }) : 0; tmo = setTimeout(() => vai(null), ja ? 16 : 90); VX2.tm = 1;
+}
+// uma fatia: ~4 a 8 ms (o ócio que o navegador der, com um mínimo para a fila sempre andar); no aquecimento do mapa não roda
 function vxPasso(dl, fat = 6) {
-  VX2.tm = 0; if (WARM && fat < 1e8) return vxAgenda(); const t = performance.now(); if (dl && !dl.didTimeout) fat = Math.min(fat, Math.max(1, dl.timeRemaining()));
+  VX2.tm = 0; if (WARM && fat < 1e8) return vxAgenda(); if (dl && !dl.didTimeout && fat < 1e8) fat = Math.min(8, Math.max(4, dl.timeRemaining()));
+  vxFatia(fat); vxAgenda();
+}
+// reserva no laço do jogo: se o navegador segura os temporizadores (aba lenta, quadros longos), cada quadro ainda anda ~3 ms da fila
+function vxQuadro() { if (VX2.fila.length && !WARM && performance.now() - (VX2.ultP || 0) > 40) vxFatia(3); }
+function vxFatia(fat) {
+  const t = performance.now(); VX2.ultP = t; VX2.nP = (VX2.nP | 0) + 1;
   while (VX2.fila.length && performance.now() - t < fat) {
     const j = VX2.fila[0], t1 = performance.now(); let r;
     try { r = j.g.next(); } catch (e) { console.warn('vx2', j.nome, e); VX2.fila.shift(); vx2Guarda(j.nome, null); continue; } // falhou: fica o modelo liso
-    const dt = performance.now() - t1; j.ms += dt; if (dt > VX2.max) VX2.max = dt; if (dt > (j.max || 0)) j.max = dt;
+    const dt = performance.now() - t1; VX2.tP = (VX2.tP || 0) + dt; j.ms += dt; if (dt > VX2.max) VX2.max = dt; if (dt > (j.max || 0)) j.max = dt;
     if (!r.done) continue;
     VX2.fila.shift(); vx2Guarda(j.nome, r.value);
     VX2.log.push([j.nome, Math.round(j.ms), vx2Tri(r.value), Math.round(performance.now() - j.t0), Math.round(j.max)]); // nome, ms de conta, triângulos, ms até ficar pronto, maior pedaço
     for (const cb of j.cbs) try { cb(r.value); } catch (e) { console.warn('vx2', e); }
   }
-  vxAgenda();
 }
 // voxels prontos -> malhas no modelo; as originais ficam sem geometria (as de esqueleto, escondidas)
 function vxPoe(root, alvo, partes, mats) {
@@ -34234,6 +34246,7 @@ function renderScene() {
   else { renderer.clear(); renderer.render(scene, camera); renderer.clearDepth(); renderer.render(vmScene, vmCam); akPassada(() => renderer.render(vmScene, vmCam)); if (posLeve()) gradeMedio(); } // Médio no Sanatório: cor da área com cópia; na Vila ela vem no shader dos materiais (O1-B10)
 }
 function tick(dt) {
+  if (!window.__simLock) vxQuadro(); // vx2: a fila de voxels anda mesmo sem ócio
   if (R1.q || R1.rq) r1Fecha(); // (sobra de um quadro que parou no meio)
   if (NET.isHost) { R1.q = []; R1.rq = []; srvTick(dt); } // R1: o que o host manda no quadro sai junto (um pacote por canal e conexão)
   updateMe(dt);
@@ -34299,7 +34312,7 @@ requestAnimationFrame(frame);
 if (DEBUG) window.__T = { get NOW() { return now; }, vxExport, vxbExport, VXB, VX, VXZ, vxzArma, vxzAlvos, vxzNucleo, vxzHash, VMC, THREE, FPW, fpw, akAnim, akPassada, showPause, attPartsProc, skinSwatch, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade, zKill, zDrop, zEndRound,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
-if (DEBUG) Object.assign(window.__T, { VX2, vxObj, vx3, vxAquecer, knBuild, vxDrena: () => { const t = performance.now(); while (VX2.fila.length) vxPasso(null, 1e9); return performance.now() - t; }, RGUN, remoteGunTpl, setRemoteGun, c4Maos, cloneShared, DROPM, vxBHAND: () => BHAND }); // vx2: medição
+if (DEBUG) Object.assign(window.__T, { VX2, vxObj, vx3, vxAquecer, knBuild, vxDrena: () => { const t = performance.now(); while (VX2.fila.length) vxPasso(null, 1e9); return performance.now() - t; }, RGUN, remoteGunTpl, setRemoteGun, c4Maos, cloneShared, DROPM, vxBHAND: () => BHAND, vxWarm: () => !!WARM }); // vx2: medição
 if (DEBUG) Object.assign(window.__T, { R1, R1enc, R1dec, r1PosH, r1PosC, r1FastDec }); // R1: ganchos de teste do formato de fio
 // ===== O2-C01: ganchos de teste para a auditoria de itens (tools/itens/auditoria.mjs); só leitura e as funções do próprio jogo, nada de gameplay =====
 if (DEBUG) Object.assign(window.__T, { zBuildWalk, footFreeR, segClearR, zRoomAt, zActive, zDoorOpen, zBoxPlace, zHigh, colQuery, ffCell, ZPERKS, ZTRAP, ZMAXPERKS, ZWEAP, PR, STEP, ZVAULT, ZTOP });
