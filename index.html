@@ -16963,6 +16963,7 @@ function buildMap(id) {
   // a arma em primeira pessoa acompanha a luz do mapa (à noite ela fica mais escura e reflete menos)
   const VL = M.stars ? VMLUZ.noite : VMLUZ.dia; vmHemi.color.set(VL.ceu); vmHemi.groundColor.set(VL.chao); vmHemi.intensity = VL.hemi; vmKey.color.set(VL.keyC); vmKey.intensity = VL.key; vmRim.color.set(VL.rimC); vmRim.intensity = VL.rim; VM_ENV = VL.env; // (a13)
   for (const set of [...Object.values(GM), ARM || {}]) for (const m of Object.values(set)) if (m?.isMeshStandardMaterial) m.envMapIntensity = VM_ENV * (m.userData.env ?? .35);
+  vxEnv(); // item 0: voxels da mão
   scene.fog = new THREE.Fog(M.fogC ?? M.sky, M.fog[0], M.fog[1]);
   if (CFG.gfx !== 'baixo') { if (!WORLD_ENV) { const pm = new THREE.PMREMGenerator(renderer); WORLD_ENV = pm.fromScene(new RoomEnvironment(renderer), .04).texture; pm.dispose(); } scene.environment = WORLD_ENV; } else scene.environment = null;
   const s = M.sun || [30, 50, 20]; sun.position.set(s[0], s[1], s[2]); sun.target.position.set(0, 0, 0);
@@ -19848,8 +19849,9 @@ function rp1Supressor(tips, C, body, mz, u) { // u: unidades do modelo por metro
 // O jogo só lê os arquivos pré-calculados (assets/vox) e monta as malhas num Worker; voxelizar na hora é só para o tools/vox-bake.mjs.
 const VX = { passo: .0022, cache: new Map(), tex: new WeakMap(), mats: null, on: true };
 function vxMats() {
-  return VX.mats ||= [new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .5, metalness: 0, clearcoat: .2, clearcoatRoughness: .45, envMapIntensity: .8, name: 'vox' }),
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .34, metalness: .68, envMapIntensity: .9, name: 'vox' })];
+  if (!VX.mats) { VX.mats = [new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .5, metalness: 0, clearcoat: .2, clearcoatRoughness: .45, name: 'vox' }),
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .34, metalness: .68, name: 'vox' })]; VX.mats[0].userData.env = .8; VX.mats[1].userData.env = .9; vxEnv(); }
+  return VX.mats;
 }
 function vxTex(t, L) { // pixels da textura (uma vez por textura); vx2: L = lado máximo (lê reduzida: 4096 px travavam a conta no ócio)
   if (!t?.image) return null; if (L && t.image instanceof HTMLCanvasElement) return null; // vx2: textura feita no código (canvas): fica a cor do material (ler os pixels travava)
@@ -20415,7 +20417,10 @@ function vxAquecer(M) {
 // aquele canto, então a malha continua fechada quando as juntas dobram (sem frestas entre os cubos) e todas as animações do pacote, o IK
 // dos braços e as trocas de pacote (fpArmsSwap) valem como antes. Arquivo pré-calculado: assets/vox/bracos_<pacote>_<n>.bin.gz.
 const VXB = { mat: null, ult: new Map(), passo: .0016 }; // braços: cubo menor que o da arma (ficam bem mais perto da câmera)
-function vxbMat() { return VXB.mat ||= new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .74, metalness: 0, envMapIntensity: .7, name: 'voxPele' }); }
+function vxbMat() { if (!VXB.mat) { VXB.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .74, metalness: 0, name: 'voxPele' }); VXB.mat.userData.env = .7; vxEnv(); } return VXB.mat; }
+// item 0: o reflexo dos voxels da mão segue a luz do mapa (VM_ENV), como os materiais da arma feita no código: à noite (Zumbi, Sanatório,
+// exposição 1,4) o reflexo cheio da sala branca deixava a arma quase branca
+function vxEnv() { for (const m of [...(VX.mats || []), VXB.mat]) if (m) m.envMapIntensity = VM_ENV * m.userData.env; }
 const vxbK = (i, j, k) => ((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024);
 function vxbVoxels(o, h) { // casca na pose de amarração (posições da geometria), com cor e até 4 pesos de osso por voxel
   const geo = o.geometry, pos = geo.attributes.position, uv = geo.attributes.uv, idx = geo.index, si = geo.attributes.skinIndex, sw = geo.attributes.skinWeight;
@@ -21772,7 +21777,11 @@ function vmSetWeapon(id) {
   if (fw) { // arma com braços prontos: o modelo procedural não aparece
     if (attHas(mid, 'akimbo') && akOK(mid)) ud.akimbo = true; // uni: Pistolas Duplas também no modelo baixado (antes do return; o fpBuild esconde o braço esquerdo)
     const h = fpBuild(mid, ud, gun);
-    if (h) { if (!fw.syn) gun.visible = false; else if (ZC.on) vxzArma(vmGun, gun); vmGun.add(h); vmRoot.add(vmGun); vmRoot.updateMatrixWorld(true); return; } // matriz do pai já no 1º quadro (o IK e as camadas leem o mundo: sem isso a mão esquerda aparecia atrás da câmera por um quadro)
+    if (h) { FPESP.t.delete(mid); if (!fw.syn) gun.visible = false; else if (ZC.on) vxzArma(vmGun, gun); vmGun.add(h); vmRoot.add(vmGun); vmRoot.updateMatrixWorld(true); return; } // matriz do pai já no 1º quadro (o IK e as camadas leem o mundo: sem isso a mão esquerda aparecia atrás da câmera por um quadro)
+    // item 0: pacote ainda baixando/compilando: a mão fica vazia (abaixada) em vez da arma do código com as luvas antigas; o fpBuild chama
+    // vmSetWeapon de novo quando ficar pronto. Se passar de FPESP.max s (arquivo que não chega), fica a do código como antes.
+    const t0 = FPESP.t.get(mid) ?? FPESP.t.set(mid, performance.now()).get(mid);
+    if (!h && performance.now() - t0 < FPESP.max * 1000) { gun.visible = false; vmGun.add(gun); vmRoot.add(vmGun); ud.fpEspera = 1; return; }
   }
   if (MAO_ITENS.has(m) && !MAO.off) { // E3: granadas, Semtex, macaco e Claymore nos braços das armas (pacote da pistola, em voxel)
     const h = maoBuild(ud, gun, { pronto: () => { if (vmGun && !vmGun.userData.fps2 && W[G.cur]?.model === m) vmSetWeapon(G.cur); } });
@@ -22812,6 +22821,7 @@ function fabMira(ud) {
   if (ud.fabLens) for (const m of ud.fabLens) m.opacity = 1 - FABM.vidro * k;
   if (fabMira.op !== op) { fabMira.op = op; const el = $('#fabRet'); el.style.opacity = op; el.classList.toggle('hidden', !op); }
 }
+const FPESP = { t: new Map(), max: 15 }; // item 0: desde quando cada arma espera o pacote
 function updateViewmodel(dt) {
   const w = W[G.cur], ud = vmGun?.userData || {}, vo = ud.vm || [0, 0, 0];
   const hs = Math.hypot(me.vel.x, me.vel.z);
