@@ -18088,7 +18088,7 @@ function gunMats(pap, fp, skin) {
     holoGlass: new THREE.MeshBasicMaterial({ color: 0x7fb8e0, transparent: true, opacity: .05, depthWrite: false }),
     shell: mk({ color: 0xa82020, metalness: .2, roughness: .5 }),
   };
-  for (const k of ['glass', 'holoGlass', 'reticle', 'dot', 'trit']) M[k].userData.noVox = 1; M.trit.userData.trit = 1; // vxz: lente, retícula e pontos de trítio não viram voxel (o trítio vem um voxel para trás: senão a mira em voxel o engole)
+  for (const k of ['glass', 'holoGlass', 'reticle', 'dot', 'trit']) M[k].userData.noVox = 1; M.glass.userData.lente = 1; // vxz: lente, retícula e pontos de trítio não viram voxel (a lente sai um voxel para fora: senão o tubo em voxel a cobre)
   return (GM[key] = M);
 }
 // ===== 6-w13: camuflagem do Pack-a-Punch (projeção triplanar no espaço da arma) =====
@@ -18146,7 +18146,7 @@ function gunModel(id, fp = false, skin = null) {
   const hi = fp && CFG.gfx !== 'baixo';
   const RB = (w, h, d, r = .004) => { const m = Math.min(w, h, d); return hi && m > .012 ? new RoundedBoxGeometry(w, h, d, 2, Math.min(r, m / 2 - .001)) : new THREE.BoxGeometry(w, h, d); };
   const CY = (r, len, seg = 14, rFront = r) => { const q = new THREE.CylinderGeometry(rFront, r, len, hi ? seg : Math.max(6, seg >> 1)); q.rotateX(-Math.PI / 2); return q; }; // deitado ao longo de z
-  const add = (par, geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); par.add(m); return m; };
+  const add = (par, geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); par.add(m); return m; }, add0 = add;
   const grp = (par, x, y, z) => { const q = new THREE.Group(); q.position.set(x, y, z); par.add(q); return q; };
   // Perfil lateral recortado: pontos [u, v] (u = para a frente, v = altura) ou ['q', cu, cv, u, v] (curva).
   // O perfil é extrudado na largura da arma com chanfro — é isso que dá a silhueta de arma de verdade.
@@ -18178,6 +18178,7 @@ function gunModel(id, fp = false, skin = null) {
   };
   // mira de ferro: alça (anel de abertura ou entalhe) atrás e massa (poste com orelhas de proteção) na frente, com ponto de trítio
   const irons = (y, zr, zf, o = {}) => {
+    const add = (...a) => { const m = add0(...a); m.userData.noVox = 1; return m; }; // vxz: alça e massa ficam lisas (em voxel o entalhe fecha na mira)
     const hb = o.base ?? .012; // altura do suporte até a linha de mira
     if (o.notch) { // entalhe em U (pistola/revólver)
       add(g, new THREE.BoxGeometry(.014, hb - .005, .008), M.dark, 0, y - hb / 2 - .0025, zr);
@@ -18231,8 +18232,8 @@ function gunModel(id, fp = false, skin = null) {
     const slide = grp(g, 0, sy, -o.sz);
     add(slide, EX([[-h, -sh], [-h, sh - .005], [-h + .01, sh], [h - .016, sh], [h, sh - .008], [h, -sh]], o.sw), o.slideM);
     for (let k = 0; k < 7; k++) add(slide, new THREE.BoxGeometry(o.sw + .002, sh * 1.3, .0022), M.dark, 0, -.001, h - .01 - k * .0055);
-    add(slide, EX([[-.003, 0], [.003, 0], [.002, .008], [-.002, .008]], .004), M.dark, 0, sh, -h + .01);
-    add(slide, new THREE.BoxGeometry(.018, .004, .009), M.dark, 0, sh + .002, h - .01); for (const s2 of [-1, 1]) add(slide, new THREE.BoxGeometry(.0065, .0042, .009), M.dark, s2 * .00575, sh + .0061, h - .01); // alça com entalhe
+    add(slide, EX([[-.003, 0], [.003, 0], [.002, .008], [-.002, .008]], .004), M.dark, 0, sh, -h + .01).userData.noVox = 1; // vxz: massa lisa
+    add(slide, new THREE.BoxGeometry(.018, .004, .009), M.dark, 0, sh + .002, h - .01).userData.noVox = 1; for (const s2 of [-1, 1]) add(slide, new THREE.BoxGeometry(.0065, .0042, .009), M.dark, s2 * .00575, sh + .0061, h - .01).userData.noVox = 1; // alça com entalhe
     add(slide, new THREE.BoxGeometry(.002, sh * .9, .042), M.dark, o.sw / 2 + .0006, sh * .15, -.014); // janela de ejeção
     if (o.rib) add(slide, EX([[-h + .02, 0], [h - .02, 0], [h - .02, .007], [-h + .026, .007]], .012), o.slideM, 0, sh, 0);
     add(g, EX([[-.03, fy], [o.fl, fy], [o.fl, fy - .012], [.064, fy - .012], [.05, fy - .018], [.032, fy - .05], [-.002, fy - .05], [-.016, fy - .03], [-.03, fy - .022]], o.sw - .003, [[[.004, fy - .02], [.044, fy - .02], [.028, fy - .043], [.004, fy - .043]]]), o.frameM);
@@ -21140,7 +21141,7 @@ if (DEBUG) window.__W17 = { VMC, vmcChave, vmcAquecer, applyInv }; // testes (s�
 // (geometria, passo e cor) reaproveita a malha de voxels (cache por assinatura, com limite de triângulos). Arma ainda sem voxels aparece
 // lisa por um instante (normalmente durante o saque) e troca para voxel inteira de uma vez; as do inventário já se adiantam no
 // aquecimento (vmcAquecer monta a arma no ócio e a voxelização vai junto).
-const VXZ = { on: true, passo: .0022, passoBaixo: .003, cache: new Map(), tri: 0, triMax: 1.5e6, var: new WeakMap(), pap: new Map(), nada: null, w: null, n: 0, pend: new Map(), prom: new Map(), tex: new Map(), texOk: new Set(), fila: [], rodando: 0, ms: 0, msMain: 0, tris: 0 };
+const VXZ = { on: true, passo: .0022, passoBaixo: .003, cache: new Map(), tri: 0, triMax: 8e5, prazo: 15000, papMax: 300, var: new WeakMap(), pap: new Map(), nada: null, w: null, n: 0, pend: new Map(), prom: new Map(), tex: new Map(), texOk: new Set(), ms: 0, msMain: 0, tris: 0 };
 const vxzNada = () => VXZ.nada ||= Object.assign(new THREE.MeshBasicMaterial({ visible: false }), { name: 'voxOrig' });
 const vxzFora = m => !m || Array.isArray(m) || m.userData.noVox || m.transparent || !m.visible || m.depthWrite === false || m.blending !== THREE.NormalBlending || !(m.isMeshStandardMaterial || m.isMeshBasicMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial);
 const vxzShader = m => Object.hasOwn(m, 'onBeforeCompile');
@@ -21153,8 +21154,9 @@ function vxzHash(geo) { // assinatura da geometria (posições, índices e UV)
 // material do voxel: cópia com cor por vértice. Comum: sem textura e branco (a cor está no voxel). Skin/brilho: o mesmo shader.
 function vxzMat(src, R) {
   if (src.userData.papCamo) { // camuflagem do PaP: posição de repouso (espaço da arma) por matriz, uma cópia por peça (guardada: a arma remontada reusa)
-    const k = src.uuid + R.elements.map(x => x.toFixed(4)).join(); let m = VXZ.pap.get(k); if (m) return m;
-    m = src.clone(); const u = { value: R.clone() }; m.vertexColors = true; m.name = 'vox'; m.userData = { ...src.userData, vxz: 1 }; m.defaultAttributeValues = {}; VXZ.pap.set(k, m);
+    const k = src.uuid + R.elements.map(x => x.toFixed(4)).join(); let m = VXZ.pap.get(k); if (m) { VXZ.pap.delete(k); VXZ.pap.set(k, m); return m; }
+    m = src.clone(); const u = { value: R.clone() }; m.vertexColors = true; m.name = 'vox'; m.userData = { ...src.userData, vxz: 1 }; m.defaultAttributeValues = {}; VXZ.pap.set(k, m); (GM.vxz ||= {})[m.uuid] = m;
+    for (const [k2, m2] of VXZ.pap) { if (VXZ.pap.size <= VXZ.papMax) break; VXZ.pap.delete(k2); delete GM.vxz[m2.uuid]; m2.dispose(); } // a mais antiga sai (arma guardada que ainda usa recompila)
     m.onBeforeCompile = sh => { src.onBeforeCompile(sh); sh.uniforms.papM = u;
       sh.vertexShader = sh.vertexShader.replace('attribute vec4 papP;', 'uniform mat4 papM;').replace('vPapP = papP.w > .5 ? position : papP.xyz;', 'vPapP = (papM * vec4(position, 1.)).xyz;'); };
     m.customProgramCacheKey = () => 'w13papvx'; return m;
@@ -21179,7 +21181,7 @@ function vxzNucleo(P, U, IX, h, branco, cor, tx) {
   if (!(Mx >= mx)) return null;
   const x0 = Math.floor(mx * ih) - 2, y0 = Math.floor(my * ih) - 2, z0 = Math.floor(mz * ih) - 2;
   const nx = Math.floor(Mx * ih) - x0 + 3, ny = Math.floor(My * ih) - y0 + 3, nz = Math.floor(Mz * ih) - z0 + 3, NN = nx * ny * nz, L = nx * ny;
-  if (NN > 8e6) return null;
+  if (NN > 8e6) return { grande: NN };
   const cel = new Int32Array(NN); let S = new Float32Array(4096), CI = new Int32Array(1024), ns = 0; // S: cor somada (r, g, b, n) e CI: célula, por voxel da casca
   const n = IX ? IX.length : P.length / 3, d = h * .45, tw = tx ? tx.w : 0, th = tx ? tx.h : 0, tp = tx ? tx.px : null, fy = tx ? tx.fy : false;
   let cr = 1, cg = 1, cb = 1;
@@ -21258,7 +21260,7 @@ function vxzNucleo(P, U, IX, h, branco, cor, tx) {
   return { vp, vn, vc, I, nf };
 }
 function vxzGeo(r) { // resultado do núcleo -> BufferGeometry (cor em 16 bits: os escuros da arma não fazem degrau)
-  if (!r) return null; const g = new THREE.BufferGeometry();
+  if (!r?.vp) return null; const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(r.vp, 3)); g.setAttribute('normal', new THREE.BufferAttribute(r.vn, 3, true));
   g.setAttribute('color', new THREE.BufferAttribute(r.vc, 3, true)); g.setIndex(new THREE.BufferAttribute(r.I, 1)); g.computeBoundingSphere(); g.userData.keep = true; g.userData.tri = r.nf * 2;
   return g;
@@ -21267,17 +21269,13 @@ function vxzWorker() {
   if (VXZ.w !== null) return VXZ.w;
   try {
     const src = 'const N = ' + vxzNucleo.toString() + ';\nconst T = new Map();\nonmessage = ({ data: d }) => { if (d.tx) T.set(d.tk, d.tx); if (!d.P) return; let r = null; try { r = N(d.P, d.U, d.IX, d.h, d.br, d.cor, d.tk ? T.get(d.tk) : null); } catch (e) { r = null; }\n'
-      + '  postMessage({ id: d.id, r }, r ? [r.vp.buffer, r.vn.buffer, r.vc.buffer, r.I.buffer] : []); };';
+      + '  postMessage({ id: d.id, r }, r && r.vp ? [r.vp.buffer, r.vn.buffer, r.vc.buffer, r.I.buffer] : []); };';
     const w = VXZ.w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
     const cx = new THREE.BoxGeometry(.05, .1, .2); w.postMessage({ id: 0, P: cx.attributes.position.array, U: null, IX: cx.index.array, h: VXZ.passo, br: true, cor: [1, 1, 1], tk: null }); cx.dispose(); // aquece o JIT do Worker (a 1ª arma não sai lenta)
     w.onmessage = e => { const p = VXZ.pend.get(e.data.id); if (p) { VXZ.pend.delete(e.data.id); p.fim(e.data.r); } };
-    w.onerror = e => { e.preventDefault?.(); VXZ.w = false; w.terminate(); for (const p of VXZ.pend.values()) VXZ.fila.push(p); VXZ.pend.clear(); vxzRoda(); }; // sem Worker: no ócio
+    w.onerror = e => { e.preventDefault?.(); VXZ.w = false; w.terminate(); for (const p of VXZ.pend.values()) p.fim(null, 1); VXZ.pend.clear(); }; // Worker quebrou: a arma fica lisa
   } catch (e) { VXZ.w = false; }
   return VXZ.w;
-}
-function vxzRoda() { // sem Worker: uma peça por vez, no ócio
-  if (VXZ.rodando || !VXZ.fila.length) return; const ric = window.requestIdleCallback || (f => setTimeout(f, 30));
-  VXZ.rodando = ric(() => { VXZ.rodando = 0; const p = VXZ.fila.shift(); if (p) { const d = p.d; p.fim(vxzNucleo(d.P, d.U, d.IX, d.h, d.br, d.cor, d.tk ? VXZ.tex.get(d.tk) : null)); } vxzRoda(); }, { timeout: 300 }) || 1;
 }
 function vxzTexW(t) { // pixels da textura (vxTex, uma vez) e cópia no Worker (uma vez); devolve a chave
   const tx = vxTex(t); if (!tx) return null; const tk = t.uuid; VXZ.tex.set(tk, tx);
@@ -21289,17 +21287,22 @@ function vxzPede(a) { // promessa da malha de voxels de uma peça (uma por assin
   const geo = a.o.geometry, mat = a.o.material, tk = a.br ? null : vxzTexW(mat.map), c = mat.color.clone().convertLinearToSRGB();
   const d = { id: ++VXZ.n, P: geo.attributes.position.array.slice(), U: geo.attributes.uv?.array.slice() || null, IX: geo.index?.array.slice() || null, h: a.h, br: a.br, cor: [c.r, c.g, c.b], tk };
   pr = new Promise(res => {
-    const fim = r => { VXZ.prom.delete(a.key); const g = vxzGeo(r); vxzCache(a.key, g); res(g); }, w = vxzWorker();
-    if (w) { VXZ.pend.set(d.id, { d, fim }); w.postMessage(d); } else { VXZ.fila.push({ d, fim }); vxzRoda(); }
+    let tm = 0; const w = vxzWorker();
+    const fim = (r, falhou) => { clearTimeout(tm); VXZ.prom.delete(a.key); if (falhou) { res(null); return; } // falha/tempo: lisa agora, sem gravar no cache (tenta de novo depois)
+      if (r?.grande && DEBUG) console.warn('vxz: peça grande demais para voxel (' + r.grande + ' células)', a.o.name || a.o.geometry.type);
+      const g = vxzGeo(r); vxzCache(a.key, g); res(g); };
+    if (!w) { res(null); return; } // sem Worker: não voxeliza no thread principal (a arma fica lisa)
+    VXZ.pend.set(d.id, { fim }); tm = setTimeout(() => { if (VXZ.pend.delete(d.id)) fim(null, 1); }, VXZ.prazo);
+    w.postMessage(d, [d.P.buffer, d.U?.buffer, d.IX?.buffer].filter(Boolean)); // as cópias vão transferidas
   });
-  VXZ.prom.set(a.key, pr); return pr;
+  if (VXZ.w) VXZ.prom.set(a.key, pr); return pr; // (sem Worker a promessa já saiu resolvida com null)
 }
 // peças da arma que viram voxel (ver o topo do bloco). Peça escondida só pela animação (pente-clipe, carregador rápido, foguete) entra.
-function vxzAlvos(dono, gun) {
+function vxzAlvos(gun) {
   const ud = gun.userData, anim = new Set([ud.clipG, ud.spdl, ud.mag, ud.item, ud.pino, ud.handShell].filter(Boolean)), out = [], fita = new Set(ud.belt?.m || []); // fita da metralhadora: o beltAnim mostra só as balas que restam (drawRange), fica lisa
   const gi = new THREE.Matrix4().copy(gun.matrixWorld).invert(), passo = CFG.gfx === 'baixo' ? VXZ.passoBaixo : VXZ.passo;
   gun.traverse(o => {
-    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.userData.vox || o.userData.vxzMat || fita.has(o) || vxzFora(o.material) || !o.geometry?.attributes.position) return;
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.userData.vox || o.userData.noVox || o.userData.vxzMat || fita.has(o) || vxzFora(o.material) || !o.geometry?.attributes.position) return;
     for (let p = o; p && p !== gun; p = p.parent) { if (p.userData.mao || p === ud.handShell) return; if (!p.visible && !anim.has(p)) return; }
     const R = new THREE.Matrix4().multiplyMatrices(gi, o.matrixWorld), h = passo / vxEscala(R), br = vxzBranco(o.material);
     const ck = br ? 'w' : o.material.color.getHexString() + (o.material.map?.uuid || '-');
@@ -21319,17 +21322,16 @@ function vxzTroca(job) { // tudo pronto: os voxels entram de uma vez (a arma nã
     const vm = new THREE.Mesh(g, vxzMat(a.o.material, a.R)); vm.userData.vox = 1; vm.name = 'vox'; vm.frustumCulled = false; vm.castShadow = vm.receiveShadow = false; vm.renderOrder = a.o.renderOrder;
     a.o.add(vm); a.o.userData.vxzMat = a.o.material; a.o.material = vxzNada(); tri += g.userData.tri;
   }
-  if (tri) { // pontos de trítio (lisos) um voxel para trás, para o olho: a face da mira em voxel fica até um voxel fora da peça lisa e os cobria
-    const gun = job.gun, d = CFG.gfx === 'baixo' ? VXZ.passoBaixo : VXZ.passo, m4 = new THREE.Matrix4(), p0 = new V3(), p1 = new V3(); gun.updateMatrixWorld(true); const gi = gun.matrixWorld.clone().invert();
-    gun.traverse(o => { if (!o.isMesh || !o.material?.userData.trit || o.userData.vxzTrit) return; o.userData.vxzTrit = 1;
-      m4.multiplyMatrices(gi, o.parent.matrixWorld).invert(); p0.set(0, 0, 0).applyMatrix4(m4); o.position.add(p1.set(0, 0, d).applyMatrix4(m4).sub(p0)); });
+  if (tri) { // lente da luneta (lisa) um voxel para fora, na direção da face dela: a casca do tubo em voxel fica até um voxel além da peça lisa e a cobria
+    const d = CFG.gfx === 'baixo' ? VXZ.passoBaixo : VXZ.passo, n = new V3();
+    job.gun.traverse(o => { if (!o.isMesh || !o.material?.userData.lente || o.userData.vxzLente) return; o.userData.vxzLente = 1; o.position.add(n.set(0, 0, d).applyQuaternion(o.quaternion)); });
   }
   job.gun.userData.vxzTri = tri || -1;
   if (job.dono === vmGun) { VXZ.tris = tri; VXZ.ms = Math.round(performance.now() - job.t0); VXZ.msTroca = +(performance.now() - t0).toFixed(1); VXZ.msMain = +job.msMain.toFixed(1); }
 }
 function vxzArma(dono, gun) {
   if (!VXZ.on) return; const t0 = performance.now(); gun.updateMatrixWorld(true);
-  const alvos = vxzAlvos(dono, gun), falta = alvos.filter(a => (a.g = vxzCache(a.key)) === undefined), job = { dono, gun, alvos, t0, msMain: 0 };
+  const alvos = vxzAlvos(gun), falta = alvos.filter(a => (a.g = vxzCache(a.key)) === undefined), job = { dono, gun, alvos, t0, msMain: 0 };
   if (!falta.length) { job.msMain = performance.now() - t0; vxzTroca(job); return; } // tudo no cache: na hora
   const ps = falta.map(a => vxzPede(a).then(g => (a.g = g))); job.msMain = performance.now() - t0;
   Promise.all(ps).then(() => { if (job.dono === vmGun || VMC.dono.has(job.dono)) vxzTroca(job); }); // arma descartada no meio: os voxels ficam só no cache
