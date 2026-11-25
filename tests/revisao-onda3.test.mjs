@@ -103,7 +103,7 @@ test('estouro do Explosivo destrói o corpo que o Pregador levantaria; longe nã
 
 test('seta do objetivo de coletar a chave: aponta a Enfermeira-chefe enquanto a chave não cai', { timeout: 60000 }, async () => {
   const r = await rodar((T, H) => {
-    H.limpa(); H.vivo(); H.poe(-8, -4);
+    H.limpa(); H.vivo(); H.poe(-8, -4); const zd = T.C.st.zdiff; T.C.st.zdiff = 0; // 14/10: a seta só aparece no Fácil (campDica)
     for (const id in T.CAMP.obj) T.CAMP.obj[id].st = 'oculto'; for (const id in T.CAMP.c.obj) T.CAMP.c.obj[id].st = 'oculto';
     T.CAMP_OBJ['T.seta'] = { id: 'T.seta', tipo: 'coletar', titulo: 'Seta de teste', item: 'chave-seta', origem: 'elite', destino: { x: 0, z: 0, r: 1 } };
     T.CAMP.obj['T.seta'] = { st: 'oculto', p: 0 }; T.CAMP.itens['chave-seta'] = { st: 'oculto', x: 0, z: 0, quem: null, i: -1 }; T.CAMP.obj['T.seta'].st = 'ativo';
@@ -112,7 +112,7 @@ test('seta do objetivo de coletar a chave: aponta a Enfermeira-chefe enquanto a 
     const o = { sem: /SETA DE TESTE/.test(mk()) };
     const z = H.um(10, 4, 6); T.sim(.2); T.CAMP_ZKF.msg.elite({ id: z.id }); T.sim(.2); o.com = mk();
     T.CAMP_ZK2C.elite.clear(); H.limpa(); T.sim(.2); o.depois = /SETA DE TESTE/.test(mk());
-    delete T.CAMP.obj['T.seta']; delete T.CAMP_OBJ['T.seta']; delete T.CAMP.itens['chave-seta']; if (T.CAMP.c.obj['T.seta']) T.CAMP.c.obj['T.seta'].st = 'feito'; T.sim(.1);
+    delete T.CAMP.obj['T.seta']; delete T.CAMP_OBJ['T.seta']; delete T.CAMP.itens['chave-seta']; if (T.CAMP.c.obj['T.seta']) T.CAMP.c.obj['T.seta'].st = 'feito'; T.sim(.1); T.C.st.zdiff = zd;
     return o;
   });
   assert.equal(r.sem, false, 'sem a elite e sem a chave no chão: sem seta');
