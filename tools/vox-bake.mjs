@@ -10,6 +10,7 @@ await ctx.route('**/*', r => { const u = new URL(r.request().url()); if (u.hostn
   const f = REPO + (u.pathname === '/' ? 'index.html' : decodeURIComponent(u.pathname.slice(1)));
   if (/assets\/vox\//.test(f)) return r.fulfill({ status: 404, body: '' }); // sempre recalcula
   if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' }); r.fulfill({ body: fs.readFileSync(f), contentType: TYPES[f.split('.').pop()] }); });
+await ctx.addInitScript(() => { window.__vxExport = true; }); // voxeliza na hora (sem isto o jogo só lê os arquivos)
 const p = await ctx.newPage(); await p.goto('http://localhost/'); await p.waitForTimeout(3000);
 await p.evaluate(() => document.querySelector('#btnHost').click()); await p.waitForTimeout(800);
 await p.evaluate(() => { document.querySelector('#lbForm [data-mode="dm"]').click(); document.querySelector('#lbForm [data-map="arena"]').click(); });
