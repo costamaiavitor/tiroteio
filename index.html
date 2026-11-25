@@ -19585,7 +19585,7 @@ function armsTipPts(gun) { // (a13) cantos das peças visíveis no espaço da ar
   return P;
 }
 function frameArms(ud, F) {
-  const vo = ud.vm || [0, 0, 0], cam = vmCam.clone(); cam.aspect = 16 / 9; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+  const vo = ud.vm || [0, 0, 0], cam = vmCam.clone(); cam.fov = VMASP.fov; cam.aspect = 16 / 9; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
   vmRoot.position.set(.165 + vo[0], -.145 + vo[1], -.43 + vo[2]); vmRoot.rotation.set(0, 0, 0); vmRoot.updateMatrixWorld(true);
   // ponta da arma = o canto mais à frente das peças (ud.muzzle é só o ponto do clarão, nem sempre na ponta do cano)
   const gun = vmGun.children[0], tip = new V3(0, 0, 1e9), c = new V3();
@@ -22845,6 +22845,20 @@ function updateViewmodel(dt) {
   fabMira(ud);
   if (ud.armsGun && vmRoot.visible) armsIK(ud);
   updateVmFx(dt);
+  vmAspecto(ak);
+}
+// Proporção da tela: a arma em 1ª pessoa tem o enquadramento do 16:9 em qualquer tela. Mais estreita (4:3, 16:10, celular): o ângulo
+// horizontal da vmCam fica o do 16:9 (a arma não escorrega para a direita/fora) e a imagem desce até a borda de baixo do 16:9 bater na
+// da tela; mais larga (21:9): a vertical fica e a imagem vai para o lado (desvio da lente, xa = onde a arma fica no 16:9). Mirando, os
+// desvios somem com a mira (a mira continua no centro: a vmCam não gira, só a projeção desliza). Celular em pé: a vertical abre no
+// máximo cap vezes (senão a arma ficava minúscula no canto) e o 16:9, mais largo que a tela, encosta a borda direita na dela.
+const VMASP = { r: 16 / 9, fov: 62, xa: .45, cap: 2.4, a: 0 };
+function vmAspecto(ak) {
+  const a = innerWidth / innerHeight, R = VMASP.r, k = 1 - clamp(ak || 0, 0, 1);
+  const f = a < R ? Math.min(R / a, VMASP.cap) : 1, q = R / (a * f); // f: quanto a vertical abre; q > 1: o 16:9 ficou mais largo que a tela (celular em pé, com o teto cap)
+  if (a !== VMASP.a) { VMASP.a = a; vmCam.fov = 2 * Math.atan(Math.tan(VMASP.fov * Math.PI / 360) * f) * 180 / Math.PI; vmCam.aspect = a; vmCam.updateProjectionMatrix(); }
+  const sx = (a > R ? VMASP.xa * (1 - R / a) : q > 1 ? 1 - q : 0) * k, sy = -(1 - 1 / f) * k, e = vmCam.projectionMatrix.elements; // em pé: a borda direita do 16:9 na da tela
+  if (e[8] !== -sx || e[9] !== -sy) { e[8] = -sx; e[9] = -sy; vmCam.projectionMatrixInverse.copy(vmCam.projectionMatrix).invert(); }
 }
 
 // ---------- armas ----------
