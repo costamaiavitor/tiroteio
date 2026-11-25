@@ -20408,19 +20408,24 @@ function vxbPack(h, V) {
   return buf;
 }
 const vxbNomes = (P, W2) => ['bracos_' + (P.armsFrom || W2.pack) + '_0'];
-function vxBracos(root, P, W2) { // troca a malha dos braços (com esqueleto) pela de voxels, ligada ao mesmo esqueleto
-  if (!VX.on) return;
+function vxBracos(root, P, W2, X) { // troca a malha dos braços (com esqueleto) pela de voxels, ligada ao mesmo esqueleto
+  if (!VX.on) return; // E3 X: outro pacote (faca: { nome, k } com k = escala da raiz na tela, em cm): mesmo cubo na tela que os braços das armas
+  const pre = X?.nome || 'bracos_' + (P.armsFrom || W2.pack), kR = X?.k || FPH / P.hr;
   root.updateMatrixWorld(true);
   const Ri = root.matrixWorld.clone().invert(), vis = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }, alvo = [];
   root.traverse(o => { if (fpArmsMesh(o) && vis(o)) alvo.push(o); });
   alvo.forEach((o, n) => {
-    const nome = 'bracos_' + (P.armsFrom || W2.pack) + '_' + n, ch = vxChave(nome); let c = vxUsa(ch);
-    if (!c && window.__vxExport) { const h = VXB.passo * FPG * P.hr / fpMeshScale(o, Ri), V = vxbVoxels(o, h); VXB.ult.set(nome, { h, V }); c = vxEnt('bracos', vxwBracos(vxbPack(h, V), vxMeio())); if (c) { vxGuarda(ch, c); vxUsa(ch); } }
+    const nome = pre + '_' + n, ch = vxChave(nome); let c = vxUsa(ch);
+    if (!c && window.__vxExport) { const h = VXB.passo * (X?.f || 1) * FPG * FPH / kR / fpMeshScale(o, Ri), V = vxbVoxels(o, h); if (X?.fora) vxbFora(V, o, X.fora); VXB.ult.set(nome, { h, V }); c = vxEnt('bracos', vxwBracos(vxbPack(h, V), vxMeio())); if (c) { vxGuarda(ch, c); vxUsa(ch); } }
     if (!c) { VX.falta.push(ch); return; } // sem arquivo: ficam os braços lisos
     const vm = new THREE.SkinnedMesh(c.geo, vxbMat()); vm.name = 'voxBraco'; vm.userData.vox = 1; vm.frustumCulled = false;
     o.parent.add(vm); vm.position.copy(o.position); vm.quaternion.copy(o.quaternion); vm.scale.copy(o.scale); vm.updateMatrixWorld(true);
     vm.bind(o.skeleton, o.bindMatrix.clone().multiply(new THREE.Matrix4().makeScale(c.h, c.h, c.h))); o.visible = false; // posição em unidades de voxel: o passo entra na matriz de amarração
   });
+}
+function vxbFora(V, o, raiz) { // E3: voxels presos (peso > metade) a ossos que nunca aparecem (braço esquerdo da faca) saem do arquivo
+  const fora = new Set(); raiz.traverse(b => { const i = o.skeleton.bones.indexOf(b); if (i >= 0) fora.add(i); });
+  for (const [k, e] of V) { let w = 0; for (let q = 0; q < 4; q++) if (fora.has(e.bi[q])) w += e.bw[q]; if (w > .5) V.delete(k); }
 }
 function vxbExport() { const out = []; for (const [nome, { h, V }] of VXB.ult) { const b = new Uint8Array(vxbPack(h, V)); let s = ''; for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768)); out.push({ nome, b64: btoa(s) }); } return out; }
 // Clipes dos pacotes: chaves cozidas a 30 qps ligadas por reta: a velocidade dá um degrau em cada chave (a arma e as mãos "estalam",
@@ -21561,10 +21566,12 @@ const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 8, -22], 
   // ponto de encaixe do modelo (FPKN: guarda da KA-BAR / centro do anel da karambit) vai para Q no pacote,
   // fwd/up: para onde vão o cano (lâmina) e o dorso do modelo; len: comprimento total (cm)
   fit: { knife: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 30 }, karambit: { Q: [1.6, 8.5, .2], fwd: [0, 1, 0], up: [-1, 0, 0], len: 30 } } }; // butterfly: lâmina de lado para a câmera e mais à frente (os cabos não passam tanto do mindinho) // butterfly: cabos fechados no punho, lâmina saindo pelo lado do indicador
+const KN_VXB = 'bracos_faca'; // E3: arquivo dos braços da faca em voxel (assets/vox/bracos_faca_<n>.bin.gz)
 function knBuild(kind, ud, skin) {
   const key = 'k:pack', mk = 'm:' + kind;
   if (!FPC[key]) FPC[key] = new GLTFLoader().loadAsync(FPKNIFE.url).then(g => (FPC[key] = g), e => { console.warn('faca', e); delete FPC[key]; });
   if (!fpReady(key) || !fpReady(mk) || !fpReady('p:rifle')) { Promise.all([FPC[key], fpLoad(mk), fpLoad('p:rifle')]).then(() => { if (vmGun && W[G.cur]?.slot === 'knife' && !vmGun.userData.fps2) vmSetWeapon(G.cur); }); return false; }
+  if (!vxPronto(KN_VXB + '_0')) { vxLoad(KN_VXB + '_0').then(() => { if (vmGun && W[G.cur]?.slot === 'knife' && !vmGun.userData.fps2) vmSetWeapon(G.cur); }); return false; } // E3: braços da faca em voxel (arquivo pronto)
   const g = FPC[key], root = SkeletonUtils.clone(g.scene), K = FPKNIFE, F = K.fit[kind], D = FPKN[kind];
   const all = g.animations[0], mixer = new THREE.AnimationMixer(root), clips = {};
   for (const [n, [a, b]] of Object.entries(K.clips)) clips[n] = THREE.AnimationUtils.subclip(all, n, a, b, 30);
@@ -21590,6 +21597,7 @@ function knBuild(kind, ud, skin) {
   // câmera do pacote → câmera do jogo
   const C = new THREE.Matrix4().lookAt(new V3(...K.eye), new V3(...K.look), new V3(0, 1, 0)).setPosition(new V3(...K.eye));
   const holder = new THREE.Group(); holder.matrixAutoUpdate = false; holder.matrix.makeScale(K.k, K.k, K.k).multiply(C.invert()); holder.add(root);
+  vxBracos(root, null, null, { nome: KN_VXB, k: K.k, f: 1.6, fora: root.getObjectByName('L_arm_02') }); // f: medido, cubo de 1,66 mm na tela como o dos braços das armas // E3: braços da faca em voxel (bloco vxb, mesmo cubo na tela que os das armas, com a luva e a manga do fuzil)
   const mz = new THREE.Object3D(); root.add(mz);
   Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P: { hr: 1 }, mz, follow: [], ik: null, aq: new THREE.Quaternion(), ap: new V3(), knife: true, hideL: root.getObjectByName('L_arm_02') }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
   if (wrist) ud.fps2.kf = knFollowInit(ud.fps2, wrist, node, h, kind); // a faca gira com o pacote dentro do punho (a9)
