@@ -19613,18 +19613,18 @@ const FPG = .9, FPH = .6806; // unidades de pacote (mão 1) por metro de arma re
 // onde fica o gatilho na tela (metros do jogo a partir do olho; x direita, y cima, z para trás) e o giro do cano [guinada, arfagem, rolagem]
 const FPV = { long: { p: [.202, -.118, -.233], e: [.025, 0, -.102] }, pistol: { p: [.17, -.1, -.37], e: [.06, 0, -.2] } }; // padrão (cada pacote pode ter o seu em v)
 const FPK = {
-  ak: { url: 'assets/fps/ak/scene.gltf', mag2: 'Pmag2', armsFrom: 'rifle', v: { p: [.2, -.095, -.25], e: [.025, 0, -.102] }, sh: [.04, -.08, .1], hr: 1.99, body: 'PBody', ref: 'Rif', T: [null, .194, -.075], fwd: '-y', up: '+z', mag: 'Pmag', spare: ['Object_99'],
+  ak: { url: 'assets/fps/ak/scene.gltf', mag2: 'Pmag2', armsFrom: 'rifle', v: { p: [.13, -.08, -.28], e: [.025, 0, -.102] }, sh: [.11, -.08, .1], hr: 1.99, body: 'PBody', ref: 'Rif', T: [null, .194, -.075], fwd: '-y', up: '+z', mag: 'Pmag', spare: ['Object_99'],
     clips: { idle: 'AK_Idle', draw: 'AK_Draw', fire: 'AK_Shot', reload: 'AK_Reload', reloadE: 'AK_Reload_full', walk: 'AK_Walk', run: 'AK_Run' }, semCorrida: 1 }, // a13 semCorrida: a animação de correr põe a arma em pé e solta a mão esquerda; corre com a de andar + VMOV.corridaCS
-  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.12, -.10, -.26], e: [.12, 0, -.1] }, ombro: [0, -.4, .05], ads: .34, adsY: -.035, adsP: .26, // uni: pistola maior e mais baixa no quadril; na mira os ombros descem e entram (os antebraços não cobrem a tela) e o olho fica um pouco acima da linha (o ferrolho aparece por cima das mãos)
+  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.11, -.085, -.27], e: [.12, 0, -.1] }, ombro: [0, -.4, .05], ads: .4, adsMao: .05, // uni: pistola maior e mais baixa no quadril; na mira os ombros descem e entram (os antebraços não cobrem a tela); en1: olho na linha da alça e da massa (sem olhar de cima do ferrolho) e as mãos descem no punho (adsMao, ver fpIK)
     sh: [.04, -.08, .1], hr: 1, view: 'pistol', body: 'PBody', ref: 'Rif', T: [.061, null, .054], fwd: '+x', up: '-z', mag: 'Pmag', slide: 'Rif',
     clips: { idle: 'FPS_Pistol_Idle', fire: 'FPS_Pistol_Fire', reload: 'FPS_Pistol_Reload_easy', reloadE: 'FPS_Pistol_Reload_full', walk: 'FPS_Pistol_Walk' } },
-  smg: { url: 'assets/fps/smg/scene.gltf', armsFrom: 'rifle', v: { p: [.198, -.083, -.383], e: [.016, -.007, -.105] }, sh: [.05, -.1, .13], hr: 1.98, body: 'PBody', ref: 'Rif', T: [-.092, null, -.067], fwd: '+x', up: '+z', mag: 'Pmag', spare: ['Object_96'],
+  smg: { url: 'assets/fps/smg/scene.gltf', armsFrom: 'rifle', v: { p: [.178, -.093, -.383], e: [.016, -.007, -.105] }, sh: [.09, -.1, .13], hr: 1.98, body: 'PBody', ref: 'Rif', T: [-.092, null, -.067], fwd: '+x', up: '+z', mag: 'Pmag', spare: ['Object_96'],
     clips: { idle: 'KDW_DPose_Idle', draw: 'KDW_Draw', fire: 'KDW_Shot', reload: 'KDW_Reload_fast', reloadE: 'KDW_Reload_full', walk: 'KDW_Walk', run: 'KDW_Run' }, semCorrida: 1 },
-  rifle: { url: 'assets/fps/rifle/scene.gltf', v: { p: [.197, -.115, -.325], e: [0, 0, -.026] }, sh: [.05, -.1, .13], hr: 1, body: 'ACRRifle', ref: 'Rif', T: [.298, null, .124], fwd: '-x', up: '-z', mag: 'Pmag', spare: ['Object_13', 'Object_14'],
+  rifle: { url: 'assets/fps/rifle/scene.gltf', v: { p: [.147, -.105, -.325], e: [0, 0, -.026] }, sh: [.1, -.1, .13], hr: 1, body: 'ACRRifle', ref: 'Rif', T: [.298, null, .124], fwd: '-x', up: '-z', mag: 'Pmag', spare: ['Object_13', 'Object_14'],
     clips: { idle: 'Arms_FPS_Anim_Idle', draw: 'Arms_FPS_Anim_Draw', fire: 'Arms_FPS_Anim_Shoot', reload: 'Arms_FPS_Anim_Reload_Fast', walk: 'Arms_FPS_Anim_Walk', run: 'Arms_FPS_Anim_Run' }, semCorrida: 1 }, // a13: a mão esquerda solta da arma na animação de correr
-  sniper: { url: 'assets/fps/sniper/scene.gltf', armsFrom: 'rifle', v: { p: [.197, -.115, -.325], e: [0, 0, -.03] }, sh: [.04, -.08, .1], hr: 1, body: 'Body', ref: 'Bolt', T: [-.074, null, .045], fwd: '+z', up: '+x', mag: 'Mag', bolt: 'Bolt',
+  sniper: { url: 'assets/fps/sniper/scene.gltf', armsFrom: 'rifle', v: { p: [.147, -.105, -.325], e: [0, 0, -.03] }, sh: [.09, -.08, .1], hr: 1, body: 'Body', ref: 'Bolt', T: [-.074, null, .045], fwd: '+z', up: '+x', mag: 'Mag', bolt: 'Bolt',
     clips: { idle: 'SRifle_Idle', fire: 'SRifle_Shot_nosight', reload: 'SRifle_Reload', reloadE: 'SRifle_Reload_Full', walk: 'SRifle_Walk' } },
-  pump: { url: 'assets/fps/pump/scene.gltf', shells: 4, armsFrom: 'rifle', v: { p: [.216, -.061, -.362], e: [.034, -.005, -.223] }, sh: [.06, -.14, .18], hr: 1, body: 'Body', ref: 'Slide', T: [null, -.313, .0185], fwd: '+y', up: '-z',
+  pump: { url: 'assets/fps/pump/scene.gltf', shells: 4, armsFrom: 'rifle', v: { p: [.166, -.076, -.362], e: [.034, -.005, -.223] }, sh: [.11, -.14, .18], ads: .32, hr: 1, body: 'Body', ref: 'Slide', T: [null, -.313, .0185], fwd: '+y', up: '-z',
     clips: { idle: 'SG_FPS_Idle', fire: 'SG_FPS_Shot', reload: 'SG_FPS_Reload', walk: 'SG_FPS_Walk' } },
 };
 // modelos: T (gatilho), eixos, L = comprimento real (m), hide = peças soltas que vêm junto (balas, carregador extra), lens = materiais de vidro,
@@ -19635,11 +19635,11 @@ const FPM = {
   p250: { T: [-.008, .005, null], fwd: '+x', up: '+y', L: .196 },
   deagle: { T: [-31, 11, null], fwd: '+x', up: '+y', L: .27 },
   cz75: { T: [-.08, .18, null], fwd: '+x', up: '+y', L: .207 },
-  m1911: { T: [-54, 79, null], fwd: '+x', up: '+y', L: .216, adsY: .012 }, // adsY: na mira, a massa desta sobe até o centro (a alça é mais baixa que a da USP)
+  m1911: { T: [-54, 79, null], fwd: '+x', up: '+y', L: .216 },
   python: { T: [null, -.041, .002], fwd: '-z', up: '+y', L: .292 },
   raygun: { T: [null, -1.14, 0], fwd: '+z', up: '+y', L: .30 },
   mp5: { T: [.018, -.02, null], fwd: '+x', up: '+y', L: .70 },
-  mp5k: { T: [.15, -.17, null], fwd: '+x', up: '+y', L: .325, vo: [-.01, .005, .07] }, // curta: mais perto do olho para não sumir na tela
+  mp5k: { T: [.15, -.17, null], fwd: '+x', up: '+y', L: .325, vo: [-.01, .005, .03], ve: [.3, 0, 0] }, // curta: mais perto do olho para não sumir na tela; en1: ve = guinada para o cano apontar para o centro (curta e perto, apontava para cima)
   mp40: { T: [-33.4, 2, null], fwd: '+x', up: '+y', L: .833 },
   p90: { T: [10, -40, null], fwd: '-x', up: '+y', L: .68, lhf: .3, lens: ['Colimator'] }, // Modular P90 Tactical (com supressor)
   ak74u: { T: [-115, 23, null], fwd: '+x', up: '+y', L: .73 },
@@ -19651,7 +19651,7 @@ const FPM = {
   commando: { T: [-44, -1, null], fwd: '+x', up: '+y', L: .85 , lhf: .5, magBase: 1 },
   fal: { T: [-16.5, 2.3, null], fwd: '+x', up: '+y', L: 1.09 , lhf: .5 , tint: { Material: 0x2b2b2b, 'Material.003': 0x2b2b2b }, brass: ['Material.001', 'Material.002'], mat: 1 }, // a13 mat: modelo sem textura (cinza chapado) leva o aço/polímero das armas do jogo
   m14: { T: [-1.885, -.055, null], fwd: '+x', up: '+y', L: 1.118 , lhf: .5, magBase: 1, tint: { Material: 0x3b4130, 'Material.002': 0x3b4130, ...Object.fromEntries('004 005 006 007 008 009 010 012 013 014'.split(' ').map(n => ['Material.' + n, 0x2c2d2e])), bolt1: 0x2c2d2e, bolt2: 0x2c2d2e } }, // (só a AUG usa este modelo: coronha verde-oliva como o polímero da AUG, não madeira) a4: coronha salmão e aço quase branco (cores claras demais no modelo): madeira e aço escuros como os do M4
-  thundergun: { T: [-17.5, null, -6.2], fwd: '+x', up: '+z', L: .85, vo: [.04, -.04, -.2] },
+  thundergun: { T: [-17.5, null, -6.2], fwd: '+x', up: '+z', L: .85, vo: [.03, -.03, -.12], ve: [.2, 0, 0] }, // en1: ve = cano para o centro; mais perto (longe, o corte da manga esquerda aparecia)
   scout: { T: [-97, -19, null], fwd: '+x', up: '+y', L: 1.2, lens: ['Material.019'] },
   awp: { T: [-94, 5.5, null], fwd: '+x', up: '+y', L: 1.2, lens: ['Material.019'] },
   stakeout: { T: [-.204, -.003, null], fwd: '+x', up: '+y', L: 1.0 },
@@ -19660,7 +19660,7 @@ const FPM = {
   spas: { T: [-.275, -.015, null], fwd: '+x', up: '+y', L: 1.04 },
 };
 // arma do jogo → pacote + modelo (sem modelo = a arma do próprio pacote)
-const FPW = { ak47: { pack: 'ak', vo: [.01, .005, -.07] }, // a AK do pacote é um pouco grande: mais longe do olho
+const FPW = { ak47: { pack: 'ak', vo: [.03, 0, -.04] }, // a AK do pacote é um pouco grande: mais longe do olho
   nova: { pack: 'pump' }, m1911_ls: { pack: 'pistol', m: 'm1911' } };
 for (const [p, l] of Object.entries({ pistol: 'glock usp p250 deagle cz75 m1911 python raygun', smg: 'mp5 mp5k mp40 p90', ak: 'ak74u galil rpk hk21 dragunov',
   rifle: 'm4 commando fal m14 thundergun', sniper: 'scout awp', pump: 'stakeout olympia chinalake spas' })) for (const id of l.split(' ')) FPW[id] = { pack: p, m: id };
@@ -21381,6 +21381,7 @@ function fpIK(F) {
   K.zm = F.z2 ? fz2Mao(F) : null; // fz2: mão esquerda desviada (saque e roteiro da recarga), no mundo dos braços
   if (K.zm && K.hl) { I.t.setFromMatrixPosition(K.hl.matrixWorld).add(K.zm); K.hl.position.copy(K.hl.parent.worldToLocal(I.t.clone())); K.hl.updateMatrixWorld(true); I.dl.add(K.zm); }
   for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.anM) a.tw.applyMatrix4(a.anM); /* an: a mão foi levada pelas camadas */ if (a.sd < 0) a.tw.add(I.dl); }
+  { const kp = F.P.adsMao ? smooth(G.ads || 0) * F.P.adsMao : 0; if (kp) for (const a of K.arms) { a.tw.y -= kp; if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld); I.t.y -= kp; a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } } // en1: pistola na mira: as mãos descem no punho (alça e massa à vista por cima delas, sem olhar de cima do ferrolho)
   // mão que vem para perto do olho (pegar carregador no colete): desce e vai para a frente, senão o braço passa colado na câmera
   // (a câmera fica na origem, olhando para -Z)
   K.pushL = null;
