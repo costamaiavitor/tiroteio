@@ -576,6 +576,79 @@ summary{cursor:pointer;color:#fff;font-weight:700}
   #pause .panel.wide{grid-template-columns:1fr;overflow-y:auto}#pause .panel.wide>*{grid-column:auto!important;grid-row:auto!important}#pause .panel.wide>.cols2{grid-template-columns:1fr}}
 .lbmus input{flex:1 1 100%!important}
 .mf canvas.planta{max-height:min(170px,18vh)}
+/* aba Personagem: palco 3D atrás, painel de categorias à esquerda, presets à direita, ações embaixo (celular: palco em cima) */
+#menu .mbody>#charPane{max-width:none;margin:-12px -28px;height:calc(100% + 24px);position:relative;overflow:hidden;background:radial-gradient(70% 80% at 62% 45%,#1a1f27 0%,#07080a 72%)}
+#pgCv{position:absolute;inset:0;width:100%;height:100%;cursor:grab;touch-action:none}
+#pgCv:active{cursor:grabbing}
+.pgleft{position:absolute;left:28px;top:14px;bottom:78px;width:380px;display:flex;flex-direction:column;gap:8px;z-index:2}
+.pgleft h1{font-family:Teko,Rajdhani,sans-serif;font-size:44px;font-weight:500;letter-spacing:3px;text-shadow:none;line-height:1;color:#fff;text-transform:uppercase}
+.pgleft h1 i{font-style:normal;color:var(--acc)}
+.pgtabs{display:flex;gap:20px;border-bottom:1px solid rgba(255,255,255,.1)}
+#charPane .pgtabs button{background:none;border:0;font-family:Teko,Rajdhani,sans-serif;font-size:25px;font-weight:400;letter-spacing:2px;text-transform:uppercase;color:#7d8692;padding:0 0 1px;border-bottom:3px solid transparent;margin-bottom:-1px}
+#charPane .pgtabs button.on{color:#fff;border-bottom-color:var(--acc)}
+#pgPanel{flex:1;min-height:0;overflow-y:auto;padding-right:6px;scrollbar-width:thin}
+.pgsec{margin:8px 0 12px}
+.pgopts{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:5px}
+#charPane .pgopt{display:flex;align-items:center;gap:6px;text-align:left;padding:6px 8px;min-height:34px;background:rgba(14,17,23,.82);border:1px solid rgba(255,255,255,.08);border-left:3px solid transparent;color:#d6dbe1;font-size:13px;font-weight:600;line-height:1.1;letter-spacing:.2px}
+#charPane .pgopt:hover{border-color:rgba(255,176,32,.5);color:#fff}
+#charPane .pgopt.on{border-color:var(--acc);border-left-color:var(--acc);background:linear-gradient(90deg,rgba(255,176,32,.2),rgba(14,17,23,.85));color:#fff}
+.pgcm{flex:none;width:16px;height:16px;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.4)}
+.pgsws{display:flex;flex-wrap:wrap;gap:6px}
+#charPane .pgsw{position:relative;width:30px;height:30px;padding:0;border-radius:50%;border:2px solid rgba(255,255,255,.14);background:var(--c);cursor:pointer;flex:none;overflow:hidden;color:#cfd5dc;font-size:12px;font-weight:700}
+#charPane .pgsw:hover{border-color:rgba(255,255,255,.5)}
+#charPane .pgsw.on{border-color:var(--acc);box-shadow:0 0 0 2px rgba(255,176,32,.35)}
+#charPane .pgpad{background:repeating-linear-gradient(45deg,#2a2f37 0 4px,#1d2127 4px 8px)}
+.pglivre::after{content:'+';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;text-shadow:0 1px 2px #000;pointer-events:none}
+.pglivre input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;border:0;padding:0}
+.pgsel{font-size:12px;color:#8d97a5;margin-top:4px;letter-spacing:.5px}
+.pgright{position:absolute;right:24px;top:14px;width:170px;z-index:2;display:flex;flex-direction:column;gap:5px}
+.pgpre{display:flex;flex-direction:column;gap:5px}
+#charPane .pgchip{text-align:left;padding:6px 10px;background:rgba(10,12,16,.82);border:1px solid rgba(255,255,255,.1);color:#cfd5dc;font-size:13px;font-weight:700;letter-spacing:.5px;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,0 100%)}
+#charPane .pgchip:hover,#charPane .pgchip.on{border-color:var(--acc);color:#fff;background:rgba(44,32,10,.92)}
+.pgfoot{position:absolute;left:28px;right:24px;bottom:14px;height:52px;display:flex;align-items:center;gap:10px;z-index:2}
+#charPane .pgfoot>button{height:46px;padding:0 18px;background:rgba(14,17,23,.86);border:1px solid rgba(255,255,255,.14);color:#e6eaee;font-family:Teko,Rajdhani,sans-serif;font-size:22px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase}
+#charPane .pgfoot>button:hover:not(:disabled){border-color:var(--acc);color:#fff}
+#charPane .pgfoot>button:disabled{opacity:.35;cursor:default}
+#charPane .pgfoot>#pgSave{margin-left:auto;width:auto;min-width:180px;color:#1a1200;background:linear-gradient(180deg,#ffc24a,var(--acc));border:0;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
+#pgSt{font-size:13px;color:#7fbf7f;letter-spacing:.5px}#pgSt.suj{color:var(--acc)}
+#pgInfo{position:absolute;right:24px;bottom:76px;font-size:11px;color:#6c7682;letter-spacing:1px;text-transform:uppercase;z-index:2;pointer-events:none}
+.pgzoom{position:absolute;right:24px;bottom:96px;display:flex;flex-direction:column;gap:6px;z-index:2}
+#charPane .pgzoom button{width:38px;height:38px;padding:0;border-radius:50%;background:rgba(14,17,23,.86);border:1px solid rgba(255,255,255,.16);color:#fff;font-size:22px;line-height:1}
+#pgLoad{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);font-family:Teko,Rajdhani,sans-serif;font-size:24px;letter-spacing:3px;color:var(--acc);text-transform:uppercase;pointer-events:none;z-index:1;animation:pgpis 1s ease-in-out infinite alternate}
+@keyframes pgpis{from{opacity:.35}to{opacity:1}}
+@media(min-width:761px){#pgLoad{left:calc(50% + 200px)}}
+@media(max-height:520px) and (min-width:761px){ /* celular deitado: boneco à esquerda, painel à direita */
+  .pgleft{left:auto;right:12px;top:6px;bottom:58px;width:52%}
+  .pgleft h1,#pgInfo{display:none}
+  .pgright{left:10px;right:auto;top:6px;width:44%;flex-direction:row;overflow-x:auto;scrollbar-width:none}
+  .pgright .arph{display:none}.pgpre{flex-direction:row}#charPane .pgchip{white-space:nowrap;font-size:12px;padding:4px 8px}
+  .pgfoot{left:auto;right:12px;width:52%;bottom:6px;height:46px;gap:6px}
+  #charPane .pgfoot>button{height:40px;padding:0 10px;font-size:18px}#charPane .pgfoot>#pgSave{min-width:0;flex:1}
+  #pgSt{display:none}.pgzoom{left:10px;right:auto;bottom:10px;flex-direction:row}
+  #pgLoad{left:24%}
+  .pgopts{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+}
+@media(max-width:900px){#menu .mtop .tabs{overflow-x:auto;max-width:100%;scrollbar-width:none;flex-wrap:nowrap}#menu .mtop .tabs button{flex:none}} /* abas do menu rolam de lado em vez de alargar a página */
+@media(max-width:760px){
+  #menu .mbody>#charPane{display:flex;flex-direction:column;height:auto;min-height:calc(100% + 24px);overflow:visible}
+  #charPane.hidden{display:none}
+  #pgCv{position:relative;inset:auto;height:44vh;min-height:250px;flex:none}
+  .pgleft{position:relative;left:auto;top:auto;bottom:auto;width:auto;padding:0 14px;order:3}
+  .pgleft h1{display:none}
+  #pgPanel{overflow:visible;padding:0}
+  .pgright{position:absolute;left:0;right:0;top:6px;width:auto;flex-direction:row;padding:0 10px;overflow-x:auto;scrollbar-width:none}
+  .pgright .arph{display:none}
+  .pgpre{flex-direction:row}
+  #charPane .pgchip{white-space:nowrap;font-size:12px;padding:5px 9px}
+  .pgfoot{position:sticky;bottom:0;left:auto;right:auto;order:4;padding:8px 14px;background:linear-gradient(0deg,#07080a 70%,transparent);height:auto;flex-wrap:wrap}
+  #charPane .pgfoot>button{height:42px;padding:0 12px;font-size:19px}
+  #charPane .pgfoot>button,#charPane .pgfoot>#pgSave{min-width:0;flex:1 1 0}
+  #pgSt{order:5;width:100%;text-align:center}
+  .pgzoom{top:calc(44vh - 96px);bottom:auto;right:12px}
+  #pgInfo{top:calc(44vh - 18px);bottom:auto;right:14px}
+  #pgLoad{top:22vh}
+  .pgopts{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+}
 </style>
 <!-- Bibliotecas servidas do próprio repositório (vendor/: mesmas versões e bytes das CDNs, hashes em vendor/HASHES.md): uma CDN comprometida
      não troca o código do jogo. Exceção: index.html aberto direto do disco (file://), onde o navegador bloqueia módulos ES locais (CORS);
@@ -652,7 +725,7 @@ summary{cursor:pointer;color:#fff;font-weight:700}
   <div class="mshell">
     <header class="mtop">
       <div class="mlogo">DAN <i>GUN</i></div>
-      <nav class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="friends">Amigos</button><button data-tab="arsenal">Arsenal</button><button data-tab="cases">Caixas</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></nav>
+      <nav class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="friends">Amigos</button><button data-tab="arsenal">Arsenal</button><button data-tab="char">Personagem</button><button data-tab="cases">Caixas</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></nav>
       <div class="mplayer"><div class="mav" id="mAv">J</div><div class="mpinfo"><input id="inName" maxlength="16" autocomplete="off" title="Seu nome"><div class="mpsub" id="mpSub"></div><div class="mpxp"><i id="mpXp"></i></div></div></div>
     </header>
     <main class="mbody">
@@ -689,6 +762,20 @@ summary{cursor:pointer;color:#fff;font-weight:700}
           <div id="arFoot"></div>
         </div>
       </div>
+    </div>
+    <!-- Personagem: criar/editar o avatar (voxel), salvo no perfil e mostrado para os outros jogadores -->
+    <div data-pane="char" id="charPane" class="hidden">
+      <canvas id="pgCv"></canvas>
+      <div id="pgLoad">Montando...</div>
+      <div class="pgleft">
+        <h1>Perso<i>nagem</i></h1>
+        <div class="pgtabs" id="pgTabs"><button data-cat="rosto" class="on">Rosto</button><button data-cat="cabeca">Cabeça</button><button data-cat="roupa">Roupa</button><button data-cat="cores">Cores</button></div>
+        <div id="pgPanel"></div>
+      </div>
+      <div class="pgright"><div class="arph">Presets</div><div id="pgPre" class="pgpre"></div></div>
+      <div class="pgzoom"><button data-z="+" title="Aproximar">+</button><button data-z="-" title="Afastar">&minus;</button></div>
+      <div id="pgInfo"></div>
+      <div class="pgfoot"><button id="pgRnd">Aleatório</button><button id="pgUndo">Desfazer</button><span id="pgSt"></span><button id="pgSave">Salvar</button></div>
     </div>
     <!-- Caixas: conta, XP até a próxima caixa, as quatro caixas de raridade e a roleta -->
     <div data-pane="cases" id="casesPane" class="hidden">
@@ -18996,6 +19083,7 @@ function tpPose(g, tp, pitch, k) {
   const ud = g.userData, P = TP_POSE[tp?.cls || 'pistol'], ka = k?.aim || 0, kr = k?.run || 0, sw = k?.sw || 0;
   const mix = f => { const i = P.idle[f], a = P.aim[f], r = P.run[f]; return Array.isArray(i) ? [0, 1, 2].map(n => lerp(lerp(i[n], a[n], ka), r[n], kr)) : lerp(lerp(i, a, ka), r, kr); };
   const T = mix('T'), sR = TPV.sR.fromArray(P.sh[0]), sL = TPV.sL.fromArray(P.sh[1]);
+  if (ud.shK) { sR.x *= ud.shK; sL.x *= ud.shK; } // avatar: ombros mais estreitos que os do boneco antigo
   let dp = 0, dy = 0; // golpe de faca (kn 0..1; kv 0/1 = corte para um lado e para o outro, 2 = estocada) e arremesso (th 0..1)
   if (k?.kn >= 0 && k.kn < 1) { const e = Math.sin(k.kn * Math.PI), u = smooth(k.kn), s = k.kv === 1 ? -1 : 1;
     if (k.kv === 2) { T[1] += .1 * e; T[2] -= .3 * e; dp = .6 * e; } else { T[0] += s * lerp(.14, -.3, u) * e; T[1] += lerp(.18, -.1, u) * e; T[2] -= .22 * e; dy = s * lerp(.9, -.9, u) * e; dp = -.3 * e; } }
@@ -19017,8 +19105,8 @@ function tpPose(g, tp, pitch, k) {
 function tpAct(g, kk, t) {
   const ud = g.userData, P = TP_POSE.pistol, H = TPV.b, f = kk === 'p' ? Math.max(0, Math.sin(t * 22)) * .035 : Math.sin(t * 9) * .03;
   ud.arms.rotation.x = 0; ud.head.rotation.x = -.55;
-  H.set(.08, -.5 + f, -.36); tpArm(ud.tpR, TPV.sR.fromArray(P.sh[0]), H, null);
-  H.set(-.08, -.5 + (kk === 'p' ? 0 : -f), -.36); tpArm(ud.tpL, TPV.sL.fromArray(P.sh[1]), H, null);
+  const k = ud.shK || 1; H.set(.08, -.5 + f, -.36); tpArm(ud.tpR, TPV.sR.fromArray(P.sh[0]).multiplyScalar(k), H, null);
+  H.set(-.08, -.5 + (kk === 'p' ? 0 : -f), -.36); tpArm(ud.tpL, TPV.sL.fromArray(P.sh[1]).multiplyScalar(k), H, null);
 }
 // dados de terceira pessoa de um molde de arma (uma vez por molde): classe, âncora, mãos e boca do cano, já na escala do molde
 function tpInfo(t, w) {
@@ -23202,12 +23290,137 @@ function localSpawn(m) {
   applyInv(m.inv, m.refill);
 }
 
+// ===== Avatares "Voxel fino" (js/avatar/): cada jogador aparece para os outros com o personagem da aba Personagem =====
+// O código compacto do avatar (PROF.data.av, ex. 'pe3.ol0.ca4...') viaja dentro do sk (skins) com a chave _av: o cleanSk só deixa
+// passar letras, dígitos, '.' e '+' até 240 caracteres e quem monta decodifica ignorando o que não existe (versão antiga do jogo:
+// o _av some no cleanSk dela e o boneco é o padrão; sem _av aqui: também o boneco padrão). Bots: sorteio pelo id e nome.
+// As peças são assadas num Worker (js/avatar/trabalhador.js), uma por vez, com cache por código e nível de detalhe:
+// 'f' = voxel fino (3,4 mm na cabeça, 4,5 nas mãos, 6,8 no corpo; só os AVT.FINO_MAX mais perto, até AVT.FINO_D m), 'm' = 17 mm,
+// 'l' = 32 mm (longe de AVT.MEIO_D). Gráfico Baixo: só 'm' e 'l'. Até a primeira peça ficar pronta continua o boneco antigo.
+// As peças entram nos MESMOS grupos do playerModel (inner, head, legL/legR, e nos braços ombro/braço/antebraço/mão que o tpArm
+// move), então andar, agachar, morrer, a pose da arma (tpPose/IK) e as hitboxes (que são da lógica) não mudam. Cor do time:
+// braçadeira nos dois braços com o bodyM (que já troca de cor com o time).
+const AVT = { mod: null, modP: null, falhou: false, w: null, n: 0, cb: new Map(), ent: new Map(), fila: [], ocup: false, mat: null, vazio: null, FINO_MAX: 2, FINO_D: 6, MEIO_D: 26, MAX_ENT: 40, MAX_FINO: 4 };
+const AVT_PRI = { m: 0, l: 1, f: 2 };
+function avtMod() {
+  return AVT.modP ||= import('./js/avatar/avatar.js').then(m => { AVT.mod = m; avtMeuPadrao(); return m; }, e => { console.warn('avatar: módulo', e); AVT.falhou = true; return null; });
+}
+function avtWorker() {
+  if (AVT.w !== null) return AVT.w;
+  try { // import dinâmico: o estático dentro do blob falha no Chromium
+    const u = new URL('js/avatar/trabalhador.js', location.href).href, w = new Worker(URL.createObjectURL(new Blob(['self.__q = []; onmessage = e => self.__q.push(e.data); import(' + JSON.stringify(u) + ').catch(e => postMessage({ falhou: String(e) }));'], { type: 'text/javascript' })), { type: 'module' });
+    w.onmessage = e => { const d = e.data; if (d.pronto) return; if (d.falhou) { w.onerror({ message: d.falhou }); return; } const f = AVT.cb.get(d.id); AVT.cb.delete(d.id); f?.(d); };
+    w.onerror = ev => { console.warn('avatar: worker', ev.message || ev); AVT.w = false; for (const f of AVT.cb.values()) f({ err: 'worker' }); AVT.cb.clear(); };
+    AVT.w = w;
+  } catch (e) { AVT.w = false; }
+  return AVT.w;
+}
+// entrada do cache (pronta ou na fila); pri < 0 = tela Personagem (passa na frente)
+function avtEnt(cod, nivel, pri) {
+  const k = cod + '|' + nivel; let e = AVT.ent.get(k);
+  if (!e) { e = { k, cod, nivel, ok: false, pri: pri ?? AVT_PRI[nivel] }; AVT.ent.set(k, e); AVT.fila.push(e); avtBomba(); }
+  else if (pri != null && pri < e.pri) e.pri = pri;
+  e.t = performance.now(); return e;
+}
+function avtBomba() {
+  if (AVT.ocup || !AVT.fila.length) return;
+  if (!AVT.mod) { if (!AVT.falhou) avtMod().then(m => m && avtBomba()); return; }
+  AVT.fila.sort((a, b) => a.pri - b.pri); const e = AVT.fila.shift(); AVT.ocup = true;
+  const fim = d => {
+    AVT.ocup = false;
+    if (d.r) avtPronta(e, d.r); else if (d.err === 'worker' && AVT.w === false) AVT.fila.unshift(e); else { e.err = d.err || 'falhou'; console.warn('avatar', e.err); }
+    setTimeout(avtBomba, 0);
+  };
+  const w = avtWorker();
+  if (w) { const id = ++AVT.n; AVT.cb.set(id, fim); w.postMessage({ id, cod: e.cod, nivel: e.nivel }); }
+  else if (e.nivel === 'f') fim({ err: 'sem Worker: o fino não roda no fio principal' });
+  else (window.requestIdleCallback || setTimeout)(() => { try { fim({ r: AVT.mod.gerarPartes(AVT.mod.decodificar(e.cod), e.nivel) }); } catch (x) { fim({ err: String(x) }); } });
+}
+function avtMat() { return AVT.mat ||= new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .86, metalness: 0, envMapIntensity: .6, name: 'avatar' }); }
+function avtPronta(e, r) {
+  const geos = {}; let bytes = 0;
+  for (const [n, p] of Object.entries(r.partes)) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p.pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(p.nor, 3, true));
+    g.setAttribute('color', new THREE.BufferAttribute(p.col, 3, true)); g.setIndex(new THREE.BufferAttribute(p.ind, 1)); g.computeBoundingSphere(); g.userData.keep = true;
+    geos[n] = g; bytes += vxBytes(g);
+  }
+  let braco = .06; // raio do braço onde vai a braçadeira (local do 'up': y de -0,5 no ombro a 0,5 no cotovelo, x/z em metros)
+  for (const n of ['upL', 'upR']) { const a = geos[n]?.attributes.position.array; if (a) for (let i = 0; i < a.length; i += 3) if (a[i + 1] > -.3 && a[i + 1] < -.1) braco = Math.max(braco, Math.hypot(a[i], a[i + 2])); }
+  Object.assign(e, { ok: true, geos, rig: r.rig, tri: r.tri, ms: r.ms, bytes, braco: Math.min(.11, braco) });
+  avtPoda();
+}
+function avtEmUso(e) { if (AVE.e === e || AVE.ef === e) return true; for (const rp of R.values()) if (rp.avE === e) return true; return false; }
+function avtPoda() { // cache: no máximo MAX_FINO finos e MAX_ENT ao todo; sai o usado há mais tempo que ninguém está mostrando
+  const L = [...AVT.ent.values()].filter(e => e.ok && !avtEmUso(e)).sort((a, b) => a.t - b.t);
+  let nf = [...AVT.ent.values()].filter(e => e.ok && e.nivel === 'f').length, n = [...AVT.ent.values()].filter(e => e.ok).length;
+  for (const e of L) {
+    if (!(n > AVT.MAX_ENT || (e.nivel === 'f' && nf > AVT.MAX_FINO))) continue;
+    for (const g of Object.values(e.geos)) g.dispose(); AVT.ent.delete(e.k); n--; if (e.nivel === 'f') nf--;
+  }
+}
+// veste o boneco (playerModel) com as peças da entrada: esconde as peças antigas e põe as do avatar nos mesmos grupos
+function avtVestir(model, e, banda = true) {
+  const ud = model.userData; let av = ud.av;
+  if (!av) {
+    av = ud.av = { m: {}, oc: [], arm: [], pos: { head: ud.head.position.clone(), legL: ud.legL.position.clone(), legR: ud.legR.position.clone() } };
+    for (const o of ud.pmM || []) if (o.visible) { o.visible = false; av.oc.push(o); }
+    const sombra = CFG.gfx === 'alto', mk = par => { const m = new THREE.Mesh(AVT.vazio ||= new THREE.BufferGeometry(), avtMat()); m.castShadow = sombra; m.receiveShadow = sombra; par.add(m); return m; };
+    for (const [a, L] of [[ud.tpR, 'R'], [ud.tpL, 'L']]) {
+      av.arm.push([a, { sh: a.sh, up: a.up, fo: a.fo }]);
+      for (const p of ['sh', 'up', 'fo']) { const g = new THREE.Group(); g.position.copy(a[p].position); g.quaternion.copy(a[p].quaternion); g.scale.copy(a[p].scale); ud.arms.add(g); a[p] = g; av.m[p + L] = mk(g); }
+      av.m['h' + L] = mk(a.hand);
+    }
+    for (const n of ['inner', 'head', 'legL', 'legR']) av.m[n] = mk(ud[n]);
+    av.band = [ud.tpR.up, ud.tpL.up].map(g => { const b = new THREE.Mesh(AVT.bandGeo ||= new THREE.CylinderGeometry(1, 1, 1, 16, 1, true), ud.bodyM); g.add(b); return b; });
+  }
+  for (const [n, m] of Object.entries(av.m)) { const g = e.geos[n]; m.geometry = g || AVT.vazio; m.visible = !!g; }
+  ud.head.position.fromArray(e.rig.head); ud.legL.position.fromArray(e.rig.legL); ud.legR.position.fromArray(e.rig.legR);
+  ud.shK = Math.abs(e.rig.shR[0]) / .25; // ombros do TP_POSE (0,25 m) no ombro do avatar
+  for (const b of av.band) { b.visible = banda; b.scale.set(e.braco + .007, .08 / TP_POSE.reach[0], e.braco + .007); b.position.y = -.5 + .11 / TP_POSE.reach[0]; }
+  av.e = e;
+}
+function avtDespir(model) {
+  const ud = model.userData, av = ud.av; if (!av) return;
+  for (const m of Object.values(av.m)) m.parent?.remove(m); for (const b of av.band) b.parent?.remove(b);
+  for (const [a, o] of av.arm) for (const p of ['sh', 'up', 'fo']) { a[p].parent?.remove(a[p]); a[p] = o[p]; }
+  for (const o of av.oc) o.visible = true; for (const k of ['head', 'legL', 'legR']) ud[k].position.copy(av.pos[k]);
+  ud.shK = 0; ud.av = null;
+}
+// a cada quadro, por jogador remoto: nível de detalhe pela distância (fino só para os mais perto) e troca quando a peça fica pronta
+function avtFinos() {
+  const L = []; if (CFG.gfx === 'baixo' || AVT.w === false) return L;
+  for (const rp of R.values()) if (rp.model.visible && rp.avCod) { const d = rp.pos.distanceTo(camera.position); if (d < AVT.FINO_D + (rp.avNiv === 'f' ? 1 : 0)) L.push([d, rp]); }
+  return L.sort((a, b) => a[0] - b[0]).slice(0, AVT.FINO_MAX).map(x => x[1]);
+}
+function avtRemoto(rp, finos) {
+  if (rp.avSrc && !rp.avCod && AVT.mod) rp.avCod = rp.avSrc.startsWith('bot:') ? AVT.mod.codificar(AVT.mod.aleatorio(AVT.mod.hashTxt(rp.avSrc))) : rp.avSrc;
+  const cod = rp.avCod;
+  if (!cod) { if (rp.model.userData.av) { avtDespir(rp.model); rp.avE = null; rp.avNiv = null; } return; }
+  if (AVT.falhou) return; if (!AVT.mod) { avtMod(); return; }
+  if (!rp.model.visible && rp.avE?.cod === cod) return;
+  const d = rp.pos.distanceTo(camera.position), quer = finos.includes(rp) ? 'f' : d < AVT.MEIO_D + (rp.avNiv === 'l' ? -2 : 2) ? 'm' : 'l';
+  let e = avtEnt(cod, quer);
+  if (e.err && quer !== 'm') e = avtEnt(cod, 'm');
+  if (e.ok) { if (rp.avE !== e) { avtVestir(rp.model, e); rp.avE = e; rp.avNiv = e.nivel; } return; }
+  if (rp.avE?.cod !== cod) { const m = avtEnt(cod, 'm'); if (m.ok) { avtVestir(rp.model, m); rp.avE = m; rp.avNiv = 'm'; } } // o médio sai antes (rápido); o resto continua na fila
+}
+// sem avatar salvo: sorteia um pelo nome na primeira vez (fica no perfil; dá para trocar na aba Personagem)
+function avtMeuPadrao() {
+  const d = PROF.data; if (!d || !AVT.mod) return;
+  if (typeof d.av !== 'string' || !d.av) { const s = load('avatar', null); d.av = typeof s === 'string' && AVT.mod.COD_RE.test(s) && s ? s : AVT.mod.codificar(AVT.mod.aleatorio(AVT.mod.hashTxt('eu:' + (CFG.name || '') + ':' + Math.random()))); save('avatar', d.av); profSave(); skinsChanged(); }
+}
+function avtLimpa(s) { return typeof s === 'string' && s.length <= 240 && /^[a-z0-9.+]+$/.test(s) ? s : null; } // o que chega pela rede (o resto é ignorado ao decodificar)
+// o que vai para os outros no sk: skins equipadas + o avatar
+function skEnvio() { const sk = cleanSk(PROF.data?.equipped), av = avtLimpa(PROF.data?.av); if (av) sk._av = av; return sk; }
+// ===== fim dos avatares (a aba Personagem fica perto da tela de skins: pgUI) =====
+
 // ---------- jogadores remotos ----------
 function getRemote(id) {
   let rp = R.get(id);
   if (rp) return rp;
   const info = C.players.get(id), color = info?.c ?? '#aaaaaa';
   const model = pmJunta(playerModel(color)); model.visible = false; scene.add(model); // O4-D01
+  model.userData.pmM = []; model.traverse(o => { if (o.isMesh) model.userData.pmM.push(o); }); // peças do boneco antigo (o avatar esconde estas)
   if (CFG.gfx === 'alto') model.traverse(o => { if (o.isMesh) o.castShadow = true; });
   rp = { id, model, buf: [], pos: new V3(), last: new V3(), yaw: 0, pitch: 0, crouch: 0, alive: false, dead: false, deadT: 0, downed: false, w: null, spd: 0, anim: 0, stepT: 0, color, name: '', tag: null };
   R.set(id, rp);
@@ -23268,14 +23481,17 @@ function setRemoteGun(rp, w) {
   const mid = knifeModelOf(w, rp.sk), t = remoteGunTpl(mid, rp.sk?.[mid]); gh.add(rp.gun = cloneShared(t)); rp.gunT = t; rp.gunVx = t.userData.vx ? t : null; // vx2
   rp.tp = tpInfo(t, w); rp.swT = now; rp.supW = null; // terceira pessoa: pega do jeito da arma nova e saca (a14)
 }
-function removeRemote(id) { const rp = R.get(id); if (!rp) return; scene.remove(rp.model); const gh = rp.model.userData.gh; while (gh.children.length) gh.remove(gh.children[0]); disposeGroup(rp.model); R.delete(id); }
+function removeRemote(id) { const rp = R.get(id); if (!rp) return; scene.remove(rp.model); avtDespir(rp.model); // as peças do avatar são do cache (não descarta)
+  const gh = rp.model.userData.gh; while (gh.children.length) gh.remove(gh.children[0]); disposeGroup(rp.model); R.delete(id); }
 function refreshRemoteInfo(rp) {
   const info = C.players.get(rp.id); if (!info) return;
   if (info.c !== rp.color) { rp.color = info.c; rp.model.userData.bodyM.color.set(info.c); }
+  const src = info.b ? 'bot:' + info.id + ':' + (info.n || '') : avtLimpa(info.sk?._av); if (src !== rp.avSrc) { rp.avSrc = src; rp.avCod = null; } // avatar (bots: sorteio pelo id e nome)
   const skk = JSON.stringify(info.sk || {}); if (skk !== rp.skKey) { rp.skKey = skk; rp.sk = info.sk || {}; const w = rp.w; rp.w = null; setRemoteGun(rp, w); } // skins dos outros
   if (info.n !== rp.name || info.c !== rp.tagC) { rp.name = info.n; rp.tagC = info.c; if (rp.tag) rp.model.remove(rp.tag); rp.tag = nameSprite(info.n, info.c); rp.model.add(rp.tag); }
 }
 function updateRemotes(dt) {
+  const finos = avtFinos();
   for (const rp of R.values()) {
     const ud = rp.model.userData, buf = rp.buf, rt = now - netDelay(rp.id);
     if (rp.gunT) { const tn = RGUN.get(rp.gunT.userData.rk) || rp.gunT; if (tn !== rp.gunT || (tn.userData.vx && rp.gunVx !== tn)) vx3Troca(rp, tn); } // vx2: o molde ficou em voxel (ou o modelo baixado ficou pronto e o molde foi refeito)
@@ -23315,6 +23531,7 @@ function updateRemotes(dt) {
       const k = zt ? Math.max(1, rp.pos.distanceTo(camera.position) / 14) : 1; rp.tag.scale.set(1.3 * k, .325 * k, 1);
     }
     if (rp.alive && rp.spd > 4.3 && vy < 2) { rp.stepT -= dt; if (rp.stepT <= 0) { rp.stepT = .36; play('step', rp.pos); } }
+    avtRemoto(rp, finos);
   }
 }
 function remoteShot(m) {
@@ -23729,7 +23946,7 @@ function startHost(st) {
   NET.isHost = true; C.myId = 'h'; C.st = st; NET.hostKey = genCode() + genCode(); // segredo do host: vai no link de convite e volta no 'welcome' (quem entrou pelo link confere que caiu na sala certa)
   S.st = st; S.players.clear(); S.nextId = 1; S.colorI = 0;
   buildMap(st.map);
-  srvAddPlayer('h', CFG.name, false).skins = cleanSk(PROF.data?.equipped);
+  srvAddPlayer('h', CFG.name, false).skins = skEnvio();
   enterGame();
   srvStartMatch();
   hostOpenPeer(5);
@@ -23804,7 +24021,7 @@ function joinRoom(code) {
     NET.hostConn = conn; r1Liga(conn, false); // R1: 'state' em diferença
     // v: 2 = entende "state" sem as skins repetidas (o host manda a versão completa para quem não manda v); v: 3 = formato de fio R1
     // rk: token de reentrada (guardado por sala por 10 min: só quem tem o nome E o token recupera pontos e armas ao voltar); pv: versão do protocolo; u: usuário fixo (salas só com convite)
-    conn.on('open', () => { stage = 'waiting'; attachFast(conn, m => { NET.lastHost = performance.now(); if (welcomed) onMsg(m); }); conn.send({ t: 'join', v: 3, pv: PROTO, name: CFG.name, u: PROF.user || '', sk: cleanSk(PROF.data?.equipped), rk: tokenReentrada(code) }); });
+    conn.on('open', () => { stage = 'waiting'; attachFast(conn, m => { NET.lastHost = performance.now(); if (welcomed) onMsg(m); }); conn.send({ t: 'join', v: 3, pv: PROTO, name: CFG.name, u: PROF.user || '', sk: skEnvio(), rk: tokenReentrada(code) }); });
     const aoDado = m => {
       NET.lastHost = performance.now(); if (!m || typeof m !== 'object') return;
       if (!welcomed && (m.t === 'err' || m.t === 'deny')) return fail(String(m.txt || 'Conexão recusada').slice(0, 160)); // sala cheia, versão diferente, removido, só com convite
@@ -33393,7 +33610,7 @@ const PROF = { user: null, uid: null, email: '', name: '', cloud: false, fb: fal
 const FB = {};
 const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0, st: {}, wxp: {}, att: {}, cx: { r: 0, e: 0, l: 0 } }); // cases: Caixas Comuns; cx: Raras, Épicas e Lendárias
 const STK = ['k', 'd', 'hs', 'w', 'm', 'zk', 'zr']; // abates, mortes, headshots, vitórias, partidas, zumbis, recorde de rodada
-function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) { if (w === '_faca') { if (f === 'karambit') o._faca = f; } else if (typeof f === 'string' && Object.hasOwn(W, w) && Object.hasOwn(SKIN_BY, f)) o[w] = f; } return o; } // hasOwn: 'constructor'/'toString' passavam e quebravam o state de todos
+function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) { if (w === '_faca') { if (f === 'karambit') o._faca = f; } else if (w === '_av') { const a = avtLimpa(f); if (a) o._av = a; } else if (typeof f === 'string' && Object.hasOwn(W, w) && Object.hasOwn(SKIN_BY, f)) o[w] = f; } return o; } // hasOwn: 'constructor'/'toString' passavam e quebravam o state de todos
 function cleanProf(d) {
   const p = newProfile(0); if (!d || typeof d !== 'object') return p;
   p.xp = Math.max(0, +d.xp || 0); p.cases = Math.max(0, Math.floor(+d.cases || 0)); p.opened = Math.max(0, Math.floor(+d.opened || 0));
@@ -33403,17 +33620,19 @@ function cleanProf(d) {
   if (d.wxp && typeof d.wxp === 'object') for (const [k, v] of Object.entries(d.wxp)) if (Object.hasOwn(W, k) && +v > 0) p.wxp[k] = Math.min(1e7, Math.floor(+v)); // nível das armas (Armeiro)
   if (d.att && typeof d.att === 'object') for (const [k, v] of Object.entries(d.att)) if (Object.hasOwn(W, k) && Array.isArray(v)) { const a = [], sl = new Set(); for (const x of v.slice(0, 20)) if (typeof x === 'string' && Object.hasOwn(ATT, x) && !sl.has(ATT[x].slot) && a.length < ATT_MAX) { sl.add(ATT[x].slot); a.push(x); } if (a.length) p.att[k] = a; }
   p.equipped = cleanSk(d.equipped); for (const [w, f] of Object.entries(p.equipped)) if (w !== '_faca' && !p.items.includes(w + ':' + f)) delete p.equipped[w];
+  delete p.equipped._av; p.av = avtLimpa(d.av) || avtLimpa(load('avatar', null)) || ''; // avatar (aba Personagem); a cópia em 'avatar' cobre a conta na nuvem
   return p;
 }
 const profKey = () => 'prof.' + (PROF.uid || 'guest');
 function profLoadLocal() { const d = load(profKey(), null); PROF.data = d ? cleanProf(d) : newProfile(); }
+const AV_NUVEM = false; // o avatar só vai para a nuvem depois de publicar o firestore.rules com o campo av (senão a gravação inteira é recusada)
 function profSave(now_) {
   if (!PROF.data) return;
   save(profKey(), PROF.data);
   if (!PROF.cloud) return;
   clearTimeout(PROF.saveT);
   const gravar = async (imediato) => {
-    try { await FB.F.setDoc(FB.F.doc(FB.db, 'players', PROF.uid), { ...PROF.data, name: PROF.name, upd: FB.F.serverTimestamp() }, { merge: true }); PROF.retentou = false; }
+    try { const { av, ...dados } = PROF.data; if (AV_NUVEM) dados.av = av; await FB.F.setDoc(FB.F.doc(FB.db, 'players', PROF.uid), { ...dados, name: PROF.name, upd: FB.F.serverTimestamp() }, { merge: true }); PROF.retentou = false; }
     catch (e) {
       // as regras do Firestore (firestore.rules) aceitam uma gravação por segundo: duas imediatas no mesmo segundo (abrir caixa e esconder a aba) são refeitas em silêncio
       if (imediato && e.code === 'permission-denied' && !PROF.retentou) { PROF.retentou = true; clearTimeout(PROF.saveT); PROF.saveT = setTimeout(() => gravar(false), 3100); return; }
@@ -33593,7 +33812,7 @@ function openLobby(priv) {
   audioInit(); const st = getHostForm(); save('lastSt', st);
   NET.isHost = true; C.myId = 'h'; C.st = st; S.st = st; S.players.clear(); S.nextId = 1; S.colorI = 0; S.lobby = true;
   LB.on = true; LB.priv = priv;
-  srvAddPlayer('h', CFG.name, false).skins = cleanSk(PROF.data?.equipped);
+  srvAddPlayer('h', CFG.name, false).skins = skEnvio();
   hostOpenPeer(priv ? 10 : 5);
   lobbySync();
 }
@@ -33822,7 +34041,7 @@ function equipItem(it, on) {
 }
 // avisa o jogo (arma na mão) e os outros jogadores quando a skin equipada muda
 function skinsChanged() {
-  const sk = cleanSk(PROF.data?.equipped);
+  const sk = skEnvio();
   if (inGame) {
     if (NET.isHost) { const p = S.players.get('h'); if (p) { p.skins = sk; S.skDirty = true; } } else sendToHost({ t: 'skins', sk });
     if (G.cur) vmSetWeapon(G.cur);
@@ -33836,6 +34055,128 @@ function skCard(it, extra = '') {
   const { f, s, wn, rar } = itemInfo(it), eq = PROF.data?.equipped?.[it.split(':')[0]] === f;
   return `<div class="skc${SKUI.sel === it ? ' on' : ''}" data-it="${it}" style="--rc:${RARITY[rar].css}"${extra}><div class="sw" style="background-image:url(${swatch(f)})"></div><b>${esc(wn)}</b><small>${esc(s.name)}</small>${eq ? '<i>EQUIPADA</i>' : ''}</div>`;
 }
+// ---------- aba Personagem: criar/editar o avatar (prévia 3D girável com zoom, categorias, presets, aleatório, desfazer, salvar) ----------
+// A prévia é o mesmo boneco do jogo (playerModel vestido com as peças do Worker), primeiro no nível médio e logo depois no fino.
+const AVE = { cfg: null, cod: '', hist: [], cat: 'rosto', e: null, ef: null, v: null };
+const PG_CAT = {
+  rosto: [['pele', 'Pele', 'cor'], ['olho', 'Olhos', 'cor'], ['cabelo', 'Cabelo'], ['corCabelo', 'Cor do cabelo', 'cor'], ['barba', 'Barba e bigode'], ['rosto', 'Acessórios de rosto (até 3)', 'multi']],
+  cabeca: [['chapeu', 'Chapéu, capacete ou máscara'], ['k:chapeu', 'Cor do chapéu', 'pc']],
+  roupa: [['tronco', 'Tronco'], ['calca', 'Calça'], ['calcado', 'Calçado'], ['colete', 'Colete'], ['luvas', 'Luvas'], ['mochila', 'Mochila']],
+  cores: [['camo', 'Camuflagem (peças camufladas)', 'camo'], ['k:tronco', 'Tronco', 'pc'], ['k:tronco2', 'Tronco: detalhe', 'pc'], ['k:calca', 'Calça', 'pc'], ['k:calcado', 'Calçado', 'pc'], ['k:calcado2', 'Calçado: detalhe', 'pc'], ['k:colete', 'Colete', 'pc'], ['k:luvas', 'Luvas', 'pc'], ['k:mochila', 'Mochila', 'pc']],
+};
+const PG_PRESET = { operador: 'Operador', camuflado: 'Camuflado', urbano: 'Urbano', balaclava: 'Insurgente', swat: 'SWAT', zumbi: 'Sobrevivente', ghillie: 'Atirador ghillie', casual: 'Casual' };
+const PG_PAL = ['#16181b', '#2f3338', '#55595f', '#8b8f94', '#d8d4ca', '#f2efe6', '#1f2a44', '#2a4f9a', '#3e6f8e', '#2f3a24', '#4f5a35', '#6f6a49', '#8b7d5c', '#c9b28a', '#6b4a2b', '#3d2a1e', '#6e1f24', '#a33a2c', '#c4882a', '#d6b13a', '#4d6b3a', '#7a4a8a'];
+const pgNome = k => k.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+function pgSalvo() { return avtLimpa(PROF.data?.av) || ''; }
+function pgUI() {
+  const P = $('#pgPanel');
+  if (!AVT.mod) { P.innerHTML = '<div class="hint">' + (AVT.falhou ? 'Não consegui carregar o editor de personagem (abra o jogo pelo site, não do disco).' : 'Carregando o editor...') + '</div>'; if (!AVT.falhou) avtMod().then(m => m && pgUI()); return; }
+  const M = AVT.mod;
+  if (!AVE.cfg) { AVE.cod = pgSalvo() || M.codificar(M.aleatorio(1)); AVE.cfg = M.decodificar(AVE.cod); AVE.hist = []; }
+  pgStage(); pgPreset(); pgPainel(); pgPrevia(); pgEstado();
+}
+function pgEstado() {
+  const suj = AVE.cod !== pgSalvo(); $('#pgSt').textContent = suj ? 'Alterações não salvas' : 'Salvo no perfil'; $('#pgSt').classList.toggle('suj', suj);
+  $('#pgUndo').disabled = !AVE.hist.length; $('#pgSave').disabled = !suj;
+}
+function pgMuda(f) { // f altera AVE.cfg; guarda o anterior para o Desfazer
+  const antes = AVE.cod; f(AVE.cfg); AVE.cfg = AVT.mod.normalizar(AVE.cfg); const c = AVT.mod.codificar(AVE.cfg);
+  if (c === antes) return; AVE.hist.push(antes); if (AVE.hist.length > 60) AVE.hist.shift(); AVE.cod = c; pgPainel(); pgPreset(); pgPrevia(); pgEstado();
+}
+function pgPreset() {
+  const M = AVT.mod; $('#pgPre').innerHTML = Object.keys(M.PRESETS).map(k => { const c = M.codificar({ preset: k }); return `<button class="pgchip${c === AVE.cod ? ' on' : ''}" data-pre="${k}">${PG_PRESET[k] || pgNome(k)}</button>`; }).join('');
+}
+function pgSw(cor, on, data, tit) { return `<button class="pgsw${on ? ' on' : ''}" ${data} title="${tit}" style="--c:${cor}"></button>`; }
+function pgCamoBg(n) { const c = AVT.mod.CAMOS[n]?.p || ['#777', '#555']; return `linear-gradient(135deg,${c[0]} 0 30%,${c[1]} 30% 55%,${c[2] || c[0]} 55% 75%,${c[3] || c[1]} 75%)`; }
+function pgPainel() {
+  const M = AVT.mod, O = M.OPCOES, cfg = AVE.cfg, out = [];
+  $('#pgTabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.cat === AVE.cat));
+  for (const [campo, tit, tipo] of PG_CAT[AVE.cat]) {
+    if (tipo === 'pc') { // cor por peça: padrão, camuflagem, paleta e cor livre
+      const p = campo.slice(2), tem = { colete: cfg.colete !== 'nenhum', luvas: cfg.luvas !== 'nenhuma', mochila: cfg.mochila !== 'nenhuma', chapeu: cfg.chapeu !== 'nenhum' }[p.replace(/2$/, '')];
+      if (tem === false) continue; const v = cfg.cores[p];
+      out.push(`<div class="pgsec"><div class="arph">${tit}</div><div class="pgsws">` + `<button class="pgsw pgpad${v == null ? ' on' : ''}" data-pc="${p}" data-cor="" title="Cor original da peça">A</button>`
+        + `<button class="pgsw${v === 'camo' ? ' on' : ''}" data-pc="${p}" data-cor="camo" title="Camuflagem" style="--c:${pgCamoBg(cfg.camo)}"></button>`
+        + PG_PAL.map(c => pgSw(c, v === c, `data-pc="${p}" data-cor="${c}"`, c)).join('')
+        + `<label class="pgsw pglivre${typeof v === 'string' && v[0] === '#' && !PG_PAL.includes(v) ? ' on' : ''}" title="Outra cor" style="--c:${typeof v === 'string' && v[0] === '#' ? v : '#444'}"><input type="color" data-pc="${p}" value="${typeof v === 'string' && v[0] === '#' ? v : '#556070'}"></label></div></div>`);
+      continue;
+    }
+    const L = O[campo]; let h = `<div class="pgsec"><div class="arph">${tit}</div>`;
+    if (tipo === 'cor') h += '<div class="pgsws">' + Object.entries(L).map(([k, c]) => pgSw(c, cfg[campo] === k, `data-f="${campo}" data-v="${k}"`, pgNome(k))).join('') + `</div><div class="pgsel">${pgNome(cfg[campo])}</div>`;
+    else if (tipo === 'camo') h += '<div class="pgopts">' + Object.entries(L).map(([k, n]) => `<button class="pgopt${cfg.camo === k ? ' on' : ''}" data-f="camo" data-v="${k}"><i class="pgcm" style="background:${pgCamoBg(k)}"></i>${n}</button>`).join('') + '</div>';
+    else h += '<div class="pgopts">' + Object.entries(L).filter(([k]) => tipo !== 'multi' || k !== 'nenhum').map(([k, n]) => `<button class="pgopt${(tipo === 'multi' ? cfg.rosto.includes(k) : cfg[campo] === k) ? ' on' : ''}" data-f="${campo}" data-v="${k}"${tipo === 'multi' ? ' data-multi="1"' : ''}>${n}</button>`).join('') + '</div>';
+    out.push(h + '</div>');
+  }
+  const P = $('#pgPanel'), st = P.scrollTop; P.innerHTML = out.join(''); P.scrollTop = st;
+}
+function pgClick(e) {
+  const b = e.target.closest('button'); if (!b || !AVT.mod) return;
+  if (b.dataset.cat) { AVE.cat = b.dataset.cat; pgPainel(); $('#pgPanel').scrollTop = 0; if (AVE.v) AVE.v.foco = AVE.cat === 'rosto' || AVE.cat === 'cabeca' ? 1 : 0; return; }
+  if (b.dataset.f) { const f = b.dataset.f, v = b.dataset.v; pgMuda(c => { if (b.dataset.multi) { const s = new Set(c.rosto); s.has(v) ? s.delete(v) : s.add(v); c.rosto = [...s].slice(-3); } else c[f] = v; }); return; }
+  if (b.dataset.pc && b.dataset.cor !== undefined) { const p = b.dataset.pc, v = b.dataset.cor; pgMuda(c => { if (v) c.cores[p] = v; else delete c.cores[p]; }); return; }
+  if (b.dataset.pre) { const p = AVT.mod.PRESETS[b.dataset.pre]; pgMuda(c => { for (const k of Object.keys(c)) if (k !== 'corpo') delete c[k]; Object.assign(c, AVT.mod.normalizar({ ...p, cores: { ...(p.cores || {}) }, rosto: [...(p.rosto || [])] })); }); }
+}
+function pgAcoes() {
+  $('#charPane').addEventListener('click', pgClick);
+  $('#pgPanel').addEventListener('input', e => { const i = e.target; if (i.type !== 'color') return; clearTimeout(AVE.ct); AVE.ct = setTimeout(() => pgMuda(c => { c.cores[i.dataset.pc] = i.value.toLowerCase(); }), 120); });
+  $('#pgRnd').onclick = () => { const r = AVT.mod?.aleatorio((Math.random() * 4294967295) >>> 0); if (r) pgMuda(c => { for (const k of Object.keys(c)) delete c[k]; Object.assign(c, r); }); };
+  $('#pgUndo').onclick = () => { if (!AVE.hist.length) return; AVE.cod = AVE.hist.pop(); AVE.cfg = AVT.mod.decodificar(AVE.cod); pgPainel(); pgPreset(); pgPrevia(); pgEstado(); };
+  $('#pgSave').onclick = () => { if (!PROF.data) return; PROF.data.av = AVE.cod; save('avatar', AVE.cod); profSave(); skinsChanged(); pgEstado(); };
+  for (const b of document.querySelectorAll('#charPane [data-z]')) b.onclick = () => { if (AVE.v) AVE.v.zoom = clamp(AVE.v.zoom * (b.dataset.z === '+' ? .8 : 1.25), .35, 1.6); };
+}
+// palco 3D: renderer próprio no canvas da aba (como o do Arsenal); arrastar gira, roda/pinça/botões dão zoom, a categoria escolhe o foco
+function pgStage() {
+  if (AVE.v) { if (!AVE.v.on) { AVE.v.on = true; requestAnimationFrame(AVE.v.loop); } return; }
+  const cv = $('#pgCv'), r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); r.toneMapping = THREE.ACESFilmicToneMapping; r.setPixelRatio(Math.min(devicePixelRatio, 2));
+  r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+  const sc = new THREE.Scene(), pm = new THREE.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(r), .04).texture; pm.dispose();
+  sc.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a3128, .9));
+  const dl = new THREE.DirectionalLight(0xfff0dc, 2.6); dl.position.set(1.6, 3.2, 2.2); dl.castShadow = true; dl.shadow.mapSize.set(1024, 1024); Object.assign(dl.shadow.camera, { left: -1.2, right: 1.2, top: 2.2, bottom: -.2, near: .5, far: 8 }); dl.shadow.bias = -.0004; sc.add(dl);
+  const rim = new THREE.DirectionalLight(0xbcd4ff, 1.6); rim.position.set(-2, 1.6, -2.4); sc.add(rim);
+  const chao = new THREE.Mesh(new THREE.CircleGeometry(1.1, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x1b1f26, roughness: .95, transparent: true, opacity: .85 })); chao.receiveShadow = true; sc.add(chao);
+  const anel = new THREE.Mesh(new THREE.RingGeometry(1.06, 1.1, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: .45 })); anel.position.y = .002; sc.add(anel);
+  const cam = new THREE.PerspectiveCamera(30, 1, .05, 40), g = playerModel('#ffb020'); g.userData.pmM = []; g.traverse(o => { if (o.isMesh) g.userData.pmM.push(o); }); sc.add(g);
+  const V = AVE.v = { r, sc, cam, g, yaw: .5, pit: .08, zoom: 1, foco: 1, f: 1, on: true, cw: 0, ch: 0, drag: null, toques: new Map() };
+  cv.onpointerdown = e => { V.toques.set(e.pointerId, [e.clientX, e.clientY]); cv.setPointerCapture(e.pointerId); V.drag = [e.clientX, e.clientY]; V.pinca = null; };
+  cv.onpointermove = e => {
+    if (!V.toques.has(e.pointerId)) return; V.toques.set(e.pointerId, [e.clientX, e.clientY]);
+    if (V.toques.size >= 2) { const [a, b] = [...V.toques.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (V.pinca) V.zoom = clamp(V.zoom * V.pinca / d, .35, 1.6); V.pinca = d; return; }
+    if (V.drag) { V.yaw += (e.clientX - V.drag[0]) * .011; V.pit = clamp(V.pit + (e.clientY - V.drag[1]) * .004, -.35, .6); V.drag = [e.clientX, e.clientY]; V.mexeu = performance.now(); }
+  };
+  cv.onpointerup = cv.onpointercancel = e => { V.toques.delete(e.pointerId); if (!V.toques.size) { V.drag = null; V.pinca = null; } };
+  cv.addEventListener('wheel', e => { e.preventDefault(); V.zoom = clamp(V.zoom * Math.exp(e.deltaY * .0012), .35, 1.6); }, { passive: false });
+  V.loop = () => {
+    if ($('#menu').classList.contains('hidden') || $('#charPane').classList.contains('hidden')) { V.on = false; return; } // fora da tela o laço para
+    requestAnimationFrame(V.loop);
+    const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
+    if (w !== V.cw || h !== V.ch) { V.cw = w; V.ch = h; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+    if (!V.drag && performance.now() - (V.mexeu || 0) > 4000) V.yaw += .0025; // parado: gira devagar
+    V.f += (V.foco - V.f) * .12; const larga = w > 760, alvoY = lerp(.94, 1.56, V.f), dist = lerp(5.8, 1.75, V.f) * V.zoom * (h > w ? 1.25 : h < 520 ? 1.2 : 1);
+    const tgt = TPV.a.set(0, alvoY, 0), fo = larga ? (h < 520 ? 1 : -1) * Math.min(7, 190 / w * 35) : 0; if (cam.filmOffset !== fo) { cam.filmOffset = fo; cam.updateProjectionMatrix(); } // na tela larga o boneco fica à direita do painel
+    cam.position.set(tgt.x - Math.sin(V.yaw) * Math.cos(V.pit) * dist, tgt.y + Math.sin(V.pit) * dist, -Math.cos(V.yaw) * Math.cos(V.pit) * dist); cam.lookAt(tgt); // o boneco olha para -z
+    r.render(sc, cam);
+  };
+  requestAnimationFrame(V.loop);
+}
+function pgPose(g) { // de pé, braços soltos ao lado do corpo (sem arma)
+  const ud = g.userData, k = ud.shK || 1; ud.arms.rotation.x = 0;
+  tpArm(ud.tpR, TPV.sR.set(.25 * k, 0, 0), TPV.b.set(.25 * k + .05, -.6, -.06), TPV.q.setFromEuler(TPV.eu.set(-.25, 0, -.15)));
+  tpArm(ud.tpL, TPV.sL.set(-.25 * k, 0, 0), TPV.b.set(-.25 * k - .05, -.6, -.06), TPV.q.setFromEuler(TPV.eu.set(-.25, 0, .15)));
+  ud.gh.visible = false;
+}
+function pgPrevia() { // médio já (rápido) e o fino logo depois; pedidos antigos da tela saem da fila
+  const V = AVE.v; if (!V) return; const cod = AVE.cod;
+  AVT.fila = AVT.fila.filter(e => { if (e.pri < 0 && e.cod !== cod) { AVT.ent.delete(e.k); return false; } return true; });
+  const m = avtEnt(cod, 'm', -2), f = AVT.w === false ? null : avtEnt(cod, 'f', -1); AVE.e = m; AVE.ef = f;
+  $('#pgLoad').classList.toggle('hidden', !!(m.ok || f?.ok));
+  const tenta = () => {
+    if (AVE.cod !== cod || !AVE.v) return; const e = f?.ok ? f : m.ok ? m : null;
+    if (e && V.g.userData.av?.e !== e) { avtVestir(V.g, e, false); V.g.traverse(o => { if (o.isMesh && o.visible) o.castShadow = true; }); pgPose(V.g); $('#pgLoad').classList.add('hidden'); $('#pgInfo').textContent = (e.nivel === 'f' ? 'Voxel fino' : 'Prévia rápida') + ' · ' + Math.round(e.tri / 1000) + ' mil triângulos'; }
+    if (!(f ? f.ok || f.err : m.ok || m.err)) setTimeout(tenta, 120);
+  };
+  tenta();
+}
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AVT, AVE, avtEnt, avtVestir, avtMod, R, pgUI }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes (avatares)
 function skinsUI() {
   mpUI();
   if (!PROF.data || !$('#casesPane')) return;
@@ -34152,12 +34493,13 @@ function applySettings() {
   applyQuality(); visApply();
 }
 const lastSt = load('lastSt', { map: 'arena', mode: 'rounds', rounds: 13, frags: 20, bots: 0, diff: 1, zmap: 'vila', zdiff: 1 });
-skinsInit();
+skinsInit(); pgAcoes(); (window.requestIdleCallback || setTimeout)(() => avtMod(), { timeout: 4000 });
 document.querySelectorAll('#menu .tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('#menu .tabs button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('#menu [data-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab));
   if (b.dataset.tab === 'cases') skinsUI();
   if (b.dataset.tab === 'arsenal') arsenalUI();
+  if (b.dataset.tab === 'char') pgUI();
   if (b.dataset.tab === 'friends') frUI();
 });
 const getHostForm = () => ({ ...lastSt, ...load('lastSt', {}) }); // modo, mapa e opções agora se escolhem no lobby

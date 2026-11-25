@@ -67,7 +67,8 @@ service cloud.firestore {
       // wxp: XP de cada arma (nível do Arsenal); att: acessórios escolhidos por arma; elo: patente (Rodadas)
       function mapaArmasOk(m) { return m is map && m.keys().size() <= 150 && m.keys().join(',').matches('^$|^[a-z0-9_]{1,24}(,[a-z0-9_]{1,24})*$'); }
       function formaOk() {
-        return d().keys().hasOnly(['xp', 'cases', 'items', 'equipped', 'opened', 'name', 'upd', 'created', 'st', 'cx', 'wxp', 'att', 'elo'])
+        return d().keys().hasOnly(['xp', 'cases', 'items', 'equipped', 'opened', 'name', 'upd', 'created', 'st', 'cx', 'wxp', 'att', 'elo', 'av'])
+          && (!('av' in d()) || (d().av is string && d().av.size() <= 240 && d().av.matches('^[a-z0-9.+]*$'))) // avatar (aba Personagem): código compacto; o index.html só manda com AV_NUVEM = true
           && (!('wxp' in d()) || mapaArmasOk(d().wxp))
           && (!('att' in d()) || mapaArmasOk(d().att))
           && (!('elo' in d()) || (d().elo is number && d().elo >= 0 && d().elo <= 5000))
