@@ -42,7 +42,9 @@ export function camo(nome, seed = 0) {
   return (x, y, z) => {
     const e = d.e * K;
     if (d.t === 'pixel') { const q = 1 / 85; x = Math.floor(x / q) * q; y = Math.floor(y / q) * q; z = Math.floor(z / q) * q; }
-    if (d.t === 'tigre') { const s = Math.sin(y * e * 3.4 + fbm(x * 4, y * 2, z * 4) * 16 + (x + z) * 6), m = fbm(x * 5 + 3, y * 9, z * 5); let c = C[0]; if (fbm(x * e, y * e, z * e) > .6) c = C[3]; if (s > .55 && m > .42) c = C[1]; if (s > .82 && m > .5) c = C[2]; return c; }
+    if (d.t === 'tigre') { // tigrado: pinceladas horizontais compridas (ruído esticado na horizontal), preto por cima do verde escuro
+      const w = fbm(x * 3 + 1, y * 3, z * 3) * .9, a = vnoise(x * 7 + 3, (y + w * .05) * 42, z * 7 + 1), b = vnoise(x * 6 + 11, (y + w * .05) * 36 + 5, z * 6 + 7);
+      let c = fbm(x * 4, y * 4, z * 4) > .6 ? C[3] : C[0]; if (b > .62) c = C[1]; if (a > .66) c = C[2]; return c; }
     if (d.t === 'pontos') { const a = vnoise(x * e, y * e, z * e), b = vnoise(x * e * 1.7 + 9, y * e * 1.7, z * e * 1.7 + 4), g = fbm(x * 8, y * 8, z * 8); let c = C[0]; if (g > .58) c = C[1]; if (a > .7) c = C[2]; else if (b > .72) c = C[3]; else if (a < .2) c = C[4]; return c; }
     if (d.t === 'escamas') { const n = fbm(x * e * .4, y * e * .4, z * e * .4), m = vnoise(x * e, y * e, z * e); let c = n > .54 ? C[1] : C[0]; if (m > .62 && n > .5) c = C[3]; if (Math.abs(m - .62) < .03) c = C[2]; return c; }
     let c = C[0]; if (fbm(x * e + seed, y * e * .8, z * e) > .55) c = C[1]; if (N > 2 && fbm(x * e * 1.25 + 17, y * e + 5, z * e * 1.25 + 11) > .6) c = C[2]; if (N > 3 && fbm(x * e * 2 + 31, y * e * 1.7, z * e * 2 + 7) > .66) c = C[3]; return c;

@@ -109,8 +109,8 @@ export function calca(B, k, pr, tipo, c1, det) {
     if (tipo === 'jeans' || tipo === 'jeans_rasgado') { B.box(T, [o * .075, .2, 0], [.02, .2, .0018], 0, null, '#b8743a', PT(tag)); B.box(k.Fp, [s * .065, -.065, -.11], [.035, .04, .006], .004, [.2, 0, 0], col, { tag }); B.box(k.Fp, [s * .065, -.035, -.118], [.032, .002, .02], 0, null, '#b8743a', PT(tag)); B.box(k.Fp, [s * .1, .03, .09], [.002, .04, .04], 0, [0, 0, s * .6], '#b8743a', PT(tag)); }
     if (tipo === 'jeans_rasgado') { B.ell(S, [0, -.01 + s * .01, .07], [.03, .018, .02], null, hx('#ffffff'), PT(tag)); B.P[B.P.length - 1].col = (x, y) => ((y * 300) % 1 + 1) % 1 < .45 ? hx('#e6e2da') : mul(hx('#b0866a'), .9); B.ell(T, [.01, L.thL * .4, .085], [.02, .012, .02], null, '#e6e2da', PT(tag)); }
     if (tipo === 'social') B.box(T, [0, L.thL * .5, .09], [.0022, L.thL * .55, .03], 0, null, mul(hx(base(c1)), 1.35), PT(tag));
-    if (tipo === 'jogger') { B.cone(S, [0, L.shL - .05, 0], [0, L.shL - .015, 0], .043, .039, malha(mul(hx(base(c1)), .85)), { tag }); B.box(T, [o * .085, .2, 0], [.006, .25, .02], 0, null, '#e0e0e0', PT(tag)); }
-    if (tipo === 'shorts') B.box(T, [o * .085, .08, 0], [.006, .1, .02], 0, null, '#f0f0f0', PT(tag));
+    if (tipo === 'jogger') { B.cone(S, [0, L.shL - .05, 0], [0, L.shL - .015, 0], .043, .039, malha(mul(hx(base(c1)), .85)), { tag }); B.box(T, [o * .07, L.thL * .5, 0], [.05, L.thL * .55, .009], 0, null, '#e0e0e0', PT(tag)); B.box(S, [o * .05, L.shL * .45, 0], [.04, L.shL * .5, .009], 0, null, '#e0e0e0', PT(tag)); } // faixa lateral contínua (a caixa atravessa a superfície da perna)
+    if (tipo === 'shorts') B.box(T, [o * .07, .08, 0], [.05, .1, .009], 0, null, '#f0f0f0', PT(tag));
     if (tipo === 'tatica') { B.box(T, [o * .085, .22, .02], [.004, .05, .03], 0, null, E, PT(tag)); B.box(T, [o * .087, .24, -.01], [.012, .03, .02], .006, null, col, { tag }); }
   }
   B.box(k.Fp, [0, .02, .125], [.0025, .045, .03], 0, null, mul(hx(base(c1)), .55), PT(tag)); // braguilha

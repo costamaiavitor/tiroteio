@@ -177,7 +177,7 @@ export function montarAvatar(cfg0) {
 export const RIG = { quadril: .86, ombro: 1.38, reach: [.3, .34] };
 export const NIVEIS = { // resolução (m) do corpo, da cabeça e das mãos; det = detalhes pequenos das roupas
   f: { res: .0068, cab: .0034, mao: .0045, jit: .035, jitCab: .02, det: 2 },
-  m: { res: .017, cab: .012, mao: .014, jit: .03, jitCab: .02, det: 1 },
+  m: { res: .02, cab: .014, mao: .016, jit: .03, jitCab: .02, det: 1 },
   l: { res: .032, cab: .024, mao: .026, jit: .02, jitCab: .02, det: 0 },
 };
 const RPI = new THREE.Matrix4().makeRotationY(Math.PI);

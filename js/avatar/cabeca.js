@@ -135,7 +135,7 @@ export function barba(B, F, tipo, c) {
     case 'van_dyke': bigode(.026, .006); B.cone(F, [0, .036, .088], [0, .0, .08], .014, .004, Hf, o); break;
     case 'mosca': B.ell(F, [0, .034, .092], [.0075, .009, .006], null, Hf, o); break;
     case 'queixo': mand(.0045, [pl(F, [0, .03, 0], [0, 1, 0])]); queixo(.004); break;
-    case 'costeleta': for (const s of [1, -1]) mand(.006, [pl(F, [s * .034, 0, 0], [-s, 0, 0])]); for (const s of [1, -1]) B.box(F, [s * .079, .09, .02], [.007, .03, .014], .005, null, Hf, o); bigode(.026); break;
+    case 'costeleta': for (const s of [1, -1]) { B.cone(F, [s * .079, .155, .018], [s * .079, .078, .027], .016, .009, Hf, { kind: 'paint', on: ['rosto', 'pele'] }); B.cone(F, [s * .077, .14, .016], [s * .076, .082, .026], .006, .004, Hf, o); } break; // costeleta: pinta a pele junto à orelha e dá um pouco de volume, afinando para baixo
     case 'curta': mand(.0035); baixo(.0025); queixo(.003); bigode(); break;
     case 'cheia': mand(.0055); baixo(.005); queixo(.005); bigode(.025, .006); break;
     case 'longa': mand(.006); baixo(.005); queixo(.006); bigode(.026, .0065); B.ell(F, [0, -.015, .07], [.048, .06, .036], [-.25, 0, 0], Hf, o); B.cone(F, [0, -.03, .075], [0, -.09, .085], .03, .008, Hf, o); break;

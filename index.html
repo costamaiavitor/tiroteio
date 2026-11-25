@@ -19076,7 +19076,15 @@ function tpArm(a, S, H, q) { // ombro S → mão H (espaço dos braços); cotove
   const pv = TPV.d.set(a.s * .55, -1, .3); pv.addScaledVector(d, -pv.dot(d)).normalize();
   a.sh.position.copy(S); a.el.position.copy(S).addScaledVector(d, x).addScaledVector(pv, h);
   a.hand.position.copy(S).addScaledVector(d, L); if (q) a.hand.quaternion.copy(q); else a.hand.quaternion.identity();
+  if (a.tw) { tpTorce(a.up, S, a.el.position, pv); tpTorce(a.fo, a.el.position, a.hand.position, pv); return; } // avatar: o lado de dentro (bíceps) fica do lado oposto ao cotovelo
   tpSeg(a.up, S, a.el.position); tpSeg(a.fo, a.el.position, a.hand.position);
+}
+const TPT = { x: new V3(), y: new V3(), z: new V3(), m: new THREE.Matrix4() };
+function tpTorce(m, A, B, pv) { // como o tpSeg, mas com a torção certa: y de A para B, z = frente do braço = contrário do cotovelo (pv)
+  const y = TPT.y.subVectors(B, A), l = y.length() || 1e-4; y.multiplyScalar(1 / l);
+  const z = TPT.z.copy(pv).negate(); z.addScaledVector(y, -z.dot(y)); if (z.lengthSq() < 1e-8) z.set(0, 0, -1).addScaledVector(y, y.z); z.normalize();
+  const x = TPT.x.crossVectors(y, z); m.quaternion.setFromRotationMatrix(TPT.m.makeBasis(x, y, z));
+  m.position.copy(A).addScaledVector(y, l / 2); m.scale.set(1, l, 1);
 }
 // pose dos braços e da arma: tp = dados da arma (classe, âncora, mãos), k = { aim, run, sw, rel }
 function tpPose(g, tp, pitch, k) {
@@ -23295,12 +23303,12 @@ function localSpawn(m) {
 // passar letras, dígitos, '.' e '+' até 240 caracteres e quem monta decodifica ignorando o que não existe (versão antiga do jogo:
 // o _av some no cleanSk dela e o boneco é o padrão; sem _av aqui: também o boneco padrão). Bots: sorteio pelo id e nome.
 // As peças são assadas num Worker (js/avatar/trabalhador.js), uma por vez, com cache por código e nível de detalhe:
-// 'f' = voxel fino (3,4 mm na cabeça, 4,5 nas mãos, 6,8 no corpo; só os AVT.FINO_MAX mais perto, até AVT.FINO_D m), 'm' = 17 mm,
+// 'f' = voxel fino (3,4 mm na cabeça, 4,5 nas mãos, 6,8 no corpo; só os AVT.FINO_MAX mais perto, até AVT.FINO_D m), 'm' = 20 mm,
 // 'l' = 32 mm (longe de AVT.MEIO_D). Gráfico Baixo: só 'm' e 'l'. Até a primeira peça ficar pronta continua o boneco antigo.
 // As peças entram nos MESMOS grupos do playerModel (inner, head, legL/legR, e nos braços ombro/braço/antebraço/mão que o tpArm
 // move), então andar, agachar, morrer, a pose da arma (tpPose/IK) e as hitboxes (que são da lógica) não mudam. Cor do time:
 // braçadeira nos dois braços com o bodyM (que já troca de cor com o time).
-const AVT = { mod: null, modP: null, falhou: false, w: null, n: 0, cb: new Map(), ent: new Map(), fila: [], ocup: false, mat: null, vazio: null, FINO_MAX: 2, FINO_D: 6, MEIO_D: 26, MAX_ENT: 40, MAX_FINO: 4 };
+const AVT = { mod: null, modP: null, falhou: false, w: null, n: 0, cb: new Map(), ent: new Map(), fila: [], ocup: false, mat: null, vazio: null, FINO_MAX: 2, FINO_D: 6, MEIO_D: 18, MAX_ENT: 40, MAX_FINO: 4 };
 const AVT_PRI = { m: 0, l: 1, f: 2 };
 function avtMod() {
   return AVT.modP ||= import('./js/avatar/avatar.js').then(m => { AVT.mod = m; avtMeuPadrao(); return m; }, e => { console.warn('avatar: módulo', e); AVT.falhou = true; return null; });
@@ -23366,7 +23374,7 @@ function avtVestir(model, e, banda = true) {
     for (const o of ud.pmM || []) if (o.visible) { o.visible = false; av.oc.push(o); }
     const sombra = CFG.gfx === 'alto', mk = par => { const m = new THREE.Mesh(AVT.vazio ||= new THREE.BufferGeometry(), avtMat()); m.castShadow = sombra; m.receiveShadow = sombra; par.add(m); return m; };
     for (const [a, L] of [[ud.tpR, 'R'], [ud.tpL, 'L']]) {
-      av.arm.push([a, { sh: a.sh, up: a.up, fo: a.fo }]);
+      av.arm.push([a, { sh: a.sh, up: a.up, fo: a.fo }]); a.tw = true;
       for (const p of ['sh', 'up', 'fo']) { const g = new THREE.Group(); g.position.copy(a[p].position); g.quaternion.copy(a[p].quaternion); g.scale.copy(a[p].scale); ud.arms.add(g); a[p] = g; av.m[p + L] = mk(g); }
       av.m['h' + L] = mk(a.hand);
     }
@@ -23382,7 +23390,7 @@ function avtVestir(model, e, banda = true) {
 function avtDespir(model) {
   const ud = model.userData, av = ud.av; if (!av) return;
   for (const m of Object.values(av.m)) m.parent?.remove(m); for (const b of av.band) b.parent?.remove(b);
-  for (const [a, o] of av.arm) for (const p of ['sh', 'up', 'fo']) { a[p].parent?.remove(a[p]); a[p] = o[p]; }
+  for (const [a, o] of av.arm) { a.tw = false; for (const p of ['sh', 'up', 'fo']) { a[p].parent?.remove(a[p]); a[p] = o[p]; } }
   for (const o of av.oc) o.visible = true; for (const k of ['head', 'legL', 'legR']) ud[k].position.copy(av.pos[k]);
   ud.shK = 0; ud.av = null;
 }
@@ -34151,8 +34159,8 @@ function pgStage() {
     const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
     if (w !== V.cw || h !== V.ch) { V.cw = w; V.ch = h; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
     if (!V.drag && performance.now() - (V.mexeu || 0) > 4000) V.yaw += .0025; // parado: gira devagar
-    V.f += (V.foco - V.f) * .12; const larga = w > 760, alvoY = lerp(.94, 1.56, V.f), dist = lerp(5.8, 1.75, V.f) * V.zoom * (h > w ? 1.25 : h < 520 ? 1.2 : 1);
-    const tgt = TPV.a.set(0, alvoY, 0), fo = larga ? (h < 520 ? 1 : -1) * Math.min(7, 190 / w * 35) : 0; if (cam.filmOffset !== fo) { cam.filmOffset = fo; cam.updateProjectionMatrix(); } // na tela larga o boneco fica à direita do painel
+    V.f += (V.foco - V.f) * .12; const larga = w > 760, alvoY = lerp(.94, 1.56, V.f) + (h < 520 && w > h ? .3 * (1 - V.f) : 0), dist = lerp(5.8, 1.75, V.f) * V.zoom * (h > w ? 1.25 : h < 520 ? .8 : 1);
+    const tgt = TPV.a.set(0, alvoY, 0), fo = V.semOff ? 0 : !larga ? 0 : h < 520 ? 230 / w * 48 : -Math.min(7, 190 / w * 35); if (cam.filmOffset !== fo) { cam.filmOffset = fo; cam.updateProjectionMatrix(); } // na tela larga o boneco fica à direita do painel
     cam.position.set(tgt.x - Math.sin(V.yaw) * Math.cos(V.pit) * dist, tgt.y + Math.sin(V.pit) * dist, -Math.cos(V.yaw) * Math.cos(V.pit) * dist); cam.lookAt(tgt); // o boneco olha para -z
     r.render(sc, cam);
   };
@@ -34176,7 +34184,7 @@ function pgPrevia() { // médio já (rápido) e o fino logo depois; pedidos anti
   };
   tenta();
 }
-if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AVT, AVE, avtEnt, avtVestir, avtMod, R, pgUI }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes (avatares)
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AVT, AVE, avtEnt, avtVestir, avtMod, R, pgUI, setRemoteGun, remoteGunTpl, tpInfo, tpPose, cloneShared, playerModel }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes (avatares)
 function skinsUI() {
   mpUI();
   if (!PROF.data || !$('#casesPane')) return;
