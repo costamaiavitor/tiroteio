@@ -10,6 +10,7 @@ await ctx.route('**/*', r => { const u = new URL(r.request().url()); if (u.hostn
   const f = REPO + (u.pathname === '/' ? 'index.html' : decodeURIComponent(u.pathname.slice(1)));
   if (/assets\/vox\//.test(f)) return r.fulfill({ status: 404, body: '' }); // sempre recalcula
   if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' }); r.fulfill({ body: fs.readFileSync(f), contentType: TYPES[f.split('.').pop()] }); });
+await ctx.addInitScript(() => { window.__vxExport = true; }); // voxeliza na hora (sem isto o jogo só lê os arquivos)
 const p = await ctx.newPage(); await p.goto('http://localhost/'); await p.waitForTimeout(3000);
 await p.evaluate(() => document.querySelector('#btnHost').click()); await p.waitForTimeout(800);
 await p.evaluate(() => { document.querySelector('#lbForm [data-mode="dm"]').click(); document.querySelector('#lbForm [data-map="arena"]').click(); });
@@ -25,4 +26,7 @@ for (const id of ids) {
   const gz = zlib.gzipSync(Buffer.from(r.b64, 'base64'), { level: 9 }); fs.writeFileSync(REPO + 'assets/vox/' + r.nome + '.bin.gz', gz);
   console.log(id, '->', r.nome, (gz.length / 1024).toFixed(0) + ' KB');
 }
+// braços (mãos) em voxel: um arquivo por malha de braços (iguais em todos os pacotes que pegam os braços do mesmo pacote)
+const br = await p.evaluate(() => window.__T.vxbExport?.() || []);
+for (const r of br) { const gz = zlib.gzipSync(Buffer.from(r.b64, 'base64'), { level: 9 }); fs.writeFileSync(REPO + 'assets/vox/' + r.nome + '.bin.gz', gz); console.log('braços ->', r.nome, (gz.length / 1024).toFixed(0) + ' KB'); }
 await b.close();
