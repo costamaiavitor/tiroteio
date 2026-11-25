@@ -4,7 +4,8 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-const REPO = process.env.REPO || 'C:/dev/tiroteio';
+import { fileURLToPath } from 'node:url';
+const REPO = process.env.REPO || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(REPO + '/package.json');
 const { chromium } = require('playwright');
 const PAGINA = path.resolve(process.env.PAGINA || REPO + '/index.html');
@@ -33,4 +34,4 @@ export async function abrirJogo({ console: log = false } = {}) {
   await page.waitForFunction(() => window.__T && !document.querySelector('#btnHost').disabled, null, { timeout: 90000 });
   return { page, browser, erros, fechar: async () => { await browser.close(); srv.close(); } };
 }
-export { criarSala, noJogo } from 'file:///C:/dev/tiroteio/tests/_jogo.mjs';
+export { criarSala, noJogo } from './_jogo.mjs';
