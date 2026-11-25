@@ -19570,6 +19570,13 @@ function b08Itens(id) { // malhas que vão ser desenhadas: 'c|m:x' arma na mão 
     if (vis.has(k)) return; vis.add(k); const p = Object.create(o); p.material = m; p.children = []; L.push([p, cam, g]); };
   if (tipo === 'c') { const D = FPM[a.slice(2)]; FPC[a].scene.traverse(o => { if (o.isMesh && o.material && !D?.hide?.includes(o.name)) px(o, b08Cena(o.material), camera, scene); }); return L; }
   const D = b && FPM[b.slice(2)];
+  if (VX.on) { // vx: na mão só aparecem os programas vox (plástico, metal, pele com esqueleto) e o vidro/transparentes do modelo: as texturas originais não sobem
+    const g0 = B08.vxg ||= new THREE.BufferGeometry(); let s = null; FPC[c || a].scene.traverse(o => { if (!s && fpArmsMesh(o)) s = o; });
+    for (const m of vxMats()) L.push([new THREE.Mesh(g0, m), vmCam, vmScene]);
+    if (s) { const p = Object.create(s); p.material = vxbMat(); p.geometry = g0; p.children = []; L.push([p, vmCam, vmScene]); }
+    FPC[b || a].scene.traverse(o => { if (o.isMesh && o.material && !(D ? D.hide?.includes(o.name) : fpArmsMesh(o) || fpArm(o)) && (o.material.transparent || D?.lens?.includes(o.material.name))) px(o, o.material, vmCam, vmScene); });
+    return L;
+  }
   FPC[a].scene.traverse(o => { if (o.isMesh && o.material && (fpArmsMesh(o) ? !c : fpArm(o) || !D || o.material.name === '12ge')) px(o, o.material, vmCam, vmScene); }); // como no fpBuild
   if (D) FPC[b].scene.traverse(o => { if (o.isMesh && o.material && !D.hide?.includes(o.name)) px(o, o.material, vmCam, vmScene); });
   if (c) { let s = null; FPC[c].scene.traverse(o => { if (!s && fpArmsMesh(o)) s = o; }); if (s) px(s, s.material, vmCam, vmScene); } // braços trocados (fpArmsSwap)
@@ -19578,7 +19585,7 @@ function b08Itens(id) { // malhas que vão ser desenhadas: 'c|m:x' arma na mão 
 const b08Chaves = id => id.split('|').slice(1).filter(Boolean);
 function b08Fim(j, ok) { if (ok) { if (!b08Ok(j.id)) B08.n++; B08.ok.set(j.id, j.mapa); } else if (B08.job.get(j.id) === j) B08.job.delete(j.id); B08.aq.delete(j); j.r(); }
 function b08Pedir(id) { // prepara no ócio; j.p resolve quando ficar pronta (ou quando o mapa mudar)
-  if (VX.on && id.startsWith('v|')) vxLoad(vxNome(id)); // vx: o arquivo de voxels também vem no aquecimento
+  if (VX.on && id.startsWith('v|')) { const k = id.split('|'); vxLoad(vxNome(id)); vxLoad('bracos_' + (k[3] || k[1]).slice(2) + '_0'); } // vx: os arquivos da arma e dos braços também vêm no aquecimento
   let j = B08.job.get(id); if (j && j.mapa === B08.mapa) return j;
   j = { id, mapa: B08.mapa }; j.p = new Promise(r => j.r = r); B08.job.set(id, j);
   if (b08Ok(id)) { j.r(); return j; }
@@ -19669,7 +19676,7 @@ function rp1Supressor(tips, C, body, mz, u) { // u: unidades do modelo por metro
 // Cada peça visível da arma (não os braços nem o vidro da luneta) vira uma casca de voxels de 2,2 mm (medida da arma real), com a cor
 // da textura do modelo e oclusão de canto por vértice. Malha com esqueleto: cada triângulo vai para o osso que mais pesa nele e os voxels
 // são montados no espaço desse osso (presos a ele), então carregador, ferrolho, gatilho e as animações do pacote continuam iguais.
-// Cache por geometria + osso + passo: a mesma arma só é voxelizada uma vez por sessão.
+// O jogo só lê os arquivos pré-calculados (assets/vox) e monta as malhas num Worker; voxelizar na hora é só para o tools/vox-bake.mjs.
 const VX = { passo: .0022, cache: new Map(), tex: new WeakMap(), mats: null, on: true };
 function vxMats() {
   return VX.mats ||= [new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: .5, metalness: 0, clearcoat: .2, clearcoatRoughness: .45, envMapIntensity: .8, name: 'vox' }),
@@ -19683,45 +19690,154 @@ function vxTex(t) { // pixels da textura (uma vez por textura)
 }
 function vxSamp(d, u, v, out) { u -= Math.floor(u); v -= Math.floor(v); if (d.fy) v = 1 - v; const i = ((Math.min(d.h - 1, v * d.h | 0)) * d.w + Math.min(d.w - 1, u * d.w | 0)) * 4; out[0] = d.px[i] / 255; out[1] = d.px[i + 1] / 255; out[2] = d.px[i + 2] / 255; return out; }
 function vxEscala(m) { const e = m.elements; return Math.cbrt(Math.abs(e[0] * (e[5] * e[10] - e[6] * e[9]) - e[4] * (e[1] * e[10] - e[2] * e[9]) + e[8] * (e[1] * e[6] - e[2] * e[5]))) || 1; }
-// voxels -> malha com AO (faces visíveis; cor sRGB -> linear); devolve [geo de plástico/madeira, geo de metal]
-function vxMalha(V, h) {
-  const K = (i, j, k) => ((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024), has = (i, j, k) => V.has(K(i, j, k));
-  const F = [[[1, 0, 0], [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]]], [[-1, 0, 0], [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]]], [[0, 1, 0], [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]]],
-    [[0, -1, 0], [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]]], [[0, 0, 1], [[1, 0, 1], [1, 1, 1], [0, 1, 1], [0, 0, 1]]], [[0, 0, -1], [[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 0, 0]]]];
-  const G = [{ p: [], n: [], c: [], i: [] }, { p: [], n: [], c: [], i: [] }], ao = [0, 0, 0, 0], o = [0, 0, 0], q = [0, 0, 0];
-  for (const v of V.values()) {
-    const g = G[v.m], cl = [Math.pow(v.c[0], 2.2), Math.pow(v.c[1], 2.2), Math.pow(v.c[2], 2.2)];
-    for (const [n, cs] of F) {
-      if (has(v.i + n[0], v.j + n[1], v.k + n[2])) continue;
-      const base = g.p.length / 3, ax = n[0] ? [1, 2] : n[1] ? [0, 2] : [0, 1]; o[0] = v.i + n[0]; o[1] = v.j + n[1]; o[2] = v.k + n[2];
+// ---- montagem das malhas: funções puras (sem THREE) que rodam num Worker, fora do fio principal (no fio principal só no vox-bake) ----
+// grade de ocupação da caixa dos voxels (+1 de margem): 1 casca, 2 ar de fora (enchente a partir do canto), 0 miolo: o espaço que o ar de
+// fora não alcança (dentro de peças fechadas) conta como cheio, então as faces de dentro da casca somem. Devolve has(i, j, k).
+function vxwGrade(I, J, K, n) {
+  let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
+  for (let t = 0; t < n; t++) { const i = I[t], j = J[t], k = K[t]; if (i < x0) x0 = i; if (i > x1) x1 = i; if (j < y0) y0 = j; if (j > y1) y1 = j; if (k < z0) z0 = k; if (k > z1) z1 = k; }
+  x0--; y0--; z0--; x1++; y1++; z1++; const nx = x1 - x0 + 1, ny = y1 - y0 + 1, nz = z1 - z0 + 1, L = nx * ny;
+  if (!n || L * nz > 4e7) { const S = new Set(), K2 = (i, j, k) => ((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024); for (let t = 0; t < n; t++) S.add(K2(I[t], J[t], K[t])); return (i, j, k) => S.has(K2(i, j, k)); } // caixa enorme: só a casca
+  const g = new Uint8Array(L * nz); for (let t = 0; t < n; t++) g[(I[t] - x0) + nx * ((J[t] - y0) + ny * (K[t] - z0))] = 1;
+  let st = new Int32Array(1 << 16), sp = 0; st[sp++] = 0; g[0] = 2;
+  const vai = c => { if (g[c]) return; g[c] = 2; if (sp === st.length) { const s2 = new Int32Array(sp * 2); s2.set(st); st = s2; } st[sp++] = c; };
+  while (sp) { const c = st[--sp], i = c % nx, r = (c - i) / nx, j = r % ny, k = (r - j) / ny;
+    if (i > 0) vai(c - 1); if (i < nx - 1) vai(c + 1); if (j > 0) vai(c - nx); if (j < ny - 1) vai(c + nx); if (k > 0) vai(c - L); if (k < nz - 1) vai(c + L); }
+  return (i, j, k) => { i -= x0; j -= y0; k -= z0; return i >= 0 && j >= 0 && k >= 0 && i < nx && j < ny && k < nz && g[i + nx * (j + ny * k)] !== 2; };
+}
+// faces visíveis com oclusão de canto (AO). M: grupo de cada voxel (0 plástico/madeira, 1 metal) ou null. Por grupo: posição int16 (em unidades
+// de voxel), normal int8, sombra e o voxel de cada vértice; índices de 16 ou 32 bits. Conta as faces antes e escreve direto em arrays tipados.
+function vxwMalha(I, J, K, n, has, M, ng) {
+  const F = [[1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1], [-1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0], [0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0],
+    [0, -1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1], [0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1], [0, 0, -1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0]]; // normal + 4 cantos
+  const cnt = new Int32Array(ng), vis = new Uint8Array(n);
+  for (let t = 0; t < n; t++) { let b = 0, c = 0; for (let f = 0; f < 6; f++) { const d = F[f]; if (!has(I[t] + d[0], J[t] + d[1], K[t] + d[2])) { b |= 1 << f; c++; } } vis[t] = b; cnt[M ? M[t] : 0] += c; }
+  const G = []; for (let q = 0; q < ng; q++) { const nf = cnt[q], nv = nf * 4; G.push(nf ? { nv, v: 0, x: 0, p: new Int16Array(nv * 3), n: new Int8Array(nv * 3), sh: new Float32Array(nv), vox: new Int32Array(nv), i: nv > 65535 ? new Uint32Array(nf * 6) : new Uint16Array(nf * 6) } : null); }
+  const ao = [0, 0, 0, 0], q = [0, 0, 0], o = [0, 0, 0];
+  for (let t = 0; t < n; t++) { const b = vis[t]; if (!b) continue; const g = G[M ? M[t] : 0], vi = I[t], vj = J[t], vk = K[t];
+    for (let f = 0; f < 6; f++) { if (!(b >> f & 1)) continue; const d = F[f], a0 = d[0] ? 1 : 0, a1 = d[2] ? 1 : 2, base = g.v; o[0] = vi + d[0]; o[1] = vj + d[1]; o[2] = vk + d[2];
       for (let c = 0; c < 4; c++) {
-        const cr = cs[c], d0 = cr[ax[0]] ? 1 : -1, d1 = cr[ax[1]] ? 1 : -1;
-        q[0] = o[0]; q[1] = o[1]; q[2] = o[2]; q[ax[0]] += d0; const a = has(q[0], q[1], q[2]) ? 1 : 0;
-        q[ax[0]] -= d0; q[ax[1]] += d1; const b = has(q[0], q[1], q[2]) ? 1 : 0; q[ax[0]] += d0; const k = has(q[0], q[1], q[2]) ? 1 : 0;
-        const sh = 1 - (a && b ? 3 : a + b + k) * .16; ao[c] = sh;
-        g.p.push((v.i + cr[0]) * h, (v.j + cr[1]) * h, (v.k + cr[2]) * h); g.n.push(n[0], n[1], n[2]); g.c.push(cl[0] * sh, cl[1] * sh, cl[2] * sh);
+        const e = 3 + c * 3, d0 = d[e + a0] ? 1 : -1, d1 = d[e + a1] ? 1 : -1;
+        q[0] = o[0]; q[1] = o[1]; q[2] = o[2]; q[a0] += d0; const A = has(q[0], q[1], q[2]) ? 1 : 0;
+        q[a0] -= d0; q[a1] += d1; const B = has(q[0], q[1], q[2]) ? 1 : 0; q[a0] += d0; const C = has(q[0], q[1], q[2]) ? 1 : 0;
+        const sh = 1 - (A && B ? 3 : A + B + C) * .16, v = g.v++; ao[c] = sh;
+        g.p[v * 3] = vi + d[e]; g.p[v * 3 + 1] = vj + d[e + 1]; g.p[v * 3 + 2] = vk + d[e + 2]; g.n[v * 3] = d[0] * 127; g.n[v * 3 + 1] = d[1] * 127; g.n[v * 3 + 2] = d[2] * 127; g.sh[v] = sh; g.vox[v] = t;
       }
-      if (ao[0] + ao[2] < ao[1] + ao[3]) g.i.push(base + 1, base + 2, base + 3, base + 1, base + 3, base); else g.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      const ix = g.i, x = g.x; g.x += 6;
+      if (ao[0] + ao[2] < ao[1] + ao[3]) { ix[x] = base + 1; ix[x + 1] = base + 2; ix[x + 2] = base + 3; ix[x + 3] = base + 1; ix[x + 4] = base + 3; ix[x + 5] = base; }
+      else { ix[x] = base; ix[x + 1] = base + 1; ix[x + 2] = base + 2; ix[x + 3] = base; ix[x + 4] = base + 2; ix[x + 5] = base + 3; }
     }
   }
-  return G.map(g => { if (!g.i.length) return null; const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(g.p, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(g.n, 3));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(g.c, 3)); geo.setIndex(g.i.length > 65535 ? new THREE.Uint32BufferAttribute(g.i, 1) : new THREE.Uint16BufferAttribute(g.i, 1)); geo.computeBoundingSphere(); geo.userData.keep = true; return geo; });
+  return G;
 }
-// miolo: o espaço vazio que o ar de fora não alcança (dentro de peças fechadas) vira voxel, então as faces de dentro da casca somem
+// passo dobrado (gráfico Baixo, reamostrando a grade do arquivo): cada bloco 2x2x2 vira um voxel; cor = média, metal = maioria, P = 1º voxel do bloco
+function vxwMeio(I, J, K, n, Cr, M) {
+  const ix = new Map(), P = [], S = [];
+  for (let t = 0; t < n; t++) { const key = ((Math.floor(I[t] / 2) + 1024) * 2048 + (Math.floor(J[t] / 2) + 1024)) * 2048 + (Math.floor(K[t] / 2) + 1024);
+    let u = ix.get(key); if (u === undefined) { ix.set(key, u = P.length); P.push(t); S.push(0, 0, 0, 0, 0); }
+    S[u * 5] += Cr[t * 3]; S[u * 5 + 1] += Cr[t * 3 + 1]; S[u * 5 + 2] += Cr[t * 3 + 2]; S[u * 5 + 3] += M ? M[t] : 0; S[u * 5 + 4]++; }
+  const m = P.length, r = { n: m, I: new Int32Array(m), J: new Int32Array(m), K: new Int32Array(m), C: new Uint8Array(m * 3), M: new Uint8Array(m), P };
+  for (let u = 0; u < m; u++) { const t = P[u], c = S[u * 5 + 4]; r.I[u] = Math.floor(I[t] / 2); r.J[u] = Math.floor(J[t] / 2); r.K[u] = Math.floor(K[t] / 2);
+    for (let q = 0; q < 3; q++) r.C[u * 3 + q] = Math.round(S[u * 5 + q] / c); r.M[u] = S[u * 5 + 3] * 2 >= c ? 1 : 0; }
+  return r;
+}
+// arquivo da arma (sem o gzip) -> por peça { malha, osso, h, geos: [plástico/madeira, metal] } com arrays tipados; tr = buffers a transferir
+function vxwArma(buf, meio) {
+  const dv = new DataView(buf); if (buf.byteLength < 6 || dv.getUint32(0, true) !== 0x31584f56) return null;
+  const dec = new TextDecoder(), np = dv.getUint16(4, true), partes = [], tr = []; let o = 6;
+  for (let q = 0; q < np; q++) {
+    const malha = dv.getUint16(o, true), L = dv.getUint8(o + 2), osso = dec.decode(new Uint8Array(buf, o + 3, L)) || null; o += 3 + L;
+    let h = dv.getFloat32(o, true), n = dv.getUint32(o + 4, true); o += 8;
+    let I = new Int32Array(n), J = new Int32Array(n), K = new Int32Array(n), Cr = new Uint8Array(n * 3), M = new Uint8Array(n);
+    for (let t = 0; t < n; t++, o += 10) { I[t] = dv.getInt16(o, true); J[t] = dv.getInt16(o + 2, true); K[t] = dv.getInt16(o + 4, true); Cr[t * 3] = dv.getUint8(o + 6); Cr[t * 3 + 1] = dv.getUint8(o + 7); Cr[t * 3 + 2] = dv.getUint8(o + 8); M[t] = dv.getUint8(o + 9); }
+    if (meio) { const r = vxwMeio(I, J, K, n, Cr, M); ({ n, I, J, K, M } = r); Cr = r.C; h *= 2; }
+    const vx = { I: Int16Array.from(I), J: Int16Array.from(J), K: Int16Array.from(K), C: Cr, M }; tr.push(vx.I.buffer, vx.J.buffer, vx.K.buffer, Cr.buffer, M.buffer); // casca compacta (recortes do fz2/an)
+    partes.push({ malha, osso, h, geos: vxwParte(I, J, K, n, Cr, M, tr), vx });
+  }
+  return { partes, tr };
+}
+function vxwParte(I, J, K, n, Cr, M, tr) { // uma peça -> [plástico/madeira, metal] em arrays tipados
+  const lin = new Float32Array(256); for (let x = 0; x < 256; x++) lin[x] = Math.pow(x / 255, 2.2); // cor sRGB -> linear
+  return vxwMalha(I, J, K, n, vxwGrade(I, J, K, n), M, 2).map(g => { if (!g) return null;
+    const c = new Uint16Array(g.nv * 3); for (let v = 0; v < g.nv; v++) { const t = g.vox[v] * 3, s = g.sh[v] * 65535; for (let e = 0; e < 3; e++) c[v * 3 + e] = Math.min(65535, Math.round(lin[Cr[t + e]] * s)); }
+    tr.push(g.p.buffer, g.n.buffer, c.buffer, g.i.buffer); return { p: g.p, n: g.n, c, i: g.i }; });
+}
+// arquivo dos braços -> geometria de SkinnedMesh: cada canto leva os pesos da média dos voxels da casca que tocam o canto (4 maiores,
+// soma exata 255: senão o vértice encolhe), então a malha continua fechada quando as juntas dobram
+function vxwBracos(buf, meio) {
+  const dv = new DataView(buf); if (buf.byteLength < 12 || dv.getUint32(0, true) !== 0x31425856) return null;
+  const lin = new Float32Array(256); for (let x = 0; x < 256; x++) lin[x] = Math.pow(x / 255, 2.2);
+  let h = dv.getFloat32(4, true), n = dv.getUint32(8, true), o = 12;
+  let I = new Int32Array(n), J = new Int32Array(n), K = new Int32Array(n), Cr = new Uint8Array(n * 3), BI = new Uint8Array(n * 4), BW = new Float32Array(n * 4);
+  for (let t = 0; t < n; t++, o += 17) { I[t] = dv.getInt16(o, true); J[t] = dv.getInt16(o + 2, true); K[t] = dv.getInt16(o + 4, true); for (let e = 0; e < 3; e++) Cr[t * 3 + e] = dv.getUint8(o + 6 + e);
+    let tot = 0; for (let q = 0; q < 4; q++) { BI[t * 4 + q] = dv.getUint8(o + 9 + q); tot += BW[t * 4 + q] = dv.getUint8(o + 13 + q) / 255; } if (tot > 0) for (let q = 0; q < 4; q++) BW[t * 4 + q] /= tot; }
+  if (meio) { const r = vxwMeio(I, J, K, n, Cr, null), BI2 = new Uint8Array(r.n * 4), BW2 = new Float32Array(r.n * 4);
+    for (let u = 0; u < r.n; u++) for (let q = 0; q < 4; q++) { BI2[u * 4 + q] = BI[r.P[u] * 4 + q]; BW2[u * 4 + q] = BW[r.P[u] * 4 + q]; }
+    ({ n, I, J, K } = r); Cr = r.C; BI = BI2; BW = BW2; h *= 2; }
+  const g = vxwMalha(I, J, K, n, vxwGrade(I, J, K, n), null, 1)[0]; if (!g) return null;
+  const Kk = (i, j, k) => ((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024), ix = new Map(); for (let t = 0; t < n; t++) ix.set(Kk(I[t], J[t], K[t]), t);
+  const nv = g.nv, c = new Uint16Array(nv * 3), si = new Uint8Array(nv * 4), sw = new Uint8Array(nv * 4), CW = new Map(), ob = new Int32Array(32), ow = new Float64Array(32), tw = [0, 0, 0, 0];
+  for (let v = 0; v < nv; v++) {
+    const t = g.vox[v] * 3, s = g.sh[v] * 65535; for (let e = 0; e < 3; e++) c[v * 3 + e] = Math.min(65535, Math.round(lin[Cr[t + e]] * s));
+    const ci = g.p[v * 3], cj = g.p[v * 3 + 1], ck = g.p[v * 3 + 2], key = Kk(ci, cj, ck), r = CW.get(key);
+    if (r !== undefined) { for (let q = 0; q < 4; q++) { si[v * 4 + q] = si[r * 4 + q]; sw[v * 4 + q] = sw[r * 4 + q]; } continue; }
+    CW.set(key, v); let m = 0;
+    for (let a = -1; a <= 0; a++) for (let b = -1; b <= 0; b++) for (let d = -1; d <= 0; d++) { const u = ix.get(Kk(ci + a, cj + b, ck + d)); if (u === undefined) continue;
+      for (let q = 0; q < 4; q++) { const w = BW[u * 4 + q]; if (!(w > 0)) continue; const bi = BI[u * 4 + q]; let e = 0; while (e < m && ob[e] !== bi) e++; if (e === m) { ob[m] = bi; ow[m++] = 0; } ow[e] += w; } }
+    let tot = 0, k = 0;
+    for (; k < 4; k++) { let best = -1; for (let e = 0; e < m; e++) if (ow[e] > 0 && (best < 0 || ow[e] > ow[best])) best = e; if (best < 0) break; si[v * 4 + k] = ob[best]; tw[k] = ow[best]; tot += ow[best]; ow[best] = -1; }
+    let s8 = 0; for (let q = 0; q < k; q++) s8 += sw[v * 4 + q] = Math.round(tw[q] / tot * 255);
+    sw[v * 4] += 255 - s8; // soma exata 255 (o resto vai para o maior; sem peso nenhum: osso 0 inteiro)
+  }
+  return { h, geo: { p: g.p, n: g.n, c, si, sw, i: g.i }, tr: [g.p.buffer, g.n.buffer, c.buffer, si.buffer, sw.buffer, g.i.buffer] };
+}
+async function vxwAbre(buf) { // gzip -> binário; se o servidor já entregou sem o gzip (Content-Encoding), usa como veio
+  const u = new Uint8Array(buf, 0, Math.min(2, buf.byteLength)); if (u[0] !== 0x1f || u[1] !== 0x8b) return buf;
+  return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+}
+function vxwFaz(tipo, buf, meio) { return vxwAbre(buf).then(b => (tipo === 'bracos' ? vxwBracos : vxwArma)(b, meio)); }
+const VXW = { w: null, n: 0, cb: new Map() };
+function vxwPede(tipo, buf, meio) { // monta no Worker (os buffers vão e voltam transferidos); sem Worker: uma vez, no ócio
+  if (VXW.w === null) try {
+    const src = [vxwGrade, vxwMalha, vxwMeio, vxwArma, vxwParte, vxwBracos, vxwAbre, vxwFaz].map(String).join('\n') +
+      '\nonmessage = e => { const { id, tipo, buf, meio } = e.data; vxwFaz(tipo, buf, meio).then(r => postMessage({ id, r }, r ? r.tr : []), err => postMessage({ id, err: String(err) })); };';
+    VXW.w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    VXW.w.onmessage = e => { const f = VXW.cb.get(e.data.id); VXW.cb.delete(e.data.id); f?.(e.data); };
+    VXW.w.onerror = () => { VXW.w = false; for (const f of VXW.cb.values()) f({ err: 'worker' }); VXW.cb.clear(); };
+  } catch { VXW.w = false; }
+  if (!VXW.w) return new Promise(ok => (window.requestIdleCallback || setTimeout)(ok)).then(() => vxwFaz(tipo, buf, meio));
+  return new Promise((ok, erro) => { const id = ++VXW.n; VXW.cb.set(id, d => d.err ? erro(d.err) : ok(d.r)); VXW.w.postMessage({ id, tipo, buf, meio }, [buf]); });
+}
+// arrays do Worker -> BufferGeometry com atributos compactos (posição int16 em unidades de voxel, normal int8, cor uint16; pele: ossos e pesos uint8)
+function vxGeo(g) {
+  const geo = new THREE.BufferGeometry(), p = g.p; geo.setAttribute('position', new THREE.BufferAttribute(p, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(g.n, 3, true));
+  geo.setAttribute('color', new THREE.BufferAttribute(g.c, 3, true)); if (g.si) { geo.setAttribute('skinIndex', new THREE.BufferAttribute(g.si, 4)); geo.setAttribute('skinWeight', new THREE.BufferAttribute(g.sw, 4, true)); }
+  geo.setIndex(new THREE.BufferAttribute(g.i, 1));
+  const a = [1e9, 1e9, 1e9], b = [-1e9, -1e9, -1e9]; for (let x = 0; x < p.length; x += 3) for (let e = 0; e < 3; e++) { const v = p[x + e]; if (v < a[e]) a[e] = v; if (v > b[e]) b[e] = v; }
+  geo.boundingSphere = new THREE.Sphere(new V3((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / 2);
+  geo.userData.keep = true; return geo;
+}
+const vxBytes = g => { let s = 0; if (g) { for (const k in g.attributes) s += g.attributes[k].array.byteLength; s += g.index?.array.byteLength || 0; } return s; };
+function vxEnt(tipo, r) {
+  if (!r) return null; let bytes = 0, tri = 0; const geo = g => { const x = vxGeo(g); bytes += vxBytes(x); tri += g.i.length / 3; return x; };
+  if (tipo === 'bracos') return { h: r.h, geo: geo(r.geo), bytes, tri };
+  const partes = r.partes.map(p => { for (const k in p.vx) bytes += p.vx[k].byteLength; return vxComV({ malha: p.malha, osso: p.osso, h: p.h, geos: p.geos.map(g => g && geo(g)), vx: p.vx }); });
+  return { partes, bytes, tri };
+}
+// p.V (Map de voxels, como no arquivo) só quando alguém pede (recortes do fz2/an): montado na hora a partir da casca compacta, não guardado
+function vxComV(p) { return Object.defineProperty(p, 'V', { configurable: true, get() { const { I, J, K, C, M } = this.vx, V = new Map();
+  for (let t = 0; t < I.length; t++) V.set(((I[t] + 1024) * 2048 + (J[t] + 1024)) * 2048 + (K[t] + 1024), { i: I[t], j: J[t], k: K[t], c: [C[t * 3] / 255, C[t * 3 + 1] / 255, C[t * 3 + 2] / 255], m: M[t] }); return V; } }); }
+// recortes (fz2/an, no fio principal; só nas armas que têm): miolo como voxels cinza (o corte fica fechado) e Map -> malha compacta
 function vxMiolo(V) {
-  let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
-  for (const v of V.values()) { x0 = Math.min(x0, v.i); y0 = Math.min(y0, v.j); z0 = Math.min(z0, v.k); x1 = Math.max(x1, v.i); y1 = Math.max(y1, v.j); z1 = Math.max(z1, v.k); }
-  if (x0 > x1) return; x0--; y0--; z0--; x1++; y1++; z1++;
-  const nx = x1 - x0 + 1, ny = y1 - y0 + 1, nz = z1 - z0 + 1; if (nx * ny * nz > 4e7) return;
-  const g = new Uint8Array(nx * ny * nz), id = (i, j, k) => (i - x0) + nx * ((j - y0) + ny * (k - z0));
-  for (const v of V.values()) g[id(v.i, v.j, v.k)] = 1;
-  const st = new Int32Array(nx * ny * nz); let sp = 0; st[sp++] = 0; g[0] = 2; // ar de fora a partir do canto (a margem é vazia)
-  while (sp) { const c = st[--sp], i = c % nx, j = ((c / nx) | 0) % ny, k = (c / (nx * ny)) | 0;
-    if (i > 0 && !g[c - 1]) { g[c - 1] = 2; st[sp++] = c - 1; } if (i < nx - 1 && !g[c + 1]) { g[c + 1] = 2; st[sp++] = c + 1; }
-    if (j > 0 && !g[c - nx]) { g[c - nx] = 2; st[sp++] = c - nx; } if (j < ny - 1 && !g[c + nx]) { g[c + nx] = 2; st[sp++] = c + nx; }
-    const L = nx * ny; if (k > 0 && !g[c - L]) { g[c - L] = 2; st[sp++] = c - L; } if (k < nz - 1 && !g[c + L]) { g[c + L] = 2; st[sp++] = c + L; } }
-  const cinza = { i: 0, j: 0, k: 0, c: [.1, .1, .1], m: 0 };
-  for (let c = 0; c < g.length; c++) if (!g[c]) { const i = c % nx + x0, j = ((c / nx) | 0) % ny + y0, k = ((c / (nx * ny)) | 0) + z0; V.set(((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024), { ...cinza, i, j, k }); }
+  const n = V.size, I = new Int32Array(n), J = new Int32Array(n), K = new Int32Array(n); let t = 0; for (const v of V.values()) { I[t] = v.i; J[t] = v.j; K[t++] = v.k; }
+  let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9; for (t = 0; t < n; t++) { x0 = Math.min(x0, I[t]); x1 = Math.max(x1, I[t]); y0 = Math.min(y0, J[t]); y1 = Math.max(y1, J[t]); z0 = Math.min(z0, K[t]); z1 = Math.max(z1, K[t]); }
+  if (!n || (x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1) > 4e7) return; const has = vxwGrade(I, J, K, n);
+  for (let k = z0; k <= z1; k++) for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) { const key = ((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024); if (!V.has(key) && has(i, j, k)) V.set(key, { i, j, k, c: [.1, .1, .1], m: 0 }); }
+}
+function vxMalha(V) {
+  const n = V.size, I = new Int32Array(n), J = new Int32Array(n), K = new Int32Array(n), Cr = new Uint8Array(n * 3), M = new Uint8Array(n); let t = 0;
+  for (const v of V.values()) { I[t] = v.i; J[t] = v.j; K[t] = v.k; for (let e = 0; e < 3; e++) Cr[t * 3 + e] = Math.round(Math.min(1, v.c[e]) * 255); M[t++] = v.m; }
+  return vxwParte(I, J, K, n, Cr, M, []).map(g => g && vxGeo(g));
 }
 // uma malha: triângulos (no espaço do osso/da própria malha) -> voxels; devolve Map osso(ou null) -> [geos]
 function vxPeca(o, passoRaiz) {
@@ -19758,7 +19874,8 @@ function vxPeca(o, passoRaiz) {
   return out;
 }
 // arquivo pré-calculado (assets/vox/*.bin.gz, feito por tools/vox-bake.mjs): por peça, índice da malha, osso, passo e os voxels da casca
-// (i, j, k em int16 e r, g, b, metal em bytes). Sem o arquivo (arma nova), a arma é voxelizada na hora.
+// (i, j, k em int16 e r, g, b, metal em bytes). Sem o arquivo (arma nova), a arma fica lisa; o vox-bake
+// (window.__vxExport) voxeliza na hora e exporta.
 function vxPack(partes) {
   const enc = new TextEncoder(); let tam = 6; const nomes = partes.map(p => enc.encode(p.osso || ''));
   partes.forEach((p, i) => tam += 2 + 1 + nomes[i].length + 4 + 4 + p.V.size * 10);
@@ -19769,49 +19886,55 @@ function vxPack(partes) {
     for (const v of p.V.values()) { dv.setInt16(o, v.i, true); dv.setInt16(o + 2, v.j, true); dv.setInt16(o + 4, v.k, true); dv.setUint8(o + 6, Math.round(v.c[0] * 255)); dv.setUint8(o + 7, Math.round(v.c[1] * 255)); dv.setUint8(o + 8, Math.round(v.c[2] * 255)); dv.setUint8(o + 9, v.m); o += 10; } });
   return buf;
 }
-function vxUnpack(buf) {
-  const dv = new DataView(buf), dec = new TextDecoder(); let o = 0; if (dv.getUint32(0, true) !== 0x31584f56) return null; o = 4; const n = dv.getUint16(o, true); o += 2; const partes = [];
-  for (let q = 0; q < n; q++) { const malha = dv.getUint16(o, true); o += 2; const L = dv.getUint8(o); o += 1; const osso = dec.decode(new Uint8Array(buf, o, L)) || null; o += L;
-    const h = dv.getFloat32(o, true); o += 4; const c = dv.getUint32(o, true); o += 4; const V = new Map();
-    for (let t = 0; t < c; t++, o += 10) { const i = dv.getInt16(o, true), j = dv.getInt16(o + 2, true), k = dv.getInt16(o + 4, true); V.set(((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024), { i, j, k, c: [dv.getUint8(o + 6) / 255, dv.getUint8(o + 7) / 255, dv.getUint8(o + 8) / 255], m: dv.getUint8(o + 9) }); }
-    partes.push({ malha, osso, h, V }); }
-  return partes;
-}
 const vxNome = b8 => b8.replace(/^v\|/, '').replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '');
-const VXF = {}; // arquivos carregados: nome -> partes | Promise | null (não existe)
-function vxLoad(nome) {
-  if (nome in VXF) return VXF[nome];
-  return (VXF[nome] = fetch('assets/vox/' + nome + '.bin.gz').then(r => { if (!r.ok) throw 0; return new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer(); })
-    .then(b => { const p = VXF[nome] = vxUnpack(b); if (p) vxPre(nome, p); return p; }, () => (VXF[nome] = null)));
+// Cache das malhas prontas (armas e braços): chave = nome do arquivo + '@2' no gráfico Baixo (passo dobrado). LRU por bytes: as usadas na
+// mão (VX.uso) nunca saem; as outras saem (dispose) quando passa de VX.lim e voltam do arquivo (cache HTTP) + Worker se forem usadas de novo.
+// A casca (voxels) não fica guardada: só no vox-bake (window.__vxExport), que voxeliza na hora e exporta.
+const VXF = {}; // carregando: chave -> Promise; null = sem arquivo (fica o modelo liso)
+Object.assign(VX, { lim: 160e6, uso: new Set(), tent: {}, falta: [] });
+const vxMeio = () => CFG.gfx === 'baixo';
+const vxChave = nome => nome + (vxMeio() ? '@2' : '');
+const vxPronto = nome => !VX.on || VX.cache.has(vxChave(nome)) || VXF[vxChave(nome)] === null;
+function vxSolta(e) { if (e.geo) e.geo.dispose(); else for (const p of e.partes) p.geos.forEach(g => g?.dispose()); }
+function vxGuarda(ch, e) {
+  VX.cache.delete(ch); VX.cache.set(ch, e); let tot = 0; for (const x of VX.cache.values()) tot += x.bytes;
+  for (const [k, x] of VX.cache) { if (tot <= VX.lim) break; if (VX.uso.has(k) || k === ch) continue; vxSolta(x); VX.cache.delete(k); tot -= x.bytes; }
 }
-function vxPre(nome, partes) { // monta as malhas no ócio, uma peça por vez (a troca de arma não trava)
-  if (VX.cache.has(nome)) return; let i = 0;
-  const passo = () => { if (VX.cache.has(nome)) return; const p = partes[i++]; if (p) { const V = new Map(p.V); vxMiolo(V); p.geos = vxMalha(V, 1); }
-    if (i < partes.length) (window.requestIdleCallback || setTimeout)(passo); else VX.cache.set(nome, partes); };
-  (window.requestIdleCallback || setTimeout)(passo);
+function vxUsa(ch) { const e = VX.cache.get(ch); if (e) { VX.cache.delete(ch); VX.cache.set(ch, e); VX.uso.add(ch); } return e; }
+function vxLoad(nome) { // arquivo -> Worker -> malhas no cache; resolve com a entrada ou null
+  const ch = vxChave(nome), meio = vxMeio(), tipo = nome.startsWith('bracos_') ? 'bracos' : 'arma';
+  if (VX.cache.has(ch)) return Promise.resolve(VX.cache.get(ch)); if (ch in VXF) return Promise.resolve(VXF[ch]);
+  return (VXF[ch] = fetch('assets/vox/' + nome + '.bin.gz').then(r => { if (!r.ok) throw r.status; return r.arrayBuffer(); }).then(b => vxwPede(tipo, b, meio))
+    .then(r => { const e = vxEnt(tipo, r); if (!e) throw 0; delete VXF[ch]; vxGuarda(ch, e); return e; }).catch(x => { vxFalhou(nome, ch, x === 404); return null; }));
 }
-const vxPronto = nome => nome in VXF && !(VXF[nome] instanceof Promise);
-function vxArma(root, P, D, b8) {
+// sem arquivo (404, rede) ou sem DecompressionStream: fica o modelo liso (nada é voxelizado na hora no fio principal); tenta de novo no ócio
+function vxFalhou(nome, ch, nao) { // nao: 404 (o arquivo não existe: não adianta tentar de novo)
+  VXF[ch] = null; if (nao || !window.DecompressionStream || window.__vxExport) return; const n = VX.tent[ch] = (VX.tent[ch] || 0) + 1; if (n > 3) return;
+  setTimeout(() => (window.requestIdleCallback || setTimeout)(() => { if (VXF[ch] !== null) return; delete VXF[ch];
+    vxLoad(nome).then(e => { if (e && vmGun?.userData.fps2?.vxFalta?.includes(ch)) vmSetWeapon(G.cur); }); }), 15000 * n);
+}
+function vxArma(root, P, D, b8, F2) {
   if (!VX.on) return; const t0 = performance.now();
   root.updateMatrixWorld(true);
   const passo = VX.passo * FPG * P.hr, lens = new Set(D?.lens || []), alvo = [];
-  const vis = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
+  const vis = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }, dentro = (o, a) => { for (let p = o; p; p = p.parent) if (p === a) return true; return false; };
   root.traverse(o => { if (o.isMesh && !o.userData.vox && !fpArm(o) && vis(o) && !lens.has(o.material?.name) && !o.material?.transparent && o.geometry?.attributes.position) alvo.push(o); });
-  const mats = vxMats(), nome = vxNome(b8 || ''), arq = vxPronto(nome) ? VXF[nome] : null;
-  let partes = VX.cache.get(nome);
-  if (!partes) {
-    partes = arq || [];
-    if (!arq) alvo.forEach((o, mi) => { for (const [b, gr] of vxPeca(o, passo)) partes.push({ malha: mi, osso: b ? b.name : null, h: gr.h, V: gr.V }); });
-    for (const p of partes) if (!p.geos) { const V = new Map(p.V); vxMiolo(V); p.geos = vxMalha(V, 1); } // casca + miolo -> malha (a casca fica para exportar)
-    VX.cache.set(nome, partes);
+  const mats = vxMats(), nome = vxNome(b8 || ''), ch = vxChave(nome); let e = vxUsa(ch);
+  if (!e && window.__vxExport) { // vox-bake: voxeliza na hora e guarda a casca para exportar
+    const partes = []; alvo.forEach((o, mi) => { for (const [b, gr] of vxPeca(o, passo)) partes.push({ malha: mi, osso: b ? b.name : null, h: gr.h, V: gr.V }); });
+    e = vxEnt('arma', vxwArma(vxPack(partes), vxMeio())); if (e) { e.partes.forEach((p, i) => Object.defineProperty(p, 'V', { value: partes[i].V })); vxGuarda(ch, e); vxUsa(ch); }
   }
-  VX.ult = { nome, partes }; VX.ms = Math.round(performance.now() - t0); VX.arq = !!arq;
-  for (const p of partes) {
+  VX.ms = Math.round(performance.now() - t0); VX.arq = !window.__vxExport;
+  if (!e) { VX.falta.push(ch); return; } // sem arquivo: a arma fica lisa
+  VX.ult = { nome: ch, partes: e.partes }; // (vxExport, fz2Recorte, anPecas)
+  for (const p of e.partes) {
     const o = alvo[p.malha]; if (!o) continue;
     const pai = p.osso ? (o.isSkinnedMesh ? o.skeleton.bones.find(b => b.name === p.osso) : null) : o; if (!pai) continue;
-    p.geos.forEach((g, i) => { if (!g) return; const vm = new THREE.Mesh(g, mats[i]); vm.userData.vox = 1; vm.userData.vxp = p; vm.frustumCulled = false; vm.name = 'vox'; vm.scale.setScalar(p.h); pai.add(vm); }); // malha em unidades de voxel (vxp: a parte, para o recorte de peças do an)
+    if (F2 && dentro(o, F2.g) && !dentro(pai, F2.b)) { for (const g of p.geos) if (g) { e.bytes -= vxBytes(g); e.tri -= g.index.count / 3; g.dispose(); } p.geos = [null, null]; continue; } // carregador fantasma: só as peças do carregador
+    const c0 = o.material.color, mad = c0.r > c0.b * 1.6 && c0.r > .08; // madeira/marrom (o fpSkin decide por isto: o material vox é branco)
+    p.geos.forEach((g, i) => { if (!g) return; const vm = new THREE.Mesh(g, mats[i]); Object.assign(vm.userData, { vox: 1, vxp: p, voxDe: o.material.name, voxMad: mad }); vm.frustumCulled = false; vm.name = 'vox'; vm.scale.setScalar(p.h); pai.add(vm); }); // malha em unidades de voxel (vxp: a parte, para o recorte de peças do an)
   }
-  for (const o of alvo) { if (o.isSkinnedMesh) o.visible = false; else { o.geometry = new THREE.BufferGeometry(); o.userData.voxOrig = 1; } }
+  for (const o of alvo) { o.userData.voxOrig = 1; if (o.isSkinnedMesh) o.visible = false; else { o.geometry = new THREE.BufferGeometry(); o.material.visible = false; } } // (material já é cópia: não sobe textura nem programa)
 }
 // skin/camuflagem em cima do voxel: cada cubo pega UMA cor da estampa (no centro dele) e o sombreado/cor do próprio voxel modula
 // (a malha está em unidades de voxel; triS converte para a escala da arma, como no triMat/skinOn)
@@ -19836,7 +19959,7 @@ function vxExport() { const u = VX.ult; if (!u) return null; const b = new Uint8
 // amarração e vira uma SkinnedMesh ligada ao MESMO esqueleto: cada canto dos cubos leva os pesos de osso da média dos voxels que tocam
 // aquele canto, então a malha continua fechada quando as juntas dobram (sem frestas entre os cubos) e todas as animações do pacote, o IK
 // dos braços e as trocas de pacote (fpArmsSwap) valem como antes. Arquivo pré-calculado: assets/vox/bracos_<pacote>_<n>.bin.gz.
-const VXB = { cache: new Map(), mat: null, ult: new Map(), passo: .0016 }; // braços: cubo menor que o da arma (ficam bem mais perto da câmera)
+const VXB = { mat: null, ult: new Map(), passo: .0016 }; // braços: cubo menor que o da arma (ficam bem mais perto da câmera)
 function vxbMat() { return VXB.mat ||= new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .74, metalness: 0, envMapIntensity: .7, name: 'voxPele' }); }
 const vxbK = (i, j, k) => ((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024);
 function vxbVoxels(o, h) { // casca na pose de amarração (posições da geometria), com cor e até 4 pesos de osso por voxel
@@ -19872,57 +19995,12 @@ function vxbVoxels(o, h) { // casca na pose de amarração (posições da geomet
   }
   return V;
 }
-function vxbMalha(V0, h) { // casca + miolo -> SkinnedMesh geometry (pesos por canto: média dos voxels em volta)
-  const V = new Map(V0); vxMiolo(V);
-  const has = (i, j, k) => V.has(vxbK(i, j, k)), CW = new Map();
-  const canto = (ci, cj, ck) => { const key = vxbK(ci, cj, ck); let r = CW.get(key); if (r) return r; const acc = {};
-    for (let a = -1; a <= 0; a++) for (let b = -1; b <= 0; b++) for (let c = -1; c <= 0; c++) { const e = V0.get(vxbK(ci + a, cj + b, ck + c)); if (!e) continue; for (let q = 0; q < 4; q++) if (e.bw[q] > 0) acc[e.bi[q]] = (acc[e.bi[q]] || 0) + e.bw[q]; }
-    const top = Object.entries(acc).sort((p, q) => q[1] - p[1]).slice(0, 4), tot = top.reduce((x, p) => x + p[1], 0) || 1;
-    r = [top.map(p => +p[0]), top.map(p => p[1] / tot)]; while (r[0].length < 4) { r[0].push(0); r[1].push(0); } CW.set(key, r); return r; };
-  const F = [[[1, 0, 0], [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]]], [[-1, 0, 0], [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]]], [[0, 1, 0], [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]]],
-    [[0, -1, 0], [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]]], [[0, 0, 1], [[1, 0, 1], [1, 1, 1], [0, 1, 1], [0, 0, 1]]], [[0, 0, -1], [[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 0, 0]]]];
-  const p = [], nr = [], cl = [], si = [], sw = [], ix = [], ao = [0, 0, 0, 0], o = [0, 0, 0], q = [0, 0, 0];
-  for (const v of V0.values()) {
-    const lc = [Math.pow(v.c[0], 2.2), Math.pow(v.c[1], 2.2), Math.pow(v.c[2], 2.2)];
-    for (const [nn, cs] of F) {
-      if (has(v.i + nn[0], v.j + nn[1], v.k + nn[2])) continue;
-      const base = p.length / 3, ax = nn[0] ? [1, 2] : nn[1] ? [0, 2] : [0, 1]; o[0] = v.i + nn[0]; o[1] = v.j + nn[1]; o[2] = v.k + nn[2];
-      for (let c = 0; c < 4; c++) {
-        const cr = cs[c], d0 = cr[ax[0]] ? 1 : -1, d1 = cr[ax[1]] ? 1 : -1;
-        q[0] = o[0]; q[1] = o[1]; q[2] = o[2]; q[ax[0]] += d0; const a = has(q[0], q[1], q[2]) ? 1 : 0;
-        q[ax[0]] -= d0; q[ax[1]] += d1; const b = has(q[0], q[1], q[2]) ? 1 : 0; q[ax[0]] += d0; const k = has(q[0], q[1], q[2]) ? 1 : 0;
-        const sh = 1 - (a && b ? 3 : a + b + k) * .16; ao[c] = sh;
-        const ci = v.i + cr[0], cj = v.j + cr[1], ck = v.k + cr[2], [bi, bw] = canto(ci, cj, ck);
-        p.push(ci * h, cj * h, ck * h); nr.push(nn[0], nn[1], nn[2]); cl.push(lc[0] * sh, lc[1] * sh, lc[2] * sh); si.push(...bi); sw.push(...bw);
-      }
-      if (ao[0] + ao[2] < ao[1] + ao[3]) ix.push(base + 1, base + 2, base + 3, base + 1, base + 3, base); else ix.push(base, base + 1, base + 2, base, base + 2, base + 3);
-    }
-  }
-  // atributos compactos (normal em int8, cor em uint16, pesos e ossos em uint8): ~1/2 da memória de vídeo
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.Int8BufferAttribute(nr.map(x => x * 127), 3, true));
-  g.setAttribute('color', new THREE.Uint16BufferAttribute(cl.map(x => Math.round(Math.min(1, x) * 65535)), 3, true)); g.setAttribute('skinIndex', new THREE.Uint8BufferAttribute(si, 4));
-  const sw8 = new Uint8Array(sw.length); for (let i = 0; i < sw.length; i += 4) { let t = 0, mx = i; for (let q = 0; q < 4; q++) { sw8[i + q] = Math.round(sw[i + q] * 255); t += sw8[i + q]; if (sw[i + q] > sw[mx]) mx = i + q; } sw8[mx] += 255 - t; } // soma exata 255 (senão o vértice encolhe)
-  g.setAttribute('skinWeight', new THREE.Uint8BufferAttribute(sw8, 4, true));
-  g.setIndex(ix.length / 1 > 65535 ? new THREE.Uint32BufferAttribute(ix, 1) : new THREE.Uint16BufferAttribute(ix, 1)); g.computeBoundingSphere(); g.userData.keep = true; return g;
-}
 function vxbPack(h, V) {
   const buf = new ArrayBuffer(12 + V.size * 17), dv = new DataView(buf); let o = 0;
   dv.setUint32(0, 0x31425856, true); dv.setFloat32(4, h, true); dv.setUint32(8, V.size, true); o = 12;
   for (const e of V.values()) { dv.setInt16(o, e.i, true); dv.setInt16(o + 2, e.j, true); dv.setInt16(o + 4, e.k, true); for (let c = 0; c < 3; c++) dv.setUint8(o + 6 + c, Math.round(e.c[c] * 255));
     for (let q = 0; q < 4; q++) { dv.setUint8(o + 9 + q, e.bi[q]); dv.setUint8(o + 13 + q, Math.round(e.bw[q] * 255)); } o += 17; }
   return buf;
-}
-function vxbUnpack(buf) {
-  const dv = new DataView(buf); if (dv.getUint32(0, true) !== 0x31425856) return null; const h = dv.getFloat32(4, true), n = dv.getUint32(8, true), V = new Map(); let o = 12;
-  for (let t = 0; t < n; t++, o += 17) { const i = dv.getInt16(o, true), j = dv.getInt16(o + 2, true), k = dv.getInt16(o + 4, true), bi = [], bw = []; let tot = 0;
-    for (let q = 0; q < 4; q++) { bi.push(dv.getUint8(o + 9 + q)); const w = dv.getUint8(o + 13 + q) / 255; bw.push(w); tot += w; } if (tot > 0) for (let q = 0; q < 4; q++) bw[q] /= tot;
-    V.set(vxbK(i, j, k), { i, j, k, c: [dv.getUint8(o + 6) / 255, dv.getUint8(o + 7) / 255, dv.getUint8(o + 8) / 255], bi, bw }); }
-  return { h, V };
-}
-function vxbLoad(nome) {
-  if (nome in VXF) return VXF[nome];
-  return (VXF[nome] = fetch('assets/vox/' + nome + '.bin.gz').then(r => { if (!r.ok) throw 0; return new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer(); })
-    .then(b => { const d = VXF[nome] = vxbUnpack(b); if (d) (window.requestIdleCallback || setTimeout)(() => { if (!VXB.cache.has(nome)) VXB.cache.set(nome, { h: d.h, geo: vxbMalha(d.V, d.h) }); }); return d; }, () => (VXF[nome] = null)));
 }
 const vxbNomes = (P, W2) => ['bracos_' + (P.armsFrom || W2.pack) + '_0'];
 function vxBracos(root, P, W2) { // troca a malha dos braços (com esqueleto) pela de voxels, ligada ao mesmo esqueleto
@@ -19931,18 +20009,17 @@ function vxBracos(root, P, W2) { // troca a malha dos braços (com esqueleto) pe
   const Ri = root.matrixWorld.clone().invert(), vis = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }, alvo = [];
   root.traverse(o => { if (fpArmsMesh(o) && vis(o)) alvo.push(o); });
   alvo.forEach((o, n) => {
-    const nome = 'bracos_' + (P.armsFrom || W2.pack) + '_' + n; let c = VXB.cache.get(nome);
-    if (!c) { const d = vxPronto(nome) ? VXF[nome] : null; let h, V;
-      if (d) ({ h, V } = d); else { h = VXB.passo * FPG * P.hr / fpMeshScale(o, Ri); V = vxbVoxels(o, h); VXB.ult.set(nome, { h, V }); }
-      VXB.cache.set(nome, c = { h, geo: vxbMalha(V, h) }); }
+    const nome = 'bracos_' + (P.armsFrom || W2.pack) + '_' + n, ch = vxChave(nome); let c = vxUsa(ch);
+    if (!c && window.__vxExport) { const h = VXB.passo * FPG * P.hr / fpMeshScale(o, Ri), V = vxbVoxels(o, h); VXB.ult.set(nome, { h, V }); c = vxEnt('bracos', vxwBracos(vxbPack(h, V), vxMeio())); if (c) { vxGuarda(ch, c); vxUsa(ch); } }
+    if (!c) { VX.falta.push(ch); return; } // sem arquivo: ficam os braços lisos
     const vm = new THREE.SkinnedMesh(c.geo, vxbMat()); vm.name = 'voxBraco'; vm.userData.vox = 1; vm.frustumCulled = false;
     o.parent.add(vm); vm.position.copy(o.position); vm.quaternion.copy(o.quaternion); vm.scale.copy(o.scale); vm.updateMatrixWorld(true);
-    vm.bind(o.skeleton, o.bindMatrix.clone()); o.visible = false;
+    vm.bind(o.skeleton, o.bindMatrix.clone().multiply(new THREE.Matrix4().makeScale(c.h, c.h, c.h))); o.visible = false; // posição em unidades de voxel: o passo entra na matriz de amarração
   });
 }
 function vxbExport() { const out = []; for (const [nome, { h, V }] of VXB.ult) { const b = new Uint8Array(vxbPack(h, V)); let s = ''; for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768)); out.push({ nome, b64: btoa(s) }); } return out; }
 function fpBuild(id, ud) {
-  const W2 = fpw(id), P = FPK[W2.pack], D = W2.m && FPM[W2.m], pk = 'p:' + W2.pack, mk = W2.m && 'm:' + W2.m;
+  const tb0 = performance.now(), W2 = fpw(id), P = FPK[W2.pack], D = W2.m && FPM[W2.m], pk = 'p:' + W2.pack, mk = W2.m && 'm:' + W2.m;
   const ak = P.armsFrom && 'p:' + P.armsFrom;
   if (!fpReady(pk) || (mk && !fpReady(mk)) || (ak && !fpReady(ak))) {
     Promise.all([fpLoad(pk), mk && fpLoad(mk), ak && fpLoad(ak)]).then(() => { if (fpReady(pk) && (!mk || fpReady(mk)) && (!ak || fpReady(ak)) && vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); });
@@ -19950,9 +20027,9 @@ function fpBuild(id, ud) {
   }
   const b8 = 'v|' + pk + '|' + (mk || '') + '|' + (ak || ''); // O1-B08: só entra pronta (programas e texturas); até lá fica a de antes
   if (!b08Ok(b8)) { b08Pedir(b8).p.then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; }
-  const vxn = vxNome(b8 + (W[id]?.sil ? '|sil' : ''));
-  for (const nb of vxbNomes(P, W2)) if (VX.on && !vxPronto(nb)) { vxbLoad(nb).then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; } // vxb: espera o arquivo dos braços
-  if (VX.on && !vxPronto(vxn)) { vxLoad(vxn).then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; } // vx: espera o arquivo pré-calculado
+  const sup = D && W[id]?.snd === 'silenced' && !W[id]?.sil, vxs = W[id]?.sil ? '|sil' : sup ? '|sup' : '', vxn = vxNome(b8 + vxs); // rp1: USP-S/MP5-SD com supressor (arquivo próprio)
+  // vx/vxb: espera as malhas dos braços e da arma ficarem prontas (arquivo + Worker, fora do fio principal); até lá fica a de antes
+  for (const nb of [...vxbNomes(P, W2), vxn]) if (!vxPronto(nb)) { vxLoad(nb).then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; }
   const g = FPC[pk], root = SkeletonUtils.clone(g.scene);
   if (ak) fpArmsSwap(root, FPC[ak].scene);
   const mixer = new THREE.AnimationMixer(root), clips = {};
@@ -20060,7 +20137,11 @@ function fpBuild(id, ud) {
   if (D?.tint) model.traverse(o => { if (o.isMesh && D.tint[o.material.name] != null) o.material.color.set(D.tint[o.material.name]); }); // cores chapadas estranhas do modelo
   if (D?.brass) model.traverse(o => { if (o.isMesh && D.brass.includes(o.material.name)) Object.assign(o.material, { metalness: .9, roughness: .35 }).color.set(0xb08d3c); }); // balas brancas sem textura viram latão
   if (D?.lens) model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) Object.assign(o.material, { roughness: .08, metalness: .4 }).color.set(0x14232c); }); // vidro da luneta
-  vxArma(root, P, D, b8 + (W[id]?.sil ? '|sil' : '')); // vx: a arma vira voxel fino (peça por peça, presa ao osso dela: animações, carregador e ferrolho continuam); skin entra por cima
+  const mz = new THREE.Object3D(); mz.position.copy(tips.muzzle).applyMatrix4(C); body.add(mz);
+  const ej = new THREE.Object3D(); ej.position.set(tips.muzzle.x, lerp(tips.muzzle.y, tips.sight.y, .6), tips.L * RP1.ej).applyMatrix4(C); body.add(ej); // rp1: janela de ejeção (cápsula)
+  if (sup) rp1Supressor(tips, C, body, mz, tips.L / D.L); // rp1: USP-S e MP5-SD: o modelo baixado vem sem o supressor (antes do vx: sai em voxel)
+  VX.uso = new Set(); VX.falta = []; // malhas da mão (o LRU não solta) e as que ficaram lisas (sem arquivo: tenta de novo no ócio)
+  vxArma(root, P, D, b8 + vxs, F2); // vx: a arma vira voxel fino (peça por peça, presa ao osso dela: animações, carregador e ferrolho continuam); skin entra por cima
   if (z2r && (VX.on || z2r.nos)) fz2Recorte(z2r); // fz2: os voxels do carregador (MP5) passam para o nó dele
   vxBracos(root, P, W2); // vxb: mãos e braços em voxel, deformando com o mesmo esqueleto
   const sk = SKIN_BY[skinOf(id)], pap = W[id]?.pap | 0;
@@ -20069,9 +20150,6 @@ function fpBuild(id, ud) {
     if (D) { const kp = D.mat ? [...(D.lens || []), ...(D.brass || [])] : D.lens; fpSkin(model.children[0], mats, tips.L, kp); if (F2) fpSkin(F2.g.children[0], mats, tips.L, kp); } // (a13) D.mat: as balas continuam latão
     else fpSkin(root, mats, tips.L, ['12ge'], false, m => !fpArm(m));
   }
-  const mz = new THREE.Object3D(); mz.position.copy(tips.muzzle).applyMatrix4(C); body.add(mz);
-  const ej = new THREE.Object3D(); ej.position.set(tips.muzzle.x, lerp(tips.muzzle.y, tips.sight.y, .6), tips.L * RP1.ej).applyMatrix4(C); body.add(ej); // rp1: janela de ejeção (cápsula)
-  if (D && W[id]?.snd === 'silenced') rp1Supressor(tips, C, body, mz, tips.L / D.L); // rp1: USP-S e MP5-SD: o modelo baixado vem sem o supressor
   // pacote → tela: o gatilho da arma vai para o mesmo ponto da tela em todas as armas (FPV), com o cano no mesmo giro; os braços vêm junto
   const V = P.v || FPV[P.view || 'long'], k = FPH / P.hr, de = D?.ve || [0, 0, 0], tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1] + de[1], Math.PI + V.e[0] + de[0], V.e[2] + de[2], 'YXZ'));
   const holder = new THREE.Group(); holder.matrixAutoUpdate = false;
@@ -20081,7 +20159,7 @@ function fpBuild(id, ud) {
   const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)).multiply(tq.clone().invert()), sp = tips.sight.clone().applyMatrix4(Gv).applyQuaternion(aq);
   holder.add(root);
   Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, mz, follow, ik, body, C, aq, sl: tips.sight.clone().applyMatrix4(C), ap: new V3(0, 0, -(P.view === 'pistol' ? ADS.csPistola : ADS.csLonga)).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
-  ud.fps2.ej = ej; ud.fps2.magP = magP;
+  ud.fps2.ej = ej; ud.fps2.vxFalta = VX.falta; ud.fps2.magP = magP;
   anMonta(ud.fps2, id, D, model, D ? tips.L / D.L : 1); // an: saque e recarga caprichados (peças recortadas dos voxels, ossos das camadas)
   ud.fab = null; ud.fabLens = null; // a holográfica da arma feita no código não vale aqui (a M4 baixada usa a mira de ferro dela)
   if (D?.lens && !W[id]?.scope) { // mira de fábrica do modelo baixado (P90: colimador; HK21/M249: luneta): no ADS a lente fica transparente, com retícula e zoom (FABM)
@@ -20093,6 +20171,7 @@ function fpBuild(id, ud) {
   const sw = G.switchEnd - now, dr = clips.draw && sw > .02 && !z2; mixer.stopAllAction(); fpPlay(ud, dr ? 'draw' : 'idle', dr ? G.switchDur : undefined); mixer.update(dr ? Math.max(0, G.switchDur - sw) : 0); if (dr) ud.fps2.until = G.switchEnd;
   if (z2) { fz2Monta(ud.fps2, id, W2, D ? model.children[0] : null); if (z2r?.R.topo) ud.fps2.z2.topo = { no: z2r.no, c0: z2r.c0, c0w: new V3(), pc: new V3(), q: new THREE.Quaternion(), on: false }; }
   if (D?.cover) fpCoverInit(ud.fps2, model.children[0], D); // a7: tampa de alimentação do modelo (metralhadora de fita)
+  VX.tt = performance.now(); VX.tb = VX.tt - tb0; // medição: tempo da montagem que deu certo
   return holder;
 }
 // skin / Pack-a-Punch nos modelos baixados: o UV deles não serve para a textura da skin, então ela é projetada nos três eixos do modelo
@@ -20138,8 +20217,8 @@ function fpSkin(root, mats, L, keep = [], all = false, filt = null) { // all: pi
   root.updateMatrixWorld(true);
   const Ri = root.matrixWorld.clone().invert(), cache = {};
   root.traverse(o => {
-    if (!o.isMesh || o.userData.voxOrig || (filt && !filt(o)) || keep.includes(o.material.name) || (!all && o.material.emissive?.getHex())) return;
-    const c = o.material.color, wood = c.r > c.b * 1.6 && c.r > .08; // madeira / marrom
+    if (!o.isMesh || o.userData.voxOrig || (filt && !filt(o)) || keep.includes(o.userData.voxDe ?? o.material.name) || (!all && o.material.emissive?.getHex())) return; // vx: o latão continua latão
+    const c = o.material.color, wood = o.userData.vox ? !!o.userData.voxMad : c.r > c.b * 1.6 && c.r > .08; // madeira / marrom (vx: decidido pelo material de origem)
     const sc = +(2.5 / L * fpMeshScale(o, Ri)).toPrecision(3), k = (wood ? 'b' : 'a') + sc; // a malha pode ter escala própria
     const sm = wood ? mats.b || mats.a : mats.a;
     if (o.userData.vox) { const ck = 'vx' + k + o.material.uuid; o.material = cache[ck] || (cache[ck] = vxSkinMat(o.material, sm, sc)); return; } // vx: skin por cubo
@@ -20645,7 +20724,7 @@ function anPecas(F, an, R, model, u) { // ferrolho e carregador por caixa, recor
     return Math.abs(p.x - B.c[0]) <= B.h[0] && Math.abs(y * c - z * s) <= B.h[1] && Math.abs(y * s + z * c) <= B.h[2]; };
   const lado = p => caixa(R.pente, p) ? 'pente' : caixa(R.ferrolho, p) && !caixa(cano, p) ? 'ferrolho' : 'resto';
   const partes = new Map(); model.traverse(o => { const p = o.userData.vxp; if (p) { if (!partes.has(p)) partes.set(p, []); partes.get(p).push(o); } });
-  const lista = VX.cache.get(nome) || [], nos = { ferrolho: [], pente: [] };
+  const lista = VX.ult?.partes || [], nos = { ferrolho: [], pente: [] };
   for (const [p, ms] of partes) {
     const pai = ms[0].parent, ck = nome + '|' + lista.indexOf(p) + '|' + JSON.stringify(R); let S = AN_PECAS.get(ck);
     if (!S) {
