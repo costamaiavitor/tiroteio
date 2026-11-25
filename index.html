@@ -20622,7 +20622,7 @@ function fpBuild(id, ud) {
 // separadas, mesmo passo, AO e materiais; lente, retícula e trítio ficam lisos) e o PaP entra como nas armas do código (papUV).
 // FPM.<m>.att: rail [dx, dy, dz] (m) no centro da mira; corte { slot: [[x0, x1, y0, y1, z0, z1], ...] } caixas (m, no gA) de voxels
 // apagados quando o acessório do slot entra; inteira: 1 = coronha inteiriça (ganha soleira, não é trocada).
-const FPA = { fatia: .01, pts: 60000, ms: 0, olhoZ: .12, olhoY: .05 }; // olhoZ/olhoY: a coronha termina olhoZ à frente do olho e fica olhoY abaixo da linha dele (m)
+const FPA = { fatia: .01, pts: 60000, ms: 0, olhoZ: .12 }; // olhoZ: a coronha do Armeiro termina olhoZ à frente do olho na mira (m)
 function fpAtt(id, ud, F, X) {
   if (!attPecas(id) || !F) return;
   const t0 = performance.now(), { D, tips, model, F2, P, root, holder, arms } = X, body = F.body, b = attBase(id), on = attOn(id), Ad = D?.att || {};
@@ -20683,12 +20683,9 @@ function fpAtt(id, ud, F, X) {
   }
   if (pts.sl.length) { gS = new THREE.Group(); gA.add(gS); mk(gS, pts.sl); udA.slide = gS; }
   const cor = on.find(a => ATT[a].slot === 'stock'), skf = skinOf(id), passo = L => { ATT_PV = { list: L, f: skf }; try { attPartsProc(id, gA, udA); } finally { ATT_PV = null; } };
-  if (cor && zLim < 1e9) { // coronha numa 2ª passada: as peças dela descem até a linha do olho ficar livre (o olho do modelo baixado fica mais perto do cano)
+  if (cor && zLim < 1e9) { // coronha numa 2ª passada (o olho do modelo baixado fica mais perto do cano: na mira ela tapava a tela)
     passo(on.filter(a => a !== cor)); const n0 = gA.children.length; passo([cor]);
-    const ps = gA.children.slice(n0).filter(o => o.isMesh), B = new THREE.Box3(), bb = new THREE.Box3();
-    for (const o of ps) { o.geometry.computeBoundingBox(); o.updateMatrix(); B.union(bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrix)); }
-    const dy = Math.min(0, udA.sight.y - FPA.olhoY - B.max.y); for (const o of ps) o.position.y += dy;
-    F.attCor = ps; // e somem no fim da mira (o rosto está nela; a câmera fica a poucos cm do topo)
+    F.attCor = gA.children.slice(n0).filter(o => o.isMesh); // as peças dela somem no fim da mira (o rosto está nela; a câmera fica a poucos cm do topo)
   } else attPartsProc(id, gA, udA);
   if (W[id]?.pap) papUV(gA);
   gA.updateMatrixWorld(true);
