@@ -19615,7 +19615,7 @@ const FPV = { long: { p: [.202, -.118, -.233], e: [.025, 0, -.102] }, pistol: { 
 const FPK = {
   ak: { url: 'assets/fps/ak/scene.gltf', mag2: 'Pmag2', armsFrom: 'rifle', v: { p: [.2, -.095, -.25], e: [.025, 0, -.102] }, sh: [.04, -.08, .1], hr: 1.99, body: 'PBody', ref: 'Rif', T: [null, .194, -.075], fwd: '-y', up: '+z', mag: 'Pmag', spare: ['Object_99'],
     clips: { idle: 'AK_Idle', draw: 'AK_Draw', fire: 'AK_Shot', reload: 'AK_Reload', reloadE: 'AK_Reload_full', walk: 'AK_Walk', run: 'AK_Run' }, semCorrida: 1 }, // a13 semCorrida: a animação de correr põe a arma em pé e solta a mão esquerda; corre com a de andar + VMOV.corridaCS
-  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.12, -.10, -.26], e: [.12, 0, -.1] }, ombro: [0, -.3, 0], adsY: -.018, adsP: .13, // uni: pistola maior e mais baixa no quadril; na mira os ombros descem e entram (os antebraços não cobrem a tela) e o olho fica um pouco acima da linha (o ferrolho aparece por cima das mãos)
+  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.12, -.10, -.26], e: [.12, 0, -.1] }, ombro: [0, -.4, .05], ads: .34, adsY: -.035, adsP: .26, // uni: pistola maior e mais baixa no quadril; na mira os ombros descem e entram (os antebraços não cobrem a tela) e o olho fica um pouco acima da linha (o ferrolho aparece por cima das mãos)
     sh: [.04, -.08, .1], hr: 1, view: 'pistol', body: 'PBody', ref: 'Rif', T: [.061, null, .054], fwd: '+x', up: '-z', mag: 'Pmag', slide: 'Rif',
     clips: { idle: 'FPS_Pistol_Idle', fire: 'FPS_Pistol_Fire', reload: 'FPS_Pistol_Reload_easy', reloadE: 'FPS_Pistol_Reload_full', walk: 'FPS_Pistol_Walk' } },
   smg: { url: 'assets/fps/smg/scene.gltf', armsFrom: 'rifle', v: { p: [.198, -.083, -.383], e: [.016, -.007, -.105] }, sh: [.05, -.1, .13], hr: 1.98, body: 'PBody', ref: 'Rif', T: [-.092, null, -.067], fwd: '+x', up: '+z', mag: 'Pmag', spare: ['Object_96'],
@@ -19635,7 +19635,7 @@ const FPM = {
   p250: { T: [-.008, .005, null], fwd: '+x', up: '+y', L: .196 },
   deagle: { T: [-31, 11, null], fwd: '+x', up: '+y', L: .27 },
   cz75: { T: [-.08, .18, null], fwd: '+x', up: '+y', L: .207 },
-  m1911: { T: [-54, 79, null], fwd: '+x', up: '+y', L: .216 },
+  m1911: { T: [-54, 79, null], fwd: '+x', up: '+y', L: .216, adsY: .012 }, // adsY: na mira, a massa desta sobe até o centro (a alça é mais baixa que a da USP)
   python: { T: [null, -.041, .002], fwd: '-z', up: '+y', L: .292 },
   raygun: { T: [null, -1.14, 0], fwd: '+z', up: '+y', L: .30 },
   mp5: { T: [.018, -.02, null], fwd: '+x', up: '+y', L: .70 },
@@ -19754,6 +19754,7 @@ function b08Aquecer(M) { // aquecimento do mapa: refaz tudo (luzes e névoa muda
   const ws = M.zombie ? (UNI ? ['m1911', inv.primary, inv.secondary] : []) : [inv.primary || (dm ? 'ak47' : null), inv.secondary || (dm ? 'deagle' : 'glock')]; // uni: no Zumbi, a M1911 inicial (e o que já estiver na mão) baixada no aquecimento; as outras quando forem compradas (applyInv)
   for (const w of ws) { const f = w && fpw(w), P = f && FPK[f.pack]; if (P) ids.push('v|p:' + f.pack + '|' + (f.m ? 'm:' + f.m : '') + '|' + (P.armsFrom ? 'p:' + P.armsFrom : '')); }
   for (const id of ids) { const j = b08Pedir(id); if (!b08Ok(id)) B08.aq.add(j); }
+  if (M.zombie && UNI) for (const w of new Set((M.z?.wall || []).map(e => e.w))) { const f = fpw(w), P = f && FPK[f.pack]; if (P) b08Pedir('v|p:' + f.pack + '|' + (f.m ? 'm:' + f.m : '') + '|' + (P.armsFrom ? 'p:' + P.armsFrom : '')); } // uni: armas de parede do mapa baixam e ficam prontas no ócio (sem segurar a carga); até lá a mão mostra o modelo do código
 }
 const b08Falta = W => B08.aq.size > 0 && performance.now() - W.t0 < B08_ESPERA; // o aquecimento espera as armas da partida
 if (DEBUG) window.__B08 = q => q ? B08 : [...B08.ok].filter(([, m]) => m === B08.mapa).map(([k]) => k).join(' ') + ' fila ' + B08.fila.length; // medição (só em localhost)
@@ -20591,7 +20592,7 @@ function fpBuild(id, ud) {
   const Gv = holder.matrix.clone().multiply(body.matrixWorld).multiply(C);
   const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)).multiply(tq.clone().invert()), sp = tips.sight.clone().applyMatrix4(Gv).applyQuaternion(aq);
   holder.add(root);
-  Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, pk: W2.pack, mz, follow, ik, body, C, aq, sl: tips.sight.clone().applyMatrix4(C), ap: new V3(0, P.adsY || 0, -(P.ads ?? (P.view === 'pistol' ? ADS.csPistola : ADS.csLonga))).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
+  Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, pk: W2.pack, mz, follow, ik, body, C, aq, sl: tips.sight.clone().applyMatrix4(C), adsY: (P.adsY || 0) + (D?.adsY || 0), ap: new V3(0, (P.adsY || 0) + (D?.adsY || 0), -(P.ads ?? (P.view === 'pistol' ? ADS.csPistola : ADS.csLonga))).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
   ud.fps2.ej = ej; ud.fps2.vxFalta = VX.falta; ud.fps2.magP = magP;
   if (ud.akimbo && arms[0].ua) ud.fps2.hideL = arms[0].ua; // uni: Pistolas Duplas: o braço esquerdo do pacote some (a passada espelhada da direita segura a outra pistola)
   anMonta(ud.fps2, id, D, model, D ? tips.L / D.L : 1); // an: saque e recarga caprichados (peças recortadas dos voxels, ossos das camadas)
@@ -22599,7 +22600,7 @@ function updateViewmodel(dt) {
   vmRoot.updateMatrixWorld();
   if (ud.fps2 && !ud.fps2.q1) { ud.fps2.q1 = 1; fpUpdate(ud, 0); } // 1º quadro da arma: as camadas e o IK leram a pose da arma anterior (ombros e mão esquerda fora do lugar por um quadro); refaz com a pose certa
   if (ud.fps2 && ak > 0) { // mirando: a animação parada balança o corpo da arma; a mira (medida agora) volta para o centro da tela
-    const F = ud.fps2, e = _adsV.copy(F.sl).applyMatrix4(F.body.matrixWorld); vmGun.position.x -= e.x * ak; vmGun.position.y -= (e.y - (F.P.adsY || 0)) * ak; vmRoot.updateMatrixWorld();
+    const F = ud.fps2, e = _adsV.copy(F.sl).applyMatrix4(F.body.matrixWorld); vmGun.position.x -= e.x * ak; vmGun.position.y -= (e.y - (F.adsY || 0)) * ak; vmRoot.updateMatrixWorld();
   }
   if (ud.fps2) { ud.fps2.mz.updateMatrixWorld(true); ud.muzzle.setFromMatrixPosition(ud.fps2.mz.matrixWorld); vmRoot.worldToLocal(ud.muzzle); } // boca do cano segue a animação
   w19Clarao(ud); // 6-w19
