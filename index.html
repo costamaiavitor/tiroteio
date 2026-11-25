@@ -21322,7 +21322,7 @@ function anEscopeta(F, an, w, a) {
   } else { // tempo fixo
     const T = G.reloadEnd - G.reloadStart, f = clamp((now - G.reloadStart) / T, 0, 1), fa = vazia ? .66 : .82, falta = Math.max(1, wMag(G.cur) - an.mag0), k = Math.min(falta, Cc.n);
     if (f < fa) { const x = f / fa * (Cc.ins + Cc.per * (k - 1)), feitos = x < Cc.ins ? 0 : 1 + Math.floor((x - Cc.ins) / Cc.per + 1e-6); t = x;
-      while (an.nIns < Math.min(feitos, k)) { an.nIns++; const q = an.nIns === k ? Math.min(wMag(G.cur) - a.mag, a.res) : Math.min(1, a.res); a.mag += q; a.res -= q; G.rEv.mun = 1; play('shellin'); anImpulso(an, an.A.imp.cart, an.A.cam.cart); } }
+      while (an.nIns < Math.min(feitos, k)) { an.nIns++; play('shellin'); /* MAG-7 é de carregador: a munição entra toda de uma vez abaixo (cancelar não deixa cartuchos soltos) */ anImpulso(an, an.A.imp.cart, an.A.cam.cart); } }
     else { if (an.nIns < k) { an.nIns = k; const q = Math.min(wMag(G.cur) - a.mag, a.res); a.mag += q; a.res -= q; G.rEv.mun = 1; play('shellin'); } t = anEscFim(an, (f - fa) / (1 - fa), fimT, vazia, semi); }
   }
   F.act.timeScale = 0; F.act.time = clamp(t, 0, F.act.getClip().duration - 1e-3);
