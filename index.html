@@ -19670,7 +19670,7 @@ FPW.l96 = { pack: 'sniper', m: 'awp' }; // uni: a L96A1 do Zumbi é da mesma fam
 // tambor, bomba, cano basculante, maravilhas, lançadores) fica com as camadas procedurais da própria arma (gunAnim só nas peças, sem
 // mexer na tela); carregador de caixa embaixo (rig 'mag') e ferrolho da pistola seguem a peça do pacote. Acessórios do Armeiro, PaP
 // (papUV), Pistolas Duplas e o voxel fino (vxz) continuam os da arma do código. ?syn=0 volta às mãos antigas.
-const FSYN = { off: /[?&]syn=0\b/.test(location.search) };
+const FSYN = { off: /[?&]syn=0\b/.test(location.search), adsZ: { smg: .06, sniper: .14 } }; // adsZ: na mira a arma do código fica mais longe do olho (m; medido: braço esquerdo cobria 28% da tela nas SMGs, 21% depois; Kar98k 24% -> 14%; na bomba piora: fica 0)
 if (!FSYN.off) for (const [p, l] of Object.entries({ pistol: 'fiveseven b23r c96 raygun2', smg: 'ppsh thompson spectre kiparis uzi pm63', ak: 'stg44 mg42 stoner psg1',
   rifle: 'm16 aug famas g11 enfield law crossbow wunderwaffe wintershowl', pump: 'trench hs10 ks23', sniper: 'kar98k' })) for (const id of l.split(' ')) FPW[id] = { pack: p, syn: 1 };
 function fpSyn(id, ud, gun) { // modelo "baixado" sintético: origem no gatilho, cano para -Z, metros (escala 1)
@@ -19683,6 +19683,14 @@ function fpSynTips(D, tips, Mi) { // mira e boca do cano da própria arma (com a
   if (D.ud.sight) tips.sight.copy(D.ud.sight).applyMatrix4(Mi);
   if (D.ud.muzzle) tips.muzzle.copy(D.ud.muzzle).applyMatrix4(Mi);
   if (D.ud.lh) D.lhZ = D.ud.lh.clone().applyMatrix4(Mi).z; // mão esquerda onde a mão procedural ficava (guarda-mão), não no tambor/carregador
+}
+function fpSynFundo(D, Mi, s, z, lim) { // fundo da arma em z (referencial da arma, unidades do pacote): as peças do código são caixas com vértice só nas pontas, então mede pelas caixas das malhas
+  let y = 1e9; const b = new THREE.Box3(), M = new THREE.Matrix4();
+  D.gun.updateMatrixWorld(true); const Gi = D.gun.matrixWorld.clone().invert();
+  D.gun.traverse(o => { if (!o.isMesh || !o.visible || o.material?.transparent || !o.geometry) return; for (let p = o; p && p !== D.gun; p = p.parent) if (!p.visible) return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); b.copy(o.geometry.boundingBox).applyMatrix4(M.multiplyMatrices(Mi, Gi).multiply(o.matrixWorld));
+    if (b.min.z * s <= z && b.max.z * s >= z && b.min.y * s > lim) y = Math.min(y, b.min.y * s); });
+  return y;
 }
 const _oSyn = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 };
 function fpSynAnim(ud, w) { for (const k in _oSyn) _oSyn[k] = 0; gunAnim(ud, w, _oSyn); } // peças da arma do código (a tela fica com o pacote)
@@ -20486,7 +20494,7 @@ function fpBuild(id, ud, gun) {
     return false;
   }
   const b8 = 'v|' + pk + '|' + (mk || '') + '|' + (ak || ''); // O1-B08: só entra pronta (programas e texturas); até lá fica a de antes
-  if (!b08Ok(b8)) { b08Pedir(b8).p.then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; }
+  if (!W2.syn && !b08Ok(b8)) { b08Pedir(b8).p.then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; }
   const sup = D && W[id]?.snd === 'silenced' && !W[id]?.sil, vxs = W[id]?.sil ? '|sil' : sup ? '|sup' : '', vxn = vxNome(b8 + vxs); // rp1: USP-S/MP5-SD com supressor (arquivo próprio)
   // vx/vxb: espera as malhas dos braços e da arma ficarem prontas (arquivo + Worker, fora do fio principal); até lá fica a de antes
   for (const nb of [...vxbNomes(P, W2), ...(W2.syn ? [] : [vxn])]) if (!vxPronto(nb)) { vxLoad(nb).then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; }
@@ -20572,7 +20580,7 @@ function fpBuild(id, ud, gun) {
     if (P.view !== 'pistol' && hl) {
       const L0 = new V3().setFromMatrixPosition(hl.matrixWorld).applyMatrix4(Ai), mc = mp.map(p => p.multiplyScalar(s)), dep = .09 * FPG * P.hr;
       const bottom = (c, z, lim) => { let y = 1e9; for (const p of c) if (Math.abs(p.z - z) < .015 * P.hr && p.y > lim && p.y < y) y = p.y; return y; };
-      const zT = D.lhZ != null ? D.lhZ * s : Math.min(L0.z, tips.muzzle.z * s * (D.lhf || .62)), yp = bottom(pc, L0.z, ptips.muzzle.y - dep), ym = bottom(mc, zT, tips.muzzle.y * s - dep);
+      const zT = D.lhZ != null ? D.lhZ * s : Math.min(L0.z, tips.muzzle.z * s * (D.lhf || .62)), yp = bottom(pc, L0.z, ptips.muzzle.y - dep), ym = D.syn ? fpSynFundo(D, Mi, s, zT, tips.muzzle.y * s - dep) : bottom(mc, zT, tips.muzzle.y * s - dep);
       if (yp < 1e8 && ym < 1e8) lh = { hl, L0, d: new V3(0, ym - yp, zT - L0.z) };
     }
     if (F2) follow.push(F2);
@@ -20621,7 +20629,7 @@ function fpBuild(id, ud, gun) {
   Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, pk: W2.pack, mz, follow, ik, body, C, aq, sl: tips.sight.clone().applyMatrix4(C), adsY: (P.adsY || 0) + (D?.adsY || 0), ap: new V3(0, (P.adsY || 0) + (D?.adsY || 0), -(P.ads ?? (P.view === 'pistol' ? ADS.csPistola : ADS.csLonga))).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
   ud.fps2.ej = ej; ud.fps2.vxFalta = VX.falta; ud.fps2.magP = magP;
   if (ud.akimbo && arms[0].ua) ud.fps2.hideL = arms[0].ua; // uni: Pistolas Duplas: o braço esquerdo do pacote some (a passada espelhada da direita segura a outra pistola)
-  if (D?.syn) ud.fps2.syn = 1; else anMonta(ud.fps2, id, D, model, D ? tips.L / D.L : 1); // an: saque e recarga caprichados (peças recortadas dos voxels, ossos das camadas)
+  if (D?.syn) { ud.fps2.syn = 1; ud.fps2.ap.z -= FSYN.adsZ[W2.pack] || 0; } else anMonta(ud.fps2, id, D, model, D ? tips.L / D.L : 1); // an: saque e recarga caprichados (peças recortadas dos voxels, ossos das camadas)
   if (!D?.syn) ud.fab = ud.fabLens = null; // a holográfica da arma feita no código não vale aqui (a M4 baixada usa a mira de ferro dela)
   if (D?.lens && !W[id]?.scope) { // mira de fábrica do modelo baixado (P90: colimador; HK21/M249: luneta): no ADS a lente fica transparente, com retícula e zoom (FABM)
     ud.fab = FAB_HOLO.includes(attBase(id)) ? 'holo' : 'luneta'; ud.fabLens = [];
@@ -20642,9 +20650,11 @@ function fpBuild(id, ud, gun) {
 // (mão direita fechada nele). A pose é a parada do pacote (respira e anda); o pino, o arremesso, o "por baixo", o plantar e a volta do
 // próximo continuam sendo as camadas que já moviam a mão procedural (nadeToss, nadeVolta, G.pin), agora movendo braços e objeto juntos.
 // MAO.punho: onde fica o ponto da mão do objeto (ud.rh do gunModel) em relação ao gatilho da pistola (m, cano para -Z, Y para cima);
+// vo/ve: deslocamento (m) e giro [guinada, arfagem, rolagem] extra na tela: granada embaixo à direita, perto, com o antebraço vindo de baixo em
+// perspectiva (medido; antes a mão ficava no meio da tela com o antebraço esticado); esc: escala do objeto na mão.
 // MAO.giro: giro extra do objeto [x, y, z] (rad); dois: com as duas mãos (C4); sem ele a mão esquerda some (como a faca).
 const MAO_ITENS = new Set(['nade', 'smoke', 'flashb', 'molotov', 'inc', 'decoy', 'semtex', 'clay', 'monkey']);
-const MAO = { off: /[?&]mao=0\b/.test(location.search), foraL: [-.1, -.45, .15], vo: [-.03, .035, 0], punho: [0, .0, .035], giro: [0, 0, 0], c4: { punho: [0, .04, -.02], giro: [.4, 0, 0], def: .35 } };
+const MAO = { off: /[?&]mao=0\b/.test(location.search), foraL: [-.1, -.45, .15], vo: [0, .06, .22], ve: [-.55, .2, 0], esc: 1.3, punho: [0, .0, .035], giro: [0, 0, 0], c4: { punho: [0, .04, -.02], giro: [.4, 0, 0], def: .35, vo: [-.03, .035, 0], ve: [0, 0, 0] } };
 function maoBuild(ud, obj, X = {}) {
   const pk = 'p:pistol', ak = 'p:rifle', P = FPK.pistol, bn = vxbNomes(P, { pack: 'pistol' })[0];
   if (!fpReady(pk) || !fpReady(ak)) { Promise.all([fpLoad(pk), fpLoad(ak)]).then(() => X.pronto?.()); return false; }
@@ -20660,14 +20670,14 @@ function maoBuild(ud, obj, X = {}) {
   // objeto: espaço do gunModel (m, cano para -Z) com o ponto da mão (ud.rh) no punho da pistola
   const M = X.c4 ? MAO.c4 : MAO, u = FPG * P.hr, an = new THREE.Group(); an.matrixAutoUpdate = false;
   an.matrix.copy(body.matrixWorld).invert().multiply(A).multiply(new THREE.Matrix4().makeScale(u, u, u)).multiply(new THREE.Matrix4().makeRotationY(Math.PI)); body.add(an);
-  const pv = new THREE.Group(); pv.position.fromArray(M.punho); pv.rotation.set(...M.giro); an.add(pv);
+  const pv = new THREE.Group(); pv.position.fromArray(M.punho); pv.rotation.set(...M.giro); pv.scale.setScalar(M.esc || 1); an.add(pv);
   obj.position.copy(ud.rh || new V3()).negate(); pv.add(obj);
   vxBracos(root, P, { pack: 'pistol' });
   const arm = sd => fpBone(root, 'UpArm_' + sd), Ai = A.clone().invert();
   const bra = sd => ({ cl: fpBone(root, 'Arm_' + sd), ua: fpBone(root, 'UpArm_' + sd), fa: fpBone(root, 'Forearm_' + sd), wr: fpBone(root, 'BoneTwist_01' + sd + '_end'), hand: fpBone(root, 'Hand_' + sd), sd: sd === 'L' ? -1 : 1 });
   const arms = [bra('L'), bra('R')]; for (const a of arms) if (a.hand) a.r0 = new V3().setFromMatrixPosition(a.hand.matrixWorld).applyMatrix4(Ai);
   const ik = arms.every(a => a.cl && a.ua && a.fa && a.wr) ? { arms, sh: P.sh, Cb: new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A), body } : null; // ombros recuados como na pistola (corte das mangas fora da tela)
-  const V = P.v, k = FPH / P.hr, tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1], Math.PI + V.e[0], V.e[2], 'YXZ'));
+  const V = P.v, k = FPH / P.hr, ve = M.ve || MAO.ve || [0, 0, 0], tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1] + ve[1], Math.PI + V.e[0] + ve[0], V.e[2] + ve[2], 'YXZ'));
   const holder = new THREE.Group(); holder.matrixAutoUpdate = false; holder.matrix.compose(new V3(...V.p).add(new V3(...(M.vo || MAO.vo))), tq, new V3(k, k, k)).multiply(A.clone().invert()); holder.add(root);
   const mz = new THREE.Object3D(); pv.add(mz);
   ud.fps2 = { holder, root, mixer, clips, act: null, cur: '', P, pk: 'mao', mz, follow: [], ik, body, C: an.matrix, aq: new THREE.Quaternion(), ap: new V3(), sl: new V3(), mao: true };
@@ -21630,10 +21640,20 @@ const FPKNIFE = { url: 'assets/fps/knife/scene.gltf', k: .01, eye: [0, 8, -22], 
   // ponto de encaixe do modelo (FPKN: guarda da KA-BAR / centro do anel da karambit) vai para Q no pacote,
   // fwd/up: para onde vão o cano (lâmina) e o dorso do modelo; len: comprimento total (cm)
   fit: { knife: { Q: [0, 6.3, .2], fwd: [0, 1, 0], up: [0, 0, -1], len: 30 }, karambit: { Q: [1.6, 8.5, .2], fwd: [0, 1, 0], up: [-1, 0, 0], len: 30 } } }; // butterfly: lâmina de lado para a câmera e mais à frente (os cabos não passam tanto do mindinho) // butterfly: cabos fechados no punho, lâmina saindo pelo lado do indicador
+const knPack = () => FPC['k:pack'] || (FPC['k:pack'] = new GLTFLoader().loadAsync(FPKNIFE.url).then(g => (FPC['k:pack'] = g), e => { console.warn('faca', e); delete FPC['k:pack']; }));
+// E3: pré-carga no ócio (ao receber o inventário) do que as mãos únicas usam: pacote e braços voxel da faca (com a luva trocada), pacotes
+// da pistola/fuzil (granadas e C4) e o pacote das armas feitas no código do inventário; até ficar pronto a troca mostra as mãos antigas.
+function maoPre(inv) {
+  const ric = window.requestIdleCallback || (f => setTimeout(f, 300));
+  ric(() => { if (!inGame) return; fpLoad('p:pistol'); fpLoad('p:rifle'); vxLoad('bracos_rifle_0');
+    for (const k of ['primary', 'secondary', 'third']) { const f = fpw(inv?.[k]); if (f?.syn) fpLoad('p:' + f.pack); }
+    const kn = W[knifeModelOf('knife', PROF.data?.equipped)]?.model; if (!VX.on || !['knife', 'karambit'].includes(kn)) return;
+    Promise.all([knPack(), fpLoad('m:' + kn), vxLoad(KN_VXB + '_0')]).then(() => ric(() => { if (fpReady('k:pack') && fpReady('p:rifle')) FPC['k:pack'].scene.traverse(o => { if (o.isMesh && /arm/i.test(o.material?.name)) knArmsTex(o.material.map); }); })); });
+}
 const KN_VXB = 'bracos_faca'; // E3: arquivo dos braços da faca em voxel (assets/vox/bracos_faca_<n>.bin.gz)
 function knBuild(kind, ud, skin) {
   const key = 'k:pack', mk = 'm:' + kind;
-  if (!FPC[key]) FPC[key] = new GLTFLoader().loadAsync(FPKNIFE.url).then(g => (FPC[key] = g), e => { console.warn('faca', e); delete FPC[key]; });
+  knPack();
   if (!fpReady(key) || !fpReady(mk) || !fpReady('p:rifle')) { Promise.all([FPC[key], fpLoad(mk), fpLoad('p:rifle')]).then(() => { if (vmGun && W[G.cur]?.slot === 'knife' && !vmGun.userData.fps2) vmSetWeapon(G.cur); }); return false; }
   if (!vxPronto(KN_VXB + '_0')) { vxLoad(KN_VXB + '_0').then(() => { if (vmGun && W[G.cur]?.slot === 'knife' && !vmGun.userData.fps2) vmSetWeapon(G.cur); }); return false; } // E3: braços da faca em voxel (arquivo pronto)
   const g = FPC[key], root = SkeletonUtils.clone(g.scene), K = FPKNIFE, F = K.fit[kind], D = FPKN[kind];
@@ -22841,7 +22861,7 @@ function equip(id, force) {
 }
 function applyInv(inv, refill, got) {
   G.inv = { ...inv };
-  for (const k of ['primary', 'secondary', 'third']) { const f = fpw(inv[k]); if (f) { fpLoad('p:' + f.pack); if (f.m) fpLoad('m:' + f.m); } } // braços prontos: já baixa os da arma comprada
+  for (const k of ['primary', 'secondary', 'third']) { const f = fpw(inv[k]); if (f) { fpLoad('p:' + f.pack); if (f.m) fpLoad('m:' + f.m); } } maoPre(inv); // braços prontos: já baixa os da arma comprada (E3: e o que as mãos únicas usam)
   for (const k of ['primary', 'secondary', 'third']) { const w = inv[k]; if (w && (refill || !G.ammo[w] || got === w)) G.ammo[w] = { mag: wMag(w), res: W[w].res }; }
   if (G.cur === 'dmach' && hasW('dmach')) { if (got && W[got]?.slot !== 'nade') C.dmPrev = got; return; } // Máquina da Morte na mão: a arma nova espera
   if (got && (W[got]?.slot === 'primary' || W[got]?.slot === 'secondary')) equip(got, true);
