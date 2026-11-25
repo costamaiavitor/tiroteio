@@ -19665,6 +19665,27 @@ const FPW = { ak47: { pack: 'ak', vo: [.03, 0, -.04] }, // a AK do pacote é um 
 for (const [p, l] of Object.entries({ pistol: 'glock usp p250 deagle cz75 m1911 python raygun', smg: 'mp5 mp5k mp40 p90', ak: 'ak74u galil rpk hk21 dragunov',
   rifle: 'm4 commando fal m14 thundergun', sniper: 'scout awp', pump: 'stakeout olympia chinalake spas' })) for (const id of l.split(' ')) FPW[id] = { pack: p, m: id };
 FPW.l96 = { pack: 'sniper', m: 'awp' }; // uni: a L96A1 do Zumbi é da mesma família da AWP do CS (Accuracy International)
+// E3 syn: as armas que só existem no Zumbi (feitas no código) também nos braços dos pacotes: o modelo do código entra no lugar da arma
+// do pacote da sua classe (como um modelo baixado), com o clipe do pacote nos braços. O que o pacote não tem (pente-clipe, fita,
+// tambor, bomba, cano basculante, maravilhas, lançadores) fica com as camadas procedurais da própria arma (gunAnim só nas peças, sem
+// mexer na tela); carregador de caixa embaixo (rig 'mag') e ferrolho da pistola seguem a peça do pacote. Acessórios do Armeiro, PaP
+// (papUV), Pistolas Duplas e o voxel fino (vxz) continuam os da arma do código. ?syn=0 volta às mãos antigas.
+const FSYN = { off: /[?&]syn=0\b/.test(location.search) };
+if (!FSYN.off) for (const [p, l] of Object.entries({ pistol: 'fiveseven b23r c96 raygun2', smg: 'ppsh thompson spectre kiparis uzi pm63', ak: 'stg44 mg42 stoner psg1',
+  rifle: 'm16 aug famas g11 enfield law crossbow wunderwaffe wintershowl', pump: 'trench hs10 ks23', sniper: 'kar98k' })) for (const id of l.split(' ')) FPW[id] = { pack: p, syn: 1 };
+function fpSyn(id, ud, gun) { // modelo "baixado" sintético: origem no gatilho, cano para -Z, metros (escala 1)
+  const D = { syn: 1, T: [null, 0, 0], fwd: '-z', up: '+y', L: 1, noMag2: 1, gun, ud, parts: {} };
+  if (ud.mag && ud.rig === 'mag' && !ud.magUp) { ud.mag.name = 'zsyn_mag'; D.parts.mag = /^zsyn_mag$/; }
+  if (ud.slide) { ud.slide.name = 'zsyn_slide'; D.parts.slide = /^zsyn_slide$/; }
+  return D;
+}
+function fpSynTips(D, tips, Mi) { // mira e boca do cano da própria arma (com a mira do Armeiro), não as medidas pela nuvem de pontos
+  if (D.ud.sight) tips.sight.copy(D.ud.sight).applyMatrix4(Mi);
+  if (D.ud.muzzle) tips.muzzle.copy(D.ud.muzzle).applyMatrix4(Mi);
+  if (D.ud.lh) D.lhZ = D.ud.lh.clone().applyMatrix4(Mi).z; // mão esquerda onde a mão procedural ficava (guarda-mão), não no tambor/carregador
+}
+const _oSyn = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 };
+function fpSynAnim(ud, w) { for (const k in _oSyn) _oSyn[k] = 0; gunAnim(ud, w, _oSyn); } // peças da arma do código (a tela fica com o pacote)
 // a versão do Pack-a-Punch usa os braços e o modelo da arma base.
 // uni (etapa 1 da unificação CS × Zumbi): no Zumbi a arma com modelo baixado usa o MESMO modelo, pacote, mãos e animações do CS. uni2
 // (etapa 2): os acessórios do Armeiro entram no modelo baixado (fpAtt), então a arma com acessório também fica nele.
@@ -20457,8 +20478,8 @@ function fpSuavizaClipe(c) {
     return new tr.constructor(tr.name, nt, nv);
   });
 }
-function fpBuild(id, ud) {
-  const tb0 = performance.now(), W2 = fpw(id), P = FPK[W2.pack], D = W2.m && FPM[W2.m], pk = 'p:' + W2.pack, mk = W2.m && 'm:' + W2.m;
+function fpBuild(id, ud, gun) {
+  const tb0 = performance.now(), W2 = fpw(id), P = FPK[W2.pack], D = W2.syn ? fpSyn(id, ud, gun) : W2.m && FPM[W2.m], pk = 'p:' + W2.pack, mk = W2.m && 'm:' + W2.m;
   const ak = P.armsFrom && 'p:' + P.armsFrom;
   if (!fpReady(pk) || (mk && !fpReady(mk)) || (ak && !fpReady(ak))) {
     Promise.all([fpLoad(pk), mk && fpLoad(mk), ak && fpLoad(ak)]).then(() => { if (fpReady(pk) && (!mk || fpReady(mk)) && (!ak || fpReady(ak)) && vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); });
@@ -20468,7 +20489,7 @@ function fpBuild(id, ud) {
   if (!b08Ok(b8)) { b08Pedir(b8).p.then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; }
   const sup = D && W[id]?.snd === 'silenced' && !W[id]?.sil, vxs = W[id]?.sil ? '|sil' : sup ? '|sup' : '', vxn = vxNome(b8 + vxs); // rp1: USP-S/MP5-SD com supressor (arquivo próprio)
   // vx/vxb: espera as malhas dos braços e da arma ficarem prontas (arquivo + Worker, fora do fio principal); até lá fica a de antes
-  for (const nb of [...vxbNomes(P, W2), vxn]) if (!vxPronto(nb)) { vxLoad(nb).then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; }
+  for (const nb of [...vxbNomes(P, W2), ...(W2.syn ? [] : [vxn])]) if (!vxPronto(nb)) { vxLoad(nb).then(() => { if (vmGun && !vmGun.userData.fps2 && fpw(G.cur) === W2) vmSetWeapon(G.cur); }); return false; }
   const g = FPC[pk], root = SkeletonUtils.clone(g.scene);
   if (ak) fpArmsSwap(root, FPC[ak].scene);
   const mixer = new THREE.AnimationMixer(root), clips = {};
@@ -20484,7 +20505,7 @@ function fpBuild(id, ud) {
   const Ai = A.clone().invert(), pc = pp.map(p => p.applyMatrix4(Ai)), ptips = fpTips(pc); // arma do pacote no referencial da arma
   let C, tips, model = null, follow = [], ik = null, lh = null, F2 = null, magP = null, z2r = null;
   if (D) { // modelo baixado no lugar da arma do pacote
-    const mg = FPC[mk], ms = SkeletonUtils.clone(mg.scene);
+    const ms = D.syn ? D.gun : SkeletonUtils.clone(FPC[mk].scene); // E3 syn: a própria arma feita no código
     ms.traverse(o => { if (o.isMesh && D.hide?.includes(o.name)) o.visible = false; });
     ms.updateMatrixWorld(true);
     const mp = fpPts(ms, () => true), M = fpFit(D, mp, new THREE.Matrix4()), Mi = M.clone().invert();
@@ -20493,7 +20514,7 @@ function fpBuild(id, ud) {
       const lp = fpPts(ms, o => D.lens.includes(o.material.name), 1).map(p => p.applyMatrix4(Mi));
       if (lp.length) { let a = 1e9, b = -1e9; for (const p of lp) { a = Math.min(a, p.z); b = Math.max(b, p.z); } const e = lp.filter(p => p.z < a + (b - a) * .25), c = new V3(); for (const p of e) c.add(p); c.divideScalar(e.length); tips.sight.set(c.x, c.y, 0); }
     }
-    const s = D.L * FPG * P.hr / tips.L;
+    if (D.syn) { D.L = tips.L; fpSynTips(D, tips, Mi); } const s = D.L * FPG * P.hr / tips.L;
     C = new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A).multiply(new THREE.Matrix4().makeScale(s, s, s)); // referencial da arma → osso do corpo
     root.traverse(o => { if (o.isMesh && !fpArm(o) && o.material?.name !== '12ge') o.visible = false; }); // some a arma do pacote (o cartucho na mão da escopeta fica)
     model = new THREE.Group(); model.matrixAutoUpdate = false; model.matrix.copy(C).multiply(Mi); model.add(ms); body.add(model);
@@ -20551,7 +20572,7 @@ function fpBuild(id, ud) {
     if (P.view !== 'pistol' && hl) {
       const L0 = new V3().setFromMatrixPosition(hl.matrixWorld).applyMatrix4(Ai), mc = mp.map(p => p.multiplyScalar(s)), dep = .09 * FPG * P.hr;
       const bottom = (c, z, lim) => { let y = 1e9; for (const p of c) if (Math.abs(p.z - z) < .015 * P.hr && p.y > lim && p.y < y) y = p.y; return y; };
-      const zT = Math.min(L0.z, tips.muzzle.z * s * (D.lhf || .62)), yp = bottom(pc, L0.z, ptips.muzzle.y - dep), ym = bottom(mc, zT, tips.muzzle.y * s - dep);
+      const zT = D.lhZ != null ? D.lhZ * s : Math.min(L0.z, tips.muzzle.z * s * (D.lhf || .62)), yp = bottom(pc, L0.z, ptips.muzzle.y - dep), ym = bottom(mc, zT, tips.muzzle.y * s - dep);
       if (yp < 1e8 && ym < 1e8) lh = { hl, L0, d: new V3(0, ym - yp, zT - L0.z) };
     }
     if (F2) follow.push(F2);
@@ -20580,11 +20601,11 @@ function fpBuild(id, ud) {
   const ej = new THREE.Object3D(); ej.position.set(tips.muzzle.x, lerp(tips.muzzle.y, tips.sight.y, .6), tips.L * RP1.ej).applyMatrix4(C); body.add(ej); // rp1: janela de ejeção (cápsula)
   if (sup) rp1Supressor(tips, C, body, mz, tips.L / D.L); // rp1: USP-S e MP5-SD: o modelo baixado vem sem o supressor (antes do vx: sai em voxel)
   VX.uso = new Set(); VX.falta = []; // malhas da mão (o LRU não solta) e as que ficaram lisas (sem arquivo: tenta de novo no ócio)
-  vxArma(root, P, D, b8 + vxs, F2); // vx: a arma vira voxel fino (peça por peça, presa ao osso dela: animações, carregador e ferrolho continuam); skin entra por cima
+  if (!D?.syn) vxArma(root, P, D, b8 + vxs, F2); // vx: a arma vira voxel fino (peça por peça, presa ao osso dela: animações, carregador e ferrolho continuam); skin entra por cima
   if (z2r && (VX.on || z2r.nos)) fz2Recorte(z2r); // fz2: os voxels do carregador (MP5) passam para o nó dele
   vxBracos(root, P, W2); // vxb: mãos e braços em voxel, deformando com o mesmo esqueleto
   const sk = SKIN_BY[skinOf(id)], pap = W[id]?.pap | 0;
-  if (sk || pap || D?.mat) { // (a13: D.mat = modelo sem textura usa os materiais das armas do jogo, mesmo sem skin) skin: no modelo baixado ou, nas armas do próprio pacote (AK-47, Nova), nas peças da arma do pacote (cartucho fica)
+  if ((sk || pap || D?.mat) && !D?.syn) { // (a13: D.mat = modelo sem textura usa os materiais das armas do jogo, mesmo sem skin) skin: no modelo baixado ou, nas armas do próprio pacote (AK-47, Nova), nas peças da arma do pacote (cartucho fica)
     const M = gunMats(pap, true, skinOf(id)), mats = { a: M.metal, b: M.polymer };
     if (D) { const kp = D.mat ? [...(D.lens || []), ...(D.brass || [])] : D.lens; fpSkin(model.children[0], mats, tips.L, kp); if (F2) fpSkin(F2.g.children[0], mats, tips.L, kp); } // (a13) D.mat: as balas continuam latão
     else fpSkin(root, mats, tips.L, ['12ge'], false, m => !fpArm(m));
@@ -20600,15 +20621,15 @@ function fpBuild(id, ud) {
   Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, pk: W2.pack, mz, follow, ik, body, C, aq, sl: tips.sight.clone().applyMatrix4(C), adsY: (P.adsY || 0) + (D?.adsY || 0), ap: new V3(0, (P.adsY || 0) + (D?.adsY || 0), -(P.ads ?? (P.view === 'pistol' ? ADS.csPistola : ADS.csLonga))).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', muzzle: new V3() });
   ud.fps2.ej = ej; ud.fps2.vxFalta = VX.falta; ud.fps2.magP = magP;
   if (ud.akimbo && arms[0].ua) ud.fps2.hideL = arms[0].ua; // uni: Pistolas Duplas: o braço esquerdo do pacote some (a passada espelhada da direita segura a outra pistola)
-  anMonta(ud.fps2, id, D, model, D ? tips.L / D.L : 1); // an: saque e recarga caprichados (peças recortadas dos voxels, ossos das camadas)
-  ud.fab = null; ud.fabLens = null; // a holográfica da arma feita no código não vale aqui (a M4 baixada usa a mira de ferro dela)
+  if (D?.syn) ud.fps2.syn = 1; else anMonta(ud.fps2, id, D, model, D ? tips.L / D.L : 1); // an: saque e recarga caprichados (peças recortadas dos voxels, ossos das camadas)
+  if (!D?.syn) ud.fab = ud.fabLens = null; // a holográfica da arma feita no código não vale aqui (a M4 baixada usa a mira de ferro dela)
   if (D?.lens && !W[id]?.scope) { // mira de fábrica do modelo baixado (P90: colimador; HK21/M249: luneta): no ADS a lente fica transparente, com retícula e zoom (FABM)
     ud.fab = FAB_HOLO.includes(attBase(id)) ? 'holo' : 'luneta'; ud.fabLens = [];
     if (ud.fab === 'luneta') model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name) && !ud.fabLens.includes(o.material)) { o.material.transparent = true; ud.fabLens.push(o.material); } });
   }
-  fpAtt(id, ud, ud.fps2, { D, tips, model, F2, P, root, holder, arms }); // uni2: acessórios do Armeiro no modelo baixado (peças em voxel, presas aos ossos)
+  if (!D?.syn) fpAtt(id, ud, ud.fps2, { D, tips, model, F2, P, root, holder, arms }); // uni2: acessórios do Armeiro no modelo baixado (peças em voxel, presas aos ossos)
   // a15: o saque do pacote cabe no tempo do jogo (G.switchDur); modelo que chega depois entra no ponto do saque em que a troca está (ou parado)
-  const z2 = FZ2F.includes(W2.pack); // fz2: saque procedural (sobe girando com mola, a mão esquerda chega depois) sobre a pose parada
+  const z2 = !D?.syn && FZ2F.includes(W2.pack); // fz2: saque procedural (sobe girando com mola, a mão esquerda chega depois) sobre a pose parada
   const sw = G.switchEnd - now, dr = clips.draw && sw > .02 && !z2; mixer.stopAllAction(); fpPlay(ud, dr ? 'draw' : 'idle', dr ? G.switchDur : undefined); mixer.update(dr ? Math.max(0, G.switchDur - sw) : 0); if (dr) ud.fps2.until = G.switchEnd;
   if (z2) { fz2Monta(ud.fps2, id, W2, D ? model.children[0] : null); if (z2r?.R.topo) ud.fps2.z2.topo = { no: z2r.no, c0: z2r.c0, c0w: new V3(), pc: new V3(), q: new THREE.Quaternion(), on: false }; }
   if (D?.cover) fpCoverInit(ud.fps2, model.children[0], D); // a7: tampa de alimentação do modelo (metralhadora de fita)
@@ -21699,8 +21720,8 @@ function vmSetWeapon(id) {
   vmGun = new THREE.Group();
   const mid = knifeModelOf(id, PROF.data?.equipped), gun = (GM_VM = true, gunModel(mid, true, skinOf(mid))), ud = gun.userData, A = armMats(); vmGun.add(gun);
   const fw = fpw(mid), tp0 = !fw && attOn(mid).length ? armsTipPts(gun) : null; // (a13) ponta da arma antes dos acessórios (enquadramento)
-  if (!fw) attPartsProc(mid, gun, ud); // acessórios do Armeiro (modo Zumbi) no modelo feito no código (uni: nunca medindo a arma que fica escondida sob a baixada)
-  if (W[mid]?.pap && !fw) papUV(gun); // 6-w13: peças dos acessórios com a camuflagem
+  if (!fw || fw.syn) attPartsProc(mid, gun, ud); // acessórios do Armeiro (modo Zumbi) no modelo feito no código (uni: nunca medindo a arma que fica escondida sob a baixada)
+  if (W[mid]?.pap && (!fw || fw.syn)) papUV(gun); // 6-w13: peças dos acessórios com a camuflagem
   if (tp0) ud.tipPts = tp0;
   gun.updateMatrixWorld(true); ud.sightY = new THREE.Box3().setFromObject(gun).max.y; // topo da arma = altura da mira
   adsEye(gun, ud); // mirar (ADS): onde fica o olho na arma
@@ -21709,8 +21730,8 @@ function vmSetWeapon(id) {
   const m = W[mid]?.model;
   if (fw) { // arma com braços prontos: o modelo procedural não aparece
     if (attHas(mid, 'akimbo') && akOK(mid)) ud.akimbo = true; // uni: Pistolas Duplas também no modelo baixado (antes do return; o fpBuild esconde o braço esquerdo)
-    const h = fpBuild(mid, ud);
-    if (h) { gun.visible = false; vmGun.add(h); vmRoot.add(vmGun); vmRoot.updateMatrixWorld(true); return; } // matriz do pai já no 1º quadro (o IK e as camadas leem o mundo: sem isso a mão esquerda aparecia atrás da câmera por um quadro)
+    const h = fpBuild(mid, ud, gun);
+    if (h) { if (!fw.syn) gun.visible = false; else if (ZC.on) vxzArma(vmGun, gun); vmGun.add(h); vmRoot.add(vmGun); vmRoot.updateMatrixWorld(true); return; } // matriz do pai já no 1º quadro (o IK e as camadas leem o mundo: sem isso a mão esquerda aparecia atrás da câmera por um quadro)
   }
   if (MAO_ITENS.has(m) && !MAO.off) { // E3: granadas, Semtex, macaco e Claymore nos braços das armas (pacote da pistola, em voxel)
     const h = maoBuild(ud, gun, { pronto: () => { if (vmGun && !vmGun.userData.fps2 && W[G.cur]?.model === m) vmSetWeapon(G.cur); } });
@@ -22764,6 +22785,7 @@ function updateViewmodel(dt) {
     _pQ.setFromEuler(_pE.set(S.rx * k, 0, S.rz * k)); _pV.fromArray(ud.fps2.P.v?.p || FPV.long.p); _pV2.copy(_pV).applyQuaternion(_pQ); o.x += _pV.x - _pV2.x; o.y += _pV.y - _pV2.y; o.z += _pV.z - _pV2.z; o.rx += S.rx * k; o.rz += S.rz * k;
   } else if (now < G.switchEnd && !pist && !ud.armsKnife && !ud.fps2?.clips.draw && !ud.fps2?.an) { const k = smooth((G.switchEnd - now) / (G.switchDur || .35)); o.y -= k * .22; o.rx -= k * .9; o.rz += k * .35; if (ud.scopeEye || ud.boltAction) { o.rx += k * .5; o.y -= k * .08; } } // precisão (a6): arma comprida sobe de baixo sem apontar a luneta para o olho // sacando a arma (os braços do Blender têm animação própria)
   if (ud.armsKnife) ARMS.mixer.update(dt);
+  if (ud.fps2?.syn) fpSynAnim(ud, w); // E3 syn: peças da arma do código antes do pacote (o carregador que segue o do pacote fica com o pacote)
   if (ud.fps2) fpUpdate(ud, dt);
   if (G.swing > 0) { G.swing = Math.max(0, G.swing - dt * 4); if (ud.toss) nadeToss(ud, o, 1 - G.swing); else { const s = Math.sin(G.swing * Math.PI); o.ry += s * 1.1; o.x -= s * .12; o.z -= s * .1; } } // (a8) arremesso/colocação
   if (ud.tossFim) nadeVolta(ud, o); // 6-w11: o próximo objeto sobe na mão

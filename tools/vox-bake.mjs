@@ -16,7 +16,7 @@ await p.evaluate(() => document.querySelector('#btnHost').click()); await p.wait
 await p.evaluate(() => { document.querySelector('#lbForm [data-mode="dm"]').click(); document.querySelector('#lbForm [data-map="arena"]').click(); });
 await p.evaluate(() => document.querySelector('#lbGo').click()); await p.waitForTimeout(10000);
 await p.evaluate(() => setInterval(() => { window.__T.me.hp = 100; }, 50));
-let ids = process.argv[2]?.split(',') || await p.evaluate(() => { const T = window.__T; return Object.keys(T.W).filter(id => T.fpw(id) && ['primary', 'secondary'].includes(T.W[id].slot)); });
+let ids = process.argv[2]?.split(',') || await p.evaluate(() => { const T = window.__T; return Object.keys(T.W).filter(id => T.fpw(id) && !T.FPW[id]?.syn && ['primary', 'secondary'].includes(T.W[id].slot)); });
 const feitos = new Set();
 for (const id of ids) {
   const r = await p.evaluate(async id => { const T = window.__T, G = T.G, sl = T.W[id].slot; G.inv[sl] = id; G.ammo[id] = { mag: T.W[id].mag, res: 90 }; T.VX.ult = null;
