@@ -19700,7 +19700,7 @@ function fpSynAnim(ud, w) { for (const k in _oSyn) _oSyn[k] = 0; gunAnim(ud, w, 
 // Desligar: UNI = false (ou ?uni=0 na página) volta tudo para o modelo do código no Zumbi.
 const UNI = !/[?&]uni=0\b/.test(location.search);
 const fpw = id => { const f = FPW[W[id]?.base || id]; return C.st?.mode !== 'zombies' ? f : UNI && f ? f : undefined; };
-const fpw3 = id => C.st?.mode === 'zombies' ? undefined : FPW[W[id]?.base || id]; // fora da 1ª pessoa (mão dos outros, parede, Caixa): no Zumbi ainda é o modelo do código
+const fpw3 = id => C.st?.mode !== 'zombies' || UNI ? FPW[W[id]?.base || id] : undefined; // fora da 1ª pessoa (mão dos outros, Caixa, baú, Pack-a-Punch): no Zumbi também o modelo baixado (em voxel de 3ª pessoa, ver arma3)
 const FPC = {}; // cache dos glTF carregados ('p:pacote' e 'm:modelo')
 function fpLoad(key) {
   if (FPC[key]) return FPC[key];
@@ -19750,7 +19750,7 @@ function b08Itens(id) { // malhas que vão ser desenhadas: 'c|m:x' arma na mão 
   return L;
 }
 const b08Chaves = id => id.split('|').slice(1).filter(Boolean);
-function b08Fim(j, ok) { if (ok) { if (!b08Ok(j.id)) B08.n++; B08.ok.set(j.id, j.mapa); if (VX.on && j.id.startsWith('c|m:') && W[j.id.slice(4)]) setTimeout(() => { if (inGame && C.st?.mode !== 'zombies') remoteGunTpl(j.id.slice(4), null); }); } else if (B08.job.get(j.id) === j) B08.job.delete(j.id); B08.aq.delete(j); j.r(); } // vx2: o molde da arma dos bots já vai para a fila de voxel no aquecimento
+function b08Fim(j, ok) { if (ok) { if (!b08Ok(j.id)) B08.n++; B08.ok.set(j.id, j.mapa); if (VX.on && j.id.startsWith('c|m:') && W[j.id.slice(4)]) setTimeout(() => { if (inGame && (UNI || C.st?.mode !== 'zombies')) remoteGunTpl(j.id.slice(4), null); }); } else if (B08.job.get(j.id) === j) B08.job.delete(j.id); B08.aq.delete(j); j.r(); } // vx2: o molde da arma dos bots já vai para a fila de voxel no aquecimento
 function b08Pedir(id) { // prepara no ócio; j.p resolve quando ficar pronta (ou quando o mapa mudar)
   if (VX.on && id.startsWith('v|')) { const k = id.split('|'); vxLoad(vxNome(id)); vxLoad('bracos_' + (k[3] || k[1]).slice(2) + '_0'); } // vx: os arquivos da arma e dos braços também vêm no aquecimento
   let j = B08.job.get(id); if (j && j.mapa === B08.mapa) return j;
@@ -20367,13 +20367,34 @@ function vx3Poe(t, partes) {
 // fonte: o molde sem skin (a conta lê a cor do material; a skin entra por cima, molde por molde)
 function vx3(t, nome, M, pca, fonte) {
   if (!VX.on || !VX2.on || !VX2.p3) return; t.userData.vxN = nome; t.userData.vxM = M; t.userData.vxPca = pca;
+  vx3Lod(t, nome, M, pca); // antes da fina: a cópia de onde a grossa sai ainda tem as peças originais
   const c = vx2Usa(nome); if (c === null) return; if (c) return vx3Poe(t, c);
   const f = fonte || t; vxPede(nome, () => { const a = vxAlvos(f); return vxGenJ(f, a, vx3Passo(), pca ? vxEixos(f, a) : null, true); }, p => vx3Poe(t, p));
+}
+// LOD da arma dos outros (muitos jogadores): além de VX3L.d m (x zoom da mira) a cópia desenha uma casca grossa (VX3L.f x o passo, ~1/8
+// dos triângulos) em vez da fina. A grossa entra no próprio molde (malhas 'voxL', escondidas), feita no ócio DEPOIS da fina, de uma
+// cópia do molde tirada agora (a fina tira as peças originais do molde). As cópias na mão trocam quando as duas ficam prontas.
+const VX3L = { d: 18, f: 3 };
+function vx3Fonte(t) { const c = cloneShared(t), a = [], b = []; t.traverse(o => a.push(o)); c.traverse(o => b.push(o)); a.forEach((o, i) => { const u = o.userData, d = b[i]?.userData; if (d) { if (u.noVox) d.noVox = 1; if (u.mao) d.mao = 1; if (u.vox) d.vox = 1; } }); return c; }
+function vx3Lod(t, nome, M, pca) {
+  const n = nome + '|L' + (M ? '|' + t.userData.rk : ''), poe = partes => { if (t.userData.vxL) return; const mats = vxMats3();
+    for (const p of partes) if (p.junto) p.geos.forEach((g, i) => { if (!g) return; const m = new THREE.Mesh(g, mats[i]); if (p.Ei) m.applyMatrix4(p.Ei); m.name = 'voxL'; m.visible = false; m.userData.vox = 1; t.add(m); });
+    t.userData.vxL = 1; };
+  const c = vx2Usa(n); if (c === null) return; if (c) return poe(c);
+  const f = vx3Fonte(t); setTimeout(() => vxPede(n, () => { const a = vxAlvos(f); return vxGenJ(f, a, vx3Passo() * VX3L.f, pca ? vxEixos(f, a) : null, true); }, poe)); // na fila depois da fina
+}
+function vx3Lista(rp) { // malhas fina e grossa da cópia na mão (só quando as duas existem)
+  const t = rp.gunT; rp.gunL = t?.userData.vxL && t.userData.vx ? 1 : 0; rp.gunLk = -1; rp.gunLf = []; rp.gunLc = [];
+  if (rp.gunL) for (const o of rp.gun.children) if (o.name === 'vox') rp.gunLf.push(o); else if (o.name === 'voxL') rp.gunLc.push(o);
+}
+function vx3Ver(rp) { // a cada quadro: fina perto, grossa longe
+  if (!rp.gunL || !rp.gun) return; const d = VX3L.d * (CFG.fov || 75) / camera.fov, k = camera.position.distanceToSquared(rp.pos) > d * d ? 1 : 0;
+  if (k === rp.gunLk) return; rp.gunLk = k; for (const o of rp.gunLf) o.visible = !k; for (const o of rp.gunLc) o.visible = !!k;
 }
 // cópia na mão de um jogador: se o molde ficou em voxel depois (ou foi refeito com o modelo baixado), troca a cópia sem refazer o saque
 function vx3Troca(rp, t) {
   rp.gunT = t; rp.gunVx = t.userData.vx ? t : null; rp.tp = tpInfo(t, rp.w);
-  const gh = rp.model.userData.gh, v = rp.gun?.visible ?? true; if (rp.gun) gh.remove(rp.gun); gh.add(rp.gun = cloneShared(t)); rp.gun.visible = v;
+  const gh = rp.model.userData.gh, v = rp.gun?.visible ?? true; if (rp.gun) gh.remove(rp.gun); gh.add(rp.gun = cloneShared(t)); rp.gun.visible = v; vx3Lista(rp);
 }
 // aquecimento do mapa: põe na fila (no ócio) a faca do pacote e as granadas da própria mão (a C4 entra quando c4Maos monta; as armas
 // dos bots, quando o B08 as deixa prontas)
@@ -23755,7 +23776,7 @@ function cloneShared(t) { // o three copia userData por JSON (aqui ele guarda ma
 function setRemoteGun(rp, w) {
   if (!w || rp.w === w) return; rp.w = w;
   const gh = rp.model.userData.gh; while (gh.children.length) gh.remove(gh.children[0]); // não descarta: é do molde
-  const mid = knifeModelOf(w, rp.sk), t = remoteGunTpl(mid, rp.sk?.[mid]); gh.add(rp.gun = cloneShared(t)); rp.gunT = t; rp.gunVx = t.userData.vx ? t : null; // vx2
+  const mid = knifeModelOf(w, rp.sk), t = remoteGunTpl(mid, rp.sk?.[mid]); gh.add(rp.gun = cloneShared(t)); rp.gunT = t; rp.gunVx = t.userData.vx ? t : null; vx3Lista(rp); // vx2
   rp.tp = tpInfo(t, w); rp.swT = now; rp.supW = null; // terceira pessoa: pega do jeito da arma nova e saca (a14)
 }
 function removeRemote(id) { const rp = R.get(id); if (!rp) return; scene.remove(rp.model); avtDespir(rp.model); // as peças do avatar são do cache (não descarta)
@@ -23771,7 +23792,7 @@ function updateRemotes(dt) {
   const finos = avtFinos();
   for (const rp of R.values()) {
     const ud = rp.model.userData, buf = rp.buf, rt = now - netDelay(rp.id);
-    if (rp.gunT) { const tn = RGUN.get(rp.gunT.userData.rk) || rp.gunT; if (tn !== rp.gunT || (tn.userData.vx && rp.gunVx !== tn)) vx3Troca(rp, tn); } // vx2: o molde ficou em voxel (ou o modelo baixado ficou pronto e o molde foi refeito)
+    if (rp.gunT) { const tn = RGUN.get(rp.gunT.userData.rk) || rp.gunT; if (tn !== rp.gunT || (tn.userData.vx && rp.gunVx !== tn) || (tn.userData.vx && tn.userData.vxL && !rp.gunL)) vx3Troca(rp, tn); vx3Ver(rp); } // vx2: o molde ficou em voxel (ou o modelo baixado ficou pronto e o molde foi refeito)
     if (buf.length) { // interpola; sem dado novo ainda, segue a última velocidade por até 200 ms (netPick)
       const s = netPick(buf, rt, .2, 15), a = s.a, b = s.b, k = s.k; netEo(rp.eo ||= new V3(), dt);
       rp.rx = s.x; rp.rz = s.z; rp.rt = rt; rp.xt = s.ext;
@@ -26407,12 +26428,16 @@ function zBoxPlace(loc) {
   Wd.boxCol = { minX: L.x - hw, maxX: L.x + hw, minY: 0, maxY: .9, minZ: L.z - hd, maxZ: L.z + hd }; COL.push(Wd.boxCol);
   renderer.shadowMap.needsUpdate = true;
 }
+// Caixa, baú e Pack-a-Punch do Zumbi: cópia leve do molde da 3ª pessoa (remoteGunTpl: o modelo baixado em voxel de 4,5 mm, uma malha
+// por material e a geometria dividida com a mão dos outros); arma3Nova: o molde foi refeito ou ficou em voxel depois (troca a cópia).
+function arma3(w, esc) { const t = remoteGunTpl(w, null), m = cloneShared(t); m.scale.setScalar(esc); m.userData.t = t; m.userData.vx = t.userData.vx; return m; }
+function arma3Nova(m) { const t = m?.userData.t, tn = t && (RGUN.get(t.userData.rk) || t); return !!tn && (tn !== t || (!!tn.userData.vx && !m.userData.vx)); }
 function zClearHolder(h) { while (h.children.length) { const c = h.children[0]; h.remove(c); c.traverse(o => o.geometry?.dispose()); } }
 const ZBOXM = new Map(); // modelos da roleta da caixa, construídos uma vez
 function zBoxShow(w) {
-  const b = ZC.world?.box; if (!b || b.cur === w) return;
+  const b = ZC.world?.box; if (!b || (b.cur === w && !arma3Nova(b.holder.children[0]))) return;
   while (b.holder.children.length) b.holder.remove(b.holder.children[0]); b.cur = w; if (!w) return; // modelos da caixa ficam em cache (a roleta troca de arma várias vezes por segundo)
-  let m = ZBOXM.get(w); if (!m) { m = gunModel(w); m.scale.setScalar(w === 'monkey' ? 3 : 2); m.rotation.y = Math.PI / 2; ZBOXM.set(w, m); }
+  let m = ZBOXM.get(w); if (!m || arma3Nova(m)) { m = arma3(w, w === 'monkey' ? 3 : 2); m.rotation.y = Math.PI / 2; ZBOXM.set(w, m); }
   b.holder.add(m);
 }
 function zPowerOn() {
@@ -26474,9 +26499,9 @@ function zUpdateWorld(dt) {
   const P = Wd.pap, pst = ZC.pap.st;
   P.roller.rotation.x += dt * (pst === 'work' ? 14 : 0);
   if (pst === 'ready' && ZC.pap.w) {
-    if (P.holderW !== ZC.pap.w) { zClearHolder(P.holder); const m = gunModel(ZC.pap.w); m.scale.setScalar(2); P.holder.add(m); P.holderW = ZC.pap.w; }
+    if (P.holderW !== ZC.pap.w || arma3Nova(P.holder.children[0])) { P.holder.clear(); P.holder.add(arma3(ZC.pap.w, 2)); P.holderW = ZC.pap.w; } // cópia do molde: a geometria é dele (não descarta)
     P.holder.rotation.y += dt * 1.5;
-  } else if (P.holderW) { zClearHolder(P.holder); P.holderW = null; }
+  } else if (P.holderW) { P.holder.clear(); P.holderW = null; }
   P.lightM.color.set(ZC.power ? (Math.floor(now * 4) % 2 ? 0xa060ff : 0x6030d0) : 0x222222);
   // armadilhas: raios entre os postes enquanto ligada; lâmpada verde (pronta), azul (ligada), vermelha (recarregando)
   Wd.traps?.forEach((o, i) => {
@@ -28989,8 +29014,8 @@ function zintBauDa(p, w, back, cur) { // host: entrega (letais e macaco como na 
 const ZBAU_LUZ = new THREE.MeshBasicMaterial({ color: 0xd8e0c8 }); // lâmpada do armário (compartilhada)
 const ZBAU_M = new Map(); // modelos do baú, construídos uma vez (separados do ZBOXM: um modelo só tem um pai)
 function zintBauMostra(e, w) {
-  if (e.cur === w) return; while (e.holder.children.length) e.holder.remove(e.holder.children[0]); e.cur = w; if (!w || !W[w]) return;
-  let m = ZBAU_M.get(w); if (!m) { m = gunModel(w); m.scale.setScalar(w === 'monkey' ? 2.6 : e.esc); m.rotation.y = Math.PI / 2; ZBAU_M.set(w, m); }
+  if (e.cur === w && !arma3Nova(e.holder.children[0])) return; while (e.holder.children.length) e.holder.remove(e.holder.children[0]); e.cur = w; if (!w || !W[w]) return;
+  let m = ZBAU_M.get(w); if (!m || arma3Nova(m)) { m = arma3(w, w === 'monkey' ? 2.6 : e.esc); m.rotation.y = Math.PI / 2; ZBAU_M.set(w, m); }
   e.holder.add(m);
 }
 ZINT_FN.bau = {
@@ -35083,3 +35108,4 @@ if (DEBUG) Object.assign(window.__T, { ZKIND, CAMP, CAMP_G, CAMP_IA, zfTipo, zTi
 </script>
 </body>
 </html>
+if (DEBUG) Object.assign(window.__T, { remoteGunTpl, RGUN, VX2, VX3L, zBoxShow, arma3, setRemoteGun, getRemote }); // testes (pendências de proporção, 3ª pessoa e Arsenal)
