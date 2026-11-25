@@ -22966,7 +22966,7 @@ function attEq(id) { // acessórios equipados no Armeiro e liberados (sem olhar 
   return (PROF.data?.att?.[attBase(id)] || []).filter(a => un.has(a) && ATT[a] && attCabe(id, a) && !(ATT[a].slot === 'optic' && fabLuneta(id))); // luneta de fábrica: sem outra mira
 }
 // uni2: algum acessório equipado tem peça na arma (vis ≠ 0 e a arma tem lugar para ela)? Aí o fpAtt monta as peças no modelo baixado
-const attPecas = id => ZC.on && attOK(id) && attEq(id).some(a => { const s = ATTV.sem[attBase(id)] || []; return ATT[a].vis !== 0 && !s.includes(ATT[a].slot) && !s.includes(a); });
+const attPecas = id => (ATT_PV ? ATT_PV.list : ZC.on && attOK(id) ? attEq(id) : []).some(a => { const s = ATTV.sem[attBase(id)] || []; return ATT[a].vis !== 0 && !s.includes(ATT[a].slot) && !s.includes(a); }); // ATT_PV: Armeiro (menu), arVox
 function attStat(id, k) { let v = 1; for (const a of attOn(id)) if (ATT[a][k] != null) v *= ATT[a][k]; return v; }
 const attHas = (id, k) => attOn(id).some(a => ATT[a][k]);
 const wMag = id => Math.max(1, Math.round(W[id].mag * attStat(id, 'magX')));
@@ -34344,7 +34344,8 @@ function rollItem(t = 0) {
 const itemInfo = it => { const [w, f] = it.split(':'), s = SKIN_BY[f]; return { w, f, s, wn: w === 'knife' ? 'Faca' : (W[w]?.name || w), rar: s?.r ?? 0 }; };
 const isKnife = w => w === 'knife' || w === 'karambit';
 const knifeInUse = () => PROF.data?.equipped?._faca === 'karambit' ? 'karambit' : 'knife';
-function skinOf(id) { if (!id || W[id]?.pap) return null; return PROF.data?.equipped?.[id] || null; }
+let SKIN_PV = null; // arVox: a skin da prévia do Arsenal na montagem da arma da mão
+function skinOf(id) { if (!id || W[id]?.pap) return null; if (SKIN_PV?.id === id) return SKIN_PV.f; return PROF.data?.equipped?.[id] || null; }
 function equipItem(it, on) {
   const d = PROF.data, { w, f } = itemInfo(it); if (!d || !d.items.includes(it)) return;
   if (on) { d.equipped[w] = f; if (w === 'karambit') d.equipped._faca = 'karambit'; else if (w === 'knife') delete d.equipped._faca; } else if (d.equipped[w] === f) delete d.equipped[w];
@@ -34630,13 +34631,44 @@ function arStage() {
   };
   requestAnimationFrame(ARV.loop);
 }
+// ===== Arsenal e Armeiro: a mesma arma da mão =====
+// arVox monta pelo próprio fpBuild a arma da 1ª pessoa (modelo baixado em voxel, skin e acessórios do Armeiro pelo fpAtt) e esconde os
+// braços; o grupo leva o giro da mira (aq: cano reto para -z, como o gunModel). Cache por arma|skin|acessórios (ARVX.max entradas: a
+// montagem custa ~0,1 s uma vez). Pacote ainda baixando: 'espera' (fica a feita no código e troca quando ele chega); sem pacote: null.
+const ARVX = { cache: new Map(), max: 8 };
+function arVox(w, f, list = []) {
+  const fw = fpw(w); if (!fw || fw.syn || !FPK[fw.pack]) return null;
+  const k = w + '|' + (f || '') + '|' + list.join(); let g = ARVX.cache.get(k); if (g) { ARVX.cache.delete(k); ARVX.cache.set(k, g); return g; }
+  const ud = {}, ap = ATT_PV, sp = SKIN_PV; let h; ATT_PV = { list, f }; SKIN_PV = { id: w, f: f || null };
+  try { h = fpBuild(w, ud, new THREE.Group()); } catch (e) { console.warn('arVox', e); return null; } finally { ATT_PV = ap; SKIN_PV = sp; }
+  if (!h) return 'espera';
+  const F = ud.fps2; F.mixer.stopAllAction();
+  F.root.traverse(o => { if (o.isMesh && (o.name === 'voxBraco' || fpArm(o) || o.material?.name === '12ge')) o.visible = false; });
+  g = new THREE.Group(); g.quaternion.copy(F.aq); g.add(h); g.updateMatrixWorld(true);
+  const gi = g.matrixWorld.clone().invert(), L = v => v.applyMatrix4(gi), hr = fpBone(F.root, 'Hand_R'), hl = fpBone(F.root, 'Hand_L');
+  g.userData = { arVox: 1, muzzle: L(new V3().setFromMatrixPosition(F.mz.matrixWorld)), sight: L(F.sl.clone().applyMatrix4(F.body.matrixWorld)),
+    rh: hr ? L(new V3().setFromMatrixPosition(hr.matrixWorld)) : null, lh: hl ? L(new V3().setFromMatrixPosition(hl.matrixWorld)) : null };
+  ARVX.cache.set(k, g); for (const [kk, x] of ARVX.cache) { if (ARVX.cache.size <= ARVX.max) break; if (!x.parent) ARVX.cache.delete(kk); }
+  return g;
+}
+function arCaixa(g) { // só o que aparece (sem os braços escondidos, a lente e o feixe do laser)
+  const b = new THREE.Box3(), bb = new THREE.Box3(); g.updateMatrixWorld(true);
+  g.traverse(o => { if (!o.isMesh || !o.geometry?.attributes.position) return; for (let p = o; p; p = p.parent) if (!p.visible) return; const m = o.material; if (m?.transparent || m?.isMeshBasicMaterial || Array.isArray(m)) return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); b.union(bb); });
+  return b;
+}
 function arModel() {
   if (!ARV) return; const d = PROF.data, w = AR.w, att = AR.tab === 'att', f = att ? (d.equipped[w] || null) : (AR.sel || null), list = att ? arAtts(w) : [];
   const key = [w, f, att, list.join()].join('|'); if (ARV.key === key) { arTags(); return; } ARV.key = key;
-  while (ARV.pivot.children.length) { const c = ARV.pivot.children[0]; ARV.pivot.remove(c); c.traverse(o => o.geometry?.dispose()); }
-  GM_PROC = att; let g; try { g = gunModel(w, true, f); } finally { GM_PROC = false; } // Acessórios: a arma feita no código (a do modo Zumbi), com as peças
-  g.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(g); // medida sem as peças (o feixe do laser tem 2,5 m)
-  if (list.length) { ATT_PV = { list, f }; try { attPartsProc(w, g, g.userData); } catch (e) { console.warn(e); } ATT_PV = null; }
+  while (ARV.pivot.children.length) { const c = ARV.pivot.children[0]; ARV.pivot.remove(c); if (!c.userData.arVox) c.traverse(o => o.geometry?.dispose()); }
+  let g = arVox(w, f, list), box;
+  if (g === 'espera') setTimeout(() => { if (ARV?.key === key) { ARV.key = null; arModel(); } }, 500); // o pacote chega: troca
+  if (g && g !== 'espera') { g.position.set(0, 0, 0); box = arCaixa(g); }
+  else {
+    GM_PROC = att; try { g = gunModel(w, true, f); } finally { GM_PROC = false; } // sem pacote: a arma feita no código, com as peças
+    g.updateMatrixWorld(true); box = new THREE.Box3().setFromObject(g); // medida sem as peças (o feixe do laser tem 2,5 m)
+    if (list.length) { ATT_PV = { list, f }; try { attPartsProc(w, g, g.userData); } catch (e) { console.warn(e); } ATT_PV = null; }
+  }
   ARV.anc = att && attOK(w) ? arAnchors(g, box) : null;
   g.position.sub(box.getCenter(new V3())); ARV.pivot.add(g); ARV.gun = g; ARV.sz = box.getSize(new V3());
   if (!att) ARV.rot = 0;
@@ -34738,16 +34770,18 @@ function thPump() {
     const sc = new THREE.Scene(), pm = new THREE.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(r), .04).texture; pm.dispose();
     sc.add(new THREE.HemisphereLight(0xffffff, 0x606060, 1.8)); const dl = new THREE.DirectionalLight(0xffffff, 2.6); dl.position.set(3, 3, 1); sc.add(dl);
     const fl = new THREE.DirectionalLight(0xdfe8ff, 1.6); fl.position.set(4, -1, -2); sc.add(fl); // luz de preenchimento: arma escura não some no cartão
-    TH = { r, sc, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, .01, 20), c };
+    TH = { r, sc, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, .01, 20), c, n: {} };
   }
-  const [w, f] = k.split(':'), g = gunModel(w, true, f || null);
-  const box = new THREE.Box3().setFromObject(g), ctr = box.getCenter(new V3()), sz = box.getSize(new V3());
+  const [w, f] = k.split(':'); let g = arVox(w, f || null);
+  if (g === 'espera' && (TH.n[k] = (TH.n[k] || 0) + 1) < 60) { setTimeout(thPump, 300); return; } // a da mão: um pacote baixando por vez (até ~18 s; depois fica a do código)
+  const vx = g && g !== 'espera', par = vx ? g.parent : null, p0 = vx ? g.position.clone() : null; if (!vx) g = gunModel(w, true, f || null); else { par?.remove(g); g.position.set(0, 0, 0); }
+  const box = vx ? arCaixa(g) : new THREE.Box3().setFromObject(g), ctr = box.getCenter(new V3()), sz = box.getSize(new V3());
   g.position.sub(ctr); TH.sc.add(g);
   const asp = 360 / 150, hw = Math.max(sz.z / 2, sz.y / 2 * asp) * 1.08, hh = hw / asp;
   Object.assign(TH.cam, { left: -hw, right: hw, top: hh, bottom: -hh }); TH.cam.position.set(5, 0, 0); TH.cam.lookAt(0, 0, 0); TH.cam.updateProjectionMatrix(); // de lado: cano para a direita
   TH.r.render(TH.sc, TH.cam);
   const done = url => { THC[k] = url; thQ.shift(); document.querySelectorAll(`img[data-th="${k}"]`).forEach(i => { i.src = url; i.removeAttribute('data-th'); }); if (thQ.length) setTimeout(thPump, 10); };
-  TH.sc.remove(g); g.traverse(o => o.geometry?.dispose());
+  TH.sc.remove(g); if (vx) { g.position.copy(p0); par?.add(g); } else g.traverse(o => o.geometry?.dispose()); // a da mão é do cache (e pode estar no Armeiro)
   if (TH.c.toBlob) TH.c.toBlob(b => done(b ? URL.createObjectURL(b) : TH.c.toDataURL('image/png')), 'image/png'); // copia a imagem agora e codifica depois
   else done(TH.c.toDataURL('image/png'));
 }
@@ -35092,6 +35126,7 @@ requestAnimationFrame(frame);
 if (DEBUG) window.__T = { get NOW() { return now; }, FPA, attOn, vxExport, vxbExport, VXB, VX, VXZ, vxzArma, vxzAlvos, vxzNucleo, vxzHash, VMC, THREE, FPW, fpw, akAnim, akPassada, showPause, attPartsProc, skinSwatch, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade, zKill, zDrop, zEndRound,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
+if (DEBUG) Object.assign(window.__T, { remoteGunTpl, RGUN, VX2, VX3L, zBoxShow, arma3, setRemoteGun, getRemote, AR, arsenalUI, ATT, ARVX, arModel: () => ARV }); // testes (pendências de proporção, 3ª pessoa e Arsenal)
 if (DEBUG) Object.assign(window.__T, { c4Maos, maoBuild, vmScene, MAO, fpIK }); // E3: testes das mãos únicas
 if (DEBUG) Object.assign(window.__T, { VX2, vxObj, vx3, vxAquecer, knBuild, vxDrena: () => { const t = performance.now(); while (VX2.fila.length) vxPasso(null, 1e9); return performance.now() - t; }, RGUN, remoteGunTpl, setRemoteGun, c4Maos, cloneShared, DROPM, vxBHAND: () => BHAND, vxWarm: () => !!WARM }); // vx2: medição
 if (DEBUG) Object.assign(window.__T, { R1, R1enc, R1dec, r1PosH, r1PosC, r1FastDec }); // R1: ganchos de teste do formato de fio
@@ -35108,4 +35143,3 @@ if (DEBUG) Object.assign(window.__T, { ZKIND, CAMP, CAMP_G, CAMP_IA, zfTipo, zTi
 </script>
 </body>
 </html>
-if (DEBUG) Object.assign(window.__T, { remoteGunTpl, RGUN, VX2, VX3L, zBoxShow, arma3, setRemoteGun, getRemote }); // testes (pendências de proporção, 3ª pessoa e Arsenal)
