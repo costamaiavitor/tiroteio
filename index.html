@@ -19646,11 +19646,11 @@ const FPM = {
   galil: { T: [-130, 39, null], fwd: '+x', up: '+y', L: .98, brass: ['Material.007', 'Material.008', 'Material.009'], lhf: .32 }, // a3: mão esquerda no guarda-mão, não no tubo de gás
   rpk: { T: [-116, 20, null], fwd: '+x', up: '+y', L: 1.04, lhf: .3, tint: { 'Material.008': 0x3a2014, 'Material.003': 0x3a2014, 'Material.002': 0x45281a, 'Material.007': 0x2e1a10 } }, // a3: madeira chapada rosada vira madeira escura; mão no guarda-mão
   hk21: { T: [-1.0, -.30, null], fwd: '+x', up: '+y', L: 1.02, lens: ['Material.015'], lhf: .78, cover: 'topcover', coverA: 1.1 }, // mão esquerda à frente da caixa de munição; a7: tampa abre na recarga
-  dragunov: { T: [-93, -6.7, null], fwd: '+x', up: '+y', L: 1.225, magBase: 1 }, // fz2: carregador curto: o fundo dele vai para o fundo do do pacote (a cópia na mão ficava solta)
+  dragunov: { T: [-93, -6.7, null], fwd: '+x', up: '+y', L: 1.225, magBase: 1, att: { inteira: 1 } }, // fz2: carregador curto: o fundo dele vai para o fundo do do pacote (a cópia na mão ficava solta)
   m4: { T: [-20, -3, null], fwd: '+x', up: '+y', L: .84 , lhf: .5, magBase: 1 },
   commando: { T: [-44, -1, null], fwd: '+x', up: '+y', L: .85 , lhf: .5, magBase: 1 },
   fal: { T: [-16.5, 2.3, null], fwd: '+x', up: '+y', L: 1.09 , lhf: .5 , tint: { Material: 0x2b2b2b, 'Material.003': 0x2b2b2b }, brass: ['Material.001', 'Material.002'], mat: 1 }, // a13 mat: modelo sem textura (cinza chapado) leva o aço/polímero das armas do jogo
-  m14: { T: [-1.885, -.055, null], fwd: '+x', up: '+y', L: 1.118 , lhf: .5, magBase: 1, tint: { Material: 0x3b4130, 'Material.002': 0x3b4130, ...Object.fromEntries('004 005 006 007 008 009 010 012 013 014'.split(' ').map(n => ['Material.' + n, 0x2c2d2e])), bolt1: 0x2c2d2e, bolt2: 0x2c2d2e } }, // (só a AUG usa este modelo: coronha verde-oliva como o polímero da AUG, não madeira) a4: coronha salmão e aço quase branco (cores claras demais no modelo): madeira e aço escuros como os do M4
+  m14: { T: [-1.885, -.055, null], fwd: '+x', up: '+y', L: 1.118, lhf: .5, magBase: 1, att: { inteira: 1 }, tint: { Material: 0x3b4130, 'Material.002': 0x3b4130, ...Object.fromEntries('004 005 006 007 008 009 010 012 013 014'.split(' ').map(n => ['Material.' + n, 0x2c2d2e])), bolt1: 0x2c2d2e, bolt2: 0x2c2d2e } }, // (só a AUG usa este modelo: coronha verde-oliva como o polímero da AUG, não madeira) a4: coronha salmão e aço quase branco (cores claras demais no modelo): madeira e aço escuros como os do M4
   thundergun: { T: [-17.5, null, -6.2], fwd: '+x', up: '+z', L: .85, vo: [.03, -.03, -.12], ve: [.2, 0, 0] }, // en1: ve = cano para o centro; mais perto (longe, o corte da manga esquerda aparecia)
   scout: { T: [-97, -19, null], fwd: '+x', up: '+y', L: 1.2, lens: ['Material.019'] },
   awp: { T: [-94, 5.5, null], fwd: '+x', up: '+y', L: 1.2, lens: ['Material.019'] },
@@ -19666,11 +19666,11 @@ for (const [p, l] of Object.entries({ pistol: 'glock usp p250 deagle cz75 m1911 
   rifle: 'm4 commando fal m14 thundergun', sniper: 'scout awp', pump: 'stakeout olympia chinalake spas' })) for (const id of l.split(' ')) FPW[id] = { pack: p, m: id };
 FPW.l96 = { pack: 'sniper', m: 'awp' }; // uni: a L96A1 do Zumbi é da mesma família da AWP do CS (Accuracy International)
 // a versão do Pack-a-Punch usa os braços e o modelo da arma base.
-// uni (etapa 1 da unificação CS × Zumbi): no Zumbi a arma com modelo baixado usa o MESMO modelo, pacote, mãos e animações do CS. Enquanto os
-// acessórios do Armeiro não existem no modelo baixado (etapa 2), a arma com acessório que tem peça (attPecas) fica com o modelo do código.
+// uni (etapa 1 da unificação CS × Zumbi): no Zumbi a arma com modelo baixado usa o MESMO modelo, pacote, mãos e animações do CS. uni2
+// (etapa 2): os acessórios do Armeiro entram no modelo baixado (fpAtt), então a arma com acessório também fica nele.
 // Desligar: UNI = false (ou ?uni=0 na página) volta tudo para o modelo do código no Zumbi.
 const UNI = !/[?&]uni=0\b/.test(location.search);
-const fpw = id => { const f = FPW[W[id]?.base || id]; return C.st?.mode !== 'zombies' ? f : UNI && f && !attPecas(id) ? f : undefined; };
+const fpw = id => { const f = FPW[W[id]?.base || id]; return C.st?.mode !== 'zombies' ? f : UNI && f ? f : undefined; };
 const fpw3 = id => C.st?.mode === 'zombies' ? undefined : FPW[W[id]?.base || id]; // fora da 1ª pessoa (mão dos outros, parede, Caixa): no Zumbi ainda é o modelo do código
 const FPC = {}; // cache dos glTF carregados ('p:pacote' e 'm:modelo')
 function fpLoad(key) {
@@ -20601,6 +20601,7 @@ function fpBuild(id, ud) {
     ud.fab = FAB_HOLO.includes(attBase(id)) ? 'holo' : 'luneta'; ud.fabLens = [];
     if (ud.fab === 'luneta') model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name) && !ud.fabLens.includes(o.material)) { o.material.transparent = true; ud.fabLens.push(o.material); } });
   }
+  fpAtt(id, ud, ud.fps2, { D, tips, model, F2, P, root, holder, arms }); // uni2: acessórios do Armeiro no modelo baixado (peças em voxel, presas aos ossos)
   // a15: o saque do pacote cabe no tempo do jogo (G.switchDur); modelo que chega depois entra no ponto do saque em que a troca está (ou parado)
   const z2 = FZ2F.includes(W2.pack); // fz2: saque procedural (sobe girando com mola, a mão esquerda chega depois) sobre a pose parada
   const sw = G.switchEnd - now, dr = clips.draw && sw > .02 && !z2; mixer.stopAllAction(); fpPlay(ud, dr ? 'draw' : 'idle', dr ? G.switchDur : undefined); mixer.update(dr ? Math.max(0, G.switchDur - sw) : 0); if (dr) ud.fps2.until = G.switchEnd;
@@ -20608,6 +20609,148 @@ function fpBuild(id, ud) {
   if (D?.cover) fpCoverInit(ud.fps2, model.children[0], D); // a7: tampa de alimentação do modelo (metralhadora de fita)
   VX.tt = performance.now(); VX.tb = VX.tt - tb0; // medição: tempo da montagem que deu certo
   return holder;
+}
+// ===== uni2: acessórios do Armeiro no modelo baixado (fps2, modo Zumbi) =====
+// Um grupo adaptador (gA) preso ao osso do corpo, no espaço que o attPartsProc espera (metros, cano para -Z, Y para cima, origem no
+// gatilho). As âncoras saem da nuvem de pontos dos voxels do modelo (boca, mira de ferro, trilho = fpTips.rail, punho, carregador, mão
+// esquerda) com ajuste por modelo em FPM.<m>.att. A nuvem entra no gA como "malhas-sonda" (o corpo em fatias de 1 cm no comprimento, o
+// carregador e o ferrolho em grupos à parte) e as peças saem das mesmas funções das armas feitas no código, sem mexer no attPartsProc.
+// O que o attPartsProc faz com as sondas volta para os voxels do modelo: fatia escondida (coronha de fábrica) = voxels apagados;
+// fatia andada (cano longo) = voxels da ponta à frente (o cano novo é um segmento novo, não estica voxel); carregador esticado,
+// descido ou copiado (estendido, pistola, duplo) = a mesma conta nos voxels do carregador (presos ao osso dele: seguem a recarga, e a
+// cópia que a mão traz também). As peças do carregador e do ferrolho passam para o osso deles. As peças viram voxel pelo vxz (malhas
+// separadas, mesmo passo, AO e materiais; lente, retícula e trítio ficam lisos) e o PaP entra como nas armas do código (papUV).
+// FPM.<m>.att: rail [dx, dy, dz] (m) no centro da mira; corte { slot: [[x0, x1, y0, y1, z0, z1], ...] } caixas (m, no gA) de voxels
+// apagados quando o acessório do slot entra; inteira: 1 = coronha inteiriça (ganha soleira, não é trocada).
+const FPA = { fatia: .01, pts: 60000, ms: 0, olhoZ: .12, olhoY: .05 }; // olhoZ/olhoY: a coronha termina olhoZ à frente do olho e fica olhoY abaixo da linha dele (m)
+function fpAtt(id, ud, F, X) {
+  if (!attPecas(id) || !F) return;
+  const t0 = performance.now(), { D, tips, model, F2, P, root, holder, arms } = X, body = F.body, b = attBase(id), on = attOn(id), Ad = D?.att || {};
+  holder.updateMatrixWorld(true); // tudo no mesmo mundo (o do holder), como o attach() vai ver
+  const u = D ? tips.L / D.L : FPG * P.hr, M4 = () => new THREE.Matrix4();
+  const gA = new THREE.Group(); gA.name = 'att'; gA.matrixAutoUpdate = false;
+  gA.matrix.copy(F.C).multiply(M4().makeScale(u, u, u)).multiply(M4().makeRotationY(Math.PI)); body.add(gA); gA.updateMatrixWorld(true);
+  const gi = gA.matrixWorld.clone().invert(), Wg = M4().copy(gA.matrix).invert().multiply(F.C), Gw = Wg.clone().invert(); // arma (fpFrame) <-> gA
+  const pis = P.view === 'pistol', hg = W[b]?.slot === 'secondary';
+  // partes do modelo: carregador e ferrolho (osso/nó que o follow move) e o resto (corpo)
+  const magN = new Set(), slN = new Set();
+  for (const f of F.follow) { if (f.ghost) continue; if (f.rest) magN.add(f.b); else if (pis && (f.b.name === 'an_ferrolho' || (P.slide && f.a.name.startsWith(P.slide + '_')))) slN.add(f.b); }
+  if (!D && F.magP) magN.add(F.magP.l[0].a);
+  const parte = o => { for (let p = o; p && p !== root; p = p.parent) { if (magN.has(p)) return ['mag', p]; if (slN.has(p)) return ['sl', p]; if (F2 && p === F2.g) return null; } return ['c', null]; };
+  const Vs = { c: [], mag: [], sl: [] }, src = D ? model : root;
+  src.traverse(o => { if (!o.isMesh || !o.userData.vox || o.name === 'voxBraco' || !o.geometry?.attributes.position) return; for (let p = o; p; p = p.parent) if (!p.visible) return; const r = parte(o); if (r) Vs[r[0]].push({ o, no: r[1] }); });
+  let tot = 0; for (const k in Vs) for (const e of Vs[k]) tot += e.o.geometry.attributes.position.count;
+  const st = Math.max(1, Math.ceil(tot / FPA.pts)), pts = { c: [], mag: [], sl: [] }, v = new V3();
+  for (const k in Vs) for (const e of Vs[k]) { const a = e.o.geometry.attributes.position; e.M = M4().multiplyMatrices(gi, e.o.matrixWorld); for (let i = 0; i < a.count; i += st) { v.fromBufferAttribute(a, i).applyMatrix4(e.M); pts[k].push(v.x, v.y, v.z); } }
+  if (!tot) for (const p of fpPts(src, m => m.visible && !fpArm(m) && !m.material?.transparent && !(D?.lens || []).includes(m.material?.name), 3)) { p.applyMatrix4(gi); pts.c.push(p.x, p.y, p.z); } // sem voxels (arquivo faltando): só as peças
+  const C = pts.c; if (!C.length) { gA.removeFromParent(); return; }
+  // âncoras
+  const W2G = p => p.clone().applyMatrix4(Wg), G2W = p => p.clone().applyMatrix4(Gw);
+  const sight = W2G(tips.sight), rail = W2G(tips.rail), muzzle = F.mz.position.clone().applyMatrix4(M4().copy(gA.matrix).invert());
+  let ymin = 1e9; for (let i = 0; i < C.length; i += 3) if (C[i + 2] > -.01 && C[i + 2] < .13 && C[i + 1] < -.02) ymin = Math.min(ymin, C[i + 1]);
+  let gripAx, rh = new V3(0, -.04, .05);
+  if (ymin < -.05) {
+    const bt = new V3(), tp = new V3(); let nb = 0, nt = 0;
+    for (let i = 0; i < C.length; i += 3) { const y = C[i + 1], z = C[i + 2]; if (z > -.01 && z < .13 && y < ymin + .012) { bt.x += C[i]; bt.z += z; nb++; } if (z > 0 && z < .09 && y > -.035 && y < -.015) { tp.x += C[i]; tp.z += z; nt++; } }
+    let yt = -.015; if (hg) { const S = pts.sl.length ? pts.sl : null; let y0 = 1e9; if (S) for (let i = 1; i < S.length; i += 3) y0 = Math.min(y0, S[i]); yt = y0 < 1e8 ? y0 - .012 : sight.y - .03; } // pistola: topo do punho logo abaixo do ferrolho (a armação na frente dele é onde a empunhadura prende)
+    if (nb && nt) { gripAx = { top: new V3(tp.x / nt, yt, tp.z / nt), bot: new V3(bt.x / nb, ymin, bt.z / nb) }; rh = gripAx.top.clone().lerp(gripAx.bot, .3); }
+  }
+  const op = on.find(a => ATT[a].slot === 'optic'), dd = ATTV[(op && ATT[op].dot > 1 ? 'holo' : 'reflex') + (hg ? 'P' : '')][2], ra = Ad.rail || [0, 0, 0];
+  let sightR = rail.z + ra[2] + dd / 2 - (hg ? .006 : .008);
+  if (pis) { const S = pts.sl.length ? pts.sl : C; let zr = -1e9; for (let i = 0; i < S.length; i += 3) if (S[i + 1] > sight.y - .006) zr = Math.max(zr, S[i + 2]); if (zr > -1e8) sightR = zr - .008; } // pistola: no fim do ferrolho, como a RMR
+  let lh = null; const Cb = F.ik?.Cb, G2A = Cb && M4().copy(Cb).invert().multiply(gA.matrix), A2G = G2A && G2A.clone().invert();
+  // mão esquerda: o ponto de contato é a palma (meio dos nós dos dedos), não o pulso (o osso da mão); o alvo do IK anda o mesmo que ela
+  const hl = fpBone(root, 'Hand_L'), dedos = hl ? hl.children.filter(o => o.isBone) : [], Ai = Cb && M4().multiplyMatrices(body.matrixWorld, Cb).invert();
+  const palma = Ai && hl ? (dedos.length ? dedos.reduce((c, o) => c.add(v.setFromMatrixPosition(o.matrixWorld)), new V3()).divideScalar(dedos.length) : new V3().setFromMatrixPosition(hl.matrixWorld)).applyMatrix4(Ai) : null; // no referencial da arma do pacote
+  if (F.ik?.d && palma) lh = palma.clone().add(F.ik.d).applyMatrix4(A2G); else if (F.ik && palma) lh = palma.clone().applyMatrix4(A2G);
+  const udA = { muzzle, sight: new V3(sight.x + ra[0], sight.y + ra[1], sight.z), sightR, rh, gripAx, lh: lh?.clone(), pistol: ud.pistol || pis, rig: ud.rig, magUp: ud.magUp };
+  // sondas
+  const pm = new THREE.MeshBasicMaterial(), prx = [];
+  const mk = (par, arr, off) => { const f = new Float32Array(arr); if (off) for (let i = 0; i < f.length; i += 3) { f[i] -= off.x; f[i + 1] -= off.y; f[i + 2] -= off.z; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(f, 3)); g.userData.prx = 1; const o = new THREE.Mesh(g, pm); par.add(o); prx.push(o); return o; };
+  const h = FPA.fatia, fat = new Map(), fatias = new Map();
+  for (let i = 0; i < C.length; i += 3) { const k = Math.floor(C[i + 2] / h); let a = fat.get(k); if (!a) fat.set(k, a = []); a.push(C[i], C[i + 1], C[i + 2]); }
+  // coronha do Armeiro: não passa do olho na mira (senão enche a metade de baixo da tela); o que fica atrás dele sai junto com a de fábrica
+  const sem = ATTV.sem[b] || [], temSlot = s => on.some(a => ATT[a].slot === s && ATT[a].vis !== 0) && !sem.includes(s), drop = new Set();
+  const olho = udA.sight.z + (P.ads ?? (pis ? ADS.csPistola : ADS.csLonga)) / gA.matrixWorld.getMaxScaleOnAxis(), zLim = temSlot('stock') && !Ad.inteira && !hg ? olho - FPA.olhoZ : 1e9;
+  for (const [k, a] of fat) if (k * h > zLim && (k + .5) * h > rh.z) drop.add(k); else fatias.set(mk(gA, a), k);
+  if (Ad.inteira) { let zr = -1e9; for (let i = 2; i < C.length; i += 3) zr = Math.max(zr, C[i]); mk(gA, [0, 0, zr, 0, 0, rh.z - .12]); }
+  let gM = null, pM = null, gS = null; const o0 = new V3();
+  if (pts.mag.length) {
+    const B = new THREE.Box3(); for (let i = 0; i < pts.mag.length; i += 3) B.expandByPoint(v.set(pts.mag[i], pts.mag[i + 1], pts.mag[i + 2]));
+    B.getCenter(o0); o0.y = pis ? B.min.y : B.max.y; // origem no topo (o estendido estica para baixo); pistola: na base (desce)
+    gM = new THREE.Group(); gM.position.copy(o0); gA.add(gM); pM = mk(gM, pts.mag, o0); udA.mag = gM;
+  }
+  if (pts.sl.length) { gS = new THREE.Group(); gA.add(gS); mk(gS, pts.sl); udA.slide = gS; }
+  const cor = on.find(a => ATT[a].slot === 'stock'), skf = skinOf(id), passo = L => { ATT_PV = { list: L, f: skf }; try { attPartsProc(id, gA, udA); } finally { ATT_PV = null; } };
+  if (cor && zLim < 1e9) { // coronha numa 2ª passada: as peças dela descem até a linha do olho ficar livre (o olho do modelo baixado fica mais perto do cano)
+    passo(on.filter(a => a !== cor)); const n0 = gA.children.length; passo([cor]);
+    const ps = gA.children.slice(n0).filter(o => o.isMesh), B = new THREE.Box3(), bb = new THREE.Box3();
+    for (const o of ps) { o.geometry.computeBoundingBox(); o.updateMatrix(); B.union(bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrix)); }
+    const dy = Math.min(0, udA.sight.y - FPA.olhoY - B.max.y); for (const o of ps) o.position.y += dy;
+    F.attCor = ps; // e somem no fim da mira (o rosto está nela; a câmera fica a poucos cm do topo)
+  } else attPartsProc(id, gA, udA);
+  if (W[id]?.pap) papUV(gA);
+  gA.updateMatrixWorld(true);
+  // de volta aos voxels: corpo (fatias escondidas/andadas e cortes do FPM)
+  const anda = new Map(), cx = [];
+  for (const [o, k] of fatias) { if (!o.visible) { if (temSlot('stock') && (k + .5) * h > rh.z) drop.add(k); } else if (o.position.lengthSq() > 1e-12) anda.set(k, o.position.clone()); }
+  for (const s in Ad.corte || {}) if (temSlot(s)) cx.push(...Ad.corte[s]);
+  const gAw = gA.matrixWorld, Kl = (X, par) => M4().copy(par.matrixWorld).invert().multiply(gAw).multiply(X).multiply(gi).multiply(par.matrixWorld); // X (no gA) no espaço do pai
+  const geoIx = (g, ix) => { const n = new THREE.BufferGeometry(); for (const k in g.attributes) n.setAttribute(k, g.attributes[k]); n.setIndex(ix); return n; };
+  if (drop.size || anda.size || cx.length) {
+    const dv = anda.size ? anda.values().next().value : null;
+    for (const e of Vs.c) {
+      const g = e.o.geometry, ix = g.index, a = g.attributes.position, m = e.M.elements; if (!ix) continue;
+      const I = ix.array, cru = !a.isInterleavedBufferAttribute && !a.normalized && a.itemSize === 3, Pa = a.array, keep = new (I.constructor)(I.length), mov = []; let nk = 0, mud = false;
+      for (let t = 0; t < I.length; t += 3) { // centro do triângulo no gA (só z, e x/y quando há caixa de corte)
+        let x = 0, y = 0, z = 0;
+        for (let j = 0; j < 3; j++) { const i = I[t + j], px = cru ? Pa[i * 3] : a.getX(i), py = cru ? Pa[i * 3 + 1] : a.getY(i), pz = cru ? Pa[i * 3 + 2] : a.getZ(i); z += m[2] * px + m[6] * py + m[10] * pz + m[14]; if (cx.length) { x += m[0] * px + m[4] * py + m[8] * pz + m[12]; y += m[1] * px + m[5] * py + m[9] * pz + m[13]; } }
+        x /= 3; y /= 3; z /= 3; const k = Math.floor(z / h);
+        if (drop.has(k) || (cx.length && cx.some(c => x >= c[0] && x <= c[1] && y >= c[2] && y <= c[3] && z >= c[4] && z <= c[5]))) { mud = true; continue; }
+        if (anda.has(k)) { mov.push(I[t], I[t + 1], I[t + 2]); mud = true; } else { keep[nk++] = I[t]; keep[nk++] = I[t + 1]; keep[nk++] = I[t + 2]; }
+      }
+      if (!mud) continue;
+      e.o.geometry = geoIx(g, new THREE.BufferAttribute(keep.slice(0, nk), 1));
+      if (mov.length) { const vm = new THREE.Mesh(geoIx(g, new THREE.BufferAttribute(new (I.constructor)(mov), 1)), e.o.material); Object.assign(vm.userData, e.o.userData); vm.name = 'vox'; vm.frustumCulled = false; vm.matrixAutoUpdate = false;
+        e.o.updateMatrix(); vm.matrix.copy(Kl(M4().makeTranslation(dv.x, dv.y, dv.z), e.o.parent)).multiply(e.o.matrix); e.o.parent.add(vm); }
+    }
+  }
+  // carregador: esticado/descido (o próprio) e copiado (duplo); a cópia que a mão traz na recarga ganha o mesmo
+  const ehI = X => X.elements.every((x, i) => Math.abs(x - (i % 5 ? 0 : 1)) < 1e-6);
+  if (gM && Vs.mag.length) {
+    gM.updateMatrix(); pM.updateMatrix(); const T0i = M4().makeTranslation(-o0.x, -o0.y, -o0.z), X0 = gM.matrix.clone().multiply(pM.matrix).multiply(T0i), P0 = Vs.mag[0].o.parent;
+    for (const c of gM.children) if (c !== pM && c.geometry?.userData.prx) { c.updateMatrix(); const Xc = gM.matrix.clone().multiply(c.matrix).multiply(T0i);
+      for (const e of Vs.mag) { e.o.updateMatrix(); const vm = new THREE.Mesh(e.o.geometry, e.o.material); Object.assign(vm.userData, e.o.userData); vm.name = 'vox'; vm.frustumCulled = false; vm.matrixAutoUpdate = false; vm.matrix.copy(Kl(Xc, e.o.parent)).multiply(e.o.matrix); e.o.parent.add(vm); } }
+    if (!ehI(X0)) {
+      const K0 = Kl(X0, P0); for (const e of Vs.mag) { e.o.updateMatrix(); e.o.matrixAutoUpdate = false; e.o.matrix.premultiply(e.o.parent === P0 ? K0 : Kl(X0, e.o.parent)); }
+      if (F2?.b) F2.b.traverse(o => { if (o.isMesh && o.userData.vox) { o.updateMatrix(); o.matrixAutoUpdate = false; o.matrix.premultiply(K0); } }); // o osso da cópia tem o mesmo referencial local
+    }
+  }
+  for (const o of prx) { o.removeFromParent(); o.geometry.dispose(); } // sondas fora
+  for (const g of [gM, gS]) if (g) for (const o of [...g.children]) if (o.geometry?.userData.prx) { o.removeFromParent(); o.geometry.dispose(); } // e as cópias delas
+  gA.updateMatrixWorld(true);
+  vxzArma(vmGun, gA); // vxz: peças em voxel (com tudo ainda no gA: a grade é a do gA)
+  // peças do carregador e do ferrolho vão para o osso deles (seguem recarga e tiro)
+  for (const [g, L] of [[gM, Vs.mag], [gS, Vs.sl]]) { const no = L[0]?.no; if (!g || !no) continue; for (const o of [...g.children]) no.attach(o); g.removeFromParent(); }
+  // boca, mira (ADS) e retícula
+  F.mz.position.copy(udA.muzzle).applyMatrix4(gA.matrix);
+  if (!udA.sight.equals(sight)) {
+    const Gv = M4().multiplyMatrices(body.matrixWorld, F.C), s0 = tips.sight.clone().applyMatrix4(Gv).applyQuaternion(F.aq), nw = G2W(udA.sight), s1 = nw.clone().applyMatrix4(Gv).applyQuaternion(F.aq);
+    F.ap.add(s0).sub(s1); F.sl = nw.applyMatrix4(F.C);
+  }
+  if (udA.attRet) ud.attRet = udA.attRet;
+  if (op && udA.fab === null) { // mira do Armeiro: a de fábrica sai (holográfica do modelo: lente e colimador escondidos)
+    if (ud.fab === 'holo' && D?.lens) model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name)) o.visible = false; });
+    ud.fab = null; ud.fabLens = null;
+  }
+  // mão esquerda na empunhadura (alvo do IK)
+  if (udA.lhAtt && lh && udA.lh && F.ik) {
+    const dA = udA.lh.clone().applyMatrix4(G2A).sub(lh.clone().applyMatrix4(G2A)), K = F.ik;
+    if (K.d) K.d.add(dA); else { K.hl = hl; K.L0 = new V3().setFromMatrixPosition(hl.matrixWorld).applyMatrix4(Ai); K.d = dA; }
+    F.lhAtt = 1;
+  }
+  F.att = gA; FPA.ms = +(performance.now() - t0).toFixed(1);
 }
 // skin / Pack-a-Punch nos modelos baixados: o UV deles não serve para a textura da skin, então ela é projetada nos três eixos do modelo
 // (triplanar), com ~rep repetições ao longo do comprimento L (unidades do modelo). Madeira e polímero claro recebem a variante fosca (b).
@@ -22584,7 +22727,7 @@ function updateViewmodel(dt) {
   const ak = smooth(Math.max(G.ads || 0, w?.scope ? G.scR || 0 : 0)); let hx = 0, hy = 0, hz = 0; // luneta: a arma sobe até o olho (G.scR, só visual) // hx..: posição de quadril antes da mira (para os ombros ficarem onde estavam)
   if (vmGun && ud.baseYaw != null) vmGun.rotation.y = lerp(ud.baseYaw, .05, ak); // mirando: a arma endireita (a mira foi calculada com ela reta)
   if (ud.fps2) { // braços prontos: gira a arma para o cano ficar reto e põe a mira na linha do olho
-    const F = ud.fps2; vmGun.quaternion.identity().slerp(F.aq, ak); if (F.P.adsP) vmGun.quaternion.premultiply(_adsQ.setFromAxisAngle(_adsX, F.P.adsP * ak)); vmGun.position.copy(F.ap).multiplyScalar(ak); // adsP: o olho fica um pouco acima da linha da mira (pistola: o ferrolho aparece por cima das mãos) o.ry *= 1 - ak; o.rx *= 1 - ak; o.rz *= 1 - ak;
+    const F = ud.fps2; vmGun.quaternion.identity().slerp(F.aq, ak); if (F.P.adsP) vmGun.quaternion.premultiply(_adsQ.setFromAxisAngle(_adsX, F.P.adsP * ak)); vmGun.position.copy(F.ap).multiplyScalar(ak); if (F.attCor) for (const c of F.attCor) c.visible = ak < .6; // uni2: coronha do Armeiro some na mira; adsP: o olho fica um pouco acima da linha da mira (pistola: o ferrolho aparece por cima das mãos) o.ry *= 1 - ak; o.rx *= 1 - ak; o.rz *= 1 - ak;
   } else if (ak > 0) { // mirando: arma no centro, com o topo (alça/mira holográfica) na linha do olho
     hx = o.x; hy = o.y; hz = o.z;
     const sp = ud.sight || (w?.scope ? ud.scopeEye : null), ay = -(sp ? sp.y : (ud.sightY ?? .05)) * ADS.esc, az = ud.adsZ != null ? -ud.adsZ * ADS.esc : sp && !ud.sight ? -(sp.z + SCOPE.olho) * ADS.esc : -.34; // olho atrás da alça e da caixa da culatra (ver adsEye)
@@ -22686,14 +22829,14 @@ const akOK = id => attOK(id) && ['pistol', 'deagle', 'revolver'].includes(W[attB
 const attCabe = (id, a) => !ATT[a].pistol || akOK(id);
 function attOn(id) { // acessórios valendo agora (só no modo Zumbi)
   if (ATT_PV) return ATT_PV.list; // prévia do Arsenal (menu): os acessórios escolhidos, sem mexer no jogo
-  if (!ZC.on || !attOK(id)) return []; // só no modo Zumbi (uni: na arma baixada só ficam os sem peça, ver attPecas)
+  if (!ZC.on || !attOK(id)) return []; // só no modo Zumbi
   return attEq(id);
 }
 function attEq(id) { // acessórios equipados no Armeiro e liberados (sem olhar o modelo da mão)
   const un = new Set(attUnlocked(id));
   return (PROF.data?.att?.[attBase(id)] || []).filter(a => un.has(a) && ATT[a] && attCabe(id, a) && !(ATT[a].slot === 'optic' && fabLuneta(id))); // luneta de fábrica: sem outra mira
 }
-// uni: algum acessório equipado tem peça na arma (vis ≠ 0 e a arma tem lugar para ela)? Aí a 1ª pessoa fica no modelo do código (etapa 2: peças no baixado)
+// uni2: algum acessório equipado tem peça na arma (vis ≠ 0 e a arma tem lugar para ela)? Aí o fpAtt monta as peças no modelo baixado
 const attPecas = id => ZC.on && attOK(id) && attEq(id).some(a => { const s = ATTV.sem[attBase(id)] || []; return ATT[a].vis !== 0 && !s.includes(ATT[a].slot) && !s.includes(a); });
 function attStat(id, k) { let v = 1; for (const a of attOn(id)) if (ATT[a][k] != null) v *= ATT[a][k]; return v; }
 const attHas = (id, k) => attOn(id).some(a => ATT[a][k]);
@@ -34804,7 +34947,7 @@ fpLoad('p:ak'); fpLoad('m:knife'); fpLoad('m:karambit'); FPC['k:pack'] = new GLT
 setTimeout(() => { let q = Promise.resolve(); for (const k of Object.keys(FPM)) q = q.then(() => fpLoad('m:' + k)); }, 8000); // modelos das armas aos poucos (mundo e mãos dos outros)
 requestAnimationFrame(frame);
 // ganchos de depuração (usados nos testes automáticos); só em desenvolvimento (DEBUG), nunca no site publicado
-if (DEBUG) window.__T = { get NOW() { return now; }, vxExport, vxbExport, VXB, VX, VXZ, vxzArma, vxzAlvos, vxzNucleo, vxzHash, VMC, THREE, FPW, fpw, akAnim, akPassada, showPause, attPartsProc, skinSwatch, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
+if (DEBUG) window.__T = { get NOW() { return now; }, FPA, attOn, vxExport, vxbExport, VXB, VX, VXZ, vxzArma, vxzAlvos, vxzNucleo, vxzHash, VMC, THREE, FPW, fpw, akAnim, akPassada, showPause, attPartsProc, skinSwatch, MARKS, startFire, startSmoke, startDecoy, nades, losClear, srvHE, V3, srvEndRound, srvStartRound, srvKill, setTeam, srvTarget, botBuy, addMark, sendMark, srvState, decoys, openBuy, flashBang, spawnNade, srvDamage, srvHandle, fires, smokes, startHost, S, C, me, G, R, NET, W, MAPS, COL: () => COL, onMsg, srvOnData, srvDrop, LB, PROF, sendToHost, buildMap, navPath, trace, camera, shoot, equip, knifeAttack, throwNade, srvBuy, srvStartMatch, broadcast,
   CFG, applyQuality, renderer, Z, ZC, get ZD() { return ZD; }, FF, startReload, vmCam, vmRoot, thQ, THC, thPump, grantAllSkins, PROF, openBuy, closeBuy, KG, HAND3D, KANIM, ARMS, GRIP, FRAME, FPK, FPW, FPC, FPM, FPV, FPKNIFE, gunModel, get vmGun() { return vmGun; }, srvZUse, srvZHold, zHit, zStartRound, zSpawnOne, zCount, zHp, zHurt, zCands, keys, zUse, zInteract, spawnNade, zKill, zDrop, zEndRound,
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 if (DEBUG) Object.assign(window.__T, { VX2, vxObj, vx3, vxAquecer, knBuild, vxDrena: () => { const t = performance.now(); while (VX2.fila.length) vxPasso(null, 1e9); return performance.now() - t; }, RGUN, remoteGunTpl, setRemoteGun, c4Maos, cloneShared, DROPM, vxBHAND: () => BHAND, vxWarm: () => !!WARM }); // vx2: medição
