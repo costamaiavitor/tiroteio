@@ -21614,6 +21614,12 @@ function anMonta(F, id, D, model, u) {
   vmCam.rotation.x = vmCam.rotation.y = 0; VMCAM.x.fill(0); VMCAM.fila.length = 0;
   an.pump = W2.pack === 'pump';
   if (D && model && ANPEC[W2.m] && VX.on) anPecas(F, an, ANPEC[W2.m], model, u);
+  if (W2.m === 'raygun' && an.mag) { // D16: Ray Gun: a mão esquerda traz uma bateria nova (cilindro verde aceso) no osso do carregador do pacote; só na recarga
+    an.mag.updateMatrixWorld(true); const sc = new V3().setFromMatrixScale(an.mag.matrixWorld).x || 1, g = new THREE.Group();
+    const cap = new THREE.MeshStandardMaterial({ color: 0x2c2f33, metalness: .7, roughness: .4 }), cel = new THREE.MeshStandardMaterial({ color: 0x2fd457, emissive: 0x1fbf46, emissiveIntensity: .5, roughness: .3 });
+    const c1 = new THREE.Mesh(new THREE.CylinderGeometry(.011, .011, .038, 12), cel), c2 = new THREE.Mesh(new THREE.CylinderGeometry(.012, .012, .008, 12), cap), c3 = c2.clone(); c2.position.y = .022; c3.position.y = -.022;
+    g.add(c1, c2, c3); g.scale.setScalar(1 / sc); g.visible = false; for (const o of [c1, c2, c3]) o.frustumCulled = false; an.mag.add(g); an.bat = g;
+  }
   if (W2.m === 'python') { an.k = 100 / u; an.tb = F.follow.find(f => f.a === an.mag && f.rest) || null; an.rev = { Gw: new THREE.Matrix4(), R: new THREE.Matrix4(), post: new THREE.Matrix4(), p: new V3(), q: new V3(), sl: null }; }
 }
 function anPecas(F, an, R, model, u) { // ferrolho e carregador por caixa, recortando os voxels de cada parte (e presos aos ossos do pacote)
@@ -21686,6 +21692,7 @@ function anPose(ud, dt) {
     const t = F.act.time, E = A.ev[F.cur];
     for (const k in E) if (t >= E[k] && !G.rEv['an_' + k]) { G.rEv['an_' + k] = 1; anEvento(an, k, a); }
   }
+  if (an.bat) { const t = G.reloadEnd && !G.reload && rc ? clamp((now - G.reloadStart) / (G.reloadEnd - G.reloadStart), 0, 1) : -1; an.bat.visible = t > .2 && t < .74; } // D16: bateria da Ray Gun na mão (entre tirar a velha e encaixar)
   if (an.pump) anEscopeta(F, an, w, a);
   // pose: saque + recarga (arma, carregador e mãos juntos) + molas
   const o = _anO; o.fill(0); 
