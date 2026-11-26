@@ -1114,7 +1114,7 @@ Object.assign(W, {
   ump45:    CSW('mp5', { name: 'UMP-45', price: 1200, dmg: 35, rate: .09, auto: 1, mag: 25, res: 100, reload: 3.5, spread: .011, move: .025, air: .12, pen: .65, rm: .75, speed: .92, reward: 600, snd: 'smg' }),
   xm1014:   CSW('spas', { name: 'XM1014', price: 2000, dmg: 20, pellets: 6, rate: .35, auto: 1, mag: 7, res: 32, reload: 3, shellTime: .45, spread: .045, move: .02, air: .05, pen: .8, rm: .7, speed: .86, reward: 900, snd: 'shotgun' }),
   mag7:     CSW('stakeout', { name: 'MAG-7', price: 1300, dmg: 30, pellets: 8, rate: .85, mag: 5, res: 32, reload: 2.5, spread: .04, move: .02, air: .05, pen: .75, rm: .45, speed: .9, reward: 900, snd: 'shotgun' }),
-  sawedoff: CSW('olympia', { name: 'Sawed-Off', price: 1100, dmg: 32, pellets: 8, rate: .85, mag: 7, res: 32, reload: 3, shellTime: .5, spread: .07, move: .02, air: .05, pen: .75, rm: .45, speed: .84, reward: 900, snd: 'shotgun' }),
+  sawedoff: CSW('sawedoff', { model: 'dbarrel', name: 'Sawed-Off', price: 1100, dmg: 32, pellets: 8, rate: .85, mag: 7, res: 32, reload: 3, shellTime: .5, spread: .07, move: .02, air: .05, pen: .75, rm: .45, speed: .84, reward: 900, snd: 'shotgun' }),
   negev:    CSW('stoner', { name: 'Negev', price: 1700, dmg: 35, rate: .075, auto: 1, mag: 150, res: 300, reload: 5.7, spread: .02, move: .15, air: .3, pen: .71, rm: .97, speed: .78, snd: 'rifle' }),
   m249:     CSW('hk21', { name: 'M249', price: 5200, dmg: 32, rate: .08, auto: 1, mag: 100, res: 200, reload: 5.7, spread: .012, move: .15, air: .3, pen: .8, rm: .97, speed: .78, snd: 'rifle' }),
   galilar:  CSW('galil', { name: 'Galil AR', price: 1800, dmg: 30, rate: .09, auto: 1, mag: 35, res: 90, reload: 3, spread: .005, move: .1, air: .25, pen: .775, rm: .98, speed: .86, snd: 'rifle' }),
@@ -18743,17 +18743,20 @@ function gunModel(id, fp = false, skin = null) {
       break;
     }
     case 'dbarrel': {
+      const so = bid === 'sawedoff', BL = so ? .27 : .48; /* Sawed-Off (CS): os dois canos serrados curtos, guarda-mão curto e punho de pistola no lugar da coronha */
       add(g, EX([[-.06, -.012], [-.06, .03], [-.04, .044], [.03, .044], [.05, .03], [.05, -.012]], .05), M.steel);
       const brk = grp(g, 0, .03, -.05);
-      for (const s of [-1, 1]) { add(brk, CY(.011, .48, 16), M.metal, s * .0115, .006, -.24); add(brk, new THREE.CircleGeometry(.0085, 12), M.dark, s * .0115, .006, -.481, 0, Math.PI); }
-      add(brk, RB(.008, .006 + SG.olyRib, .46, .002), M.metal, 0, .019 + SG.olyRib / 2, -.24); // fita entre os canos, mais alta (a caixa fica embaixo da linha de mira)
-      add(brk, EX([[.0, -.034], [.2, -.03], ['q', .215, -.022, .2, -.008], [.0, -.008]], .044, null, .004), M.wood);
-      add(brk, new THREE.SphereGeometry(.004, 8, 6), M.brass, 0, .025 + SG.olyRib, -.47);
+      for (const s of [-1, 1]) { add(brk, CY(.011, BL, 16), M.metal, s * .0115, .006, -BL / 2); add(brk, new THREE.CircleGeometry(.0085, 12), M.dark, s * .0115, .006, -BL - .001, 0, Math.PI); }
+      add(brk, RB(.008, .006 + SG.olyRib, BL - .02, .002), M.metal, 0, .019 + SG.olyRib / 2, -BL / 2); /* fita entre os canos, mais alta (a caixa fica embaixo da linha de mira) */
+      add(brk, EX(so ? [[.0, -.034], [.13, -.03], ['q', .145, -.022, .13, -.008], [.0, -.008]] : [[.0, -.034], [.2, -.03], ['q', .215, -.022, .2, -.008], [.0, -.008]], .044, null, .004), M.wood);
+      add(brk, new THREE.SphereGeometry(.004, 8, 6), M.brass, 0, .025 + SG.olyRib, -BL + .01);
       ud.brk = brk; ud.rig = 'break';
       guard(g, -.03, -.012);
-      add(g, EX([[-.06, .03], ['q', -.08, SG.olyPente[0], -.12, SG.olyPente[0]], [-.36, SG.olyPente[1]], [-.366, SG.olyPente[1] - .008], [-.366, -.09], [-.358, -.096], ['q', -.2, -.055, -.06, -.012]], .04, null, .004), M.wood);
-      mz = -.53; my = .036; ud.lh = new V3(-.005, -.02, -.17); ud.port = new V3(0, .03, -.05);
-      add(brk, new THREE.SphereGeometry(.0026, 8, 6), M.trit, 0, .026 + SG.olyRib, -.469); ud.sight = new V3(0, .056 + SG.olyRib, -.52);
+      if (so) { add(g, EX([[-.06, .03], ['q', -.075, .012, -.1, -.01], [-.15, -.085], ['q', -.16, -.11, -.135, -.115], [-.105, -.1], ['q', -.075, -.06, -.045, -.012], [-.06, -.012]], .036, null, .005), M.wood); add(g, RB(.03, .016, .024, .004), M.steel, 0, -.103, .133, -.75); } /* punho de madeira serrado com a soleira de aço */
+      else add(g, EX([[-.06, .03], ['q', -.08, SG.olyPente[0], -.12, SG.olyPente[0]], [-.36, SG.olyPente[1]], [-.366, SG.olyPente[1] - .008], [-.366, -.09], [-.358, -.096], ['q', -.2, -.055, -.06, -.012]], .04, null, .004), M.wood);
+      mz = -.05 - BL; my = .036; ud.lh = new V3(-.005, -.02, so ? -.13 : -.17); ud.port = new V3(0, .03, -.05);
+      add(brk, new THREE.SphereGeometry(.0026, 8, 6), M.trit, 0, .026 + SG.olyRib, -BL + .011); ud.sight = new V3(0, .056 + SG.olyRib, -.04 - BL);
+      if (so) ud.rh = new V3(0, -.05, .09);
       break;
     }
     case 'scout': case 'awp': case 'dmr': {
@@ -19804,9 +19807,9 @@ FPW.l96 = { pack: 'sniper', m: 'awp' }; // uni: a L96A1 do Zumbi é da mesma fam
 // tambor, bomba, cano basculante, maravilhas, lançadores) fica com as camadas procedurais da própria arma (gunAnim só nas peças, sem
 // mexer na tela); carregador de caixa embaixo (rig 'mag') e ferrolho da pistola seguem a peça do pacote. Acessórios do Armeiro, PaP
 // (papUV), Pistolas Duplas e o voxel fino (vxz) continuam os da arma do código. ?syn=0 volta às mãos antigas.
-const FSYN = { off: /[?&]syn=0\b/.test(location.search), bracos: { smg: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, mp40: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, spas: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] } } /* D23: MP40 (do Zumbi) como as SMGs do código; SPAS idem */, olho: .16, adsZ: { smg: .06, sniper: .14 }, mira: { hs10: [.12, 1], trench: [.1, 1], ks23: [.05, 1] /* D15: com .2 o olho ia para cima da coronha (madeira lisa enorme no centro) */, law: [.1, 0], wunderwaffe: [.32, 0], spectre: [.2, 0], pm63: [.2, 0] /* PM63: a mão do punho, embaixo do olho, enchia 13% da tela na mira */ } }; /* mira: por arma [distância extra (m), braços somem na mira]: bombas (a mão da bomba e a coronha cobriam a tela), LAW (tubo na frente do olho), Wunderwaffe (bulbo);  adsZ: na mira a arma do código fica mais longe do olho (m; medido: braço esquerdo cobria 28% da tela nas SMGs, 21% depois; Kar98k 24% -> 14%; na bomba piora: fica 0) */
+const FSYN = { off: /[?&]syn=0\b/.test(location.search), bracos: { smg: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, mp40: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, spas: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] } } /* D23: MP40 (do Zumbi) como as SMGs do código; SPAS idem */, olho: .16, adsZ: { smg: .06, sniper: .14 }, mira: { hs10: [.12, 1], trench: [.1, 1], sawedoff: [.1, 1] /* Sawed-Off do CS: sem coronha, a mão do punho ficava na frente do olho */, ks23: [.05, 1] /* D15: com .2 o olho ia para cima da coronha (madeira lisa enorme no centro) */, law: [.1, 0], wunderwaffe: [.32, 0], spectre: [.2, 0], pm63: [.2, 0] /* PM63: a mão do punho, embaixo do olho, enchia 13% da tela na mira */ } }; /* mira: por arma [distância extra (m), braços somem na mira]: bombas (a mão da bomba e a coronha cobriam a tela), LAW (tubo na frente do olho), Wunderwaffe (bulbo);  adsZ: na mira a arma do código fica mais longe do olho (m; medido: braço esquerdo cobria 28% da tela nas SMGs, 21% depois; Kar98k 24% -> 14%; na bomba piora: fica 0) */
 if (!FSYN.off) for (const [p, l] of Object.entries({ pistol: 'fiveseven b23r c96 raygun2 tec9', smg: 'ppsh thompson spectre kiparis uzi pm63 mac10', ak: 'stg44 mg42 stoner psg1',
-  rifle: 'm16 aug famas g11 enfield law crossbow wunderwaffe wintershowl', pump: 'trench hs10 ks23', sniper: 'kar98k' })) for (const id of l.split(' ')) FPW[id] = { pack: p, syn: 1 };
+  rifle: 'm16 aug famas g11 enfield law crossbow wunderwaffe wintershowl', pump: 'trench hs10 ks23 sawedoff', sniper: 'kar98k' })) for (const id of l.split(' ')) FPW[id] = { pack: p, syn: 1 };
 function fpSyn(id, ud, gun) { // modelo "baixado" sintético: origem no gatilho, cano para -Z, metros (escala 1)
   const D = { syn: 1, T: [null, 0, 0], fwd: '-z', up: '+y', L: 1, noMag2: 1, gun, ud, parts: {} };
   if (ud.mag && ud.rig === 'mag' && !ud.magUp) { ud.mag.name = 'zsyn_mag'; D.parts.mag = /^zsyn_mag$/; }
