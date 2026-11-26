@@ -22857,7 +22857,8 @@ ADS.recuo.mg42 = .04; ADS.recuo.stoner = .03; // zv2-A07: na mira a tampa de ali
 // G.scR (0..1) é só visual: G.scope continua mudando na hora (precisão e sensibilidade não mudam). Entrada em ent s, saída em sai s;
 // a arma some em some; a tela da luneta aparece entre luz[0] e luz[1]; o zoom chega entre zoom[0] e zoom[1]; olho: distância olho→ocular (m);
 // sombra: quanto a vinheta corre ao andar (px); ret: retícula de cada arma (sem o _pap).
-const SCOPE = { ent: .17, sai: .1, some: .74, luz: [.58, .92], zoom: [.4, 1], olho: .07, cresce: .14, sombra: 8,
+const SCOPE = { ent: .17, sai: 0, some: .3, luz: [.1, .28], zoom: [.15, 1], // lsc: a tela da luneta cobre antes da arma chegar perto do olho (o braço direito enchia meia tela por ~60 ms) e a saída é na hora, como no CS (sai 0: a arma volta já na pose de quadril, sem passar pelo olho)
+  olho: .07, cresce: .14, sombra: 8,
   ret: { awp: 'duplex', l96: 'mil', scout: 'fino', dragunov: 'pso', psg1: 'psg', g3sg1: 'duplex', scar20: 'duplex', sg553: 'fuzil', aug2: 'fuzil' } }; // (pelo id antes da base: G3SG1/SCAR-20 não usam a PSO da Dragunov; SG 553/AUG: mira de fuzil com ponto)
 const RET = { // SVG, raio 100 = borda da lente
   duplex: '<path d="M-100 0H-32M32 0H100M0 32V100M0-100V-32" stroke-width="2.6"/><path d="M-32 0H32M0-32V32" stroke-width=".42"/>',
@@ -22870,7 +22871,7 @@ const RET = { // SVG, raio 100 = borda da lente
 let SC_ID = '', SC_OP = -1, SC_TF = '';
 function scopeTick(dt, w) {
   const on = me.alive && !!w?.scope && G.scope > 0;
-  G.scR = !w?.scope ? 0 : on ? Math.min(1, (G.scR || 0) + dt / SCOPE.ent) : Math.max(0, (G.scR || 0) - dt / SCOPE.sai);
+  G.scR = !w?.scope ? 0 : on ? Math.min(1, (G.scR || 0) + dt / SCOPE.ent) : SCOPE.sai ? Math.max(0, (G.scR || 0) - dt / SCOPE.sai) : 0;
   if (on) { const f = w.scope[G.scope - 1]; G.scF = G.scR < .05 || !G.scF ? f : lerp(G.scF, f, Math.min(1, dt * 18)); } // troca de zoom (AWP 2x) desliza
   const el = $('#scope'); if (!on) return;
   const wb = W[G.cur]?.base || G.cur, id = wb + (W[G.cur]?.pap ? '+' : '');
