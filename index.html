@@ -20793,7 +20793,7 @@ function fpBuild(id, ud, gun) {
 // perspectiva (medido; antes a mão ficava no meio da tela com o antebraço esticado); esc: escala do objeto na mão.
 // MAO.giro: giro extra do objeto [x, y, z] (rad); dois: com as duas mãos (C4); sem ele a mão esquerda some (como a faca).
 const MAO_ITENS = new Set(['nade', 'smoke', 'flashb', 'molotov', 'inc', 'decoy', 'semtex', 'clay', 'monkey']);
-const MAO = { off: /[?&]mao=0\b/.test(location.search), foraL: [-.1, -.45, .15], vo: [0, .06, .22], ve: [-.55, .2, 0], esc: 1.3, punho: [0, .0, .035], giro: [0, 0, 0], c4: { punho: [0, .04, -.02], giro: [.4, 0, 0], def: .35, tela: [-.03, .07, .05, .12], vo: [-.03, .035, 0], ve: [0, 0, 0] } };
+const MAO = { off: /[?&]mao=0\b/.test(location.search), foraL: [-.1, -.45, .15], vo: [0, .06, .22], ve: [-.55, .2, 0], esc: 1.3, punho: [0, .0, .035], giro: [0, 0, 0], c4: { punho: [-.03, -.06, .17], giro: [.4, 0, 0], def: .35, tela: [-.03, .07, .05, .12], vo: [-.03, .035, 0], ve: [0, 0, 0], maos: [[-.1, .02, 0], [.06, .02, 0]], maosDef: [[-.07, .07, -.02], [.05, .07, -.02]] } }; // c4r: punho: a bomba entre as mãos (no fluxo de verdade das Rodadas ela ficava 13 cm à frente e 10 cm acima delas, longe); maos/maosDef: desvio dos pulsos [esq, dir] (m, câmera): uma de cada lado da bomba (as duas ficavam juntas no punho da pistola)
 function maoBuild(ud, obj, X = {}) {
   const pk = 'p:pistol', ak = 'p:rifle', P = FPK.pistol, bn = vxbNomes(P, { pack: 'pistol' })[0];
   if (!fpReady(pk) || !fpReady(ak)) { Promise.all([fpLoad(pk), fpLoad(ak)]).then(() => X.pronto?.()); return false; }
@@ -33762,6 +33762,7 @@ function bombHud(dt) {
       if (!def) { const Tt = MAO.c4.tela; BHAND.position.x += Tt[0]; BHAND.position.y += Tt[1]; BHAND.position.z += Tt[2]; } // c4m: segurando/plantando, a bomba sobe para o quadro com as mãos (ficava só a ponta na borda de baixo)
       BHAND.rotation.set(rx - b[2] + (def ? MAO.c4.def : MAO.c4.tela[3]), 0, 0); BHAND.updateMatrixWorld(true);
       if (F.ik?.sv) F.ik.arms.forEach((a, i) => { const v = F.ik.sv[i]; a.cl.position.copy(v[0]); a.ua.quaternion.copy(v[1]); a.fa.quaternion.copy(v[2]); if (a.hand) a.hand.position.copy(v[3]); });
+      if (F.ik) { const D2 = def ? MAO.c4.maosDef : MAO.c4.maos; F.ik.arms.forEach(a => { const d = D2[a.sd < 0 ? 0 : 1]; a.anM = (a.anM0 ||= new THREE.Matrix4()).makeTranslation(d[0], d[1], d[2]); }); } // c4r: uma mão de cada lado
       F.mixer.update(dt); if (F.ik) fpIK(F);
     }
     if (def) { U.rh.position.x += Math.sin(now * 9) * .015; U.lh.position.z += Math.sin(now * 7 + 1) * .012; } // mexe nos fios
