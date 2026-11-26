@@ -21528,6 +21528,7 @@ const AN = {
     // eventos (s do clipe): sai = o carregador solta; entra = encaixa (munição, tapa); solta = ferrolho solto (vazia)
     ev: { reload: { sai: .27, entra: 1.08 }, reloadE: { sai: .27, entra: 1.08, solta: 1.34 } },
     imp: { sai: [-.6, 0, -.4, 0, -.05, 0], entra: [1.6, .2, .5, 0, .12, .03], solta: [1.1, -.2, .3, 0, .06, .06] }, cam: { entra: [-.3, .1], solta: [-.22, -.12] },
+    tiroK: { pad: .55, deagle: .35 }, // dg1: fração do curso do ferrolho no tiro (pelo modelo)
     trava: [-.001, -.013, -.048], // ferrolho (osso Rif) travado atrás, no espaço do PBody: é onde ele começa no clipe de recarga vazia
     // saque: [u, x, y, z, rx, ry, rz] (u: fração do G.switchDur; m e rad, câmera; giro em volta do gatilho); esq: mão esquerda [u, x, y, z]
     saque: [[0, .055, -.19, .05, -1.15, -.3, -.6], [.3, .04, -.1, .03, -.62, -.17, -.4], [.62, .012, -.02, .008, -.1, -.04, -.1], [.84, 0, .004, 0, .05, .006, .02], [1, 0, 0, 0, 0, 0, 0]],
@@ -21629,6 +21630,9 @@ function anPose(ud, dt) {
   if (an.pk === 'pistol' && an.sl && a && a.mag === 0 && F.cur !== 'reloadE' && !(G.lastShotW === G.cur && now - G.lastShot < .045)) {
     anGuarda(an, an.sl); an.sl.position.copy(an.slP).add(_an.v.fromArray(A.trava));
   }
+  // dg1: no tiro o ferrolho do pacote recua o curso inteiro (o mesmo da trava): no modelo da arma ele vinha até a câmera e a pistola
+  // ficava comprida como um fuzil (Desert Eagle por ~4 quadros); o recuo do tiro usa só uma fração do curso (tiroK, por arma)
+  if (an.pk === 'pistol' && an.sl && F.cur === 'fire') { const k = A.tiroK[an.m] ?? A.tiroK.pad; anGuarda(an, an.sl); an.sl.position.sub(an.slP).multiplyScalar(k).add(an.slP); }
   // eventos da recarga (s do clipe)
   const rc = F.cur === 'reload' || F.cur === 'reloadE';
   if (an.m === 'python' && G.reloadEnd && G.rEv && !G.reload) { const t = (now - G.reloadStart) / (G.reloadEnd - G.reloadStart); // R8: tambor (a recarga própria fica para depois): cartuchos entrando, sem o roteiro de carregador
