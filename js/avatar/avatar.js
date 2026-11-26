@@ -5,12 +5,12 @@
 import * as THREE from '../../vendor/three@0.160.0/build/three.module.js';
 import { V, v, hx, mix, mul, sat, mk, child, wp, segFrame, ik, Bld, pl, bake, meshCubos, meshNets, rng } from './nucleo.js';
 import { CAMOS, camoCfg } from './tex.js';
-import { rosto, pele, cabelo, barba, chapeu, chapeuCobre, acessorio, CABELOS, CORES_CABELO, BARBAS, CHAPEUS, ROSTOS, FORMATOS, FORMA } from './cabeca.js';
+import { rosto, pele, cabelo, barba, chapeu, chapeuCobre, acessorio, CABELOS, CORES_CABELO, BARBAS, CHAPEUS, ROSTOS, FORMATOS, FORMA, BOCAS } from './cabeca.js';
 import { tronco, calca, calcado, colete, luvas, mochila, arma, TRONCOS, TRONCO_COR, CALCAS, CALCA_COR, CALCADOS, CALCADO_COR, COLETES, COLETE_COR, LUVAS, LUVA_COR, MOCHILAS, MOCHILA_COR } from './roupas.js';
 
 export const PELES = { porcelana: '#f6dcc6', clara: '#f0cfae', bege: '#e4b996', media: '#d2a07a', oliva: '#b98f66', morena: '#a8714a', canela: '#8d5a3a', parda: '#76472c', escura: '#5a3522', retinta: '#3e2418' };
 export const OLHOS = { castanho: '#4a2f1c', mel: '#8a5a24', verde: '#4a6a3a', azul: '#3d6a9a', cinza: '#6a7680', preto: '#1c1410' };
-export const OPCOES = { formato: FORMATOS, pele: PELES, corCabelo: CORES_CABELO, olho: OLHOS, cabelo: CABELOS, barba: BARBAS, chapeu: CHAPEUS, rosto: ROSTOS, tronco: TRONCOS, calca: CALCAS, calcado: CALCADOS, colete: COLETES, luvas: LUVAS, mochila: MOCHILAS, camo: Object.fromEntries(Object.entries(CAMOS).map(([k, d]) => [k, d.nome])), arma: { m4: 'M4', ak: 'AK' } };
+export const OPCOES = { formato: FORMATOS, boca: BOCAS, pele: PELES, corCabelo: CORES_CABELO, olho: OLHOS, cabelo: CABELOS, barba: BARBAS, chapeu: CHAPEUS, rosto: ROSTOS, tronco: TRONCOS, calca: CALCAS, calcado: CALCADOS, colete: COLETES, luvas: LUVAS, mochila: MOCHILAS, camo: Object.fromEntries(Object.entries(CAMOS).map(([k, d]) => [k, d.nome])), arma: { m4: 'M4', ak: 'AK' } };
 const P0 = { ombro: 1, grossura: 1, mao: 1, cabeca: 1, perna: 1, tronco: 1, cintura: 1, quadril: 1, braco: 1, olho: 1 };
 export const CORPOS = {
   fino: { nome: 'Voxel fino', malha: 'cubos', res: .0068, resCab: .0034, resMao: .0045, det: 2, jit: .035, jitCab: .02 },
@@ -118,7 +118,7 @@ function mao(B, F, s, col, o, c) {
 const def = (o, d) => o ?? d;
 export function normalizar(cfg0 = {}) {
   const p = cfg0.preset ? PRESETS[cfg0.preset] || {} : {};
-  const cfg = { corpo: 'fino', pele: 'media', cabelo: 'curto', corCabelo: 'castanho_escuro', barba: 'nenhuma', chapeu: 'nenhum', rosto: [], tronco: 'camiseta', calca: 'cargo', calcado: 'coturno', colete: 'nenhum', luvas: 'nenhuma', mochila: 'nenhuma', camo: 'multicam', olho: 'castanho', arma: 'm4', formato: 'padrao', ...p, ...cfg0, cores: { ...(p.cores || {}), ...(cfg0.cores || {}) } };
+  const cfg = { corpo: 'fino', pele: 'media', cabelo: 'curto', corCabelo: 'castanho_escuro', barba: 'nenhuma', chapeu: 'nenhum', rosto: [], tronco: 'camiseta', calca: 'cargo', calcado: 'coturno', colete: 'nenhum', luvas: 'nenhuma', mochila: 'nenhuma', camo: 'multicam', olho: 'castanho', arma: 'm4', formato: 'padrao', boca: 'media', ...p, ...cfg0, cores: { ...(p.cores || {}), ...(cfg0.cores || {}) } };
   if (!Array.isArray(cfg.rosto)) cfg.rosto = cfg.rosto ? [cfg.rosto] : [];
   return cfg;
 }
@@ -129,7 +129,7 @@ export function construir(cfg0, rig = null) {
   const cc = cfg.cores, rc = (part, tab, i = 0) => { let x = i ? cc[part + '2'] : cc[part]; if (x === undefined) x = (tab[cfg[part]] || [])[i]; return x === 'camo' ? cfg.camo : x; };
   const c = { pele: PELES[cfg.pele] || cfg.pele, cabelo: CORES_CABELO[cfg.corCabelo] || cfg.corCabelo, olho: OLHOS[cfg.olho] || cfg.olho, chapeu: (cc.chapeu === 'camo' ? cfg.camo : cc.chapeu) || ({ capacete_fast: cfg.camo, capacete_nvg: cfg.camo, capacete_pasgt: 'woodland', bone: '#3a3f45', bone_tras: '#a33a2c', gorro: '#3a3f45', boina: '#6e1f24', chapeu_selva: cfg.camo, capuz: '#4a4f57', faixa: '#7a1a1a', bandana: '#8a1c1c', cowboy: '#6b4a2b', quepe: '#1f2638' }[cfg.chapeu] || '#3a3f45'), logo: cc.logo };
   const B = new Bld(), k = rig ? esqueletoRig(pr, rig) : esqueleto(pr); k.pele = c.pele;
-  c.forma = FORMA[cfg.formato] || FORMA.padrao;
+  c.forma = FORMA[cfg.formato] || FORMA.padrao; c.boca = cfg.boca;
   corpo(B, k, pr, c); rosto(B, k.Fh, pr, c);
   cabelo(B, k.Fh, cfg.cabelo, c, chapeuCobre(cfg.chapeu)); barba(B, k.Fh, cfg.barba, c);
   tronco(B, k, pr, cfg.tronco, rc('tronco', TRONCO_COR), rc('tronco', TRONCO_COR, 1), K.det);
@@ -296,7 +296,7 @@ export function gerarPartes(cfg0, nivel = 'm') {
 // 'pe3.ol0.ca4...' : cada campo = 2 letras + índice (base 36) na ordem das chaves de OPCOES (só acrescentar opções no FIM das
 // listas, nunca reordenar: o índice é o que viaja). ro = acessórios de rosto (índices com '+'); k0..k8 = cor por peça:
 // 'x' + hex de 6, 'c' + índice da camuflagem, ou só 'c' (= a camuflagem geral). Valor fora da lista é ignorado (fica o padrão).
-export const CAMPOS = [['pe', 'pele'], ['ol', 'olho'], ['ca', 'cabelo'], ['cc', 'corCabelo'], ['ba', 'barba'], ['ch', 'chapeu'], ['tr', 'tronco'], ['cl', 'calca'], ['cd', 'calcado'], ['co', 'colete'], ['lu', 'luvas'], ['mo', 'mochila'], ['cm', 'camo'], ['fo', 'formato']]; // novos campos só no fim
+export const CAMPOS = [['pe', 'pele'], ['ol', 'olho'], ['ca', 'cabelo'], ['cc', 'corCabelo'], ['ba', 'barba'], ['ch', 'chapeu'], ['tr', 'tronco'], ['cl', 'calca'], ['cd', 'calcado'], ['co', 'colete'], ['lu', 'luvas'], ['mo', 'mochila'], ['cm', 'camo'], ['fo', 'formato'], ['bc', 'boca']]; // novos campos só no fim
 export const PECAS_COR = ['tronco', 'tronco2', 'calca', 'calcado', 'calcado2', 'colete', 'luvas', 'mochila', 'chapeu'];
 export const COD_MAX = 240, COD_RE = /^[a-z0-9.+]{0,240}$/;
 const chaves = c => Object.keys(OPCOES[c]);

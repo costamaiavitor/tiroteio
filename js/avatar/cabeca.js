@@ -12,6 +12,8 @@ export const pele = c => { const P = hx(c), Rr = mix(P, [.75, .3, .28], .25); re
 // Anatomia esculpida em camadas (crânio, testa, arco das sobrancelhas, órbitas cavadas, maçãs, bochechas, mandíbula, queixo, nariz com
 // ponte/asas/columela, lábios com arco do cupido e filtro, orelha com hélice) e cor da pele por região (rubor nas maçãs, nariz e orelhas,
 // olheira, sombra da barba). Formatos (FORMATOS) mudam larguras e volumes sem mexer nos pontos onde óculos, barbas e chapéus encaixam.
+export const BOCAS = { media: 'Média', fina: 'Fina', cheia: 'Cheia' };
+const BOCA = { media: { t: 1, w: 1 }, fina: { t: .75, w: .96 }, cheia: { t: 1.3, w: 1.05 } };
 export const FORMATOS = { padrao: 'Padrão', fino: 'Fino', largo: 'Largo', quadrado: 'Quadrado', redondo: 'Redondo', maduro: 'Maduro' };
 export const FORMA = { // fw: largura do meio do rosto; jw: mandíbula; bo: bochecha; qx/qy: largura/altura do queixo; cr: crânio; qq: ângulo da mandíbula; mad: idade
   padrao: { fw: 1, jw: 1, bo: 1, qx: 1, qy: 0, cr: 1, qq: 0, mad: 0 },
@@ -70,19 +72,24 @@ export function rosto(B, F, pr, c) {
     B.ell(F, [s * .0066, .0626, .0995], [.0042, .0026, .0055], null, mul(P, .32), PT); }
   B.ell(F, [0, .0645, .1015], [.0034, .004, .006], null, SK, o); // columela
   // boca: filtro, lábio de cima com o arco do cupido, lábio de baixo cheio, cantos e sulco abaixo
-  const L = mul(mix(P, [.62, .28, .27], .4), .93), Ld = mul(L, .82), Lc = (x, y, z, p) => { const l = p.loc(x, y, z); return mul(L, 1.02 + .1 * gau(l[0], l[1] - .043, l[2] - .1, .006) - .08 * Math.abs(l[0]) / .018); };
-  for (const s of [1, -1]) B.cone(F, [s * .0042, .0636, .0995], [s * .0058, .0565, .0975], .0017, .0017, SK, o);
-  B.ell(F, [0, .0602, .099], [.0028, .0034, .004], null, mul(P, .86), PT);
-  const ol2 = { ...o, tag: 'labio', bias: .001 };
-  B.ell(F, [0, .0526, .0928], [.0188, .005, .0078], null, Lc, ol2);
-  for (const s of [1, -1]) B.ell(F, [s * .0056, .0546, .0948], [.0068, .0036, .0058], null, Lc, ol2);
-  B.ell(F, [0, .0428, .0908], [.0162, .0072, .0092], null, Lc, ol2);
-  B.box(F, [0, .0484, .1], [.0176, .0012, .012], 0, null, mul(L, .42), { kind: 'paint', on: ['rosto', 'barba', 'labio'] });
-  for (const s of [1, -1]) B.ell(F, [s * .0192, .0485, .093], [.0026, .0026, .006], null, mul(L, .55), { kind: 'paint', on: ['rosto', 'labio'] });
-  B.ell(F, [0, .0345, .093], [.013, .0028, .007], null, mul(P, .86), PT); // sulco mentolabial
+  // lábios: pouco volume para fora (sobre um leve monte da boca), o de baixo um pouco mais cheio, cor só um pouco mais rosada/escura
+  // que a pele (multiplicativa: acompanha o tom), borda que se mistura com a pele, linha da boca suave e cantos recolhidos
+  const BO = BOCA[c.boca] || BOCA.media, lum = P[0] * .3 + P[1] * .59 + P[2] * .11;
+  const L = mul([Math.min(1, P[0] * 1.04), P[1] * .83, P[2] * .85], lum < .3 ? 1.16 : lum < .45 ? 1.02 : .97); // pele escura: lábio um pouco mais claro e rosado que a pele
+  const Lc = baixoL => (x, y, z, p) => { const l = p.loc(x, y, z), bd = Math.min(1, Math.abs(l[0]) / (.0175 * BO.w)); return mix(mul(L, 1 + (baixoL ? .07 : 0) * gau(l[0], l[1] - .0445, l[2] - .09, .005)), P, bd * bd * .45); };
+  B.ell(F, [0, .048, .0815], [.02, .0135, .0075], null, SK, o); // monte da boca (dá a curva da arcada)
+  for (const s of [1, -1]) B.cone(F, [s * .0038, .0632, .0965], [s * .0052, .0548, .0885], .0014, .0014, SK, o); // colunas do filtro
+  B.ell(F, [0, .0595, .094], [.0024, .0032, .004], null, mul(P, .9), PT);
+  const ol2 = { ...o, tag: 'labio', bias: .0008 };
+  B.ell(F, [0, .0513 + .0004 * BO.t, .0838], [.0168 * BO.w, .0036 * BO.t, .0052 * BO.t], null, Lc(false), ol2); // superior
+  for (const s of [1, -1]) B.ell(F, [s * .0048, .0527 + .0004 * BO.t, .0842], [.0052, .0024 * BO.t, .0042 * BO.t], null, Lc(false), ol2); // arco do cupido
+  B.ell(F, [0, .0447 - .0004 * BO.t, .0838], [.0152 * BO.w, .0048 * BO.t, .006 * BO.t], null, Lc(true), ol2); // inferior
+  B.box(F, [0, .0483, .09], [.0158 * BO.w, .0007, .01], 0, null, mul(L, .72), { kind: 'paint', on: ['rosto', 'barba', 'labio'] }); // linha da boca
+  for (const s of [1, -1]) B.ell(F, [s * .0172 * BO.w, .0476, .087], [.0022, .0022, .006], null, mul(P, .8), { kind: 'paint', on: ['rosto', 'labio'] }); // cantos recolhidos
+  B.ell(F, [0, .036, .089], [.012, .0026, .007], null, mul(P, .9), PT); // sulco mentolabial
   // sulco nasolabial (mais fundo com a idade)
   const nl = .82 - fm.mad * .1;
-  for (const s of [1, -1]) B.cone(F, [s * .0175, .0675, .0985], [s * .0265, .047, .0925], .0026 + fm.mad * .0008, .0022, mul(P, nl), PT);
+  for (const s of [1, -1]) B.cone(F, [s * .0175, .0675, .0975], [s * .0235, .048, .087], .0026 + fm.mad * .0008, .0022, mul(P, nl), PT);
   // olhos: globo, íris com anel escuro, fibras e brilho, pálpebras com prega, cílios, canto rosado e sobrancelhas com fios
   const sob = hx(c.cabelo), irisC = hx(c.olho), ro = .0076 * Math.min(ol, 1.6);
   const iris = x0 => (x, y, z, p) => {
