@@ -19772,7 +19772,7 @@ const FPV = { long: { p: [.202, -.118, -.233], e: [.025, 0, -.102] }, pistol: { 
 const FPK = {
   ak: { url: 'assets/fps/ak/scene.gltf', ombro: [.03, -.55, .08], adsMaoE: [.1, .05], mag2: 'Pmag2', armsFrom: 'rifle', v: { p: [.13, -.08, -.28], e: [.025, 0, -.102] }, sh: [.11, -.08, .1], hr: 1.99, body: 'PBody', ref: 'Rif', T: [null, .194, -.075], fwd: '-y', up: '+z', mag: 'Pmag', spare: ['Object_99'],
     clips: { idle: 'AK_Idle', draw: 'AK_Draw', fire: 'AK_Shot', reload: 'AK_Reload', reloadE: 'AK_Reload_full', walk: 'AK_Walk', run: 'AK_Run' }, semCorrida: 1 }, // a13 semCorrida: a animação de correr põe a arma em pé e solta a mão esquerda; corre com a de andar + VMOV.corridaCS
-  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.13, -.14, -.38], e: [.03, -.022, -.3] }, ombro: [0, -.4, .05], ads: .4, adsMao: .05, // pq1: no quadril, mais longe e mais baixa, com o cano quase paralelo à vista (mira a ~5 m do olho: o laser termina perto da retícula; antes, 7° para dentro, cruzava o centro a 0,9 m e ia para a esquerda) e os ombros mais para fora e para baixo (o antebraço vem de baixo, não por trás da arma); uni: pistola maior e mais baixa no quadril; na mira os ombros descem e entram (os antebraços não cobrem a tela); en1: olho na linha da alça e da massa (sem olhar de cima do ferrolho) e as mãos descem no punho (adsMao, ver fpIK)
+  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.12, -.11, -.33], e: [.55, .1, .1] }, gEsc: 1.45, ombro: [0, -.4, .05], ads: .4, adsMao: .05, // pq2: no quadril, embaixo à direita, girada ~30° para dentro e ~5° para baixo (vista de trás e da esquerda: o ferrolho aparece inteiro, quase deitado na tela, como no CS2) e 1,45× maior em relação à mão (o punho fechado tinha 3× o tamanho da arma na tela); o feixe do laser vai para a retícula (fpLaser); ombros para fora e para baixo; uni: pistola maior e mais baixa no quadril; na mira os ombros descem e entram (os antebraços não cobrem a tela); en1: olho na linha da alça e da massa (sem olhar de cima do ferrolho) e as mãos descem no punho (adsMao, ver fpIK)
     sh: [.12, -.2, .1], hr: 1, view: 'pistol', body: 'PBody', ref: 'Rif', T: [.061, null, .054], fwd: '+x', up: '-z', mag: 'Pmag', slide: 'Rif',
     clips: { idle: 'FPS_Pistol_Idle', fire: 'FPS_Pistol_Fire', reload: 'FPS_Pistol_Reload_easy', reloadE: 'FPS_Pistol_Reload_full', walk: 'FPS_Pistol_Walk' } },
   smg: { url: 'assets/fps/smg/scene.gltf', armsFrom: 'rifle', v: { p: [.178, -.093, -.383], e: [.016, -.007, -.105] }, sh: [.09, -.1, .13], hr: 1.98, body: 'PBody', ref: 'Rif', T: [-.092, null, -.067], fwd: '+x', up: '+z', mag: 'Pmag', spare: ['Object_96'],
@@ -20767,7 +20767,7 @@ function fpBuild(id, ud, gun, dono = vmGun) { // dono: quem recebe os voxels das
       const lp = fpPts(ms, o => D.lens.includes(o.material.name), 1).map(p => p.applyMatrix4(Mi));
       if (lp.length) { let a = 1e9, b = -1e9; for (const p of lp) { a = Math.min(a, p.z); b = Math.max(b, p.z); } const e = lp.filter(p => p.z < a + (b - a) * .25), c = new V3(); for (const p of e) c.add(p); c.divideScalar(e.length); tips.sight.set(c.x, c.y, 0); }
     }
-    if (D.syn) { D.L = tips.L; fpSynTips(D, tips, Mi); } const s = D.L * FPG * P.hr / tips.L;
+    if (D.syn) { D.L = tips.L; fpSynTips(D, tips, Mi); } const s = D.L * FPG * P.hr * (P.gEsc || 1) / tips.L; /* pq2 gEsc: arma maior em relação à mão (pistola) */
     C = new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A).multiply(new THREE.Matrix4().makeScale(s, s, s)); // referencial da arma → osso do corpo
     root.traverse(o => { if (o.isMesh && !fpArm(o) && o.material?.name !== '12ge') o.visible = false; }); // some a arma do pacote (o cartucho na mão da escopeta fica)
     model = new THREE.Group(); model.matrixAutoUpdate = false; model.matrix.copy(C).multiply(Mi); model.add(ms); body.add(model);
@@ -21293,7 +21293,17 @@ function fpUpdate(ud, dt) {
   if (F.cv) fpCover(F); // a7: tampa da metralhadora abre na recarga
   if (F.z2) fz2Pecas(F, dt); // fz2: eventos (sons, munição, trancos), carregadores e ferrolho
   else if (ZC.on ? FZS.pk.has(F.pk) : FZS.ids.has(G.cur)) fzSons(ud); // uni: no Zumbi pela regra do pacote (galil, fal, rpk, hk21, spas, l96…), não pela lista do CS
+  if (F.lz !== null) fpLaser(F); /* pq2: feixe do laser para a retícula */
   camTremePasso(dt); // tremor da câmera da arma (fz2 e an)
+}
+// pq2: a pistola fica girada para dentro no quadril (o ferrolho aparece de lado): o feixe do laser (2,5 m) seguia o cano e terminava à
+// esquerda da retícula. Com braços prontos, o fim do feixe vai para a linha da retícula (a 8 m do olho); o começo fica no módulo
+const _lz = { a: new V3(), b: new V3(), c: new V3() };
+function fpLaser(F) {
+  if (F.lz === undefined) { F.lz = null; F.root.traverse(o => { if (o.isLine && o.userData.laser) F.lz = o; }); if (!F.lz) return; const p = F.lz.geometry.attributes.position; F.lzL = _lz.a.fromBufferAttribute(p, 1).sub(_lz.b.fromBufferAttribute(p, 0)).length(); }
+  const L = F.lz, p = L.geometry.attributes.position; L.updateWorldMatrix(true, false); vmCam.updateMatrixWorld();
+  const e = _lz.a.fromBufferAttribute(p, 0), t = L.worldToLocal(vmCam.localToWorld(_lz.b.set(0, 0, -8)));
+  t.sub(e).normalize().multiplyScalar(F.lzL).add(e); p.setXYZ(1, t.x, t.y, t.z); p.needsUpdate = true;
 }
 // Fuzis, snipers, escopetas e metralhadoras com braços prontos: o gunAnim (das armas feitas no código) não roda nelas, então a recarga
 // ficava muda e a AWP/SSG 08 e as escopetas de bomba não tocavam o ferrolho/bomba nem soltavam a cápsula (o tiro deixa para "a hora da
@@ -23523,7 +23533,7 @@ function attPartsProc(id, gun, ud) {
     if (par !== gun) { par.worldToLocal(e.applyMatrix4(gun.matrixWorld)); par.worldToLocal(p1.applyMatrix4(gun.matrixWorld)); }
     const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute([e.x, e.y, e.z, p1.x, p1.y, p1.z], 3));
     bg.setAttribute('color', new THREE.Float32BufferAttribute([1, .12, .1, Lz.a, 1, .12, .1, 0], 4));
-    const ln = new THREE.Line(bg, X.beam); ln.renderOrder = 3; par.add(ln); // linha (não malha): não conta no enquadramento nem no olho da mira
+    const ln = new THREE.Line(bg, X.beam); ln.renderOrder = 3; ln.userData.laser = 1; par.add(ln); // linha (não malha): não conta no enquadramento nem no olho da mira
   }
   // empunhadura vertical ou angular embaixo do guarda-mão; a mão esquerda vai nela
   const ug = slot('under');
