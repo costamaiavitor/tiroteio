@@ -19764,6 +19764,9 @@ const FPM = {
   chinalake: { T: [null, -.04, .30], fwd: '-z', up: '+y', L: 1.0, mad: [.3, .17, .09] }, // D15: madeira laranja lisa -> nogueira (só no vox-bake)
   spas: { T: [-.275, -.015, null], fwd: '+x', up: '+y', L: 1.04 },
 };
+// mq1: enquadramento por arma (id, não a base): a MAC-10 e a MP9 do CS usam o modelo da MP5K (curta) e ficavam com ~14% da tela,
+// contra 18-25% das outras SMGs: vo = deslocamento na tela no quadril (substitui o do FPM); ads = quanto a mira chega mais perto do olho (m)
+const FPID = { mac10: { vo: [0, -.012, .1], ads: .05 }, mp9: { vo: [0, -.012, .1], ads: .05 } };
 // arma do jogo → pacote + modelo (sem modelo = a arma do próprio pacote)
 const FPW = { ak47: { pack: 'ak', vo: [.03, 0, -.04] }, // a AK do pacote é um pouco grande: mais longe do olho
   nova: { pack: 'pump' }, m1911_ls: { pack: 'pistol', m: 'm1911' } };
@@ -20760,12 +20763,13 @@ function fpBuild(id, ud, gun, dono = vmGun) { // dono: quem recebe os voxels das
   // pacote → tela: o gatilho da arma vai para o mesmo ponto da tela em todas as armas (FPV), com o cano no mesmo giro; os braços vêm junto
   const V = P.v || FPV[P.view || 'long'], k = FPH / P.hr, de = D?.ve || [0, 0, 0], tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1] + de[1], Math.PI + V.e[0] + de[0], V.e[2] + de[2], 'YXZ'));
   const holder = new THREE.Group(); holder.matrixAutoUpdate = false;
-  holder.matrix.compose(new V3(...V.p).add(new V3(...(D?.vo || W2.vo || [0, 0, 0]))), tq, new V3(k, k, k)).multiply(A.clone().invert());
+  holder.matrix.compose(new V3(...V.p).add(new V3(...(FPID[id]?.vo || D?.vo || W2.vo || [0, 0, 0]))), tq, new V3(k, k, k)).multiply(A.clone().invert());
   // mirar: giro e deslocamento da arma que deixam o cano reto para a frente e a mira na linha do olho
   const Gv = holder.matrix.clone().multiply(body.matrixWorld).multiply(C);
   const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)).multiply(tq.clone().invert()), sp = tips.sight.clone().applyMatrix4(Gv).applyQuaternion(aq);
   holder.add(root);
   Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, pk: W2.pack, mz, follow, ik, body, C, aq, maoD: D?.maoD || 0, sl: tips.sight.clone().applyMatrix4(C), adsY: (P.adsY || 0) + (D?.adsY || 0), ap: new V3(0, (P.adsY || 0) + (D?.adsY || 0), -(P.ads ?? (P.view === 'pistol' ? ADS.csPistola : ADS.csLonga))).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', rig0: ud.rig, muzzle: new V3() }); // (D22: rig0: o da arma do código, para as camadas de peças que o pacote não tem)
+  if (FPID[id]?.ads) ud.fps2.ap.z += FPID[id].ads; /* mq1: mira mais perto do olho */
   ud.fps2.ej = ej; ud.fps2.vxFalta = VX.falta; ud.fps2.vxUso = VX.uso; ud.fps2.magP = magP; /* vxUso: volta a valer quando a arma sai do cache VMC */
   if (ud.akimbo && arms[0].ua) ud.fps2.hideL = arms[0].ua; // uni: Pistolas Duplas: o braço esquerdo do pacote some (a passada espelhada da direita segura a outra pistola)
   if (D?.syn) { ud.fps2.syn = 1; const mi = FSYN.mira[W[id]?.base || id]; ud.fps2.ap.z -= mi ? mi[0] : FSYN.adsZ[W2.pack] || 0; if (tips.sightR && !W[id]?.scope) { const r = tips.sightR.clone().applyMatrix4(Gv).applyQuaternion(aq).z + ud.fps2.ap.z; if (r > -FSYN.olho) ud.fps2.ap.z -= r + FSYN.olho; } /* D2: STG-44, MG42, Stoner, M16, Kar98k: a massa ficava a csLonga do olho, mas a alça é mais para trás: o olho passava dela (bloco preto na entrada, topo liso da caixa na mira cheia) */ if (mi?.[1]) { ud.fps2.semBracos = []; root.traverse(o => { if (o.isMesh && (o.name === 'voxBraco' || fpArm(o))) { o.userData.v0 = o.visible; ud.fps2.semBracos.push(o); } }); } } else anMonta(ud.fps2, id, D, model, D ? tips.L / D.L : 1); // an: saque e recarga caprichados (peças recortadas dos voxels, ossos das camadas)
