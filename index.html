@@ -20811,7 +20811,7 @@ function maoBuild(ud, obj, X = {}) {
   ud.fps2 = { holder, root, mixer, clips, act: null, cur: '', P, pk: 'mao', mz, follow: [], ik, body, C: an.matrix, aq: new THREE.Quaternion(), ap: new V3(), sl: new V3(), mao: true };
   if (!X.dois && arms[0].cl) { // uma mão só: o braço esquerdo desce inteiro para fora da tela (encolher o osso esticava a luva em cunha até o ombro)
     const cl = arms[0].cl; holder.updateMatrixWorld(true); const p = new V3().setFromMatrixPosition(cl.matrixWorld).add(new V3(...MAO.foraL));
-    ud.fps2.foraL = { cl, p: cl.parent.worldToLocal(p) };
+    ud.fps2.foraL = { cl, p: cl.parent.worldToLocal(p), p0: cl.position.clone() }; // p0: ombro no lugar (o braço volta para puxar o pino)
   }
   fpPlay(ud, 'idle'); mixer.update(0);
   return holder;
@@ -21150,7 +21150,7 @@ function fpUpdate(ud, dt) {
   F.mixer.update(dt);
   if (F.kf) knFollow(F); // faca (a9)
   if (F.hideL) F.hideL.scale.setScalar(1e-3); // faca: a mão esquerda do pacote fica parada no canto da tela, então some (como no CS)
-  if (F.foraL) F.foraL.cl.position.copy(F.foraL.p); // E3 (granadas): braço esquerdo fora da tela
+  if (F.foraL) maoPino(F, ud); // E3 (granadas): braço esquerdo fora da tela; gr1: entra para puxar o pino
   if (F.an) anPose(ud, dt); // an: saque, travas, eventos e molas no esqueleto (antes do IK)
   if (F.ik && !F.knife) fpGin(F); // gin2: inspeção das armas longas no esqueleto
   if (F.ik) fpIK(F); // braços antes das peças: o carregador na mão esquerda acompanha o desvio da mão (pushL)
@@ -22776,8 +22776,8 @@ function armaInspectPose(o) {
 const ginEsq = F => !!(F?.ik && !F.knife && F.P?.view !== 'pistol' && F.body && F.C && F.holder);
 const _ginL = new Float32Array(6);
 function fpGin(F) {
-  if (!F.an) for (const a of F.ik.arms) a.anM = null; // (com an, o anPose refaz o anM a cada quadro)
-  const S = G.gin; if (!S || S.id !== G.cur || !ginEsq(F)) return;
+  if (!F.an && F.glOn) for (const a of F.ik.arms) a.anM = null; // (com an, o anPose refaz o anM a cada quadro; o das granadas é do maoPino)
+  F.glOn = false; const S = G.gin; if (!S || S.id !== G.cur || !ginEsq(F)) return;
   const f = S.out ? 1 - smooth((now - S.out) / GINSP.sai) : 1; if (f <= 0) return;
   const P6 = kfSuave(GINSP.longa, clamp((now - S.t0) / GINSP.dur, 0, 1), 6, _ginL); for (let j = 0; j < 6; j++) P6[j] *= f;
   const L = F.gl || (F.gl = { sv: new Map(), mR: fpBone(F.root, 'IK_Hand_Cntrl_R'), mL: fpBone(F.root, 'IK_Hand_Cntrl_L'), M: new THREE.Matrix4() });
@@ -22786,6 +22786,7 @@ function fpGin(F) {
   const M = anMat(L.M, pw, qc, P6[3], P6[4], P6[5], P6[0], P6[1], P6[2]);
   anAplica(L, F.body, M); anAplica(L, L.mR, M); anAplica(L, L.mL, M);
   for (const a of F.ik.arms) a.anM = a.anM ? (a.ginM || (a.ginM = new THREE.Matrix4())).multiplyMatrices(M, a.anM) : M;
+  F.glOn = true;
 }
 function knifeInspect() {
   if (vmGun?.userData.armsKnife) { if (ARMS.cur === 'idle') armsPlay('inspect'); return; }
@@ -23053,7 +23054,7 @@ function updateViewmodel(dt) {
   if (ud.fps2) fpUpdate(ud, dt);
   if (G.swing > 0) { G.swing = Math.max(0, G.swing - dt * 4); if (ud.toss) nadeToss(ud, o, 1 - G.swing); else { const s = Math.sin(G.swing * Math.PI); o.ry += s * 1.1; o.x -= s * .12; o.z -= s * .1; } } // (a8) arremesso/colocação
   if (ud.tossFim) nadeVolta(ud, o); // 6-w11: o próximo objeto sobe na mão
-  { const k = G.pin ? smooth(clamp((now - G.pin.t0) / NADE_PINO, 0, 1)) : 0; if (k) { o.y += .05 * k; o.z += .06 * k; o.x -= .02 * k; o.rx += .4 * k; o.rz -= .15 * k; } if (ud.pino) ud.pino.visible = k < .6; } // pino puxado: prepara o arremesso
+  { const k = G.pin ? smooth(clamp((now - G.pin.t0) / NADE_PINO, 0, 1)) : 0; if (k) { o.y += .05 * k; o.z += .06 * k; o.x -= .02 * k; o.rx += .4 * k; o.rz -= .15 * k; } if (ud.pino) ud.pino.visible = ud.fps2?.foraL ? !G.pin || now - G.pin.t0 < NADEP.some : k < .6; } // pino puxado (gr1: nos braços prontos a argola sai com a mão esquerda): prepara o arremesso
   if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model) && !ud.armsKnife && !ud.fps2) knifeAnim(o, ud);
   armaInspectPose(o); // inspeção da arma de fogo (F)
   if (ud.fps2?.z2) fz2Pose(o, ud, dt); // fz2: saque com mola, giro da recarga e trancos (fuzis, SMGs e metralhadoras)
@@ -23681,6 +23682,24 @@ function knifeAttack(heavy) {
 }
 // granada como no CS: apertar puxa o pino (mão sobe e a argola sai), soltar o botão arremessa (esquerdo forte, direito fraco); Claymore é na hora
 const NADE_PINO = .22;
+// gr1: granada nos braços prontos: a mão esquerda (fora da tela) entra, pega a argola, puxa o pino para a esquerda e sai. Tempos (s desde o
+// clique): ent (chega), puxa [início, fim], sai [início, fim], some (a argola some, já fora); vet: puxão (m, câmera); mao: mão em relação à argola
+const NADEP = { ombro: .45, ent: .12, puxa: [.12, .24], sai: [.26, .5], some: .4, vet: [-.07, -.03, .03], mao: [-.012, -.02, .01] };
+const _np = { v: new V3(), w: new V3(), M: new THREE.Matrix4() };
+function maoPino(F, ud) {
+  const L = F.foraL, P = G.pin, Q = NADEP, t = P && P.w === G.cur ? now - P.t0 : -1, arm = F.ik?.arms[0], pino = ud.pino;
+  const w = t < 0 ? 0 : smooth(t / Q.ent) * (1 - smooth((t - Q.sai[0]) / (Q.sai[1] - Q.sai[0])));
+  L.cl.position.copy(L.p).lerp(L.p0, w * Q.ombro); if (arm) arm.anM = null;
+  if (!pino) return;
+  const p0 = pino.userData.p0 || (pino.userData.p0 = pino.position.clone());
+  if (t < 0) { pino.position.copy(p0); return; }
+  pino.parent.updateWorldMatrix(true, false); F.root.updateMatrixWorld(true);
+  const k = smooth((t - Q.puxa[0]) / (Q.puxa[1] - Q.puxa[0])), alvo = _np.v.copy(p0).applyMatrix4(pino.parent.matrixWorld).add(_np.w.set(Q.vet[0] * k, Q.vet[1] * k, Q.vet[2] * k));
+  pino.position.copy(pino.parent.worldToLocal(_np.w.copy(alvo))); // a argola vai com a mão
+  if (!arm || w <= 0) return;
+  const d = alvo.add(_np.w.set(...Q.mao)).sub(_np.w.setFromMatrixPosition(arm.wr.matrixWorld)).multiplyScalar(w);
+  arm.anM = _np.M.makeTranslation(d.x, d.y, d.z); // (fpIK leva o pulso até lá)
+}
 function nadePino(forte, btn) {
   if (G.cur === 'clay' || G.pin || G.inv[G.cur] <= 0) { if (!G.pin) throwNade(forte); return; }
   G.pin = { t0: now, forte, btn, w: G.cur, up: false, solta: false }; play('empty');
