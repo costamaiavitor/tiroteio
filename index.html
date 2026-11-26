@@ -19759,7 +19759,7 @@ const FPM = {
   awp: { T: [-94, 5.5, null], fwd: '+x', up: '+y', L: 1.2, lens: ['Material.019'] },
   stakeout: { T: [-.204, -.003, null], fwd: '+x', up: '+y', L: 1.0, tint: { 'Material.001': 0x4a2a16 } }, // D18: coronha e telha (cinza-arroxeada chapada) em madeira escura
   olympia: { T: [-.256, .005, null], fwd: '+x', up: '+y', L: 1.1 },
-  chinalake: { T: [null, -.04, .30], fwd: '-z', up: '+y', L: 1.0 },
+  chinalake: { T: [null, -.04, .30], fwd: '-z', up: '+y', L: 1.0, mad: [.3, .17, .09] }, // D15: madeira laranja lisa -> nogueira (só no vox-bake)
   spas: { T: [-.275, -.015, null], fwd: '+x', up: '+y', L: 1.04 },
 };
 // arma do jogo → pacote + modelo (sem modelo = a arma do próprio pacote)
@@ -20155,7 +20155,9 @@ function vxPeca(o, passoRaiz, U) {
   for (const [b, gr] of grupos) { vxCor(gr.V); out.set(b, { V: gr.V, h: gr.h }); }
   return out;
 }
-function vxCor(V) { for (const e of V.values()) { e.c = e.s.map(x => x / e.n); const l = e.c[0] * .3 + e.c[1] * .59 + e.c[2] * .11; if (l > .7) e.c = e.c.map(x => x * .7 / l); e.m = e.mt / e.n > .45 ? 1 : 0; } }
+function vxCor(V) { const mad = VX.corD?.mad; for (const e of V.values()) { e.c = e.s.map(x => x / e.n); let l = e.c[0] * .3 + e.c[1] * .59 + e.c[2] * .11; if (l > .7) e.c = e.c.map(x => x * .7 / l);
+  if (mad && e.c[0] > e.c[1] * 1.25 && e.c[0] > e.c[2] * 1.8 && l > .12) { l = Math.min(l, .7); e.c = mad.map(x => Math.min(1, x * (.75 + .5 * l / .45))); } // D15: madeira laranja chapada (textura do modelo) vira nogueira escura, com a variação da textura
+  e.m = e.mt / e.n > .45 ? 1 : 0; } }
 // arquivo pré-calculado (assets/vox/*.bin.gz, feito por tools/vox-bake.mjs): por peça, índice da malha, osso, passo e os voxels da casca
 // (i, j, k em int16 e r, g, b, metal em bytes). Sem o arquivo (arma nova), a arma fica lisa; o vox-bake
 // (window.__vxExport) voxeliza na hora e exporta.
@@ -20204,7 +20206,7 @@ function vxArma(root, P, D, b8, F2) {
   root.traverse(o => { if (o.isMesh && !o.userData.vox && !fpArm(o) && vis(o) && !lens.has(o.material?.name) && !o.material?.transparent && o.geometry?.attributes.position) alvo.push(o); });
   const mats = vxMats(), nome = vxNome(b8 || ''), ch = vxChave(nome); let e = vxUsa(ch);
   if (!e && window.__vxExport) { // vox-bake: voxeliza na hora e guarda a casca para exportar
-    const partes = []; alvo.forEach((o, mi) => { for (const [b, gr] of vxPeca(o, passo)) partes.push({ malha: mi, osso: b ? b.name : null, h: gr.h, V: gr.V }); });
+    VX.corD = D; const partes = []; alvo.forEach((o, mi) => { for (const [b, gr] of vxPeca(o, passo)) partes.push({ malha: mi, osso: b ? b.name : null, h: gr.h, V: gr.V }); }); VX.corD = null;
     e = vxEnt('arma', vxwArma(vxPack(partes), vxMeio())); if (e) { e.partes.forEach((p, i) => Object.defineProperty(p, 'V', { value: partes[i].V })); vxGuarda(ch, e); vxUsa(ch); }
   }
   VX.ms = Math.round(performance.now() - t0); VX.arq = !window.__vxExport;
