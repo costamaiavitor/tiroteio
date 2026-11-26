@@ -19772,8 +19772,8 @@ const FPV = { long: { p: [.202, -.118, -.233], e: [.025, 0, -.102] }, pistol: { 
 const FPK = {
   ak: { url: 'assets/fps/ak/scene.gltf', ombro: [.03, -.55, .08], adsMaoE: [.1, .05], mag2: 'Pmag2', armsFrom: 'rifle', v: { p: [.13, -.08, -.28], e: [.025, 0, -.102] }, sh: [.11, -.08, .1], hr: 1.99, body: 'PBody', ref: 'Rif', T: [null, .194, -.075], fwd: '-y', up: '+z', mag: 'Pmag', spare: ['Object_99'],
     clips: { idle: 'AK_Idle', draw: 'AK_Draw', fire: 'AK_Shot', reload: 'AK_Reload', reloadE: 'AK_Reload_full', walk: 'AK_Walk', run: 'AK_Run' }, semCorrida: 1 }, // a13 semCorrida: a animação de correr põe a arma em pé e solta a mão esquerda; corre com a de andar + VMOV.corridaCS
-  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.11, -.085, -.27], e: [.12, 0, -.1] }, ombro: [0, -.4, .05], ads: .4, adsMao: .05, // uni: pistola maior e mais baixa no quadril; na mira os ombros descem e entram (os antebraços não cobrem a tela); en1: olho na linha da alça e da massa (sem olhar de cima do ferrolho) e as mãos descem no punho (adsMao, ver fpIK)
-    sh: [.04, -.08, .1], hr: 1, view: 'pistol', body: 'PBody', ref: 'Rif', T: [.061, null, .054], fwd: '+x', up: '-z', mag: 'Pmag', slide: 'Rif',
+  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.13, -.14, -.38], e: [.03, -.022, -.3] }, ombro: [0, -.4, .05], ads: .4, adsMao: .05, // pq1: no quadril, mais longe e mais baixa, com o cano quase paralelo à vista (mira a ~5 m do olho: o laser termina perto da retícula; antes, 7° para dentro, cruzava o centro a 0,9 m e ia para a esquerda) e os ombros mais para fora e para baixo (o antebraço vem de baixo, não por trás da arma); uni: pistola maior e mais baixa no quadril; na mira os ombros descem e entram (os antebraços não cobrem a tela); en1: olho na linha da alça e da massa (sem olhar de cima do ferrolho) e as mãos descem no punho (adsMao, ver fpIK)
+    sh: [.12, -.2, .1], hr: 1, view: 'pistol', body: 'PBody', ref: 'Rif', T: [.061, null, .054], fwd: '+x', up: '-z', mag: 'Pmag', slide: 'Rif',
     clips: { idle: 'FPS_Pistol_Idle', fire: 'FPS_Pistol_Fire', reload: 'FPS_Pistol_Reload_easy', reloadE: 'FPS_Pistol_Reload_full', walk: 'FPS_Pistol_Walk' } },
   smg: { url: 'assets/fps/smg/scene.gltf', armsFrom: 'rifle', v: { p: [.178, -.093, -.383], e: [.016, -.007, -.105] }, sh: [.09, -.1, .13], hr: 1.98, body: 'PBody', ref: 'Rif', T: [-.092, null, -.067], fwd: '+x', up: '+z', mag: 'Pmag', spare: ['Object_96'],
     clips: { idle: 'KDW_DPose_Idle', draw: 'KDW_Draw', fire: 'KDW_Shot', reload: 'KDW_Reload_fast', reloadE: 'KDW_Reload_full', walk: 'KDW_Walk', run: 'KDW_Run' }, semCorrida: 1 },
@@ -19793,7 +19793,7 @@ const FPM = {
   deagle: { T: [-31, 11, null], fwd: '+x', up: '+y', L: .27 },
   cz75: { T: [-.08, .18, null], fwd: '+x', up: '+y', L: .207 },
   m1911: { T: [-54, 79, null], fwd: '+x', up: '+y', L: .216 },
-  python: { T: [null, -.041, .002], fwd: '-z', up: '+y', L: .292 },
+  python: { T: [null, -.041, .002], fwd: '-z', up: '+y', L: .292, maoD: .014 }, /* r8b maoD: a mão direita desce no punho (m, no eixo de cima da arma): o polegar e a curva da mão tapavam o tambor (parado, inspeção e recarga) */
   raygun: { T: [null, -1.14, 0], fwd: '+z', up: '+y', L: .30, esconde: ['Object_74', 'Object_34'] }, // D16: anel e haste da massa ficavam soltos acima do cano
   mp5: { T: [.018, -.02, null], fwd: '+x', up: '+y', L: .70 },
   mp5k: { T: [.15, -.17, null], fwd: '+x', up: '+y', L: .325, vo: [-.01, .005, .03], ve: [.3, 0, 0] }, // curta: mais perto do olho para não sumir na tela; en1: ve = guinada para o cano apontar para o centro (curta e perto, apontava para cima)
@@ -19816,6 +19816,9 @@ const FPM = {
   chinalake: { T: [null, -.04, .30], fwd: '-z', up: '+y', L: 1.0, mad: [.3, .17, .09] }, // D15: madeira laranja lisa -> nogueira (só no vox-bake)
   spas: { T: [-.275, -.015, null], fwd: '+x', up: '+y', L: 1.04 },
 };
+// mq1: enquadramento por arma (id, não a base): a MAC-10 e a MP9 do CS usam o modelo da MP5K (curta) e ficavam com ~14% da tela,
+// contra 18-25% das outras SMGs: vo = deslocamento na tela no quadril (substitui o do FPM); ads = quanto a mira chega mais perto do olho (m)
+const FPID = { mac10: { vo: [0, -.012, .1], ads: .05 }, mp9: { vo: [0, -.012, .1], ads: .05 } };
 // arma do jogo → pacote + modelo (sem modelo = a arma do próprio pacote)
 const FPW = { ak47: { pack: 'ak', vo: [.03, 0, -.04] }, // a AK do pacote é um pouco grande: mais longe do olho
   nova: { pack: 'pump' }, m1911_ls: { pack: 'pistol', m: 'm1911' } };
@@ -20868,12 +20871,13 @@ function fpBuild(id, ud, gun, dono = vmGun) { // dono: quem recebe os voxels das
   // pacote → tela: o gatilho da arma vai para o mesmo ponto da tela em todas as armas (FPV), com o cano no mesmo giro; os braços vêm junto
   const V = P.v || FPV[P.view || 'long'], k = FPH / P.hr, de = D?.ve || [0, 0, 0], tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1] + de[1], Math.PI + V.e[0] + de[0], V.e[2] + de[2], 'YXZ'));
   const holder = new THREE.Group(); holder.matrixAutoUpdate = false;
-  holder.matrix.compose(new V3(...V.p).add(new V3(...(D?.vo || W2.vo || [0, 0, 0]))), tq, new V3(k, k, k)).multiply(A.clone().invert());
+  holder.matrix.compose(new V3(...V.p).add(new V3(...(FPID[id]?.vo || D?.vo || W2.vo || [0, 0, 0]))), tq, new V3(k, k, k)).multiply(A.clone().invert());
   // mirar: giro e deslocamento da arma que deixam o cano reto para a frente e a mira na linha do olho
   const Gv = holder.matrix.clone().multiply(body.matrixWorld).multiply(C);
   const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)).multiply(tq.clone().invert()), sp = tips.sight.clone().applyMatrix4(Gv).applyQuaternion(aq);
   holder.add(root);
-  Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, pk: W2.pack, mz, follow, ik, body, C, aq, sl: tips.sight.clone().applyMatrix4(C), adsY: (P.adsY || 0) + (D?.adsY || 0), ap: new V3(0, (P.adsY || 0) + (D?.adsY || 0), -(P.ads ?? (P.view === 'pistol' ? ADS.csPistola : ADS.csLonga))).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', rig0: ud.rig, muzzle: new V3() }); // (D22: rig0: o da arma do código, para as camadas de peças que o pacote não tem)
+  Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, pk: W2.pack, mz, follow, ik, body, C, aq, maoD: D?.maoD || 0, sl: tips.sight.clone().applyMatrix4(C), adsY: (P.adsY || 0) + (D?.adsY || 0), ap: new V3(0, (P.adsY || 0) + (D?.adsY || 0), -(P.ads ?? (P.view === 'pistol' ? ADS.csPistola : ADS.csLonga))).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', rig0: ud.rig, muzzle: new V3() }); // (D22: rig0: o da arma do código, para as camadas de peças que o pacote não tem)
+  if (FPID[id]?.ads) ud.fps2.ap.z += FPID[id].ads; /* mq1: mira mais perto do olho */
   ud.fps2.ej = ej; ud.fps2.vxFalta = VX.falta; ud.fps2.vxUso = VX.uso; ud.fps2.magP = magP; /* vxUso: volta a valer quando a arma sai do cache VMC */
   if (ud.akimbo && arms[0].ua) ud.fps2.hideL = arms[0].ua; // uni: Pistolas Duplas: o braço esquerdo do pacote some (a passada espelhada da direita segura a outra pistola)
   if (D?.syn) { ud.fps2.syn = 1; const mi = FSYN.mira[W[id]?.base || id]; ud.fps2.ap.z -= mi ? mi[0] : FSYN.adsZ[W2.pack] || 0; if (tips.sightR && !W[id]?.scope) { const r = tips.sightR.clone().applyMatrix4(Gv).applyQuaternion(aq).z + ud.fps2.ap.z; if (r > -FSYN.olho) ud.fps2.ap.z -= r + FSYN.olho; } /* D2: STG-44, MG42, Stoner, M16, Kar98k: a massa ficava a csLonga do olho, mas a alça é mais para trás: o olho passava dela (bloco preto na entrada, topo liso da caixa na mira cheia) */ if (mi?.[1]) { ud.fps2.semBracos = []; root.traverse(o => { if (o.isMesh && (o.name === 'voxBraco' || fpArm(o))) { o.userData.v0 = o.visible; ud.fps2.semBracos.push(o); } }); } } else anMonta(ud.fps2, id, D, model, D ? tips.L / D.L : 1); // an: saque e recarga caprichados (peças recortadas dos voxels, ossos das camadas)
@@ -20923,7 +20927,7 @@ function maoBuild(ud, obj, X = {}) {
   vxBracos(root, P, { pack: 'pistol' });
   const arm = sd => fpBone(root, 'UpArm_' + sd), Ai = A.clone().invert();
   const bra = sd => ({ cl: fpBone(root, 'Arm_' + sd), ua: fpBone(root, 'UpArm_' + sd), fa: fpBone(root, 'Forearm_' + sd), wr: fpBone(root, 'BoneTwist_01' + sd + '_end'), hand: fpBone(root, 'Hand_' + sd), sd: sd === 'L' ? -1 : 1 });
-  const arms = [bra('L'), bra('R')]; for (const a of arms) if (a.hand) a.r0 = new V3().setFromMatrixPosition(a.hand.matrixWorld).applyMatrix4(Ai);
+  const arms = [bra('L'), bra('R')]; for (const a of arms) { if (a.hand) a.r0 = new V3().setFromMatrixPosition(a.hand.matrixWorld).applyMatrix4(Ai); if (a.wr) a.w0 = new V3().setFromMatrixPosition(a.wr.matrixWorld).applyMatrix4(Ai); } /* w0: mo1 (a mão da molotov vai com o pulso) */
   const ik = arms.every(a => a.cl && a.ua && a.fa && a.wr) ? { arms, sh: P.sh, Cb: new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A), body } : null; // ombros recuados como na pistola (corte das mangas fora da tela)
   const V = P.v, k = FPH / P.hr, ve = M.ve || MAO.ve || [0, 0, 0], tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1] + ve[1], Math.PI + V.e[0] + ve[0], V.e[2] + ve[2], 'YXZ'));
   const holder = new THREE.Group(); holder.matrixAutoUpdate = false; holder.matrix.compose(new V3(...V.p).add(new V3(...(M.vo || MAO.vo))), tq, new V3(k, k, k)).multiply(A.clone().invert()); holder.add(root);
@@ -21937,8 +21941,11 @@ function fpIK(F) {
       I.c.sub(I.w.setFromMatrixPosition(aL.wr.matrixWorld)).sub(I.dl).multiplyScalar(w); I.dl.add(I.c); } } }
   K.zm = F.z2 ? fz2Mao(F) : null; // fz2: mão esquerda desviada (saque e roteiro da recarga), no mundo dos braços
   if (K.zm && K.hl) { I.t.setFromMatrixPosition(K.hl.matrixWorld).add(K.zm); K.hl.position.copy(K.hl.parent.worldToLocal(I.t.clone())); K.hl.updateMatrixWorld(true); I.dl.add(K.zm); }
-  for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.anM) a.tw.applyMatrix4(a.anM); /* an: a mão foi levada pelas camadas */ if (a.sd < 0) a.tw.add(I.dl); }
+  for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.anM) a.tw.applyMatrix4(a.anM); /* an: a mão foi levada pelas camadas */ if (a.sd < 0) a.tw.add(I.dl);
+    if (a.anM && a.anMao && a.hand && a.r0 && a.w0) { I.c.copy(a.r0).applyMatrix4(I.G).sub(I.h.copy(a.w0).applyMatrix4(I.G)).add(a.tw); I.t.setFromMatrixPosition(a.hand.matrixWorld).lerp(I.c, a.anMao); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } /* mo1: a mão (osso do controle do IK, fora da corrente do antebraço) vai junto com o pulso, no lugar dela em relação a ele (r0 - w0) */
   { const kp = F.P.adsMao ? smooth(Math.min(1, (G.ads || 0) * ADS.adi)) * F.P.adsMao : 0; if (kp) for (const a of K.arms) { a.tw.y -= kp; if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld); I.t.y -= kp; a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } } // en1: pistola na mira: as mãos descem no punho (alça e massa à vista por cima delas, sem olhar de cima do ferrolho)
+  if (F.maoD) { I.c.setFromMatrixColumn(I.G, 1).normalize().multiplyScalar(-F.maoD); /* r8b: mão direita mais baixa no punho (o tambor do revólver fica à vista) */
+    for (const a of K.arms) if (a.sd > 0) { a.tw.add(I.c); if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } }
   { const E = F.adsMaoE || F.P.adsMaoE, kp = E ? smooth(Math.min(1, (G.ads || 0) * ADS.adi)) * (1 - (K.arms.find(a => a.sd < 0)?.fora ?? 1)) : 0; // item 4: mirando, a mão esquerda corre para a frente no guarda-mão e desce (o antebraço sai do meio da tela)
     if (kp) for (const a of K.arms) if (a.sd < 0) { I.c.set(0, -E[1] * kp, -E[0] * kp); a.tw.add(I.c); if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } }
   // mão que vem para perto do olho (pegar carregador no colete): desce e vai para a frente, senão o braço passa colado na câmera
@@ -23854,16 +23861,17 @@ function knifeAttack(heavy) {
 const NADE_PINO = .22;
 // gr1: granada nos braços prontos: a mão esquerda (fora da tela) entra, pega a argola, puxa o pino para a esquerda e sai. Tempos (s desde o
 // clique): ent (chega), puxa [início, fim], sai [início, fim], some (a argola some, já fora); vet: puxão (m, câmera); mao: mão em relação à argola
-const NADEP = { ombro: .45, ent: .12, puxa: [.12, .24], sai: [.26, .5], some: .4, vet: [-.07, -.03, .03], mao: [-.012, -.02, .01] };
+const NADEP = { ombro: .45, ent: .12, puxa: [.12, .24], sai: [.26, .5], some: .4, vet: [-.07, -.03, .03], mao: [-.012, -.02, .01], isq: [.045, .04, -.01] }; /* isq: isqueiro em relação ao pulso esquerdo (m, câmera) */
 const _np = { v: new V3(), w: new V3(), M: new THREE.Matrix4() };
 function maoPino(F, ud) {
   const L = F.foraL, P = G.pin, Q = NADEP, t = P && P.w === G.cur ? now - P.t0 : -1, arm = F.ik?.arms[0], isq = !ud.pino && ud.isqAlvo, pino = ud.pino || isq;
   const w = t < 0 ? 0 : smooth(t / Q.ent) * (1 - smooth((t - Q.sai[0]) / (Q.sai[1] - Q.sai[0])));
-  L.cl.position.copy(L.p).lerp(L.p0, w * Q.ombro); if (arm) arm.anM = null;
+  L.cl.position.copy(L.p).lerp(L.p0, w * Q.ombro); if (arm) { arm.anM = null; arm.anMao = isq ? w : 0; }
   if (isq) { // molotov: a mão esquerda entra com um isqueiro aceso, encosta no pano e ele pega fogo (antes já vinha acesa, sem isqueiro)
-    if (!ud.isq && arm?.hand) { const g = new THREE.Group(), mt = new THREE.MeshStandardMaterial({ color: 0x8a8e94, metalness: .8, roughness: .35 });
+    if (!ud.isq && arm?.wr) { const g = new THREE.Group(), mt = new THREE.MeshStandardMaterial({ color: 0x8a8e94, metalness: .8, roughness: .35 });
       const c = new THREE.Mesh(new THREE.BoxGeometry(.022, .036, .012), mt), ch = new THREE.Mesh(new THREE.ConeGeometry(.005, .018, 6), new THREE.MeshBasicMaterial({ color: 0xffb050 }));
-      ch.position.y = .028; g.add(c, ch); for (const o of [c, ch]) o.frustumCulled = false; g.position.copy(isq.position).add(_np.w.set(-.03, -.008, .006)); g.rotation.z = -.35; isq.parent.add(g); ud.isq = g; } // ao lado do pano, a chama encostando nele
+      ch.position.y = .028; g.add(c, ch); for (const o of [c, ch]) o.frustumCulled = false;
+      g.rotation.z = -.35; isq.parent.add(g); ud.isq = g; } /* mo1: o isqueiro anda com o pulso esquerdo (NADEP.isq), não fica solto ao lado do pano */
     if (ud.isq) ud.isq.visible = w > .15;
     if (ud.chama) ud.chama.visible = t >= Q.puxa[0];
   }
@@ -23874,9 +23882,10 @@ function maoPino(F, ud) {
   const k = isq ? 0 : smooth((t - Q.puxa[0]) / (Q.puxa[1] - Q.puxa[0])), alvo = _np.v.copy(p0).applyMatrix4(pino.parent.matrixWorld).add(_np.w.set(Q.vet[0] * k, Q.vet[1] * k, Q.vet[2] * k));
   if (!isq) pino.position.copy(pino.parent.worldToLocal(_np.w.copy(alvo))); // a argola vai com a mão (o pano da molotov fica)
   if (!arm || w <= 0) return;
-  if (isq && ud.isq) { ud.isq.updateMatrixWorld(true); alvo.setFromMatrixPosition(ud.isq.matrixWorld).add(_np.w.set(-.018, -.03, .012)); } // molotov: o pulso fica embaixo e à esquerda do isqueiro (a mão não tapa o gargalo)
+  if (isq) alvo.sub(_np.w.set(Q.isq[0] + .016, Q.isq[1] + .026, Q.isq[2])); /* molotov: o pulso vai para onde a chama do isqueiro (na mão) encosta no pano, um pouco à esquerda dele */
   const d = (isq ? alvo : alvo.add(_np.w.set(...Q.mao))).sub(_np.w.setFromMatrixPosition(arm.wr.matrixWorld)).multiplyScalar(w);
   arm.anM = _np.M.makeTranslation(d.x, d.y, d.z); // (fpIK leva o pulso até lá)
+  if (isq && ud.isq) { const p = _np.w.setFromMatrixPosition(arm.wr.matrixWorld).add(d).add(_np.v.set(...Q.isq)); ud.isq.position.copy(ud.isq.parent.worldToLocal(p)); } /* isqueiro na mão: onde o pulso chega neste quadro (fpIK) + NADEP.isq */
 }
 function nadePino(forte, btn) {
   if (G.cur === 'clay' || G.pin || G.inv[G.cur] <= 0) { if (!G.pin) throwNade(forte); return; }
