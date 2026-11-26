@@ -19740,7 +19740,7 @@ const FPM = {
   cz75: { T: [-.08, .18, null], fwd: '+x', up: '+y', L: .207 },
   m1911: { T: [-54, 79, null], fwd: '+x', up: '+y', L: .216 },
   python: { T: [null, -.041, .002], fwd: '-z', up: '+y', L: .292 },
-  raygun: { T: [null, -1.14, 0], fwd: '+z', up: '+y', L: .30 },
+  raygun: { T: [null, -1.14, 0], fwd: '+z', up: '+y', L: .30, esconde: ['Object_74', 'Object_34'] }, // D16: anel e haste da massa ficavam soltos acima do cano
   mp5: { T: [.018, -.02, null], fwd: '+x', up: '+y', L: .70 },
   mp5k: { T: [.15, -.17, null], fwd: '+x', up: '+y', L: .325, vo: [-.01, .005, .03], ve: [.3, 0, 0] }, // curta: mais perto do olho para não sumir na tela; en1: ve = guinada para o cano apontar para o centro (curta e perto, apontava para cima)
   mp40: { T: [-33.4, 2, null], fwd: '+x', up: '+y', L: .833 },
@@ -20738,7 +20738,7 @@ function fpBuild(id, ud, gun) {
   const ej = new THREE.Object3D(); ej.position.set(tips.muzzle.x, lerp(tips.muzzle.y, tips.sight.y, .6), tips.L * RP1.ej).applyMatrix4(C); body.add(ej); // rp1: janela de ejeção (cápsula)
   if (sup) rp1Supressor(tips, C, body, mz, tips.L / D.L); // rp1: USP-S e MP5-SD: o modelo baixado vem sem o supressor (antes do vx: sai em voxel)
   VX.uso = new Set(); VX.falta = []; // malhas da mão (o LRU não solta) e as que ficaram lisas (sem arquivo: tenta de novo no ócio)
-  if (!D?.syn) vxArma(root, P, D, b8 + vxs, F2); // vx: a arma vira voxel fino (peça por peça, presa ao osso dela: animações, carregador e ferrolho continuam); skin entra por cima
+  if (!D?.syn) vxArma(root, P, D, b8 + vxs, F2); if (D?.esconde) model.traverse(o => { if (D.esconde.includes(o.name)) o.visible = false; }); // D16: esconde: peças soltas escondidas depois do voxel (hide mudaria a ordem das partes do arquivo de voxels) // vx: a arma vira voxel fino (peça por peça, presa ao osso dela: animações, carregador e ferrolho continuam); skin entra por cima
   if (z2r && (VX.on || z2r.nos)) fz2Recorte(z2r); // fz2: os voxels do carregador (MP5) passam para o nó dele
   vxBracos(root, P, W2); // vxb: mãos e braços em voxel, deformando com o mesmo esqueleto
   const sk = SKIN_BY[skinOf(id)], pap = W[id]?.pap | 0;
