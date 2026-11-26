@@ -22712,7 +22712,8 @@ function qkUpdate(o, dt) {
 // qk.sai: quando (s) a mão da facada rápida começa a sair, depois da varredura; saiD: quanto dura a saída; baixa: quanto ela desce (m).
 // A arma sobe junto com a saída da mão: volta pronta perto do próximo tiro (antes ficava escondida até 0,73 s, com o tiro liberado em 0,42).
 KNF.corte = { slash: .55, slash2: .55 };
-KNF.longe = { slash: [.05, -.07, -.2, .1], slash2: [.05, -.07, -.2, .1], inspect: [.05, -.06, -.17, .06] }; // kn1: [x, y, z (m), rx] no meio do clipe
+KNF.longe = { slash: [.06, -.12, -.26, .1], slash2: [.06, -.12, -.26, .1], inspect: [.06, -.1, -.22, .06] }; // D13: mais baixo e longe (o antebraço deitado cobria 14% da tela)
+ // kn1: [x, y, z (m), rx] no meio do clipe
 KNF.volta = { slash: [.35, .5], slash2: [.35, .5] }; // kn1: frações do clipe em que a faca volta da pegada invertida para a normal
 KNF.corta = { slash: .6, slash2: .6 }; // kn1 (CS): o fim do corte (punho de frente para a câmera) dá lugar à pose parada nesta fração do clipe
 Object.assign(KNF.qk, { sai: .26, saiD: .12, baixa: .3 });
