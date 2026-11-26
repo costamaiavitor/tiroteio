@@ -19072,7 +19072,7 @@ function r8Reload(ud, t, o, ev) {
   M.position.copy(h).sub(R.H); // a peça nova vem na mão
 }
 // granadas, Semtex, macaco e Claymore na mão: o objeto fica num grupo (ud.item) encaixado no punho; ud.toss = jeito de lançar
-const NADE8 = { smoke: [0, -.03, .014], molotov: [0, -.045, .014], he: [0, -.024, .014], semtex: [0, -.03, .02], monkey: [0, -.035, .005], clay: [0, -.03, .012] }; // onde o objeto fica em relação à arma (mão em ud.rh)
+const NADE8 = { smoke: [0, -.03, .014], molotov: [0, -.045, .014], he: [0, -.042, .014], semtex: [0, -.046, .02], monkey: [0, -.052, .005], clay: [0, -.046, .012] }; // D14 (Zumbi): HE, Semtex, macaco e Claymore 1,6–1,8 cm mais baixos, dentro do punho (ficavam pousados em cima dele) // onde o objeto fica em relação à arma (mão em ud.rh)
 function nadeTopo(g, add, EX, M, y) { add(g, EX([[-.01, .0], [.01, .0], [.012, -.06], [.004, -.065]], .012), M.steel, .014, y + .008, 0); return add(g, new THREE.TorusGeometry(.011, .0018, 6, 14), M.steel, -.018, y + .008, 0, 0, Math.PI / 2); } // alavanca e argola do pino
 function nadeHold(g, ud, toss, p) {
   ud.toss = toss; if (!GM_VM) return;
