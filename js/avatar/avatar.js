@@ -4,9 +4,9 @@
 // Toda opção está em OPCOES (base do editor). Valores de cor: '#hex', nome de camo (CAMOS) ou 'camo' (= cfg.camo).
 import * as THREE from '../../vendor/three@0.160.0/build/three.module.js';
 import { V, v, hx, mix, mul, sat, mk, child, wp, segFrame, ik, Bld, pl, bake, meshCubos, meshNets, rng } from './nucleo.js';
-import { CAMOS, camoCfg } from './tex.js';
+import { CAMOS, camoCfg, base } from './tex.js';
 import { rosto, pele, cabelo, barba, chapeu, chapeuCobre, acessorio, CABELOS, CORES_CABELO, BARBAS, CHAPEUS, ROSTOS, FORMATOS, FORMA, BOCAS } from './cabeca.js';
-import { tronco, calca, calcado, colete, luvas, mochila, arma, TRONCOS, TRONCO_COR, CALCAS, CALCA_COR, CALCADOS, CALCADO_COR, COLETES, COLETE_COR, LUVAS, LUVA_COR, MOCHILAS, MOCHILA_COR } from './roupas.js';
+import { tronco, calca, calcado, colete, luvas, mochila, arma, TRONCOS, TRONCO_COR, TRONCO_MANGA, CALCAS, CALCA_COR, CALCADOS, CALCADO_COR, COLETES, COLETE_COR, LUVAS, LUVA_COR, MOCHILAS, MOCHILA_COR } from './roupas.js';
 
 export const PELES = { porcelana: '#f6dcc6', clara: '#f0cfae', bege: '#e4b996', media: '#d2a07a', oliva: '#b98f66', morena: '#a8714a', canela: '#8d5a3a', parda: '#76472c', escura: '#5a3522', retinta: '#3e2418' };
 export const OLHOS = { castanho: '#4a2f1c', mel: '#8a5a24', verde: '#4a6a3a', azul: '#3d6a9a', cinza: '#6a7680', preto: '#1c1410' };
@@ -121,6 +121,12 @@ export function normalizar(cfg0 = {}) {
   const cfg = { corpo: 'fino', pele: 'media', cabelo: 'curto', corCabelo: 'castanho_escuro', barba: 'nenhuma', chapeu: 'nenhum', rosto: [], tronco: 'camiseta', calca: 'cargo', calcado: 'coturno', colete: 'nenhum', luvas: 'nenhuma', mochila: 'nenhuma', camo: 'multicam', olho: 'castanho', arma: 'm4', formato: 'padrao', boca: 'media', ...p, ...cfg0, cores: { ...(p.cores || {}), ...(cfg0.cores || {}) } };
   if (!Array.isArray(cfg.rosto)) cfg.rosto = cfg.rosto ? [cfg.rosto] : [];
   return cfg;
+}
+// braços da primeira pessoa no jogo: pele, tipo e cor da luva, tipo e cor da manga (cores sólidas '#hex'; camo vira a cor de base)
+export function bracos(cfg0) {
+  const cfg = normalizar(cfg0), cc = cfg.cores, rc = (part, tab) => { let x = cc[part]; if (x === undefined) x = (tab[cfg[part]] || [])[0]; if (x === 'camo') x = cfg.camo; if (Array.isArray(x)) x = x[0]; return typeof x === 'string' ? base(x) : null; };
+  const manga = TRONCO_MANGA[cfg.tronco] || 'longa', luva = LUVAS[cfg.luvas] && cfg.luvas !== 'nenhuma' ? cfg.luvas : 'nenhuma';
+  return { pele: PELES[cfg.pele] || cfg.pele, luva, corLuva: luva === 'nenhuma' ? null : rc('luvas', LUVA_COR), manga, corManga: manga === 'nenhuma' ? null : rc('tronco', TRONCO_COR) };
 }
 export function construir(cfg0, rig = null) {
   const cfg = normalizar(cfg0), K = rig ? CORPOS.fino : CORPOS[cfg.corpo] || CORPOS.fino, pr = { ...P0, ...(K.pr || {}), arma: cfg.corpo === 'cartoon' && !rig ? .9 : 1 };

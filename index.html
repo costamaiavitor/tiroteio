@@ -20524,7 +20524,62 @@ function vxAquecer(M) {
 // aquele canto, então a malha continua fechada quando as juntas dobram (sem frestas entre os cubos) e todas as animações do pacote, o IK
 // dos braços e as trocas de pacote (fpArmsSwap) valem como antes. Arquivo pré-calculado: assets/vox/bracos_<pacote>_<n>.bin.gz.
 const VXB = { mat: null, ult: new Map(), passo: .0016 }; // braços: cubo menor que o da arma (ficam bem mais perto da câmera)
-function vxbMat() { if (!VXB.mat) { VXB.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .74, metalness: 0, name: 'voxPele' }); VXB.mat.userData.env = .7; vxEnv(); } return VXB.mat; }
+function vxbMat() { if (!VXB.mat) { VXB.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .74, metalness: 0, name: 'voxPele' }); VXB.mat.userData.env = .7; vxbAvMat(VXB.mat); vxEnv(); } return VXB.mat; }
+// L1: luva, manga e pele dos braços em voxel seguem o boneco da aba Personagem (PROF.data.av). Uma vez por malha (vxbRegiao) cada face
+// ganha o atributo avR: x = onde está no braço (0 ombro, 1 cotovelo, 2 punho e mão; pela posição na pose de amarração e pelos pesos dos
+// ossos), y = ponta dos dedos (falanges média e distal: a luva de meio dedo deixa a pele), z = sombra (a cor cozida dividida pela média:
+// o relevo e a oclusão do arquivo continuam). O shader troca a cor pela da região (uniforms do material compartilhado): trocar o boneco
+// não remonta nada. Sem avatar (ou malha sem avR): a cor cozida de sempre. A skin da arma continua sem pintar os braços (fpSkin).
+const VXB_PUNHO = { tatica: .14, meio_dedo: .12, couro: .12, latex: .06, inverno: .24 }, VXB_MANGA = { longa: 2.02, arregacada: 1.45, curta: .45, nenhuma: 0 }; /* punho da luva (fração do antebraço a partir do pulso) e até onde a manga cobre (escala do avR.x) */
+function vxbAvMat(m) {
+  const U = m.userData.av = { avOn: { value: 0 }, avSL: { value: 9 }, avSM: { value: 2.02 }, avLuva: { value: new THREE.Color() }, avPonta: { value: new THREE.Color() }, avManga: { value: new THREE.Color() }, avPele: { value: new THREE.Color() } };
+  m.onBeforeCompile = sh => { Object.assign(sh.uniforms, U);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 avR; uniform float avOn, avSL, avSM; uniform vec3 avLuva, avPonta, avManga, avPele;')
+      .replace('#include <color_vertex>', '#include <color_vertex>\n#ifdef USE_COLOR\nif (avOn > .5 && avR.z > 0.) { float s = avR.x * 2.; vec3 c = s >= avSL ? avLuva : s < avSM ? avManga : avPele; vColor.rgb = mix(c, avPonta, avR.y) * avR.z * 2.; }\n#endif'); };
+  m.customProgramCacheKey = () => 'voxPeleAv';
+  vxbAvatar();
+}
+function vxbAvatar() { /* cores do boneco salvo nos uniforms (barato: só refaz quando o código do avatar muda) */
+  const U = VXB.mat?.userData.av; if (!U) return; const cod = avtLimpa(PROF.data?.av) || '';
+  if (VXB.avCod === cod) return;
+  if (!cod) { VXB.avCod = cod; U.avOn.value = 0; return; }
+  if (!AVT.mod) { if (!AVT.falhou) avtMod().then(m => m && vxbAvatar()); return; }
+  let b; try { b = AVT.mod.bracos(AVT.mod.decodificar(cod)); } catch (e) { console.warn('vxb: avatar', e); VXB.avCod = cod; U.avOn.value = 0; return; }
+  VXB.avCod = cod; const sem = b.luva === 'nenhuma' || !b.corLuva;
+  U.avPele.value.set(b.pele); U.avLuva.value.set(sem ? b.pele : b.corLuva); U.avPonta.value.set(sem || b.luva === 'meio_dedo' ? b.pele : b.corLuva); U.avManga.value.set(b.corManga || b.pele);
+  U.avSL.value = sem ? 9 : 2 - (VXB_PUNHO[b.luva] || .12); U.avSM.value = b.corManga ? VXB_MANGA[b.manga] ?? 2.02 : 0; U.avOn.value = 1;
+}
+function vxbRegiao(geo, o, h) { /* avR de cada face (4 vértices seguidos = uma face de um voxel): região pelo centro do voxel, pesos pela média dos cantos */
+  if (geo.attributes.avR || !o.skeleton) return;
+  const sk = o.skeleton, B = sk.bones, nb = B.length, papel = new Int8Array(nb), raiz = new Int16Array(nb).fill(-1), ponta = new Uint8Array(nb), P = [];
+  const M4 = new THREE.Matrix4(); for (let i = 0; i < nb; i++) P.push(new V3().setFromMatrixPosition(M4.copy(sk.boneInverses[i]).invert()));
+  const ix = new Map(B.map((b, i) => [b, i])), papelDe = nm => /hand|wrist/i.test(nm) ? 3 : /forearm|elbow|twist/i.test(nm) ? 2 : /arm/i.test(nm) ? 1 : 0; /* 3 mão, 2 antebraço, 1 braço */
+  const alt = b => { let m = -1; for (const f of b.children) if (ix.has(f)) m = Math.max(m, alt(f)); return m + 1; };
+  for (let i = 0; i < nb; i++) { for (let b = B[i]; b && ix.has(b); b = b.parent) { const p = papelDe(b.name); if (p) { papel[i] = p; let r = b; while (r.parent && ix.has(r.parent) && papelDe(r.parent.name) === p) r = r.parent; raiz[i] = ix.get(r); if (p === 3) { let dd = 0; for (let q = B[i]; q !== r; q = q.parent) dd++; ponta[i] = dd >= 2 && alt(B[i]) <= 2 ? 1 : 0; } break; } } }
+  const lado = nm => (/(^|[_\d])([LR])(?=[_\d])/.exec(nm) || [])[2] || ''; /* UpArm_L_03, BoneTwist_03L_05, Bone_R004_038, R_arm_025 */
+  const perto = (i, p) => { let m = -1, md = 1e9; for (let j = 0; j < nb; j++) if (raiz[j] === j && papel[j] === p) { const d = P[j].distanceTo(P[i]) + (lado(B[j].name) !== lado(B[i].name) ? 1e3 : 0); if (d < md) { md = d; m = j; } } return m; };
+  const seg = new Map(); /* raiz do antebraço -> [ombro, cotovelo, pulso] na pose de amarração */
+  for (let i = 0; i < nb; i++) if (raiz[i] === i && papel[i] === 2) { let u = -1; for (let b = B[i].parent; b && ix.has(b); b = b.parent) if (papel[ix.get(b)] === 1) { u = ix.get(b); break; } if (u < 0) u = perto(i, 1); const w = perto(i, 3); if (u >= 0 && w >= 0) seg.set(i, [P[u], P[i], P[w]]); }
+  const segDe = new Array(nb).fill(null); for (let i = 0; i < nb; i++) { if (!papel[i]) continue; let f = papel[i] === 2 ? raiz[i] : -1;
+    if (papel[i] === 1) { for (const [k] of seg) if (B[k].parent && raiz[ix.get(B[k].parent)] === raiz[i]) f = k; if (f < 0) { const d = [...seg.keys()].sort((a, b) => P[a].distanceTo(P[raiz[i]]) - P[b].distanceTo(P[raiz[i]])); f = d[0] ?? -1; } }
+    if (papel[i] === 3) { let md = 1e9; for (const [k, s] of seg) { const d = s[2].distanceTo(P[raiz[i]]) + (lado(B[k].name) !== lado(B[i].name) ? 1e3 : 0); if (d < md) { md = d; f = k; } } }
+    segDe[i] = seg.get(f) || null; }
+  const A = geo.attributes, pos = A.position.array, nor = A.normal.array, col = A.color.array, si = A.skinIndex.array, sw = A.skinWeight.array, n = A.position.count, out = new Uint8Array(n * 4); /* arrays crus (vxGeo: posição int16, normal int8, cor uint16, ossos e pesos uint8) */
+  const bm = o.bindMatrix, c = new V3(), q = new V3(), d = new V3(), lum = new Float32Array(n >> 2), w = new Float32Array(4); let soma = 0;
+  const proj = (p, a, b) => { d.subVectors(b, a); const l = d.lengthSq(); return l > 0 ? Math.min(1, Math.max(0, q.subVectors(p, a).dot(d) / l)) : 0; };
+  for (let f = 0; f < n >> 2; f++) { const v0 = f * 4; c.set(0, 0, 0); let L = 0;
+    for (let k = 0, x = v0 * 3; k < 4; k++, x += 3) { c.x += pos[x]; c.y += pos[x + 1]; c.z += pos[x + 2]; L += col[x] * .2126 + col[x + 1] * .7152 + col[x + 2] * .0722; }
+    c.multiplyScalar(.25); c.x -= nor[v0 * 3] / 254; c.y -= nor[v0 * 3 + 1] / 254; c.z -= nor[v0 * 3 + 2] / 254; c.multiplyScalar(h).applyMatrix4(bm);
+    w.fill(0); let wt = 0, wp = 0, sb = null, bw = 0; /* w[papel]; sb: ombro, cotovelo e pulso do osso de maior peso */
+    for (let x = v0 * 4; x < v0 * 4 + 16; x++) { const bi = si[x], ww = sw[x]; if (!ww) continue; const p = papel[bi]; w[p] += ww; wt += ww; if (p === 3 && ponta[bi]) wp += ww; if (p && ww > bw && segDe[bi]) { bw = ww; sb = segDe[bi]; } }
+    const wm = wt ? w[3] / wt : 0, wf = wt ? w[2] / wt : 0, wu = 1 - wm - wf, sx = sb ? wu * proj(c, sb[0], sb[1]) + wf * (1 + proj(c, sb[1], sb[2])) + wm * 2 : wm * 2;
+    const r = Math.round(Math.min(2, sx) / 2 * 255), t = Math.round(Math.min(1, wt ? wp / wt : 0) * 255);
+    lum[f] = L / 4; soma += L / 4;
+    for (let k = 0; k < 4; k++) { out[(v0 + k) * 4] = r; out[(v0 + k) * 4 + 1] = t; out[(v0 + k) * 4 + 3] = 255; } }
+  const med = soma / Math.max(1, n >> 2) || 1;
+  for (let f = 0; f < n >> 2; f++) { const z = Math.round(Math.min(1.9, Math.max(.3, lum[f] / med)) / 2 * 255); for (let k = 0; k < 4; k++) out[(f * 4 + k) * 4 + 2] = z; }
+  geo.setAttribute('avR', new THREE.BufferAttribute(out, 4, true));
+}
 // item 0: o reflexo dos voxels da mão segue a luz do mapa (VM_ENV), como os materiais da arma feita no código: à noite (Zumbi, Sanatório,
 // exposição 1,4) o reflexo cheio da sala branca deixava a arma quase branca
 // D20: à noite (luar, lâmpadas) o reflexo do ambiente (sala clara) deixava o aço do voxel quase branco: na arma ele cai a 45%
@@ -20581,6 +20636,7 @@ function vxBracos(root, P, W2, X) { // troca a malha dos braços (com esqueleto)
     const nome = pre + '_' + n, ch = vxChave(nome); let c = vxUsa(ch);
     if (!c && window.__vxExport) { const h = VXB.passo * (X?.f || 1) * FPG * FPH / kR / fpMeshScale(o, Ri), V = vxbVoxels(o, h); if (X?.fora) vxbFora(V, o, X.fora); VXB.ult.set(nome, { h, V }); c = vxEnt('bracos', vxwBracos(vxbPack(h, V), vxMeio())); if (c) { vxGuarda(ch, c); vxUsa(ch); } }
     if (!c) { VX.falta.push(ch); return; } // sem arquivo: ficam os braços lisos
+    vxbRegiao(c.geo, o, c.h); vxbAvatar(); /* L1: regiões da luva, manga e pele (uma vez por malha) e as cores do boneco salvo */
     const vm = new THREE.SkinnedMesh(c.geo, vxbMat()); vm.name = 'voxBraco'; vm.userData.vox = 1; vm.frustumCulled = false;
     o.parent.add(vm); vm.position.copy(o.position); vm.quaternion.copy(o.quaternion); vm.scale.copy(o.scale); vm.updateMatrixWorld(true);
     vm.bind(o.skeleton, o.bindMatrix.clone().multiply(new THREE.Matrix4().makeScale(c.h, c.h, c.h))); o.visible = false; // posição em unidades de voxel: o passo entra na matriz de amarração
@@ -34668,6 +34724,7 @@ function equipItem(it, on) {
 }
 // avisa o jogo (arma na mão) e os outros jogadores quando a skin equipada muda
 function skinsChanged() {
+  vxbAvatar(); /* L1: braços da primeira pessoa com a luva e a manga do boneco salvo */
   const sk = skEnvio();
   if (inGame) {
     if (NET.isHost) { const p = S.players.get('h'); if (p) { p.skins = sk; S.skDirty = true; } } else sendToHost({ t: 'skins', sk });
@@ -35678,6 +35735,7 @@ if (DEBUG) window.__T = { get NOW() { return now; }, FPA, attOn, vxExport, vxbEx
   sim(sec, dt = 1 / 60) { window.__simLock = true; if (window.__simNow) now = window.__simNow; for (let t = 0; t < sec; t += dt) { now += dt; tick(dt); } window.__simNow = now; } };
 if (DEBUG) Object.assign(window.__T, { remoteGunTpl, RGUN, VX2, VX3L, zBoxShow, arma3, setRemoteGun, getRemote, AR, arsenalUI, ATT, ARVX, arModel: () => ARV }); // testes (pendências de proporção, 3ª pessoa e Arsenal)
 if (DEBUG) Object.assign(window.__T, { c4Maos, maoBuild, vmScene, MAO, fpIK }); // E3: testes das mãos únicas
+if (DEBUG) Object.assign(window.__T, { vxbAvatar, vxbRegiao, VXB }); /* L1: braços com a luva e a manga do boneco */
 if (DEBUG) Object.assign(window.__T, { VX2, vxObj, vx3, vxAquecer, knBuild, vxDrena: () => { const t = performance.now(); while (VX2.fila.length) vxPasso(null, 1e9); return performance.now() - t; }, RGUN, remoteGunTpl, setRemoteGun, c4Maos, cloneShared, DROPM, vxBHAND: () => BHAND, vxWarm: () => !!WARM }); // vx2: medição
 if (DEBUG) Object.assign(window.__T, { R1, R1enc, R1dec, r1PosH, r1PosC, r1FastDec }); // R1: ganchos de teste do formato de fio
 // ===== O2-C01: ganchos de teste para a auditoria de itens (tools/itens/auditoria.mjs); só leitura e as funções do próprio jogo, nada de gameplay =====
