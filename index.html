@@ -13594,7 +13594,7 @@ const vmRim = new THREE.DirectionalLight(0xbcd4ff, 1.2); vmRim.position.set(2, .
 // (a13) luz da arma na mão por mapa: de dia a de sempre; à noite (M.stars) luar frio, mais fraco que o dia mas legível, com um filete de
 // contorno azulado (rim) separando a arma do fundo escuro. env: reflexo do ambiente (à noite quase some, senão o metal parece iluminado de dia)
 const VMLUZ = { dia: { ceu: 0xffffff, chao: 0x555555, hemi: 1.1, keyC: 0xfff2e0, key: 2.2, rimC: 0xbcd4ff, rim: 1.2, env: 1 },
-  noite: { ceu: 0xa9b8dc, chao: 0x2a2a34, hemi: .8, keyC: 0xc4d2f4, key: 1.45, rimC: 0x93b4ff, rim: 1.15, env: .35 } };
+  noite: { ceu: 0xa9b8dc, chao: 0x2a2a34, hemi: .8, keyC: 0xc4d2f4, key: 1.45, rimC: 0xa9b6cc, rim: .8, env: .35 } }; // D14: rim menos azul e mais fraco (a manga de pé na granada ficava com uma faixa azul-arroxeada)
 { const pm = new THREE.PMREMGenerator(renderer); vmScene.environment = pm.fromScene(new RoomEnvironment(renderer), .04).texture; pm.dispose(); }
 const hemi = new THREE.HemisphereLight(0xffffff, 0x6b5a45, 1.4); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 2.2);
