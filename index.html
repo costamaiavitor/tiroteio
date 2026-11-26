@@ -20819,7 +20819,7 @@ function maoBuild(ud, obj, X = {}) {
   vxBracos(root, P, { pack: 'pistol' });
   const arm = sd => fpBone(root, 'UpArm_' + sd), Ai = A.clone().invert();
   const bra = sd => ({ cl: fpBone(root, 'Arm_' + sd), ua: fpBone(root, 'UpArm_' + sd), fa: fpBone(root, 'Forearm_' + sd), wr: fpBone(root, 'BoneTwist_01' + sd + '_end'), hand: fpBone(root, 'Hand_' + sd), sd: sd === 'L' ? -1 : 1 });
-  const arms = [bra('L'), bra('R')]; for (const a of arms) if (a.hand) a.r0 = new V3().setFromMatrixPosition(a.hand.matrixWorld).applyMatrix4(Ai);
+  const arms = [bra('L'), bra('R')]; for (const a of arms) { if (a.hand) a.r0 = new V3().setFromMatrixPosition(a.hand.matrixWorld).applyMatrix4(Ai); if (a.wr) a.w0 = new V3().setFromMatrixPosition(a.wr.matrixWorld).applyMatrix4(Ai); } /* w0: mo1 (a mão da molotov vai com o pulso) */
   const ik = arms.every(a => a.cl && a.ua && a.fa && a.wr) ? { arms, sh: P.sh, Cb: new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A), body } : null; // ombros recuados como na pistola (corte das mangas fora da tela)
   const V = P.v, k = FPH / P.hr, ve = M.ve || MAO.ve || [0, 0, 0], tq = new THREE.Quaternion().setFromEuler(new THREE.Euler(V.e[1] + ve[1], Math.PI + V.e[0] + ve[0], V.e[2] + ve[2], 'YXZ'));
   const holder = new THREE.Group(); holder.matrixAutoUpdate = false; holder.matrix.compose(new V3(...V.p).add(new V3(...(M.vo || MAO.vo))), tq, new V3(k, k, k)).multiply(A.clone().invert()); holder.add(root);
@@ -21833,7 +21833,8 @@ function fpIK(F) {
       I.c.sub(I.w.setFromMatrixPosition(aL.wr.matrixWorld)).sub(I.dl).multiplyScalar(w); I.dl.add(I.c); } } }
   K.zm = F.z2 ? fz2Mao(F) : null; // fz2: mão esquerda desviada (saque e roteiro da recarga), no mundo dos braços
   if (K.zm && K.hl) { I.t.setFromMatrixPosition(K.hl.matrixWorld).add(K.zm); K.hl.position.copy(K.hl.parent.worldToLocal(I.t.clone())); K.hl.updateMatrixWorld(true); I.dl.add(K.zm); }
-  for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.anM) a.tw.applyMatrix4(a.anM); /* an: a mão foi levada pelas camadas */ if (a.sd < 0) a.tw.add(I.dl); }
+  for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.anM) a.tw.applyMatrix4(a.anM); /* an: a mão foi levada pelas camadas */ if (a.sd < 0) a.tw.add(I.dl);
+    if (a.anM && a.anMao && a.hand && a.r0 && a.w0) { I.c.copy(a.r0).applyMatrix4(I.G).sub(I.h.copy(a.w0).applyMatrix4(I.G)).add(a.tw); I.t.setFromMatrixPosition(a.hand.matrixWorld).lerp(I.c, a.anMao); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } /* mo1: a mão (osso do controle do IK, fora da corrente do antebraço) vai junto com o pulso, no lugar dela em relação a ele (r0 - w0) */
   { const kp = F.P.adsMao ? smooth(Math.min(1, (G.ads || 0) * ADS.adi)) * F.P.adsMao : 0; if (kp) for (const a of K.arms) { a.tw.y -= kp; if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld); I.t.y -= kp; a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } } // en1: pistola na mira: as mãos descem no punho (alça e massa à vista por cima delas, sem olhar de cima do ferrolho)
   if (F.maoD) { I.c.setFromMatrixColumn(I.G, 1).normalize().multiplyScalar(-F.maoD); /* r8b: mão direita mais baixa no punho (o tambor do revólver fica à vista) */
     for (const a of K.arms) if (a.sd > 0) { a.tw.add(I.c); if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } }
@@ -23751,16 +23752,17 @@ function knifeAttack(heavy) {
 const NADE_PINO = .22;
 // gr1: granada nos braços prontos: a mão esquerda (fora da tela) entra, pega a argola, puxa o pino para a esquerda e sai. Tempos (s desde o
 // clique): ent (chega), puxa [início, fim], sai [início, fim], some (a argola some, já fora); vet: puxão (m, câmera); mao: mão em relação à argola
-const NADEP = { ombro: .45, ent: .12, puxa: [.12, .24], sai: [.26, .5], some: .4, vet: [-.07, -.03, .03], mao: [-.012, -.02, .01] };
+const NADEP = { ombro: .45, ent: .12, puxa: [.12, .24], sai: [.26, .5], some: .4, vet: [-.07, -.03, .03], mao: [-.012, -.02, .01], isq: [.045, .04, -.01] }; /* isq: isqueiro em relação ao pulso esquerdo (m, câmera) */
 const _np = { v: new V3(), w: new V3(), M: new THREE.Matrix4() };
 function maoPino(F, ud) {
   const L = F.foraL, P = G.pin, Q = NADEP, t = P && P.w === G.cur ? now - P.t0 : -1, arm = F.ik?.arms[0], isq = !ud.pino && ud.isqAlvo, pino = ud.pino || isq;
   const w = t < 0 ? 0 : smooth(t / Q.ent) * (1 - smooth((t - Q.sai[0]) / (Q.sai[1] - Q.sai[0])));
-  L.cl.position.copy(L.p).lerp(L.p0, w * Q.ombro); if (arm) arm.anM = null;
+  L.cl.position.copy(L.p).lerp(L.p0, w * Q.ombro); if (arm) { arm.anM = null; arm.anMao = isq ? w : 0; }
   if (isq) { // molotov: a mão esquerda entra com um isqueiro aceso, encosta no pano e ele pega fogo (antes já vinha acesa, sem isqueiro)
-    if (!ud.isq && arm?.hand) { const g = new THREE.Group(), mt = new THREE.MeshStandardMaterial({ color: 0x8a8e94, metalness: .8, roughness: .35 });
+    if (!ud.isq && arm?.wr) { const g = new THREE.Group(), mt = new THREE.MeshStandardMaterial({ color: 0x8a8e94, metalness: .8, roughness: .35 });
       const c = new THREE.Mesh(new THREE.BoxGeometry(.022, .036, .012), mt), ch = new THREE.Mesh(new THREE.ConeGeometry(.005, .018, 6), new THREE.MeshBasicMaterial({ color: 0xffb050 }));
-      ch.position.y = .028; g.add(c, ch); for (const o of [c, ch]) o.frustumCulled = false; g.position.copy(isq.position).add(_np.w.set(-.03, -.008, .006)); g.rotation.z = -.35; isq.parent.add(g); ud.isq = g; } // ao lado do pano, a chama encostando nele
+      ch.position.y = .028; g.add(c, ch); for (const o of [c, ch]) o.frustumCulled = false;
+      g.rotation.z = -.35; isq.parent.add(g); ud.isq = g; } /* mo1: o isqueiro anda com o pulso esquerdo (NADEP.isq), não fica solto ao lado do pano */
     if (ud.isq) ud.isq.visible = w > .15;
     if (ud.chama) ud.chama.visible = t >= Q.puxa[0];
   }
@@ -23771,9 +23773,10 @@ function maoPino(F, ud) {
   const k = isq ? 0 : smooth((t - Q.puxa[0]) / (Q.puxa[1] - Q.puxa[0])), alvo = _np.v.copy(p0).applyMatrix4(pino.parent.matrixWorld).add(_np.w.set(Q.vet[0] * k, Q.vet[1] * k, Q.vet[2] * k));
   if (!isq) pino.position.copy(pino.parent.worldToLocal(_np.w.copy(alvo))); // a argola vai com a mão (o pano da molotov fica)
   if (!arm || w <= 0) return;
-  if (isq && ud.isq) { ud.isq.updateMatrixWorld(true); alvo.setFromMatrixPosition(ud.isq.matrixWorld).add(_np.w.set(-.018, -.03, .012)); } // molotov: o pulso fica embaixo e à esquerda do isqueiro (a mão não tapa o gargalo)
+  if (isq) alvo.sub(_np.w.set(Q.isq[0] + .016, Q.isq[1] + .026, Q.isq[2])); /* molotov: o pulso vai para onde a chama do isqueiro (na mão) encosta no pano, um pouco à esquerda dele */
   const d = (isq ? alvo : alvo.add(_np.w.set(...Q.mao))).sub(_np.w.setFromMatrixPosition(arm.wr.matrixWorld)).multiplyScalar(w);
   arm.anM = _np.M.makeTranslation(d.x, d.y, d.z); // (fpIK leva o pulso até lá)
+  if (isq && ud.isq) { const p = _np.w.setFromMatrixPosition(arm.wr.matrixWorld).add(d).add(_np.v.set(...Q.isq)); ud.isq.position.copy(ud.isq.parent.worldToLocal(p)); } /* isqueiro na mão: onde o pulso chega neste quadro (fpIK) + NADEP.isq */
 }
 function nadePino(forte, btn) {
   if (G.cur === 'clay' || G.pin || G.inv[G.cur] <= 0) { if (!G.pin) throwNade(forte); return; }
