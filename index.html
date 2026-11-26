@@ -20766,7 +20766,7 @@ function fpBuild(id, ud, gun) {
   const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)).multiply(tq.clone().invert()), sp = tips.sight.clone().applyMatrix4(Gv).applyQuaternion(aq);
   holder.add(root);
   Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, pk: W2.pack, mz, follow, ik, body, C, aq, sl: tips.sight.clone().applyMatrix4(C), adsY: (P.adsY || 0) + (D?.adsY || 0), ap: new V3(0, (P.adsY || 0) + (D?.adsY || 0), -(P.ads ?? (P.view === 'pistol' ? ADS.csPistola : ADS.csLonga))).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', rig0: ud.rig, muzzle: new V3() }); // (D22: rig0: o da arma do código, para as camadas de peças que o pacote não tem)
-  ud.fps2.ej = ej; ud.fps2.vxFalta = VX.falta; ud.fps2.magP = magP;
+  ud.fps2.ej = ej; ud.fps2.vxFalta = VX.falta; ud.fps2.vxUso = VX.uso; ud.fps2.magP = magP; /* vxUso: volta a valer quando a arma sai do cache VMC */
   if (ud.akimbo && arms[0].ua) ud.fps2.hideL = arms[0].ua; // uni: Pistolas Duplas: o braço esquerdo do pacote some (a passada espelhada da direita segura a outra pistola)
   if (D?.syn) { ud.fps2.syn = 1; const mi = FSYN.mira[W[id]?.base || id]; ud.fps2.ap.z -= mi ? mi[0] : FSYN.adsZ[W2.pack] || 0; if (tips.sightR && !W[id]?.scope) { const r = tips.sightR.clone().applyMatrix4(Gv).applyQuaternion(aq).z + ud.fps2.ap.z; if (r > -FSYN.olho) ud.fps2.ap.z -= r + FSYN.olho; } /* D2: STG-44, MG42, Stoner, M16, Kar98k: a massa ficava a csLonga do olho, mas a alça é mais para trás: o olho passava dela (bloco preto na entrada, topo liso da caixa na mira cheia) */ if (mi?.[1]) { ud.fps2.semBracos = []; root.traverse(o => { if (o.isMesh && (o.name === 'voxBraco' || fpArm(o))) { o.userData.v0 = o.visible; ud.fps2.semBracos.push(o); } }); } } else anMonta(ud.fps2, id, D, model, D ? tips.L / D.L : 1); // an: saque e recarga caprichados (peças recortadas dos voxels, ossos das camadas)
   { const bm = FSYN.bracos[W[id]?.base || id] || D?.syn && FSYN.bracos[W2.pack]; if (bm) Object.assign(ud.fps2, bm); } // D8: braços na mira por arma (ombros baixos e mão esquerda à frente, como nos fuzis)
@@ -21972,7 +21972,7 @@ function vmSetWeapon(id) {
   if (vmGun) { vmRoot.remove(vmGun); if (!VMC.dono.has(vmGun)) vmGun.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); o.skeleton?.dispose(); }); } // 6-w17: a guardada no cache fica inteira; esqueleto: a textura dos ossos de cada cópia do pacote (SkeletonUtils.clone) ficava na placa a cada troca
   if (ARMS.knife) { ARMS.knife.removeFromParent(); ARMS.knife = null; } // a faca antiga sai do soquete dos braços
   if (ARMS.gunC) ARMS.gunC.removeFromParent();
-  const vck = vmcChave(id); if (vck && vmcUsar(vck)) return; // 6-w17: arma já montada (troca sem refazer modelo, mãos e enquadramento)
+  let vck = vmcChave(id); if (vck && vmcUsar(vck)) return; // 6-w17: arma já montada (troca sem refazer modelo, mãos e enquadramento)
   if (ARMS.ik?.l) ARMS.ik.l.up.scale.setScalar(1); // Pistolas Duplas: o braço esquerdo volta
   vmGun = new THREE.Group();
   const mid = knifeModelOf(id, PROF.data?.equipped), gun = (GM_VM = true, gunModel(mid, true, skinOf(mid))), ud = gun.userData, A = armMats(); vmGun.add(gun);
@@ -21988,8 +21988,9 @@ function vmSetWeapon(id) {
   if (fw) { // arma com braços prontos: o modelo procedural não aparece
     if (attHas(mid, 'akimbo') && akOK(mid)) ud.akimbo = true; // uni: Pistolas Duplas também no modelo baixado (antes do return; o fpBuild esconde o braço esquerdo)
     const h = fpBuild(mid, ud, gun);
-    if (h) { if (!fw.syn) gun.visible = false; else if (ZC.on) vxzArma(vmGun, gun); vmGun.add(h); vmRoot.add(vmGun); vmRoot.updateMatrixWorld(true); return; } // matriz do pai já no 1º quadro (o IK e as camadas leem o mundo: sem isso a mão esquerda aparecia atrás da câmera por um quadro)
+    if (h) { if (!fw.syn) gun.visible = false; else if (ZC.on) vxzArma(vmGun, gun); vmGun.add(h); vmRoot.add(vmGun); vmRoot.updateMatrixWorld(true); if (vck) vmcGuardar(vck, vmGun); return; } // matriz do pai já no 1º quadro (o IK e as camadas leem o mundo: sem isso a mão esquerda aparecia atrás da câmera por um quadro)
   }
+  if (fw) vck = null; /* modelo baixado ainda carregando: a arma feita no código que fica no lugar não vai para o cache */
   if (MAO_ITENS.has(m) && !MAO.off) { // E3: granadas, Semtex, macaco e Claymore nos braços das armas (pacote da pistola, em voxel)
     const h = maoBuild(ud, gun, { pronto: () => { if (vmGun && !vmGun.userData.fps2 && W[G.cur]?.model === m) vmSetWeapon(G.cur); } });
     if (h) { vmGun.add(h); vmRoot.add(vmGun); vmRoot.updateMatrixWorld(true); return; }
@@ -22062,7 +22063,7 @@ const VMC = { m: new Map(), dono: new Map(), max: 6, fila: 0 }; // m: chave → 
 const VMC_FORA = [...VX2_ITENS]; // facas (braços/pacote próprios) e itens de arremesso: sempre montados na hora
 function vmcChave(id) {
   if (!ZC.on || !id || !W[id]) return null; const mid = knifeModelOf(id, PROF.data?.equipped);
-  if (VMC_FORA.includes(W[mid]?.model) || fpw(mid)) return null;
+  if (VMC_FORA.includes(W[mid]?.model)) return null; /* a1: as com braços prontos (fps2/fpw) também ficam guardadas (fpAtt de 30-110 ms a cada troca) */
   return mid + '|' + (skinOf(mid) || '') + '|' + attOn(mid).join('+') + '|' + CFG.gfx + '|' + (ARMS.root ? 1 : 0);
 }
 function vmcGuardar(k, g) {
@@ -22072,17 +22073,27 @@ function vmcGuardar(k, g) {
 }
 function vmcSoltar(k) {
   const g = VMC.m.get(k); if (!g) return; VMC.m.delete(k); VMC.dono.delete(g);
-  if (g !== vmGun) g.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); });
+  if (g !== vmGun) g.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); o.skeleton?.dispose(); }); /* esqueleto: a textura dos ossos da cópia do pacote (fps2) */
 }
 function vmcUsar(k) {
   const g = VMC.m.get(k); if (!g) return false;
+  if (g.userData.fps2?.vxFalta?.some(ch => VX.cache.has(ch))) { vmcSoltar(k); return false; } /* voxels que faltavam chegaram: monta de novo */
   if (ARMS.ik?.l) ARMS.ik.l.up.scale.setScalar(1);
   VMC.m.delete(k); VMC.m.set(k, g); // usado agora: vai para o fim da fila
   vmGun = g; const ud = g.userData;
   vmFlash.material.color.setHex(ud.flashC ?? 0xffd27a); // (o gunModel fazia isso ao montar)
   if (ud.armsGun) { vmRoot.add(ARMS.gunC); ARMS.gunC.position.set(-.165, .145, .43); ARMS.gunC.add(ARMS.holder); ARMS.kind = 'gun'; armsGunBase(); }
   if (ud.baseYaw != null) g.rotation.y = ud.baseYaw;
-  vmRoot.add(g); return true;
+  vmRoot.add(g); if (ud.fps2) { vmcFps2(ud); vmRoot.updateMatrixWorld(true); }
+  return true;
+}
+function vmcFps2(ud) { // a1: arma com braços prontos tirada do cache: recomeça o saque como no fim do fpBuild (pacote, molas e câmera do an)
+  const F = ud.fps2; VX.uso = F.vxUso || new Set(); VX.falta = F.vxFalta || [];
+  F.reloading = false; F.until = 0; F.act = null; F.cur = '';
+  if (F.z2) F.z2.molas.length = 0;
+  if (F.an) { F.an.mol.fill(0); F.an.saq = 0; F.an.esq = null; vmCam.rotation.x = vmCam.rotation.y = 0; VMCAM.x.fill(0); VMCAM.fila.length = 0; }
+  const sw = G.switchEnd - now, dr = F.clips.draw && sw > .02 && !F.z2;
+  F.mixer.stopAllAction(); fpPlay(ud, dr ? 'draw' : 'idle', dr ? G.switchDur : undefined); F.mixer.update(dr ? Math.max(0, G.switchDur - sw) : 0); if (dr) F.until = G.switchEnd;
 }
 const VM_MAO = new Map(); // molde de cada mão (por função + materiais)
 function vmMao(fn, A) {
@@ -22095,7 +22106,7 @@ function vmcAquecer() { // monta, num momento ocioso, as armas do inventário qu
   const passo = dl => {
     VMC.fila = 0; if (!ZC.on || !inGame || !vmGun || !VMC.dono.has(vmGun) || !hasW(G.cur)) return; // a da mão precisa estar guardada (volta sem custo)
     if (now < G.switchEnd || G.reloadEnd || G.reload || G.ads > 0 || G.scope) { VMC.fila = setTimeout(() => { VMC.fila = 0; vmcAquecer(); }, 500); return; } // sacando, recarregando ou mirando: depois
-    const id = ['primary', 'secondary', 'third'].map(s => G.inv[s]).find(w => w && w !== G.cur && hasW(w) && vmcChave(w) && !VMC.m.has(vmcChave(w)));
+    const id = ['primary', 'secondary', 'third'].map(s => G.inv[s]).find(w => w && w !== G.cur && hasW(w) && !fpw(w) && vmcChave(w) && !VMC.m.has(vmcChave(w))); /* a1: a com braços prontos não (50-150 ms: engasgaria no meio do jogo); entra no cache no 1º saque */
     if (!id) return; if (dl.timeRemaining() < 6) { vmcAquecer(); return; } // sem folga neste quadro: tenta no próximo ocioso
     const cur = G.cur; vmSetWeapon(id); vmSetWeapon(cur); vmcAquecer(); // monta a outra e devolve a da mão (do cache, no mesmo instante: nada é desenhado no meio)
   };
