@@ -21199,6 +21199,9 @@ function fzSons(ud) {
 // encaixa (magin, munição, tranco, câmera), puxa / solta (ferrolho: slide / bolt e tranco), mao (mão de volta ao guarda-mão: assenta)
 // g: [s, rx, ry, rz, x, y, z] (rad e m, somados à pose; em volta do gatilho); m: [s, x, y, z] (cm no referencial da arma: x direita,
 // y cima, z para trás); fer: [s, cm] ferrolho/alavanca puxado para trás (sem o osso do pacote); larga: velocidade inicial da cópia (m/s, câmera)
+// r7: fuzil do pacote: a mão esquerda sai do guarda-mão para o carregador passando colada na câmera (o antebraço atravessava a parte de
+// baixo da tela, 19-21%, e no quadro seguinte sumia de vez): desce e vai para a frente nesse trecho (mc: [s, x, y, z], m na câmera)
+const FZ2MC = [[.08, 0, 0, 0], [.22, .02, -.08, -.05], [.38, .02, -.13, -.05], [.5, 0, -.1, -.02], [.62, 0, 0, 0]];
 const FZ2 = {
   ak: { // AK do pacote (Pmag + Pmag2): o novo bate no velho, que cai; na vazia a mão passa por baixo e puxa a alavanca do lado direito
     P: { seg: [[0, .43, .6], [.43, .8, 3, 0, 9], [.8, 1.14, .8], [1.14, 1.38, .35], [1.38, 1.66, .45], [1.66, 1.9, 1.2, 0, 3], [1.9, 2.648, .7]],
@@ -21211,11 +21214,11 @@ const FZ2 = {
     P: { seg: [[0, .36, .8], [.36, .47, 1.2], [.47, .62, 6, 0, 9], [.62, .98, .7], [.98, .98, 2, .22, 3], [.98, 1.652, .9]],
       ev: { sai: .4, larga: .445, novo: .52, encaixa: .93, tapa: 1.04, mao: 1.4 }, cai: 1, larga: [0, -.5, .1],
       g: [[0, 0, 0, 0, 0, 0, 0], [.3, .03, -.05, -.14, -.01, .01, 0], [.9, .04, -.06, -.18, -.012, .012, .004], [1.25, .03, -.04, -.12, -.008, .008, .002], [1.6, 0, 0, 0, 0, 0, 0]],
-      m: [[.98, 0, 0, 0], [1.04, 0, -1.6, 0], [1.12, 0, 0, 0]] },
+      m: [[.98, 0, 0, 0], [1.04, 0, -1.6, 0], [1.12, 0, 0, 0]], mc: FZ2MC },
     E: { seg: [[0, .36, .8], [.36, .47, 1.2], [.47, .62, 6, 0, 9], [.62, .98, .7], [.98, .98, 1.5, .42, 2.5], [.98, 1.652, .9]],
       ev: { sai: .4, larga: .445, novo: .52, encaixa: .93, solta: 1.2, mao: 1.62 }, cai: 1, larga: [0, -.7, .15],
       g: [[0, 0, 0, 0, 0, 0, 0], [.3, .03, -.05, -.14, -.01, .01, 0], [.9, .04, -.06, -.18, -.012, .012, .004], [1.12, .05, .02, -.2, -.014, .012, .004], [1.3, .04, 0, -.15, -.01, .01, .002], [1.85, 0, 0, 0, 0, 0, 0]],
-      m: [[.98, 0, 0, 0], [1.14, 5, 7, 2], [1.2, 5.6, 6.2, 2], [1.26, 5, 7, 2], [1.4, 0, 0, 0]] } },
+      m: [[.98, 0, 0, 0], [1.14, 5, 7, 2], [1.2, 5.6, 6.2, 2], [1.26, 5, 7, 2], [1.4, 0, 0, 0]], mc: FZ2MC } },
   smg: { // SMG do pacote: a mão tira o carregador e o leva ao colete (na vazia ele cai), volta com o novo e empurra; a vazia puxa a alavanca
     P: { seg: [[0, .3, .6], [.3, .71, 1.5, 0, 3], [.71, 1.02, .6], [1.02, 1.63, 3, 0, 9], [1.63, 2.14, .7], [2.14, 2.55, 1.5, 0, 3], [2.55, 2.75, .4], [2.75, 3, 1], [3, 3.4, .7], [3.4, 3.948, 4, 0, 9]],
       ev: { sai: .75, encaixa: 2.7, mao: 3.24 },
