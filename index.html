@@ -21054,6 +21054,7 @@ function fpPlay(ud, name, dur) {
   const rc = F.cur === 'reload' || F.cur === 'reloadE'; // tiro que corta a recarga (escopeta): a pose da recarga está longe, a mistura curta do tiro dava um salto
   if (F.act && F.act !== a) F.act.crossFadeTo(a, name === 'fire' ? (rc ? .12 : .04) : name === 'draw' ? 0 : .15, false);
   F.act = a; F.cur = name; F.until = once && !loop ? now + c.duration / a.timeScale : 0;
+  if (F.knife && !ZC.on && KNF.corta[name]) F.until = now + c.duration * KNF.corta[name] / a.timeScale; // kn1
 }
 const _fm = new THREE.Matrix4(), _fm2 = new THREE.Matrix4(), _fv = new V3(), _fv2 = new V3(), _fv3 = new V3();
 // centro (no espaço do osso) dos vértices que se movem com o osso b (peso principal nele)
@@ -21698,7 +21699,7 @@ function anEscopeta(F, an, w, a) {
   }
   F.act.timeScale = 0; F.act.time = clamp(t, 0, F.act.getClip().duration - 1e-3);
 }
-if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AN, ANPEC, AN_PECAS }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AN, ANPEC, AN_PECAS, KNF }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
 // ===== fim an =====
 // IK dos braços: recua os ombros, leva a mão esquerda ao guarda-mão do modelo e gira braço e antebraço (dois ossos, cotovelo no mesmo
 // plano de antes) até cada pulso chegar ao alvo
@@ -22587,6 +22588,7 @@ function knFollow(F) {
     const k = clamp((u - u0) / (u1 - u0), 0, 1); if (k <= 0 || k >= 1) continue;
     I.a.set(0, ax === 'y' ? 1 : 0, ax === 'z' ? 1 : 0).applyQuaternion(I.q2); I.q.premultiply(I.q3.setFromAxisAngle(I.a, n * 2 * Math.PI * easeIO(k)));
   }
+  for (const n in KNF.volta) { const V = KNF.volta[n], a = F.clips[n] && F.mixer.existingAction(F.clips[n]); if (!a || a.getEffectiveWeight() <= 0) continue; const e = smooth((a.time / F.clips[n].duration - V[0]) / (V[1] - V[0])); if (e > 0) { I.q.slerp(I.q3.identity(), e); break; } } // kn1 (também enquanto o corte some na mistura para a pose parada): na volta do corte a faca ficava invertida, deitada ao longo do antebraço (o pomo de frente para a câmera, a lâmina escondida): volta à pegada normal logo depois da varredura
   I.v.copy(K.c).applyQuaternion(I.q); I.m.makeRotationFromQuaternion(I.q).setPosition(K.c.x - I.v.x, K.c.y - I.v.y, K.c.z - I.v.z); // gira em volta do centro do cabo
   K.h.matrix.multiplyMatrices(I.m, K.H0); K.h.matrixWorldNeedsUpdate = true;
   if (F.cur === 'stab' && KNF.stab) { // estocada: o pacote empurra a faca de lado; o pulso vira a ponta para a frente
@@ -22622,9 +22624,16 @@ function qkUpdate(o, dt) {
 // qk.sai: quando (s) a mão da facada rápida começa a sair, depois da varredura; saiD: quanto dura a saída; baixa: quanto ela desce (m).
 // A arma sobe junto com a saída da mão: volta pronta perto do próximo tiro (antes ficava escondida até 0,73 s, com o tiro liberado em 0,42).
 KNF.corte = { slash: .55, slash2: .55 };
+KNF.longe = { slash: [.05, -.07, -.2, .1], slash2: [.05, -.07, -.2, .1], inspect: [.05, -.06, -.17, .06] }; // kn1: [x, y, z (m), rx] no meio do clipe
+KNF.volta = { slash: [.35, .5], slash2: [.35, .5] }; // kn1: frações do clipe em que a faca volta da pegada invertida para a normal
+KNF.corta = { slash: .6, slash2: .6 }; // kn1 (CS): o fim do corte (punho de frente para a câmera) dá lugar à pose parada nesta fração do clipe
 Object.assign(KNF.qk, { sai: .26, saiD: .12, baixa: .3 });
 function knViewmodel(o, ud, dt) { // corrida com a faca e bote (os dois modos)
   const k = me.sprintK; if (ud.fps2?.knife && k > .01) { o.y -= .03 * k + Math.abs(Math.sin(bobT * 1.3)) * .02 * k; o.rx -= .08 * k; o.rz += Math.sin(bobT) * .04 * k; o.x += .01 * k; }
+  const F = ud.fps2; if (F?.knife) for (const n in KNF.longe) { // kn1: corte e inspeção do pacote varrem o antebraço colado na câmera (31% da tela): o braço vai mais longe e para baixo/direita (pesado pela mistura dos clipes)
+    const D = KNF.longe[n], a = F.clips[n] && F.mixer.existingAction(F.clips[n]), w = a ? a.getEffectiveWeight() : 0; if (w <= 0) continue;
+    const u = clamp(a.time / (F.clips[n].duration || 1), 0, 1), e = smooth(u / .18) * smooth((1 - u) / .3) * w;
+    o.x += D[0] * e; o.y += D[1] * e; o.z += D[2] * e; o.rx += D[3] * e; }
   me.lungeK = lerp(me.lungeK || 0, me.lungeEnd > now ? 1 : 0, Math.min(1, dt * (me.lungeEnd > now ? 25 : 8))); // bote: o braço vai junto, a visão abre um pouco
   if (me.lungeK > .01) o.z -= KNF.bote.z * me.lungeK;
   if (QK.g) qkUpdate(o, dt);
