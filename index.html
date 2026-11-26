@@ -17061,7 +17061,7 @@ function buildMap(id) {
   buildSky(M);
   // a arma em primeira pessoa acompanha a luz do mapa (à noite ela fica mais escura e reflete menos)
   const VL = M.stars ? VMLUZ.noite : VMLUZ.dia; vmHemi.color.set(VL.ceu); vmHemi.groundColor.set(VL.chao); vmHemi.intensity = VL.hemi; vmKey.color.set(VL.keyC); vmKey.intensity = VL.key; vmRim.color.set(VL.rimC); vmRim.intensity = VL.rim; VM_ENV = VL.env; // (a13)
-  for (const set of [...Object.values(GM), ARM || {}]) for (const m of Object.values(set)) if (m?.isMeshStandardMaterial) m.envMapIntensity = VM_ENV * (m.userData.env ?? .35);
+  for (const set of [...Object.values(GM), ARM || {}]) for (const m of Object.values(set)) if (m?.isMeshStandardMaterial) m.envMapIntensity = VM_ENV * (m.userData.env ?? .35) * (m.userData.vxz && VM_ENV < 1 ? .45 : 1); // D20/D24: voxel da arma do código à noite como o vxEnv
   vxEnv(); // item 0: voxels da mão
   FPPRE.ok.clear(); FPPRE.n.clear(); // item 0: os programas (B08) são por mapa: a pré-carga refaz
   scene.fog = new THREE.Fog(M.fogC ?? M.sky, M.fog[0], M.fog[1]);
@@ -18445,13 +18445,13 @@ function gunModel(id, fp = false, skin = null) {
     case 'pistol': {
       const steel = /^(m1911|cz75)/.test(id), usp = id.startsWith('usp'), fs = bid === 'fiveseven', b23 = bid === 'b23r', c96 = bid === 'c96';
       pistolBody({ L: usp ? .2 : b23 ? .22 : c96 ? .17 : .19, sy: .032, sh: c96 ? .015 : .017, sw: c96 ? .026 : .029, sz: .075, fl: .14, gs: c96 ? 1.08 : 1, bs: 1,
-        slideM: steel || c96 ? M.steel : M.metal, frameM: steel || c96 ? M.steel : fs ? M.tan : M.polymer, gripM: steel ? M.woodDark : c96 ? M.wood : fs ? M.tan : M.polymer, stipple: !steel && !c96 });
+        slideM: steel ? M.steel : M.metal, frameM: steel ? M.steel : c96 ? M.metal : fs ? M.tan : M.polymer, /* D24: C96 em aço oxidado escuro (era prateada) */ gripM: steel ? M.woodDark : c96 ? M.wood : fs ? M.tan : M.polymer, stipple: !steel && !c96 });
       if (usp) { add(g, CY(.0145, .13, 18), M.dark, 0, .036, -.24); bore(0, .036, -.305, .005); mz = -.31; }
       if (b23) { add(g, RB(.034, .03, .036, .004), M.dark, 0, .034, mz - .016); bore(0, .036, mz - .035, .004); mz -= .036; add(g, RB(.02, .007, .06, .002), M.dark, 0, .0, -.105); } // compensador e trilho
       if (c96) { // Mauser "cabo de vassoura": cano comprido e carregador na frente do gatilho
-        add(g, CY(.0065, .12, 12), M.steel, 0, .036, mz - .055); bore(0, .036, mz - .116, .004); mz -= .118;
+        add(g, CY(.0065, .12, 12), M.metal, 0, .036, mz - .055); bore(0, .036, mz - .116, .004); mz -= .118;
         g.remove(ud.mag); // zv2-A04: a C96 não tem carregador no punho; a recarga tirava um carregador de pistola comum de dentro do cabo de madeira
-        const mag = grp(g, 0, .015, -.08); add(mag, EX([[-.03, .0], [.03, .0], [.025, -.05], [-.025, -.05]], .028, null, .003), M.steel);
+        const mag = grp(g, 0, .015, -.08); add(mag, EX([[-.03, .0], [.03, .0], [.025, -.05], [-.025, -.05]], .028, null, .003), M.metal);
         for (let k = 0; k < 3; k++) add(mag, new THREE.BoxGeometry(.03, .003, .045), M.dark, 0, -.021 - k * .012, 0);
         ud.mag = mag; ud.magGrab = new V3(0, -.047, -.08); // carregador na frente do gatilho: é ele que sai e entra na recarga (mão por baixo dele)
       }
@@ -19773,7 +19773,7 @@ FPW.l96 = { pack: 'sniper', m: 'awp' }; // uni: a L96A1 do Zumbi é da mesma fam
 // tambor, bomba, cano basculante, maravilhas, lançadores) fica com as camadas procedurais da própria arma (gunAnim só nas peças, sem
 // mexer na tela); carregador de caixa embaixo (rig 'mag') e ferrolho da pistola seguem a peça do pacote. Acessórios do Armeiro, PaP
 // (papUV), Pistolas Duplas e o voxel fino (vxz) continuam os da arma do código. ?syn=0 volta às mãos antigas.
-const FSYN = { off: /[?&]syn=0\b/.test(location.search), bracos: { smg: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, mp40: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, spas: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] } } /* D23: MP40 (do Zumbi) como as SMGs do código; SPAS idem */, olho: .16, adsZ: { smg: .06, sniper: .14 }, mira: { hs10: [.12, 1], trench: [.1, 1], ks23: [.05, 1] /* D15: com .2 o olho ia para cima da coronha (madeira lisa enorme no centro) */, law: [.1, 0], wunderwaffe: [.2, 0], spectre: [.2, 0] } }; // mira: por arma [distância extra (m), braços somem na mira]: bombas (a mão da bomba e a coronha cobriam a tela), LAW (tubo na frente do olho), Wunderwaffe (bulbo);  // adsZ: na mira a arma do código fica mais longe do olho (m; medido: braço esquerdo cobria 28% da tela nas SMGs, 21% depois; Kar98k 24% -> 14%; na bomba piora: fica 0)
+const FSYN = { off: /[?&]syn=0\b/.test(location.search), bracos: { smg: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, mp40: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, spas: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] } } /* D23: MP40 (do Zumbi) como as SMGs do código; SPAS idem */, olho: .16, adsZ: { smg: .06, sniper: .14 }, mira: { hs10: [.12, 1], trench: [.1, 1], ks23: [.05, 1] /* D15: com .2 o olho ia para cima da coronha (madeira lisa enorme no centro) */, law: [.1, 0], wunderwaffe: [.32, 0], spectre: [.2, 0] } }; // mira: por arma [distância extra (m), braços somem na mira]: bombas (a mão da bomba e a coronha cobriam a tela), LAW (tubo na frente do olho), Wunderwaffe (bulbo);  // adsZ: na mira a arma do código fica mais longe do olho (m; medido: braço esquerdo cobria 28% da tela nas SMGs, 21% depois; Kar98k 24% -> 14%; na bomba piora: fica 0)
 if (!FSYN.off) for (const [p, l] of Object.entries({ pistol: 'fiveseven b23r c96 raygun2', smg: 'ppsh thompson spectre kiparis uzi pm63', ak: 'stg44 mg42 stoner psg1',
   rifle: 'm16 aug famas g11 enfield law crossbow wunderwaffe wintershowl', pump: 'trench hs10 ks23', sniper: 'kar98k' })) for (const id of l.split(' ')) FPW[id] = { pack: p, syn: 1 };
 function fpSyn(id, ud, gun) { // modelo "baixado" sintético: origem no gatilho, cano para -Z, metros (escala 1)
@@ -22126,7 +22126,7 @@ function vxzMat(src, R) {
     m.map = m.bumpMap = m.roughnessMap = m.metalnessMap = m.normalMap = null; m.color.set(0xffffff);
     if (m.isMeshStandardMaterial) { m.metalness = Math.min(m.metalness, .68); m.roughness = Math.max(m.roughness, .34); } // como o metal do vxMats: face plana de voxel espelhando o céu vira chapa clara/escura
   }
-  VXZ.var.set(src, m); (GM.vxz ||= {})[m.uuid] = m; // em GM: a luz da arma na mão ajusta o reflexo junto
+  m.envMapIntensity = VM_ENV * (m.userData.env ?? .35) * (VM_ENV < 1 ? .45 : 1); VXZ.var.set(src, m); (GM.vxz ||= {})[m.uuid] = m; // em GM: a luz da arma na mão ajusta o reflexo junto
   return m;
 }
 // uma malha -> voxels no espaço dela (passo h). Puro (roda no Worker): P posições, U UV, IX índices, cor sRGB [r, g, b] do material,
@@ -23316,7 +23316,15 @@ function attPartsProc(id, gun, ud) {
     const sill = holo ? (hg ? .006 : .011) : t, yc = Math.max(y0 + ATTV.pe + sill + h / 2, sp ? sp.y + ATTV.folga : -1), yB = yc - h / 2 - sill, zf = zc - d / 2, O = N.optic;
     put(par, RB(w + 2 * t + .002, yB - y0 + .001, d * .9), O, x, (y0 + yB) / 2, zc); // pé (trilho até a armação)
     put(par, RB(w + 2 * t, sill, d), O, x, yB + sill / 2, zc); // base da janela (na holográfica, a caixa da pilha)
-    if (holo) { // EOTech: capuz inteiro, botões atrás, retícula de anel
+    if (op === 'optic_acog') { // D24: Luneta 2x (ACOG): tubo com a objetiva maior na frente, olho atrás; vai mais para a frente que a caixa da holográfica
+      const r = h * .44, L = d * 2.1, zr = zc + d / 2, zfr = zr - L, R = N.reticle;
+      const TU = (a, b, len) => new THREE.CylinderGeometry(b, a, len, hi ? 20 : 10, 1, true).rotateX(-Math.PI / 2); // tubo aberto (o olho vê por dentro)
+      put(par, TU(r, r, L * .58), O, x, yc, zr - L * .29); put(par, TU(r, r * 1.32, L * .42), O, x, yc, zfr + L * .21); // tubo e campânula da objetiva
+      put(par, TU(r * 1.12, r * 1.12, .006), N.dark, x, yc, zr - .003); put(par, RB(.008, .006, .012), N.dark, x, yc + r + .002, zr - L * .35); // ocular e regulagem em cima
+      ret.push(put(par, new THREE.CircleGeometry(.0006, 12), R, x, yc, zfr + .0025), put(par, new THREE.PlaneGeometry(.00035, .004), R, x, yc - .0024, zfr + .0025));
+      const gl = put(par, new THREE.CircleGeometry(r * 1.25, 24), X.glass, x, yc, zfr + .0015); gl.renderOrder = 2;
+      ud.sight = V(x, yc, zfr + .0015); ud.sightR = zr; ud.fab = null;
+    } else if (holo) { // EOTech: capuz inteiro, botões atrás, retícula de anel
       put(par, RB(w + 2 * t + .003, t + .0015, d + .004), O, x, yc + h / 2 + t / 2, zc);
       for (const s of [-1, 1]) { put(par, RB(t, h, d), O, x + s * (w / 2 + t / 2), yc, zc); put(par, RB(.006, .005, .012), N.dark, x + s * (w / 2 + t - .002), yB + sill / 2, zc + d / 2 - .008); }
       const rz = zf + .0025, R = N.reticle; ret.push(put(par, new THREE.CircleGeometry(.0006, 12), R, x, yc, rz), put(par, new THREE.RingGeometry(.0052, .0056, 40), R, x, yc, rz));
@@ -23331,7 +23339,7 @@ function attPartsProc(id, gun, ud) {
       ret.push(put(par, new THREE.CircleGeometry(.0007, 12), N.reticle, x, yc, zf + .0022));
       const gl = put(par, new THREE.PlaneGeometry(w, h), X.glass, x, yc, zf + .0015); gl.renderOrder = 2;
     }
-    ud.sight = V(x, yc, zf + .0015); ud.sightR = zc + d / 2; ud.fab = null; // a mira acessória substitui a de fábrica (o zoom é o dela)
+    if (op !== 'optic_acog') { ud.sight = V(x, yc, zf + .0015); ud.sightR = zc + d / 2; ud.fab = null; } // a mira acessória substitui a de fábrica (o zoom é o dela)
   }
   // cano longo: o que está na boca do cano anda para a frente, o que atravessa estica, e um pedaço de cano preenche
   const R0 = q(mz.x - .04, mz.x + .04, my - .04, my + .04, mz.z - .001, mz.z + .006), rb = R0.n ? Math.max(.004, Math.min(.02, my - R0.y0)) : .008, ex = R0.n ? Math.max(1, (R0.x1 - R0.x0) / 2 / rb) : 1;
