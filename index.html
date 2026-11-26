@@ -649,6 +649,93 @@ summary{cursor:pointer;color:#fff;font-weight:700}
   #pgLoad{top:22vh}
   .pgopts{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
 }
+/* ===== menu no modelo de lobby militar: cabeçalho com linhas topográficas, grupo em 3D ao fundo da aba Jogar ===== */
+#menu{--mg:#e2b24c}
+#menu .mshell{position:relative;z-index:1}
+#menu .mtop{display:grid!important;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;column-gap:30px;align-items:end;height:auto!important;padding:14px clamp(18px,3vw,56px) 0!important;
+  background-color:rgba(10,12,14,.9)!important;background-image:var(--topo,none),linear-gradient(180deg,rgba(18,20,22,.96),rgba(10,12,14,.88))!important;background-size:cover,auto!important;border-bottom:1px solid rgba(255,255,255,.08)!important;box-shadow:0 10px 40px rgba(0,0,0,.45)!important}
+#menu .mlogo{grid-column:1;grid-row:1;justify-self:start;font-size:50px!important;letter-spacing:4px!important;padding-bottom:6px;border-bottom:2px solid rgba(255,255,255,.55);text-shadow:0 2px 0 #000,0 0 22px rgba(0,0,0,.6)!important}
+#menu .mtop .tabs{grid-column:1/3;grid-row:2;height:50px;margin-top:6px;gap:4px;overflow:visible}
+#menu .tabs button{font-size:21px!important;letter-spacing:1.5px!important;padding:6px 20px 0!important;color:#8e959c!important;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+#menu .tabs button::after{left:0!important;right:0!important;bottom:0!important;height:3px!important;background:var(--mg)!important}
+#menu .tabs button.on{color:var(--mg)!important;text-shadow:none!important;background:linear-gradient(0deg,rgba(226,178,76,.22),rgba(226,178,76,.04) 70%,transparent)!important}
+#menu .tabs button:hover{color:#e9e9e9!important}
+#menu .tabs .nv{display:none;width:9px;height:9px;background:#5fc25a;box-shadow:0 0 0 2px rgba(95,194,90,.25);margin:-12px 0 0}
+#menu .tabs .nv.on{display:block}
+.mright{grid-column:3;grid-row:1/3;display:flex;align-items:center;gap:22px;align-self:center;padding-bottom:8px}
+.mcur,.mgrp{display:flex;align-items:center;gap:7px;font-family:Teko,Rajdhani,sans-serif;font-size:26px;color:#d6d9dc;line-height:1}
+.mcur svg{width:26px;height:26px;color:var(--mg)}.mgrp svg{width:22px;height:22px;color:#9aa2a9}
+.mgrp{padding:4px 12px 2px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08)}
+#menu .mplayer{min-width:0!important;max-width:330px;background:none!important;backdrop-filter:none;clip-path:none;border:0!important;padding:0!important;gap:14px}
+#menu .mav{width:62px;height:62px;border-radius:50%;background:radial-gradient(circle,rgba(0,0,0,.6) 60%,transparent 62%),conic-gradient(var(--mg) var(--xp,0%),rgba(255,255,255,.16) 0);color:#fff;font-size:0}
+#menu .mav svg{width:30px;height:30px}
+#menu .mpinfo input{background:none!important;font-family:Rajdhani,sans-serif;font-size:15px;font-weight:600;color:#c9ced3;letter-spacing:.5px}
+.mrank{font-family:Teko,Rajdhani,sans-serif;font-size:38px;font-weight:500;line-height:.9;color:#fff;letter-spacing:1px;white-space:nowrap}
+#menu .mpsub{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#menu .mpxp{display:none}
+/* rodapé */
+.mfoot{flex:none;display:flex;align-items:center;gap:6px;height:44px;padding:0 clamp(18px,3vw,56px);background:linear-gradient(0deg,rgba(6,7,9,.85),rgba(6,7,9,.35));position:relative;z-index:2}
+#menu .mfk{display:flex;align-items:center;gap:7px;background:none;border:0;color:#c9ced3;font-family:Rajdhani,sans-serif;font-size:16px;font-weight:600;padding:6px 12px;letter-spacing:.5px}
+#menu .mfk:hover{color:#fff;background:none}.mfk svg{width:17px;height:17px}
+#menu[data-tab="play"] #mfBack{visibility:hidden}
+#mfToasts{display:flex;flex-direction:column;align-items:flex-end;gap:4px;position:absolute;right:clamp(18px,3vw,56px);bottom:48px;pointer-events:none}
+#mfToasts div{display:flex;align-items:center;gap:9px;padding:6px 14px;background:rgba(8,10,12,.78);border-left:2px solid var(--mg);font-family:Rajdhani,sans-serif;font-size:15px;font-weight:600;color:#dfe3e6;animation:mfin .3s ease-out;transition:opacity .6s}
+#mfToasts div.sai{opacity:0}
+#mfToasts div::before{content:'!';display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1.5px solid #aab;border-radius:50%;font-size:12px;color:#ccd}
+@keyframes mfin{from{transform:translateX(30px);opacity:0}}
+#mnNotas{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
+#mnNotas.hidden{display:none}
+.mnnbox{width:min(560px,92vw);background:rgba(14,16,19,.96);border:1px solid rgba(255,255,255,.1);border-top:3px solid var(--mg);padding:22px 26px}
+.mnnbox h2{font-family:Teko,Rajdhani,sans-serif;font-size:38px;font-weight:500;letter-spacing:2px;margin:0 0 6px;color:#fff;text-transform:uppercase}
+.mnnbox li{margin:8px 0;color:#c9ced3;font-size:16px}.mnnbox li b{color:var(--mg)}
+/* aba Jogar: fundo 3D aparece; coluna de modos à esquerda */
+#menu.mstage{background:linear-gradient(90deg,rgba(6,7,9,.72) 0,rgba(6,7,9,.38) 24%,transparent 42%),linear-gradient(0deg,rgba(0,0,0,.45),transparent 22%)!important}
+#menu.mstage::after{opacity:.4}
+#menu[data-tab="play"] .mbody{padding:18px clamp(18px,3vw,56px) 8px;overflow:hidden;pointer-events:none}
+#menu[data-tab="play"] .mbody>.playgrid{display:flex;flex-direction:column;gap:12px;width:clamp(360px,27vw,520px);max-width:none;margin:0;height:100%;overflow-y:auto;overflow-x:hidden;pointer-events:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent;padding-right:4px}
+#menu[data-tab="play"] .mbody>.playgrid.lbon{width:clamp(420px,38vw,700px)}
+#menu .playgrid>.box,#menu .playgrid .pside>.box{padding:0!important;background:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border:0!important;box-shadow:none!important;flex:none}
+#menu .playgrid .box::before{display:none}
+#menu .playgrid>#lobby,#menu .playgrid #joinBox,#menu .playgrid #sideFr:not(:empty){padding:16px 18px!important;background:rgba(14,16,19,.74)!important;backdrop-filter:blur(8px)!important;border:1px solid rgba(255,255,255,.07)!important}
+#menu .playgrid #lobby .lbcols{grid-template-columns:1fr!important;display:grid;gap:8px}
+#menu .playgrid #lobby .mf{grid-template-columns:1fr!important;display:grid}
+#menu .playgrid .pside{gap:12px}
+#menu .playgrid #joinBox h3{font-size:22px!important;margin-bottom:6px!important}
+#menu .playgrid #joinBox .hint{font-size:13px}
+#hostBox .actbar{margin-top:10px;padding-top:0;border-top:0}
+#menu #btnHost{font-size:34px!important;padding:12px 18px 6px!important}
+#menu #btnHostPriv{font-size:20px!important;line-height:1.05}
+#menu .mnm{position:relative;display:block;width:100%;text-align:left;margin:0 0 8px;padding:14px 20px 10px;background:linear-gradient(90deg,rgba(28,31,35,.8),rgba(28,31,35,.52));border:0;border-radius:0;color:#a7adb3;cursor:pointer;transition:background .15s}
+#menu .mnm:hover{background:linear-gradient(90deg,rgba(44,47,51,.86),rgba(44,47,51,.58))}
+.mnm h4{margin:0;font-family:Teko,Rajdhani,sans-serif;font-size:30px;font-weight:400;letter-spacing:1px;text-transform:uppercase;line-height:1;color:#b9bec3}
+.mnm>.nv{position:absolute;right:14px;top:14px;width:9px;height:9px;background:#5fc25a}
+.mnm p{display:none;margin:6px 0 0;font-size:15px;color:#e6e8ea;line-height:1.3;max-width:92%}
+#menu .mnm.on{padding-bottom:0;background:linear-gradient(90deg,rgba(44,38,26,.9),rgba(30,28,24,.66));border-top:2px solid var(--mg);box-shadow:0 0 0 1px rgba(226,178,76,.22) inset}
+.mnm.on h4{color:var(--mg);font-weight:500}
+.mnm.on p{display:block}
+.mnopt{display:none;margin:12px -20px 0;border-top:1px solid rgba(255,255,255,.06)}
+.mnm.on .mnopt{display:block}
+.mnrow{display:flex;align-items:center;height:38px;padding:0 8px 0 20px;background:rgba(0,0,0,.35);border-bottom:1px solid rgba(255,255,255,.05);font-family:Rajdhani,sans-serif;font-size:16px;font-weight:600;color:#cfd3d7}
+.mnrow>span{width:38%;color:#9ca2a8}.mnrow>b{flex:1;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#menu .mnrow button{width:30px;height:30px;background:none;border:0;color:#fff;font-size:26px;line-height:1;padding:0}
+#menu .mnrow button:hover{color:var(--mg);background:none}
+/* rótulos do grupo sobre os bonecos */
+#mnSquad{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:hidden}
+#menu:not(.mstage) #mnSquad{display:none}
+.msqT{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,.9);will-change:transform}
+.msqT .cr{width:26px;height:17px;color:var(--mg);margin-bottom:5px;filter:drop-shadow(0 1px 2px #000)}
+.msqT .ln{display:flex;align-items:center;gap:7px;font-family:Rajdhani,sans-serif;font-weight:600;font-size:18px;color:#eef0f2}
+.msqT .lv{font-family:Teko,Rajdhani,sans-serif;font-size:21px;color:#9fc3e6;line-height:1}
+.msqT .rk{width:12px;height:17px;color:#d8dde2}
+.msqT.eu .nm{color:var(--mg)}
+.msqT .mic{width:16px;height:16px;color:#cfd3d7;opacity:.85}
+.msqT .mic.mut{opacity:.35}
+#menu .msqI{position:absolute;left:0;top:0;pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;background:none;border:0;color:rgba(255,255,255,.6);font-family:Teko,Rajdhani,sans-serif;letter-spacing:1.5px;text-transform:uppercase;padding:0;cursor:pointer;opacity:.7;transition:opacity .2s,color .2s;will-change:transform}
+#menu .msqI:hover{opacity:1;color:var(--mg);background:none}
+.msqI svg{opacity:.3}
+.msqI b{font-weight:400;font-size:22px;text-shadow:0 1px 3px #000}
+@media(max-height:820px){#menu .mlogo{font-size:40px!important}.mrank{font-size:30px}#menu .mav{width:52px;height:52px}#menu .mtop .tabs{height:44px}#menu .tabs button{font-size:19px!important;padding:4px 14px 0!important}.mnm h4{font-size:26px}#menu .mnm{padding:10px 18px 8px}#menu #btnHost{font-size:28px!important}}
+@media(max-width:1400px){#menu .tabs button{padding:6px 12px 0!important}.mright{gap:14px}}
 </style>
 <!-- Bibliotecas servidas do próprio repositório (vendor/: mesmas versões e bytes das CDNs, hashes em vendor/HASHES.md): uma CDN comprometida
      não troca o código do jogo. Exceção: index.html aberto direto do disco (file://), onde o navegador bloqueia módulos ES locais (CORS);
@@ -721,20 +808,23 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 
 <div id="click" class="hidden">Clique para jogar</div>
 
-<div id="menu" class="overlay">
+<div id="menu" class="overlay" data-tab="play">
   <div class="mshell">
     <header class="mtop">
       <div class="mlogo">DAN <i>GUN</i></div>
-      <nav class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="friends">Amigos</button><button data-tab="arsenal">Arsenal</button><button data-tab="char">Personagem</button><button data-tab="cases">Caixas</button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></nav>
-      <div class="mplayer"><div class="mav" id="mAv">J</div><div class="mpinfo"><input id="inName" maxlength="16" autocomplete="off" title="Seu nome"><div class="mpsub" id="mpSub"></div><div class="mpxp"><i id="mpXp"></i></div></div></div>
+      <nav class="tabs"><button data-tab="play" class="on">Jogar</button><button data-tab="arsenal">Arsenal</button><button data-tab="char">Personagem<i class="nv" id="nvChar"></i></button><button data-tab="friends">Amigos<i class="nv" id="nvFr"></i></button><button data-tab="cases">Caixas<i class="nv" id="nvCx"></i></button><button data-tab="cfg">Configurações</button><button data-tab="keys">Controles</button></nav>
+      <div class="mright">
+        <div class="mcur" title="Caixas para abrir (aba Caixas)"><svg viewBox="0 0 24 24"><path d="M3 7.5l9-4 9 4v9.5l-9 4-9-4zM3 7.5l9 4 9-4M12 11.5v9.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><b id="mCxN">0</b></div>
+        <div class="mplayer"><div class="mav" id="mAv"></div><div class="mpinfo"><input id="inName" maxlength="16" autocomplete="off" title="Seu nome"><div class="mrank" id="mRank"></div><div class="mpsub" id="mpSub"></div><div class="mpxp"><i id="mpXp"></i></div></div></div>
+        <div class="mgrp" title="Jogadores no grupo"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.6" fill="currentColor"/><path d="M4.5 21c.6-5 3.4-7.6 7.5-7.6s6.9 2.6 7.5 7.6z" fill="currentColor"/></svg><b id="mGrpN">1/4</b></div>
+      </div>
     </header>
     <main class="mbody">
     <div data-pane="play" class="playgrid">
       <div id="invBar" style="grid-column:1/-1"></div>
       <div id="lobby" class="box hidden" style="grid-column:1/-1"></div>
       <div class="box" id="hostBox">
-        <h3>Criar partida</h3>
-        <div id="hostForm" class="hint" style="font-size:16px;margin:0 0 14px">Crie a sala e, no lobby, chame os amigos e escolha <b>modo</b>, <b>mapa</b> e <b>opções</b> da partida.</div>
+        <div id="mnModos"></div>
         <div class="actbar"><button id="btnHost" class="big" disabled>Carregando...</button>
         <button id="btnHostPriv" class="big alt" disabled>Só com convite</button></div>
         <div id="hostStatus" class="status"></div>
@@ -827,7 +917,16 @@ summary{cursor:pointer;color:#fff;font-weight:700}
       </div>
     </div>
     </main>
+    <footer class="mfoot"><button id="mfBack" class="mfk">&lsaquo;&nbsp; Voltar</button><button id="mfOpt" class="mfk"><svg viewBox="0 0 24 24"><path d="M12 8.6a3.4 3.4 0 100 6.8 3.4 3.4 0 000-6.8zm8.4 4.6l2-1.6-2-3.4-2.4.9a7.6 7.6 0 00-1.8-1L15.8 5h-3.9l-.4 2.6a7.6 7.6 0 00-1.8 1l-2.4-.9-2 3.4 2 1.6a7.4 7.4 0 000 2l-2 1.6 2 3.4 2.4-.9c.6.4 1.1.8 1.8 1l.4 2.6h3.9l.4-2.6c.6-.3 1.2-.6 1.8-1l2.4.9 2-3.4-2-1.6c.1-.7.1-1.3 0-2z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg> Opções</button><span style="flex:1"></span><div id="mfToasts"></div><button id="mfNotas" class="mfk">Ver notas da atualização</button></footer>
   </div>
+  <div id="mnSquad"></div>
+  <div id="mnNotas" class="hidden"><div class="mnnbox"><h2>Notas da atualização</h2><ul>
+    <li><b>Menu novo:</b> o grupo aparece em 3D no fim de tarde, cada um com o seu personagem e a arma; modos em cartões na esquerda.</li>
+    <li><b>Armas:</b> fuzis mirando cobrem menos a tela; a arma do código volta durante a carga.</li>
+    <li><b>Zumbis:</b> terceira pessoa, Caixa, baú e Pack-a-Punch com o modelo baixado em voxel.</li>
+    <li><b>Arsenal e Armeiro</b> mostram a mesma arma da mão, com os acessórios.</li>
+    <li><b>Enquadramento</b> da arma em 1ª pessoa igual em qualquer proporção de tela.</li>
+  </ul><button class="big" id="mnNotasX">Fechar</button></div></div>
 </div>
 
 <div id="pause" class="overlay hidden">
@@ -23674,7 +23773,7 @@ function avtPronta(e, r) {
   Object.assign(e, { ok: true, geos, rig: r.rig, tri: r.tri, ms: r.ms, bytes, braco: Math.min(.11, braco) });
   avtPoda();
 }
-function avtEmUso(e) { if (AVE.e === e || AVE.ef === e) return true; for (const rp of R.values()) if (rp.avE === e) return true; return false; }
+function avtEmUso(e) { if (AVE.e === e || AVE.ef === e || MSQ.slots.some(s => s?.e === e)) return true; for (const rp of R.values()) if (rp.avE === e) return true; return false; }
 function avtPoda() { // cache: no máximo MAX_FINO finos e MAX_ENT ao todo; sai o usado há mais tempo que ninguém está mostrando
   const L = [...AVT.ent.values()].filter(e => e.ok && !avtEmUso(e)).sort((a, b) => a.t - b.t);
   let nf = [...AVT.ent.values()].filter(e => e.ok && e.nivel === 'f').length, n = [...AVT.ent.values()].filter(e => e.ok).length;
@@ -33256,7 +33355,7 @@ function onMsgInner(m) {
       setHTML('drep', `<b>DANO NA RODADA</b>${m.g?.length ? '<div class="dl">Você deu</div><table>' + m.g.map(row).join('') + '</table>' : ''}${m.r?.length ? '<div class="dl">Você levou</div><table>' + m.r.map(row).join('') + '</table>' : ''}`);
       $('#drep').classList.remove('hidden'); clearTimeout(C.drepT); C.drepT = setTimeout(() => $('#drep').classList.add('hidden'), 7000); break;
     }
-    case 'lobby': m.st = saneSt(m.st); if (!Array.isArray(m.pl)) m.pl = []; for (const q of m.pl) { if (q && typeof q === 'object') { q.id = String(q.id); q.n = String(q.n ?? '').slice(0, 20); q.c = /^#[0-9a-f]{3,8}$/i.test(q.c) ? q.c : '#cccccc'; q.tm = q.tm === 't' || q.tm === 'ct' ? q.tm : ''; } } LB.data = m; C.st = m.st; lobbyUI(); break;
+    case 'lobby': m.st = saneSt(m.st); if (!Array.isArray(m.pl)) m.pl = []; for (const q of m.pl) { if (q && typeof q === 'object') { q.id = String(q.id); q.n = String(q.n ?? '').slice(0, 20); q.c = /^#[0-9a-f]{3,8}$/i.test(q.c) ? q.c : '#cccccc'; q.tm = q.tm === 't' || q.tm === 'ct' ? q.tm : ''; q.av = avtLimpa(q.av) || ''; } } LB.data = m; C.st = m.st; lobbyUI(); break;
     case 'tolobby': LB.on = true; toMenu(); lobbyUI(); break;
     case 'start': NET.lastHost = performance.now() + GRACE_MAPA; LB.on = false; C.st = saneSt(m.st); ZC.snapTs = 0; buildMap(C.st.map); MAPA_CLI = curMapId; enterGame(); lobbyUI(); break; // 6-g07: MAPA_CLI
     case 'deny': toast(m.txt, 4); LB.on = false; lobbyUI(); $('#joinStatus').textContent = m.txt; setTimeout(leaveGame, 2500); break;
@@ -34040,9 +34139,11 @@ async function authDo(kind) {
 const normUser = v => { v = String(v || '').trim().toLowerCase(); return /^[a-z0-9_]{3,16}$/.test(v) ? v : null; };
 function mpUI() { // cartão do jogador: inicial, nome, usuário/caixas e barra de XP até a próxima caixa
   const d = PROF.data; if (!$('#mAv')) return;
-  $('#mAv').textContent = (CFG.name || '?').trim()[0]?.toUpperCase() || '?';
-  setHTMLm('mpSub', (PROF.user ? '@' + esc(PROF.user) : PROF.uid ? 'Conta sem usuário' : 'Convidado') + (d ? ` · <b>${patente(d.elo)}</b> · <b>${d.cases}</b> caixa${d.cases === 1 ? '' : 's'}` : ''));
-  if (d) $('#mpXp').style.width = (d.xp / XP_CASE * 100).toFixed(1) + '%';
+  if (!$('#mAv').firstChild) $('#mAv').innerHTML = '<svg viewBox="0 0 12 17"><path d="M1 1h10v4L6 8 1 5zM1 7l5 3 5-3v4l-5 3-5-3z" fill="currentColor"/></svg>';
+  $('#mRank').textContent = 'Nível ' + msqNivel(d);
+  setHTMLm('mpSub', (d ? `<b>${patente(d.elo)}</b> · ` : '') + (PROF.user ? '@' + esc(PROF.user) : PROF.uid ? 'Conta sem usuário' : 'Convidado'));
+  if (d) { $('#mpXp').style.width = (d.xp / XP_CASE * 100).toFixed(1) + '%'; $('#mAv').style.setProperty('--xp', (d.xp / XP_CASE * 100).toFixed(1) + '%'); $('#mCxN').textContent = cxN(d, 0) + cxN(d, 1) + cxN(d, 2) + cxN(d, 3); }
+  try { mnNovidades(); } catch (e) { } // (antes do FR existir)
 }
 function nameSync() { // logado com usuário: o nome no jogo é o usuário (fixo)
   if (PROF.user) { PROF.name = PROF.user; CFG.name = PROF.user; }
@@ -34157,7 +34258,7 @@ function openLobby(priv) {
 function lobbySync() {
   if (!S.lobby) return;
   if (isR()) for (const p of S.players.values()) if (p.team !== 't' && p.team !== 'ct') setTeam(p, teamPick());
-  broadcast({ t: 'lobby', st: S.st, code: NET.code, priv: LB.priv ? 1 : 0, pl: [...S.players.values()].map(p => ({ id: p.id, n: p.name, tm: p.team || '', c: p.color })) });
+  broadcast({ t: 'lobby', st: S.st, code: NET.code, priv: LB.priv ? 1 : 0, pl: [...S.players.values()].map(p => ({ id: p.id, n: p.name, tm: p.team || '', c: p.color, av: avtLimpa(p.skins?._av) || '' })) });
 }
 function srvAfterMatch() { if (S.fromLobby) backToLobby(); else srvStartMatch(); }
 function backToLobby() { // fim da partida: todo mundo volta ao lobby (o host troca modo, mapa e times e começa de novo)
@@ -34307,7 +34408,7 @@ function musMenu() { // controles no menu de pausa
 function lobbyUI() {
   const el = $('#lobby'); if (!el) return;
   const on = LB.on && !inGame, host = NET.isHost;
-  el.classList.toggle('hidden', !on); $('#hostBox').classList.toggle('hidden', on); $('#pside').classList.toggle('hidden', on);
+  el.classList.toggle('hidden', !on); $('#hostBox').classList.toggle('hidden', on); $('#pside').classList.toggle('hidden', on); el.parentNode.classList.toggle('lbon', on); MSQ.tk = 0;
   if (!on) return;
   if (el.dataset.k !== (host ? 'h' : 'c')) { // esqueleto (o formulário do host não é redesenhado a cada mudança)
     el.dataset.k = host ? 'h' : 'c';
@@ -34515,7 +34616,228 @@ function pgPrevia() { // médio já (rápido) e o fino logo depois; pedidos anti
   };
   tenta();
 }
-if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AVT, AVE, avtEnt, avtVestir, avtMod, R, pgUI, setRemoteGun, remoteGunTpl, tpInfo, tpPose, cloneShared, playerModel }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes (avatares)
+// ===== menu principal: palco 3D do grupo (fim de tarde, terra, pedras, mato, árvores e neblina) atrás da aba Jogar =====
+// Desenhado pelo renderer do jogo (sem outro contexto WebGL) só com o menu aberto na aba Jogar; em partida não roda.
+// O grupo = quem está na sala do lobby (host e quem entrou); fora de sala, só você. Cada um com o seu avatar (médio já, fino depois)
+// e uma arma em voxel da terceira pessoa, em prontidão com respiração. Os rótulos (nível, patente, nome, voz, coroa) são HTML.
+const MSQ = { sc: null, cam: null, dl: null, t: 0, acc: 0, slots: [], tk: 1, ids: null, sim: 0, L: 0, gfx: '', poeira: null, lbl: [], key: [] };
+const MSQ_POS = [[0, 0, -.55], [-1.4, .6, -.4], [1.35, .55, -.7], [2.6, 1.2, -.8]]; // x, z, giro (o líder no meio, à frente)
+const MSQ_ARMAS = ['m4', 'ak47', 'p90', 'awp', 'mp5', 'nova'], MSQ_SIM = ['Lince', 'Sargento_Vasco', 'Tomate'];
+const MSQ_K = { aim: 0, run: 0 };
+const MSQ_SVG = {
+  cr: '<svg class="cr" viewBox="0 0 26 17"><path d="M1 15h24l2-12-7 5-7-7-7 7-7-5z" fill="currentColor"/></svg>',
+  rk: '<svg class="rk" viewBox="0 0 12 17"><path d="M1 1h10v4L6 8 1 5zM1 7l5 3 5-3v4l-5 3-5-3z" fill="currentColor"/></svg>',
+  mic: '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zM15.5 8.5a5 5 0 010 7M18 6a8.5 8.5 0 010 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  pes: h => `<svg viewBox="0 0 40 100" style="height:${h}px"><path d="M20 2a8 8 0 110 16 8 8 0 010-16zM9 22h22l4 30-5 2-2-14v58h-7V67h-2v31h-7V40l-2 14-5-2z" fill="currentColor"/></svg>`,
+};
+function msqRnd(s) { return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+const msqRuido = (x, z) => Math.sin(x * .37 + Math.sin(z * .21) * 1.7) * .5 + Math.sin(z * .43 + x * .12) * .35 + Math.sin((x + z) * 1.3) * .08 + Math.sin(x * 2.1 - z * 1.7) * .05;
+const msqAlt = (x, z) => msqRuido(x, z) * .1 + Math.max(0, -z - 7) * .14 + Math.max(0, Math.abs(x - .6) - 8) * .12;
+function msqMonta() {
+  const sc = MSQ.sc = new THREE.Scene(), rnd = msqRnd(9173), C3 = h => new THREE.Color(h), cor = new THREE.Color(), baixo = CFG.gfx === 'baixo', alto = CFG.gfx === 'alto';
+  const cv = document.createElement('canvas'); cv.width = 4; cv.height = 256; const cx = cv.getContext('2d'), gr = cx.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, '#4f585e'); gr.addColorStop(.38, '#8f8a7e'); gr.addColorStop(.6, '#b4a690'); gr.addColorStop(1, '#7d7262'); cx.fillStyle = gr; cx.fillRect(0, 0, 4, 256);
+  const bg = new THREE.CanvasTexture(cv); bg.colorSpace = THREE.SRGBColorSpace; sc.background = bg;
+  sc.fog = new THREE.FogExp2(0x9a9080, .045);
+  sc.add(new THREE.HemisphereLight(0xe8dcc8, 0x3a3026, .75));
+  const dl = MSQ.dl = new THREE.DirectionalLight(0xffc690, 2.3); dl.position.set(-4.5, 5.5, 4.5); dl.target.position.set(.6, 0, 0); sc.add(dl, dl.target);
+  Object.assign(dl.shadow.camera, { left: -5, right: 5, top: 4, bottom: -3, near: 1, far: 22 }); dl.shadow.mapSize.set(1024, 1024); dl.shadow.bias = -.0006; dl.shadow.normalBias = .02;
+  const rim = new THREE.DirectionalLight(0xffd8a6, 1.2); rim.position.set(4, 3, -6); sc.add(rim);
+  try { const pm = new THREE.PMREMGenerator(renderer); sc.environment = pm.fromScene(new RoomEnvironment(renderer), .04).texture; pm.dispose(); } catch (e) { }
+  // chão: terra com trilha clara no meio e manchas de mato seco; sobe ao fundo e dos lados
+  const gg = new THREE.PlaneGeometry(80, 52, baixo ? 80 : 160, baixo ? 52 : 104).rotateX(-Math.PI / 2).translate(0, 0, -12), p = gg.attributes.position, col = new Float32Array(p.count * 3);
+  const terra = C3(0x5e5040), trilha = C3(0x7d6d58), mato = C3(0x45472c), seco = C3(0x6e6542);
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = p.getZ(i), tr = Math.exp(-((x - .4 + z * .12) ** 2) / 5) * (z > -14 ? 1 : .3), n = msqRuido(x * 1.7, z * 1.7);
+    p.setY(i, msqAlt(x, z));
+    const m = clamp(.45 + n * .9 - tr * 1.4 + (rnd() - .5) * .35, 0, 1);
+    cor.copy(terra).lerp(trilha, tr * .8).lerp(n > 0 ? mato : seco, m * .75).multiplyScalar(.86 + rnd() * .22); cor.toArray(col, i * 3);
+  }
+  gg.setAttribute('color', new THREE.BufferAttribute(col, 3)); gg.computeVertexNormals();
+  const chao = new THREE.Mesh(gg, new THREE.MeshLambertMaterial({ vertexColors: true })); chao.receiveShadow = true; sc.add(chao);
+  const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), P = new V3(), S = new V3();
+  const inst = (geo, mat, n, f, sombra) => { const im = new THREE.InstancedMesh(geo, mat, n); let k = 0; for (let i = 0; i < n * 4 && k < n; i++) if (f(k)) { M4.compose(P, Q.setFromEuler(E), S); im.setMatrixAt(k, M4); im.setColorAt(k, cor); k++; } im.count = k; im.castShadow = !!sombra; im.receiveShadow = true; sc.add(im); return im; };
+  const longe = (x, z) => Math.abs(x - .6) < 3.4 && z > -1.6 && z < 2.4; // espaço do grupo
+  // pedras (grandes longe, pedrisco perto dos pés)
+  inst(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), baixo ? 60 : 150, k => {
+    const x = (rnd() - .5) * 26 + .6, z = -16 + rnd() * 21, pq = longe(x, z) || rnd() < .6, s = pq ? .04 + rnd() * .09 : .12 + rnd() * .45;
+    P.set(x, msqAlt(x, z) + s * .15, z); E.set(rnd() * 3, rnd() * 3, rnd() * 3); S.set(s * (1 + rnd() * .5), s * (.45 + rnd() * .3), s); cor.setHSL(.08 + rnd() * .03, .06 + rnd() * .06, .2 + rnd() * .14); return true;
+  }, !baixo);
+  // tufos de mato seco (lâminas finas, base escura e ponta clara)
+  const lam = [], lc = [], cb = C3(0x3d3a20), ct = C3(0xc2ad72);
+  for (let b = 0; b < 9; b++) {
+    const a = b / 9 * Math.PI * 2 + rnd(), r = .02 + rnd() * .06, h = .35 + rnd() * .4, inc = .1 + rnd() * .35, bx = Math.cos(a) * r, bz = Math.sin(a) * r, w = .018;
+    const tx = bx + Math.cos(a) * inc * h, tz = bz + Math.sin(a) * inc * h, px = -Math.sin(a) * w, pz = Math.cos(a) * w;
+    lam.push(bx - px, 0, bz - pz, bx + px, 0, bz + pz, tx, h, tz); for (const c of [cb, cb, ct]) lc.push(c.r, c.g, c.b);
+  }
+  const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(lam, 3)); tg.setAttribute('color', new THREE.Float32BufferAttribute(lc, 3)); tg.computeVertexNormals();
+  inst(tg, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), baixo ? 160 : alto ? 700 : 450, k => {
+    const x = (rnd() - .5) * 30 + .6, z = -18 + rnd() * 23, tr = Math.exp(-((x - .4 + z * .12) ** 2) / 5); if (rnd() < tr * .85 || (longe(x, z) && rnd() < .8)) return false;
+    const s = .6 + rnd() * 1.1; P.set(x, msqAlt(x, z) - .02, z); E.set(0, rnd() * 6, 0); S.set(s, s * (.7 + rnd() * .6), s); cor.setHSL(.1 + rnd() * .04, .1 + rnd() * .15, .45 + rnd() * .3); return true;
+  });
+  // árvores: pinheiros (tronco + 3 cones) e arbustos, dos lados e ao fundo; a neblina apaga os de trás
+  const arv = []; for (let i = 0; i < 40 && arv.length < (baixo ? 16 : 26); i++) {
+    const lado = rnd() < .5 ? -1 : 1, x = i < 10 ? (rnd() - .5) * 34 : .6 + lado * (7 + rnd() * 10), z = i < 10 ? -12 - rnd() * 14 : -6 - rnd() * 14;
+    if (arv.some(a => Math.hypot(a[0] - x, a[1] - z) < 2.4)) continue; arv.push([x, z, 4 + rnd() * 5]);
+  }
+  let ia = 0; inst(new THREE.CylinderGeometry(.08, .16, 1, 6).translate(0, .5, 0), new THREE.MeshLambertMaterial({ color: 0x3e3226 }), arv.length, k => { const [x, z, h] = arv[k]; P.set(x, msqAlt(x, z) - .1, z); E.set(0, 0, 0); S.set(h * .12, h * .5, h * .12); cor.setHSL(.07, .2, .3 + rnd() * .1); return true; }, !baixo);
+  inst(new THREE.ConeGeometry(1, 1, 7).translate(0, .5, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), arv.length * 3, k => { const [x, z, h] = arv[k / 3 | 0], j = k % 3; P.set(x, msqAlt(x, z) + h * (.22 + j * .22), z); E.set(0, rnd() * 6, 0); S.set(h * (.32 - j * .07), h * .42, h * (.32 - j * .07)); cor.setHSL(.22 + rnd() * .06, .2 + rnd() * .12, .1 + rnd() * .06); return true; }, !baixo);
+  inst(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), baixo ? 14 : 30, k => {
+    const x = (rnd() - .5) * 26 + .6, z = -12 + rnd() * 13; if (longe(x, z) || Math.abs(x - .6) < 4.5 && z > -5) return false; const s = .5 + rnd() * .9;
+    P.set(x, msqAlt(x, z) + s * .2, z); E.set(rnd(), rnd() * 6, 0); S.set(s * 1.3, s * .75, s); cor.setHSL(.15 + rnd() * .06, .2, .13 + rnd() * .06); return true;
+  }, !baixo);
+  // caixotes e um tambor (cobertura de campo)
+  const madeira = new THREE.MeshStandardMaterial({ color: 0x5e4c33, roughness: .9 });
+  for (const [x, z, s, r] of [[4.6, -1.6, .9, .3], [5.3, -2.3, .9, -.2], [4.9, -1.9, .7, .8]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), madeira); b.position.set(x, msqAlt(x, z) + s / 2 + (r > .5 ? .9 : 0), z); b.rotation.y = r; b.castShadow = !baixo; b.receiveShadow = true; sc.add(b); }
+  const tb = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .9, 14), new THREE.MeshStandardMaterial({ color: 0x3f4a36, roughness: .7, metalness: .3 })); tb.position.set(-3.7, msqAlt(-3.7, -1) + .45, -1); tb.castShadow = !baixo; sc.add(tb);
+  // poeira no ar, iluminada pelo sol baixo
+  if (!baixo) {
+    const n = 140, pp = new Float32Array(n * 3); for (let i = 0; i < n; i++) pp.set([(rnd() - .5) * 14 + .6, rnd() * 4, -6 + rnd() * 10], i * 3);
+    const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pp, 3));
+    MSQ.poeira = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0xffe2b0, size: .035, transparent: true, opacity: .55, depthWrite: false })); sc.add(MSQ.poeira);
+  }
+  MSQ.cam = new THREE.PerspectiveCamera(30, 1, .1, 120); MSQ.gfx = CFG.gfx;
+}
+function msqNivel(d) { return d ? 1 + Math.floor(((d.opened | 0) + (d.cases | 0) + 3 * ((d.cx?.r | 0) + 3 * (d.cx?.e | 0) + 9 * (d.cx?.l | 0))) + (d.xp || 0) / XP_CASE) : 1; }
+function msqMembros() {
+  const d = PROF.data, eu = { n: CFG.name || 'Jogador', av: avtLimpa(d?.av), eu: 1, lv: msqNivel(d), w: W[AR.w]?.slot === 'primary' ? AR.w : 'ak47' };
+  let L = [{ ...eu, id: 'eu', lider: 1 }];
+  if (LB.on && !inGame) {
+    if (NET.isHost) L = [...S.players.values()].filter(p => !p.isBot).map(p => p.id === 'h' ? { ...eu, id: 'h', lider: 1 } : { id: p.id, n: p.name, av: avtLimpa(p.skins?._av) });
+    else if (LB.data?.pl?.length) L = LB.data.pl.map(p => ({ ...(p.id === C.myId ? eu : { n: p.n, av: avtLimpa(p.av) }), id: p.id, lider: p.id === 'h' ? 1 : 0 }));
+  }
+  for (let i = 0; i < MSQ.sim && L.length < 4; i++) L.push({ id: 'sim' + i, n: MSQ_SIM[i], lv: 14 + i * 23, sim: 1 });
+  L.sort((a, b) => (b.lider | 0) - (a.lider | 0)); return L.slice(0, 4);
+}
+function msqLimpa(i) {
+  const s = MSQ.slots[i]; if (!s) return; MSQ.sc.remove(s.g); avtDespir(s.g); const gh = s.g.userData.gh; while (gh.children.length) gh.remove(gh.children[0]); disposeGroup(s.g); MSQ.slots[i] = null;
+}
+function msqSombra(g) { const on = CFG.gfx !== 'baixo'; g.traverse(o => { if (o.isMesh) o.castShadow = on; }); }
+function msqArma(s, w) {
+  if (s.w === w && (!s.gunT || RGUN.get(s.gunT.userData.rk) === s.gunT)) return; // o molde mudou (modelo baixado / voxel pronto): troca
+  s.w = w;
+  try { const sk = s.eu ? PROF.data?.equipped?.[w] : null, t = remoteGunTpl(w, sk), gh = s.g.userData.gh; while (gh.children.length) gh.remove(gh.children[0]); gh.add(cloneShared(t)); s.gunT = t; s.tp = tpInfo(t, w); msqSombra(gh); }
+  catch (e) { s.gunT = null; s.tp = null; console.warn('menu: arma', e); }
+}
+function msqGrupo() { // 4x por segundo: quem está no grupo, avatar, arma, rótulos e contador
+  const L = msqMembros(), ids = L.map(m => m.id + ':' + m.n);
+  if (MSQ.ids) { for (const m of L) if (!MSQ.ids.includes(m.id + ':' + m.n) && !m.eu) msqAviso(`[${m.n}] entrou no grupo.`); for (const k of MSQ.ids) if (!ids.includes(k) && !k.startsWith('eu:') && !k.startsWith('h:')) { const n = k.slice(k.indexOf(':') + 1); if (!L.some(m => m.n === n)) msqAviso(`[${n}] saiu do grupo.`); } }
+  MSQ.ids = ids;
+  if (MSQ.gfx !== CFG.gfx) { for (let i = 0; i < 4; i++) msqLimpa(i); MSQ.sc = null; msqMonta(); }
+  const fino = CFG.gfx !== 'baixo' && AVT.w !== false;
+  for (let i = 0; i < 4; i++) {
+    const m = L[i]; let s = MSQ.slots[i];
+    if (s && (!m || s.id !== m.id || s.n !== m.n)) { msqLimpa(i); s = null; }
+    if (!m) continue;
+    if (!s) { const g = playerModel('#5d6447'); g.userData.pmM = []; g.traverse(o => { if (o.isMesh) g.userData.pmM.push(o); }); MSQ.sc.add(g); msqSombra(g); s = MSQ.slots[i] = { g, id: m.id, n: m.n, eu: m.eu, e: null, w: null, tp: null }; }
+    const cod = m.av || (AVT.mod ? AVT.mod.codificar(AVT.mod.aleatorio(AVT.mod.hashTxt('menu:' + m.n))) : null);
+    if (!cod) { if (!AVT.falhou) avtMod(); }
+    else if (!AVT.falhou) {
+      const em = avtEnt(cod, 'm'), ef = fino ? avtEnt(cod, 'f') : null, e = ef?.ok ? ef : em.ok ? em : null;
+      if (e && s.e !== e) { avtVestir(s.g, e, false); s.e = e; msqSombra(s.g); }
+    }
+    msqArma(s, m.w || MSQ_ARMAS[(AVT.mod?.hashTxt(m.n) ?? i) % MSQ_ARMAS.length]);
+  }
+  // rótulos (só redesenha o que mudou)
+  const box = $('#mnSquad');
+  for (let i = 0; i < 4; i++) {
+    const m = L[i], k = m ? `${m.id}|${m.n}|${m.lv}|${m.lider}|${i}` : 'vazio' + i;
+    if (MSQ.key[i] === k && MSQ.lbl[i]) continue; MSQ.key[i] = k; MSQ.lbl[i]?.remove();
+    const el = document.createElement(m ? 'div' : 'button');
+    if (m) { el.className = 'msqT' + (m.eu ? ' eu' : ''); el.innerHTML = (m.lider ? MSQ_SVG.cr : '') + `<div class="ln">${m.lv ? `<span class="lv">${m.lv}</span>` : ''}${MSQ_SVG.rk}<span class="nm">${esc(m.n)}</span><span class="mic${m.eu ? '' : ' mut'}">${MSQ_SVG.mic}</span></div>`; }
+    else { el.className = 'msqI'; el.type = 'button'; el.title = 'Convidar para o grupo'; el.onclick = msqConvidar; }
+    box.appendChild(el); MSQ.lbl[i] = el;
+  }
+  $('#mGrpN').textContent = L.length + '/4';
+  const pg = $('#menu .playgrid'); MSQ.L = pg ? pg.getBoundingClientRect().right : 0;
+}
+function msqConvidar() {
+  if (LB.on && NET.isHost) { const f = $('#lbFr'); f?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  if (LB.on) { msqAviso('Só o líder (host) convida para a sala.'); return; }
+  document.querySelector('#menu .tabs [data-tab="friends"]').click();
+}
+function msqAviso(txt) {
+  const box = $('#mfToasts'); if (!box) return; const d = document.createElement('div'); d.textContent = txt; box.appendChild(d);
+  while (box.children.length > 3) box.firstChild.remove();
+  setTimeout(() => d.classList.add('sai'), 6000); setTimeout(() => d.remove(), 6700);
+}
+const MSQV = new V3();
+function msqQuadro(dt) {
+  if (!MSQ.sc) msqMonta();
+  const fps = CFG.gfx === 'baixo' ? 24 : CFG.gfx === 'alto' ? 60 : 40;
+  MSQ.acc += dt; if (MSQ.acc < 1 / fps - .002) return true; MSQ.t += Math.min(MSQ.acc, .1); MSQ.acc = 0;
+  if ((MSQ.tk -= 1) <= 0) { MSQ.tk = Math.round(fps / 4); msqGrupo(); }
+  const t = MSQ.t;
+  for (let i = 0; i < 4; i++) {
+    const s = MSQ.slots[i]; if (!s) continue; const ud = s.g.userData, P = MSQ_POS[i], f = t + i * 1.7, br = Math.sin(f * 1.8);
+    s.g.position.set(P[0] + Math.sin(f * .43) * .012, msqAlt(P[0], P[1]), P[1]); s.g.rotation.y = Math.PI + P[2] + Math.sin(f * .29) * .025;
+    ud.inner.position.y = br * .004; ud.arms.rotation.x = -.05 + br * .012;
+    ud.head.rotation.set(.05 + Math.sin(f * .23) * .03, Math.sin(f * .37) * .2 - P[2] * .6, 0);
+    ud.legL.rotation.set(-.08, 0, .03); ud.legR.rotation.set(.1, 0, -.03);
+    tpPose(s.g, s.tp, -.05 + br * .012, MSQ_K);
+  }
+  if (MSQ.poeira) { MSQ.poeira.position.x = Math.sin(t * .05) * .6; MSQ.poeira.position.y = Math.sin(t * .11) * .15; MSQ.poeira.rotation.y = t * .01; }
+  // câmera: o grupo no meio da área livre à direita da coluna de modos
+  const w = innerWidth, h = innerHeight, cam = MSQ.cam, livre = Math.max(200, w - MSQ.L), cx = MSQ.L + livre / 2;
+  const tv = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2), th = tv * w / h, f = clamp(livre / w * .78, .3, .82);
+  const dist = Math.max(5.4 / (2 * th * f), 2.5 / (2 * tv * .72)), x0 = .6;
+  cam.position.set(x0 + Math.sin(t * .07) * .12, 1.3 + dist * .06, .45 + dist); cam.lookAt(x0, 1.02, .45);
+  cam.aspect = w / h; cam.setViewOffset(w, h, -(cx - w / 2), -h * .02, w, h); cam.updateProjectionMatrix();
+  const sombra = CFG.gfx !== 'baixo' && renderer.shadowMap.enabled; MSQ.dl.castShadow = sombra; if (sombra) renderer.shadowMap.needsUpdate = true;
+  renderer.setRenderTarget(null); renderer.clear(); renderer.render(MSQ.sc, cam); B11M.sujo = true;
+  // rótulos: acima da cabeça (o convite fica no chão, com a silhueta do tamanho de uma pessoa)
+  for (let i = 0; i < 4; i++) {
+    const el = MSQ.lbl[i]; if (!el) continue; const P = MSQ_POS[i], y = msqAlt(P[0], P[1]);
+    MSQV.set(P[0], y + (MSQ.slots[i] ? 2.08 : 0), P[1]).project(cam); const sx = (MSQV.x + 1) / 2 * w, sy = (1 - MSQV.y) / 2 * h;
+    if (MSQ.slots[i]) { el.style.transform = `translate(${sx.toFixed(1)}px,${sy.toFixed(1)}px) translate(-50%,-100%)`; continue; }
+    MSQV.set(P[0], y + 1.8, P[1]).project(cam); const alt = Math.max(40, sy - (1 - MSQV.y) / 2 * h) | 0;
+    if (el.dataset.h !== String(alt)) { el.dataset.h = alt; el.innerHTML = MSQ_SVG.pes(alt) + '<b>+ Convidar</b>'; }
+    el.style.transform = `translate(${sx.toFixed(1)}px,${sy.toFixed(1)}px) translate(-50%,-100%) translateY(30px)`;
+  }
+  return true;
+}
+// cabeçalho: linhas topográficas (curvas de nível de um ruído) desenhadas uma vez num canvas
+function msqTopo() {
+  const el = $('#menu .mtop'); if (!el || el.dataset.topo) return; el.dataset.topo = 1;
+  const W0 = 1600, H0 = 240, c = document.createElement('canvas'); c.width = W0; c.height = H0; const g = c.getContext('2d'), N = 8, cols = W0 / N + 1, rows = H0 / N + 1, v = new Float32Array(cols * rows);
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) { const x = i * N / 140, y = j * N / 140; v[j * cols + i] = Math.sin(x * 1.3 + Math.sin(y * 1.7) * 1.6) + Math.sin(y * 1.9 + x * .6) * .8 + Math.sin((x - y) * 2.7) * .25 + Math.sin(x * .45) * .9; }
+  g.strokeStyle = 'rgba(255,255,255,.075)'; g.lineWidth = 1.2; g.beginPath();
+  for (let lv = -2.6; lv <= 2.6; lv += .32) for (let j = 0; j < rows - 1; j++) for (let i = 0; i < cols - 1; i++) {
+    const a = v[j * cols + i] - lv, b = v[j * cols + i + 1] - lv, cc = v[(j + 1) * cols + i + 1] - lv, d = v[(j + 1) * cols + i] - lv, x = i * N, y = j * N, pts = [];
+    if ((a > 0) !== (b > 0)) pts.push([x + N * a / (a - b), y]); if ((b > 0) !== (cc > 0)) pts.push([x + N, y + N * b / (b - cc)]);
+    if ((d > 0) !== (cc > 0)) pts.push([x + N * d / (d - cc), y + N]); if ((a > 0) !== (d > 0)) pts.push([x, y + N * a / (a - d)]);
+    for (let k = 0; k + 1 < pts.length; k += 2) { g.moveTo(pts[k][0], pts[k][1]); g.lineTo(pts[k + 1][0], pts[k + 1][1]); }
+  }
+  g.stroke(); el.style.setProperty('--topo', `url(${c.toDataURL()})`);
+}
+// aba Jogar: cartões de modo (o escolhido abre com descrição e opções ‹ ›); a escolha vai para o formulário do lobby (lastSt)
+const MN_MODOS = [['dm', 'Mata-mata', 'Todos contra todos. Renasce na hora, armas liberadas: quem chegar primeiro no limite de abates vence.'],
+  ['rounds', 'Rodadas', 'Ataque contra defesa com bomba. Compre armas no começo de cada rodada; sem renascer até a próxima.'],
+  ['zombies', 'Zumbis', 'Cooperativo até 4 jogadores. Sobreviva às ondas, abra o mapa e melhore as armas.']];
+function mnModos() {
+  const el = $('#mnModos'); if (!el) return;
+  const st = { ...lastSt, ...load('lastSt', {}) }, md = ['dm', 'rounds', 'zombies'].includes(st.mode) ? st.mode : 'rounds', z = md === 'zombies';
+  const maps = Object.entries(MAPS).filter(([, m]) => !!m.zonly === z && (z || (md === 'rounds') === !!m.bomb)).map(([k]) => k);
+  let cur = z ? st.zmap : (st.cmap ?? st.map); if (!maps.includes(cur)) cur = maps[0];
+  const row = (k, tit, val) => `<div class="mnrow"><span>${tit}</span><b>${val}</b><button type="button" data-mo="${k}" data-d="-1" aria-label="Anterior">&lsaquo;</button><button type="button" data-mo="${k}" data-d="1" aria-label="Próximo">&rsaquo;</button></div>`;
+  el.innerHTML = MN_MODOS.map(([k, t, d]) => `<div class="mnm${k === md ? ' on' : ''}" data-mm="${k}" role="button" tabindex="0"><h4>${t}</h4>${k === 'zombies' && !load('vistoZ', 0) ? '<i class="nv"></i>' : ''}<p>${d}</p>${k === md ? `<div class="mnopt">${row('map', 'Mapa', esc(MAPS[cur]?.name || cur))}${z ? row('zdiff', 'Dificuldade', esc(ZDIFF[clamp(st.zdiff | 0, 0, ZDIFF.length - 1)].name)) : row('bots', 'Bots', (st.bots | 0) ? `${st.bots | 0} · ${['Fácil', 'Normal', 'Difícil'][clamp(st.diff ?? 1, 0, 2)]}` : 'Sem bots')}</div>` : ''}</div>`).join('');
+  el.onclick = e => {
+    const b = e.target.closest('[data-mo]'), c = e.target.closest('[data-mm]'), s2 = { ...st, mode: md }; if (!b && !c) return;
+    if (b) {
+      const dd = +b.dataset.d;
+      if (b.dataset.mo === 'map') { const n = maps[(maps.indexOf(cur) + dd + maps.length) % maps.length]; if (z) s2.zmap = n; else { s2.map = n; s2.cmap = n; } }
+      else if (b.dataset.mo === 'zdiff') s2.zdiff = (clamp(st.zdiff | 0, 0, ZDIFF.length - 1) + dd + ZDIFF.length) % ZDIFF.length;
+      else s2.bots = ((st.bots | 0) + dd + 8) % 8;
+    } else { if (c.dataset.mm === md) return; s2.mode = c.dataset.mm; if (s2.mode === 'zombies') save('vistoZ', 1); }
+    save('lastSt', s2); mnModos();
+  };
+}
+function mnNovidades() { // quadradinhos verdes nas abas
+  const d = PROF.data; $('#nvCx')?.classList.toggle('on', !!d && (cxN(d, 0) + cxN(d, 1) + cxN(d, 2) + cxN(d, 3)) > 0);
+  $('#nvFr')?.classList.toggle('on', FR.inv.length > 0);
+  $('#nvChar')?.classList.toggle('on', !load('vistoPg', 0));
+}
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { MSQ, msqSim: n => { MSQ.sim = n; }, AVT, AVE, avtEnt, avtVestir, avtMod, R, pgUI, setRemoteGun, remoteGunTpl, tpInfo, tpPose, cloneShared, playerModel }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes (avatares)
 function skinsUI() {
   mpUI();
   if (!PROF.data || !$('#casesPane')) return;
@@ -34869,6 +35191,8 @@ skinsInit(); pgAcoes(); (window.requestIdleCallback || setTimeout)(() => avtMod(
 document.querySelectorAll('#menu .tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('#menu .tabs button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('#menu [data-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.tab));
+  $('#menu').dataset.tab = b.dataset.tab; if (b.dataset.tab === 'char') save('vistoPg', 1); mnNovidades();
+  if (b.dataset.tab === 'play') { mnModos(); MSQ.tk = 0; }
   if (b.dataset.tab === 'cases') skinsUI();
   if (b.dataset.tab === 'arsenal') arsenalUI();
   if (b.dataset.tab === 'char') pgUI();
@@ -34880,7 +35204,12 @@ $('#inName').value = CFG.name;
 $('#inName').oninput = () => { CFG.name = $('#inName').value.replace(/[<>]/g, '').slice(0, 16) || 'Jogador'; save('name', CFG.name); mpUI(); };
 { const q = new URLSearchParams(location.search), sala = q.get('sala'), h = q.get('h'); if (sala) { $('#inCode').value = sala.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5); NET.linkKey = h && /^[A-Z0-9]{10}$/.test(h) ? h : null; $('#joinStatus').textContent = 'Código preenchido pelo link — clique em Entrar'; } }
 $('#btnHost').disabled = $('#btnHostPriv').disabled = $('#btnJoin').disabled = false;
-$('#btnHost').textContent = 'Criar sala pública';
+$('#btnHost').textContent = 'Jogar';
+mnModos(); msqTopo(); mnNovidades();
+$('#mfBack').onclick = () => document.querySelector('#menu .tabs [data-tab="play"]').click();
+$('#mfOpt').onclick = () => document.querySelector('#menu .tabs [data-tab="cfg"]').click();
+$('#mfNotas').onclick = () => $('#mnNotas').classList.remove('hidden');
+$('#mnNotasX').onclick = $('#mnNotas').onclick = e => { if (e.target === e.currentTarget || e.currentTarget.id === 'mnNotasX') $('#mnNotas').classList.add('hidden'); };
 mpUI();
 frUI(); $('#btnJoin').textContent = 'Entrar';
 $('#btnHost').onclick = () => openLobby(false);
@@ -35072,14 +35401,11 @@ function vjQuadro() {
 if (DEBUG) queueMicrotask(() => { if (window.__T) Object.assign(window.__T, { VJ, vjQuadro, renderScene, vmScene, pmJunta, rgJunta, playerModel }); }); // testes de desenho (bench do O4; __o4SemJunta: monta o mapa PvP sem a junção, para comparar)
 // ===== O4-D04 fim =====
 const MF = { t: 0, acc: 0, pedido: false };
-function menuFundo(dt) { // menu: um mapa de verdade passando devagar atrás dos painéis (fora no gráfico 'baixo', com a aba escondida ou num mapa zumbi)
-  if (CFG.gfx === 'baixo' || document.hidden || window.__semFundo3d || $('#menu').classList.contains('hidden')) return false;
-  if (!curMapId) { if (!MF.pedido) { MF.pedido = true; setTimeout(() => { if (!inGame && !curMapId) try { buildMap(['dust', 'arena', 'duna', 'miragem'][Math.random() * 4 | 0]); } catch (e) { } }, 1500); } return false; }
-  if (curMap?.zombie || curMap?.zonly || WARM) return false; // espera o aquecimento dos shaders
-  MF.acc += dt; if (MF.acc < 1 / 30) return true; MF.t += MF.acc; MF.acc = 0; // 30 quadros por segundo bastam no fundo
-  const R = Math.min(curMap.w, curMap.d) * .3, a = MF.t * .035;
-  camera.position.set(Math.cos(a) * R, 7.5 + Math.sin(MF.t * .1) * 1.5, Math.sin(a) * R); camera.lookAt(0, 1.2, 0);
-  sky.position.copy(camera.position); renderer.render(scene, camera); B11M.sujo = true; return true;
+function menuFundo(dt) { // menu: palco 3D do grupo atrás da aba Jogar (msqQuadro); nas outras abas e em partida não desenha
+  const mn = $('#menu'), on = !(document.hidden || window.__semFundo3d || mn.classList.contains('hidden') || mn.dataset.tab !== 'play');
+  let ok = false; if (on) try { ok = msqQuadro(dt); } catch (e) { console.warn('menu: palco', e); window.__semFundo3d = true; }
+  if (mn.classList.contains('mstage') !== ok) mn.classList.toggle('mstage', ok);
+  return ok;
 }
 function renderScene() {
   sky.position.copy(camera.position); if (CULL.length) zCull(); b10Quadro(); vjQuadro(); // O1-B10, O4-D04
