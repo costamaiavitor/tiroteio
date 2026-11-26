@@ -1100,28 +1100,30 @@ W.clay = { name: 'Claymore', slot: 'nade', model: 'clay', speed: 1 }; // mina po
 W.dmach = { name: 'Máquina da Morte', slot: 'special', pu: 1, dmg: 150, rate: .055, auto: 1, mag: 9999, res: 0, reload: 1, spread: .018, move: .02, air: .1, head: 3, rm: 1, pen: 1, speed: .9, model: 'lmg', snd: 'rifle', tracer: 0xffd040 };
 // Armas do CS2 (Rodadas e Mata-mata): números do CS2 (dano, perfuração de colete, cadência, pente, preço, recompensa, velocidade).
 // Cada uma usa o modelo realista baixado de uma arma parecida (base); no modo Zumbis elas não aparecem.
+// Sem modelo baixado próprio: Tec-9, MAC-10, Sawed-Off (cano duplo serrado), G3SG1 e SCAR-20 têm modelo feito no código (variante pelo id em
+// gunModel); AUG, FAMAS e Negev usam os do código do Zumbi (AUG, Famas, Stoner63). Todas vão nos braços dos pacotes (FSYN).
 // rp1: MAC-10 na MP5K (compacta, sem coronha; era a MP40, comprida e de coronha) e UMP-45 na MP5 (caixa de polímero; era a AK-74u)
-const CSW = (base, o) => ({ slot: 'primary', air: .2, move: .05, recoil: .02, rm: .9, speed: .9, reward: 300, head: 4, ...o, base, model: W[base].model, cs: 1 });
+const CSW = (base, o) => ({ slot: 'primary', air: .2, move: .05, recoil: .02, rm: .9, speed: .9, reward: 300, head: 4, ...o, base, model: o.model || W[base].model, cs: 1 }); /* base = o próprio id (com o.model): modelo feito no código só para ela (variante em gunModel pelo id) */
 Object.assign(W, {
-  tec9:     CSW('m1911', { name: 'Tec-9', slot: 'secondary', price: 500, dmg: 33, rate: .12, mag: 18, res: 90, reload: 2.5, spread: .008, move: .035, air: .1, pen: .9, rm: .83, speed: .96, snd: 'pistol' }),
+  tec9:     CSW('tec9', { model: 'pistol', name: 'Tec-9', slot: 'secondary', price: 500, dmg: 33, rate: .12, mag: 18, res: 90, reload: 2.5, spread: .008, move: .035, air: .1, pen: .9, rm: .83, speed: .96, snd: 'pistol' }),
   five7:    CSW('p250', { name: 'Five-SeveN', slot: 'secondary', price: 500, dmg: 32, rate: .12, mag: 20, res: 100, reload: 2.2, spread: .007, move: .03, air: .1, pen: .91, rm: .81, speed: .96, snd: 'pistol' }),
   cz75a:    CSW('cz75', { name: 'CZ75-Auto', slot: 'secondary', price: 500, dmg: 31, rate: .1, auto: 1, mag: 12, res: 12, reload: 2.7, spread: .01, move: .035, air: .1, pen: .78, rm: .85, speed: .96, reward: 100, snd: 'pistol' }),
   r8:       CSW('python', { name: 'R8 Revolver', slot: 'secondary', price: 600, dmg: 86, rate: .5, mag: 8, res: 8, reload: 2.3, spread: .006, move: .08, air: .2, pen: .93, rm: .94, speed: .96, snd: 'deagle' }),
-  mac10:    CSW('mp5k', { name: 'MAC-10', price: 1050, dmg: 29, rate: .075, auto: 1, mag: 30, res: 100, reload: 2.6, spread: .013, move: .02, air: .12, pen: .58, rm: .8, speed: .96, reward: 600, snd: 'smg' }),
+  mac10:    CSW('mac10', { model: 'uzi', name: 'MAC-10', price: 1050, dmg: 29, rate: .075, auto: 1, mag: 30, res: 100, reload: 2.6, spread: .013, move: .02, air: .12, pen: .58, rm: .8, speed: .96, reward: 600, snd: 'smg' }),
   mp9:      CSW('mp5k', { name: 'MP9', price: 1250, dmg: 26, rate: .07, auto: 1, mag: 30, res: 120, reload: 2.1, spread: .012, move: .02, air: .12, pen: .6, rm: .87, speed: .96, reward: 600, snd: 'smg' }),
   ump45:    CSW('mp5', { name: 'UMP-45', price: 1200, dmg: 35, rate: .09, auto: 1, mag: 25, res: 100, reload: 3.5, spread: .011, move: .025, air: .12, pen: .65, rm: .75, speed: .92, reward: 600, snd: 'smg' }),
   xm1014:   CSW('spas', { name: 'XM1014', price: 2000, dmg: 20, pellets: 6, rate: .35, auto: 1, mag: 7, res: 32, reload: 3, shellTime: .45, spread: .045, move: .02, air: .05, pen: .8, rm: .7, speed: .86, reward: 900, snd: 'shotgun' }),
   mag7:     CSW('stakeout', { name: 'MAG-7', price: 1300, dmg: 30, pellets: 8, rate: .85, mag: 5, res: 32, reload: 2.5, spread: .04, move: .02, air: .05, pen: .75, rm: .45, speed: .9, reward: 900, snd: 'shotgun' }),
-  sawedoff: CSW('olympia', { name: 'Sawed-Off', price: 1100, dmg: 32, pellets: 8, rate: .85, mag: 7, res: 32, reload: 3, shellTime: .5, spread: .07, move: .02, air: .05, pen: .75, rm: .45, speed: .84, reward: 900, snd: 'shotgun' }),
-  negev:    CSW('rpk', { name: 'Negev', price: 1700, dmg: 35, rate: .075, auto: 1, mag: 150, res: 300, reload: 5.7, spread: .02, move: .15, air: .3, pen: .71, rm: .97, speed: .78, snd: 'rifle' }),
+  sawedoff: CSW('sawedoff', { model: 'dbarrel', name: 'Sawed-Off', price: 1100, dmg: 32, pellets: 8, rate: .85, mag: 7, res: 32, reload: 3, shellTime: .5, spread: .07, move: .02, air: .05, pen: .75, rm: .45, speed: .84, reward: 900, snd: 'shotgun' }),
+  negev:    CSW('stoner', { name: 'Negev', price: 1700, dmg: 35, rate: .075, auto: 1, mag: 150, res: 300, reload: 5.7, spread: .02, move: .15, air: .3, pen: .71, rm: .97, speed: .78, snd: 'rifle' }),
   m249:     CSW('hk21', { name: 'M249', price: 5200, dmg: 32, rate: .08, auto: 1, mag: 100, res: 200, reload: 5.7, spread: .012, move: .15, air: .3, pen: .8, rm: .97, speed: .78, snd: 'rifle' }),
   galilar:  CSW('galil', { name: 'Galil AR', price: 1800, dmg: 30, rate: .09, auto: 1, mag: 35, res: 90, reload: 3, spread: .005, move: .1, air: .25, pen: .775, rm: .98, speed: .86, snd: 'rifle' }),
-  famas2:   CSW('commando', { name: 'FAMAS', price: 2050, dmg: 30, rate: .09, auto: 1, mag: 25, res: 90, reload: 3.3, spread: .005, move: .1, air: .25, pen: .7, rm: .96, speed: .88, snd: 'rifle2' }),
+  famas2:   CSW('famas', { name: 'FAMAS', price: 2050, dmg: 30, rate: .09, auto: 1, mag: 25, res: 90, reload: 3.3, spread: .005, move: .1, air: .25, pen: .7, rm: .96, speed: .88, snd: 'rifle2' }),
   m4a1s:    CSW('m4', { name: 'M4A1-S', sil: 1, price: 2900, dmg: 38, rate: .1, auto: 1, mag: 20, res: 80, reload: 3.1, spread: .0025, move: .09, air: .25, pen: .7, rm: .99, speed: .9, snd: 'silenced' }),
   sg553:    CSW('fal', { name: 'SG 553', price: 3000, dmg: 30, rate: .09, auto: 1, mag: 30, res: 90, reload: 2.8, spread: .004, sspread: .0018, scope: [55], move: .11, air: .25, pen: 1, rm: .98, speed: .84, snd: 'rifle' }),
-  aug2:     CSW('m14', { name: 'AUG', price: 3300, dmg: 28, rate: .09, auto: 1, mag: 30, res: 90, reload: 3.8, spread: .0035, sspread: .0018, scope: [55], move: .1, air: .25, pen: .9, rm: .98, speed: .88, snd: 'rifle2' }),
-  g3sg1:    CSW('dragunov', { name: 'G3SG1', price: 5000, dmg: 80, rate: .25, auto: 1, mag: 20, res: 90, reload: 4.7, spread: .045, sspread: .0015, scope: [40, 15], move: .2, air: .3, pen: .83, rm: .99, speed: .86, snd: 'sniper' }),
-  scar20:   CSW('dragunov', { name: 'SCAR-20', price: 5000, dmg: 80, rate: .25, auto: 1, mag: 20, res: 90, reload: 3.1, spread: .045, sspread: .0015, scope: [40, 15], move: .2, air: .3, pen: .83, rm: .99, speed: .86, snd: 'sniper' }),
+  aug2:     CSW('aug', { name: 'AUG', price: 3300, dmg: 28, rate: .09, auto: 1, mag: 30, res: 90, reload: 3.8, spread: .0035, sspread: .0018, scope: [55], move: .1, air: .25, pen: .9, rm: .98, speed: .88, snd: 'rifle2' }),
+  g3sg1:    CSW('g3sg1', { model: 'dmr', name: 'G3SG1', price: 5000, dmg: 80, rate: .25, auto: 1, mag: 20, res: 90, reload: 4.7, spread: .045, sspread: .0015, scope: [40, 15], move: .2, air: .3, pen: .83, rm: .99, speed: .86, snd: 'sniper' }),
+  scar20:   CSW('scar20', { model: 'dmr', name: 'SCAR-20', price: 5000, dmg: 80, rate: .25, auto: 1, mag: 20, res: 90, reload: 3.1, spread: .045, sspread: .0015, scope: [40, 15], move: .2, air: .3, pen: .83, rm: .99, speed: .86, snd: 'sniper' }),
   flash:    { name: 'Flashbang', slot: 'nade', price: 200, model: 'flashb', speed: 1 },
   molotov:  { name: 'Molotov', slot: 'nade', price: 400, model: 'molotov', speed: 1 },
   inc:      { name: 'Incendiária', slot: 'nade', price: 500, model: 'inc', speed: 1 },
@@ -18440,9 +18442,24 @@ function gunModel(id, fp = false, skin = null) {
     for (const s2 of [-1, 1]) add(slide, new THREE.SphereGeometry(.0011, 8, 6), M.trit, s2 * .0058, sh + .0055, h - .0055); // pontos da alça
     ud.sight = new V3(0, sy + sh + .0072, -o.sz - h + .01); ud.sightR = -o.sz + h - .01;
   };
+  const tec9Body = () => { /* Tec-9 (CS): caixa quadrada de polímero sem ferrolho que corre, capa do cano furada, carregador comprido na frente do guarda-mato */
+    pistolBody({ L: .2, sy: .033, sh: .02, sw: .031, sz: .07, fl: .15, gs: 1, bs: 1, slideM: M.polymer, frameM: M.polymer, gripM: M.polymer, stipple: 1 });
+    const rc = ud.slide; ud.slide = null; rc.children.slice(1, 8).forEach(o => (o.visible = false)); /* a caixa não corre (sem serrilha de ferrolho); quem corre é o botão de manejo */
+    for (let k = 0; k < 3; k++) add(rc, new THREE.BoxGeometry(.034, .003, .018), M.dark, 0, -.004, .03 - k * .045);
+    const zc = -.07 - .1; add(g, CY(.0135, .075, 16), M.metal, 0, .037, zc - .0375); /* capa do cano */
+    for (let k = 0; k < 4; k++) for (const s2 of [-1, 1]) add(g, RB(.003, .007, .011, .001), M.dark, s2 * .0128, .037, zc - .012 - k * .017);
+    for (let k = 0; k < 4; k++) add(g, RB(.007, .003, .011, .001), M.dark, 0, .0502, zc - .012 - k * .017);
+    add(g, CY(.0062, .02, 10), M.metal, 0, .037, zc - .085); bore(0, .037, zc - .0955, .0042); mz = zc - .096; my = .037;
+    const kb = grp(g, -.019, .036, -.04); add(kb, CY(.0035, .012, 8), M.metal, -.004, 0, 0, 0, Math.PI / 2); add(kb, new THREE.SphereGeometry(.005, 10, 8), M.metal, -.011, 0, 0); ud.slide = kb; /* botão de manejo do lado esquerdo */
+    g.remove(ud.mag); const fy = .013, zm = -.082;
+    add(g, RB(.035, .034, .044, .004), M.polymer, 0, fy - .016, zm); /* poço do carregador */
+    const mag = grp(g, 0, fy - .03, zm); add(mag, RB(.025, .17, .033, .003), M.metal, 0, -.085, -.004, -.05); add(mag, RB(.029, .012, .037, .003), M.dark, 0, -.168, -.008, -.05);
+    ud.mag = mag; ud.magGrab = new V3(0, fy - .2, zm - .01);
+  };
   switch (model) {
     case 'pistol': {
-      const steel = /^(m1911|cz75)/.test(id), usp = id.startsWith('usp'), fs = bid === 'fiveseven', b23 = bid === 'b23r', c96 = bid === 'c96';
+      const steel = /^(m1911|cz75)/.test(id), usp = id.startsWith('usp'), fs = bid === 'fiveseven', b23 = bid === 'b23r', c96 = bid === 'c96', tec = bid === 'tec9';
+      if (tec) { tec9Body(); break; }
       pistolBody({ L: usp ? .2 : b23 ? .22 : c96 ? .17 : .19, sy: .032, sh: c96 ? .015 : .017, sw: c96 ? .026 : .029, sz: .075, fl: .14, gs: c96 ? 1.08 : 1, bs: 1,
         slideM: steel ? M.steel : M.metal, frameM: steel ? M.steel : c96 ? M.metal : fs ? M.tan : M.polymer, /* D24: C96 em aço oxidado escuro (era prateada) */ gripM: steel ? M.woodDark : c96 ? M.wood : fs ? M.tan : M.polymer, stipple: !steel && !c96 });
       if (usp) { add(g, CY(.0145, .13, 18), M.dark, 0, .036, -.24); bore(0, .036, -.305, .005); mz = -.31; }
@@ -18726,23 +18743,46 @@ function gunModel(id, fp = false, skin = null) {
       break;
     }
     case 'dbarrel': {
+      const so = bid === 'sawedoff', BL = so ? .27 : .48; /* Sawed-Off (CS): os dois canos serrados curtos, guarda-mão curto e punho de pistola no lugar da coronha */
       add(g, EX([[-.06, -.012], [-.06, .03], [-.04, .044], [.03, .044], [.05, .03], [.05, -.012]], .05), M.steel);
       const brk = grp(g, 0, .03, -.05);
-      for (const s of [-1, 1]) { add(brk, CY(.011, .48, 16), M.metal, s * .0115, .006, -.24); add(brk, new THREE.CircleGeometry(.0085, 12), M.dark, s * .0115, .006, -.481, 0, Math.PI); }
-      add(brk, RB(.008, .006 + SG.olyRib, .46, .002), M.metal, 0, .019 + SG.olyRib / 2, -.24); // fita entre os canos, mais alta (a caixa fica embaixo da linha de mira)
-      add(brk, EX([[.0, -.034], [.2, -.03], ['q', .215, -.022, .2, -.008], [.0, -.008]], .044, null, .004), M.wood);
-      add(brk, new THREE.SphereGeometry(.004, 8, 6), M.brass, 0, .025 + SG.olyRib, -.47);
+      for (const s of [-1, 1]) { add(brk, CY(.011, BL, 16), M.metal, s * .0115, .006, -BL / 2); add(brk, new THREE.CircleGeometry(.0085, 12), M.dark, s * .0115, .006, -BL - .001, 0, Math.PI); }
+      add(brk, RB(.008, .006 + SG.olyRib, BL - .02, .002), M.metal, 0, .019 + SG.olyRib / 2, -BL / 2); /* fita entre os canos, mais alta (a caixa fica embaixo da linha de mira) */
+      add(brk, EX(so ? [[.0, -.034], [.13, -.03], ['q', .145, -.022, .13, -.008], [.0, -.008]] : [[.0, -.034], [.2, -.03], ['q', .215, -.022, .2, -.008], [.0, -.008]], .044, null, .004), M.wood);
+      add(brk, new THREE.SphereGeometry(.004, 8, 6), M.brass, 0, .025 + SG.olyRib, -BL + .01);
       ud.brk = brk; ud.rig = 'break';
       guard(g, -.03, -.012);
-      add(g, EX([[-.06, .03], ['q', -.08, SG.olyPente[0], -.12, SG.olyPente[0]], [-.36, SG.olyPente[1]], [-.366, SG.olyPente[1] - .008], [-.366, -.09], [-.358, -.096], ['q', -.2, -.055, -.06, -.012]], .04, null, .004), M.wood);
-      mz = -.53; my = .036; ud.lh = new V3(-.005, -.02, -.17); ud.port = new V3(0, .03, -.05);
-      add(brk, new THREE.SphereGeometry(.0026, 8, 6), M.trit, 0, .026 + SG.olyRib, -.469); ud.sight = new V3(0, .056 + SG.olyRib, -.52);
+      if (so) { add(g, EX([[-.06, .03], ['q', -.075, .012, -.1, -.01], [-.15, -.085], ['q', -.16, -.11, -.135, -.115], [-.105, -.1], ['q', -.075, -.06, -.045, -.012], [-.06, -.012]], .036, null, .005), M.wood); add(g, RB(.03, .016, .024, .004), M.steel, 0, -.103, .133, -.75); } /* punho de madeira serrado com a soleira de aço */
+      else add(g, EX([[-.06, .03], ['q', -.08, SG.olyPente[0], -.12, SG.olyPente[0]], [-.36, SG.olyPente[1]], [-.366, SG.olyPente[1] - .008], [-.366, -.09], [-.358, -.096], ['q', -.2, -.055, -.06, -.012]], .04, null, .004), M.wood);
+      mz = -.05 - BL; my = .036; ud.lh = new V3(-.005, -.02, so ? -.13 : -.17); ud.port = new V3(0, .03, -.05);
+      add(brk, new THREE.SphereGeometry(.0026, 8, 6), M.trit, 0, .026 + SG.olyRib, -BL + .011); ud.sight = new V3(0, .056 + SG.olyRib, -.04 - BL);
+      if (so) ud.rh = new V3(0, -.05, .09);
       break;
     }
     case 'scout': case 'awp': case 'dmr': {
       const awp = model === 'awp', dmr = model === 'dmr', kar = bid === 'kar98k', l96 = bid === 'l96', psg = bid === 'psg1', body = kar ? M.wood : awp && !l96 ? M.green : M.tan, dw = psg ? M.polymer : M.wood;
       if (!dmr) add(g, CY(.018, .2, 18), M.metal, 0, .032, -.03);
-      if (dmr) { // Dragunov/PSG1: caixa da culatra de chapa com o poço do carregador e o guarda-mato embaixo (antes era só um tubo e o carregador flutuava 3 cm abaixo dele)
+      const g3 = bid === 'g3sg1', scar = bid === 'scar20';
+      if (g3) { /* G3SG1 (CS): caixa de chapa estampada com o tubo do ferrolho por cima do cano, guarda-mão fino furado, coronha fixa com apoio de rosto */
+        add(g, EX([[-.12, .028], [-.11, .046], [.075, .046], [.085, .04], [.085, -.012], [.075, -.044], [-.002, -.044], [-.01, -.035], [-.08, -.03], [-.12, -.012]], .042, null, .003), M.metal);
+        for (const s2 of [-1, 1]) add(g, new THREE.BoxGeometry(.002, .012, .15), M.dark, s2 * .0212, .02, .0); /* vinco da chapa */
+        add(g, CY(.0105, .23, 14), M.metal, 0, .054, -.2); add(g, RB(.026, .03, .03, .004), M.metal, 0, .045, -.3); /* tubo do ferrolho e bloco da frente */
+        const ch = grp(g, -.012, .056, -.27); add(ch, CY(.003, .026, 8), M.dark, -.012, 0, 0, 0, Math.PI / 2 - .3); add(ch, RB(.008, .008, .01, .002), M.dark, -.024, .004, 0); /* alavanca de manejo à esquerda, na frente */
+        const hs = []; for (let i = 0; i < 6; i++) hs.push([[.12 + i * .03, -.006], [.135 + i * .03, -.006], [.135 + i * .03, .014], [.12 + i * .03, .014]]);
+        add(g, EX([[.085, -.018], [.085, .046], [.29, .042], [.3, .034], [.3, -.01], [.285, -.02]], .05, hs, .004), M.polymer);
+        add(g, EX([[-.12, .036], [-.16, .042], [-.39, .036], [-.4, .028], [-.4, -.085], [-.39, -.09], [-.3, -.072], [-.16, -.04], [-.12, -.03]], .04, null, .004), M.polymer);
+        add(g, RB(.036, .014, .12, .004), M.dark, 0, .05, .28); add(g, RB(.044, .1, .012, .003), M.dark, 0, -.025, .405); /* apoio de rosto e soleira */
+        add(g, EX([[-.1, .012], [-.07, .012], ['q', -.08, -.04, -.09, -.085], [-.12, -.085], ['q', -.12, -.04, -.1, .012]], .03, null, .004), M.polymer);
+      } else if (scar) { /* SCAR-20 (CS): caixa de cima de alumínio inteiriça com trilho, caixa de baixo de polímero, coronha dobrável vazada com apoio de rosto */
+        add(g, EX([[-.12, .012], [-.12, .05], [.3, .05], [.31, .044], [.31, -.004], [.29, -.02], [.085, -.02], [.085, .012]], .048, null, .003), M.metal);
+        rail(g, 0, .054, -.09, .34);
+        for (const z of [-.2, -.27]) for (const s2 of [-1, 1]) add(g, RB(.006, .012, .05, .002), M.dark, s2 * .027, .016, z); /* trilhos dos lados */
+        add(g, EX([[-.12, .014], [.085, .014], [.085, -.012], [.075, -.044], [-.002, -.044], [-.01, -.035], [-.08, -.03], [-.12, -.012]], .044, null, .003), M.polymer);
+        const ch = grp(g, -.026, .03, -.16); add(ch, RB(.012, .01, .016, .003), M.dark, -.006, 0, 0); /* alavanca de manejo à esquerda */
+        add(g, EX([[-.12, .04], [-.15, .046], [-.4, .044], [-.41, .036], [-.41, -.08], [-.4, -.088], [-.33, -.07], [-.2, -.034], [-.12, -.016]], .036, [[[-.36, .024], [-.21, .028], [-.21, -.014], [-.33, -.052], [-.36, -.052]]], .004), M.polymer);
+        add(g, RB(.032, .014, .11, .004), M.dark, 0, .053, .29); add(g, RB(.044, .1, .014, .003), M.dark, 0, -.022, .412);
+        add(g, EX([[-.1, .012], [-.07, .012], ['q', -.08, -.04, -.09, -.085], [-.12, -.085], ['q', -.12, -.04, -.1, .012]], .03, null, .004), M.polymer);
+      } else if (dmr) { /* Dragunov/PSG1: caixa da culatra de chapa com o poço do carregador e o guarda-mato embaixo (antes era só um tubo e o carregador flutuava 3 cm abaixo dele) */
         add(g, EX([[-.11, .03], [-.1, .048], [.07, .048], [.085, .04], [.09, .02], [.09, -.012], [.08, -.042], [-.002, -.042], [-.01, -.035], [-.065, -.035], [-.075, -.01], [-.11, -.004]], .04, null, .003), M.metal);
         add(g, new THREE.BoxGeometry(.041, .002, .15), M.dark, 0, .03, -.005); // emenda da tampa
         add(g, RB(.006, .012, .03, .002), M.dark, -.022, .012, .02); // alavanca de segurança (lado esquerdo)
@@ -18760,7 +18800,7 @@ function gunModel(id, fp = false, skin = null) {
       if (kar) { add(g, EX([[.3, -.012], [.3, .024], [.5, .022], [.52, .012], [.52, -.004], [.48, -.012]], .036, null, .004), M.wood); for (const u of [.36, .5]) add(g, RB(.04, .05, .01, .003), M.steel, 0, .018, -u); } // guarda-mão comprido e braçadeiras
       add(g, CY(awp ? .016 : .011, .06, 12), M.dark, 0, .032, -.13 - bl - .02); bore(0, .032, -.13 - bl - .051, .005); mz = -.13 - bl - .052; my = .032;
       if (awp) for (let i = 0; i < 3; i++) add(g, new THREE.BoxGeometry(.034, .004, .008), M.metal, 0, .032, -.13 - bl - .01 + i * .01);
-      if (kar) irons(.058, .02, -(.13 + bl - .015), { notch: 1, base: .02, fbase: .022 }); else if (bid === 'dragunov') scope(g, -.01, .09, -.03, .2, .016, 1); else scope(g, dmr ? -.004 : 0, .088, -.04, psg || l96 ? .3 : .26, psg || l96 ? .02 : .017);
+      if (kar) irons(.058, .02, -(.13 + bl - .015), { notch: 1, base: .02, fbase: .022 }); else if (bid === 'dragunov') scope(g, -.01, .09, -.03, .2, .016, 1); else scope(g, dmr ? -.004 : 0, scar ? .095 : .088, -.04, psg || l96 || g3 || scar ? .3 : .26, psg || l96 || g3 || scar ? .02 : .017);
       if (dmr) { const bolt = grp(g, .026, .03, -.03); add(bolt, CY(.004, .012, 8), M.metal, .006, 0, 0, 0, Math.PI / 2); add(bolt, RB(.014, .012, .016, .004), M.metal, .014, 0, 0); ud.bolt = bolt; }
       else if (kar) { const bolt = grp(g, .016, .036, .05), ka = -.8, kc = Math.cos(ka), ks = Math.sin(ka); add(bolt, new THREE.CylinderGeometry(.0034, .0034, .036, 8), M.metal, .018 * kc, .018 * ks, 0, 0, 0, ka + Math.PI / 2); add(bolt, new THREE.SphereGeometry(.0068, 12, 10), M.metal, .039 * kc, .039 * ks, 0); ud.bolt = bolt; ud.boltAction = 1; ud.boltKnob = [.039 * kc, .039 * ks]; } // 6-w08: Kar98k com a alavanca dobrada para baixo (a bola reta e grande enchia o lado direito da mira)
       else { const bolt = grp(g, .02, .038, .05); add(bolt, new THREE.CylinderGeometry(.0045, .0045, .045, 8), M.metal, .022, 0, 0, 0, 0, Math.PI / 2); add(bolt, new THREE.SphereGeometry(.0095, 12, 10), M.metal, .046, -.004, 0); ud.bolt = bolt; ud.boltAction = 1; }
@@ -18768,7 +18808,7 @@ function gunModel(id, fp = false, skin = null) {
         const cl = grp(g, 0, .084, .03), rd = grp(cl, 0, 0, 0); add(cl, RB(.011, .05, .004, .001), M.steel, 0, -.022, .002);
         for (let i = 0; i < 5; i++) { add(rd, CY(.0046, .056, 8), M.brass, (i & 1 ? .0024 : -.0024), -.004 - i * .0088, -.028); add(rd, CY(.0028, .014, 8, .0008), M.brass, (i & 1 ? .0024 : -.0024), -.004 - i * .0088, -.063); }
         cl.visible = false; ud.clipG = cl; ud.clipR = rd; ud.clipRest = cl.position.clone(); ud.rig = 'clip';
-      } else { const mag = grp(g, 0, -.04, dmr ? -.035 : -.03); if (psg) add(mag, RB(.03, .1, .055, .004), M.metal, 0, -.05, 0); else if (dmr) add(mag, EX(banana(.16, .5, .06, .055), .028), M.metal); else add(mag, RB(.032, .042, .078, .003), M.metal, 0, -.01, 0); ud.mag = mag; ud.magGrab = new V3(0, dmr ? -.16 : -.08, dmr ? -.035 : -.03); }
+      } else { const mag = grp(g, 0, -.04, dmr ? -.035 : -.03); if (psg || g3 || scar) add(mag, RB(.03, .1, .055, .004), scar ? M.polymer : M.metal, 0, -.05, 0); else if (dmr) add(mag, EX(banana(.16, .5, .06, .055), .028), M.metal); else add(mag, RB(.032, .042, .078, .003), M.metal, 0, -.01, 0); ud.mag = mag; ud.magGrab = new V3(0, dmr ? -.16 : -.08, dmr ? -.035 : -.03); }
       guard(g, dmr ? -.055 : -.02, -.035, .048); // dmr: gatilho logo à frente do punho (antes ficava 5 cm adiante, embaixo do carregador)
       if (awp) for (const s of [-1, 1]) add(g, CY(.004, .17, 8), M.metal, s * .014, -.02, -.3, -.08);
       ud.lh = new V3(-.005, -.035, -.2); ud.vm = [.005, -.008, .02];
@@ -18846,7 +18886,21 @@ function gunModel(id, fp = false, skin = null) {
       break;
     }
     case 'uzi': { // Uzi (caixa com o carregador no punho) e PM63 (pistola-metralhadora com empunhadura dobrável)
-      if (bid === 'pm63') {
+      if (bid === 'mac10') { /* MAC-10 (CS): caixa de chapa quadrada e curta, cano rosqueado, botão de manejo em cima, coronha de arame recolhida, alça de mão na frente */
+        add(g, EX([[-.115, .0], [-.115, .058], [-.108, .062], [.122, .062], [.128, .056], [.128, .0]], .05, null, .003), M.metal);
+        add(g, new THREE.BoxGeometry(.006, .002, .2), M.dark, 0, .0625, -.0); /* fenda do botão de manejo */
+        for (const s2 of [-1, 1]) add(g, new THREE.BoxGeometry(.002, .03, .16), M.dark, s2 * .0255, .03, .0); /* emenda das chapas */
+        add(g, EX([[-.03, -.002], [.128, -.002], [.128, -.016], [.06, -.016], [.045, -.022], [-.03, -.022]], .048, null, .003), M.polymer); /* caixa de baixo */
+        add(g, CY(.0105, .016, 12), M.metal, 0, .03, -.136); add(g, CY(.0075, .045, 12), M.metal, 0, .03, -.165); for (let k = 0; k < 6; k++) add(g, new THREE.TorusGeometry(.0076, .0011, 4, 12), M.dark, 0, .03, -.15 - k * .006);
+        bore(0, .03, -.188, .0045); mz = -.19; my = .03;
+        add(g, new THREE.TorusGeometry(.022, .004, 6, 14, Math.PI), M.dark, 0, -.004, -.1, 0, Math.PI / 2, Math.PI); /* alça de nylon da mão de apoio */
+        grip(g, -.03, .0, .1, M.polymer, .036); guard(g, .035, .0, .06);
+        for (const s2 of [-1, 1]) add(g, CY(.0028, .2, 8), M.steel, s2 * .029, .035, .01); add(g, RB(.06, .045, .008, .003), M.steel, 0, .02, .118); add(g, RB(.008, .03, .02, .002), M.steel, 0, .045, .112); /* coronha de arame recolhida dos lados da caixa */
+        const bolt = grp(g, 0, .068, -.03); add(bolt, RB(.012, .012, .014, .003), M.dark); for (const s2 of [-1, 1]) add(bolt, RB(.004, .008, .014, .001), M.dark, s2 * .0045, .008, 0); ud.bolt = bolt; /* botão de manejo com o entalhe por onde se mira */
+        const mag = grp(g, 0, -.04, .0); add(mag, RB(.026, .2, .03, .003), M.metal, 0, -.055, .012, -.14); add(mag, RB(.03, .012, .034, .003), M.dark, 0, -.15, .025, -.14); ud.mag = mag; ud.magGrab = new V3(0, -.2, .03); ud.rh = new V3(0, -.045, .008);
+        ud.lh = new V3(-.005, -.03, -.1);
+        irons(.085, .1, -.115, { notch: 0, base: .022, fbase: .022 });
+      } else if (bid === 'pm63') {
         pistolBody({ L: .19, sy: .032, sh: .019, sw: .03, sz: .07, fl: .15, gs: 1.05, bs: 1.1, slideM: M.metal, frameM: M.metal, gripM: M.bakelite, stipple: 0 });
         add(ud.mag, RB(.022, .1, .03, .003), M.metal, 0, -.05, -.004); ud.magGrab = new V3(0, -.22, .046);
         add(g, EX([[.13, .0], [.155, .0], ['q', .152, -.04, .148, -.07], [.128, -.07], ['q', .13, -.03, .13, .0]], .026, null, .004), M.bakelite, 0, .012, 0); // empunhadura dianteira
@@ -19773,9 +19827,9 @@ FPW.l96 = { pack: 'sniper', m: 'awp' }; // uni: a L96A1 do Zumbi é da mesma fam
 // tambor, bomba, cano basculante, maravilhas, lançadores) fica com as camadas procedurais da própria arma (gunAnim só nas peças, sem
 // mexer na tela); carregador de caixa embaixo (rig 'mag') e ferrolho da pistola seguem a peça do pacote. Acessórios do Armeiro, PaP
 // (papUV), Pistolas Duplas e o voxel fino (vxz) continuam os da arma do código. ?syn=0 volta às mãos antigas.
-const FSYN = { off: /[?&]syn=0\b/.test(location.search), bracos: { smg: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, mp40: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, spas: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] } } /* D23: MP40 (do Zumbi) como as SMGs do código; SPAS idem */, olho: .16, adsZ: { smg: .06, sniper: .14 }, mira: { hs10: [.12, 1], trench: [.1, 1], ks23: [.05, 1] /* D15: com .2 o olho ia para cima da coronha (madeira lisa enorme no centro) */, law: [.1, 0], wunderwaffe: [.32, 0], spectre: [.2, 0], pm63: [.2, 0] /* PM63: a mão do punho, embaixo do olho, enchia 13% da tela na mira */ } }; // mira: por arma [distância extra (m), braços somem na mira]: bombas (a mão da bomba e a coronha cobriam a tela), LAW (tubo na frente do olho), Wunderwaffe (bulbo);  // adsZ: na mira a arma do código fica mais longe do olho (m; medido: braço esquerdo cobria 28% da tela nas SMGs, 21% depois; Kar98k 24% -> 14%; na bomba piora: fica 0)
-if (!FSYN.off) for (const [p, l] of Object.entries({ pistol: 'fiveseven b23r c96 raygun2', smg: 'ppsh thompson spectre kiparis uzi pm63', ak: 'stg44 mg42 stoner psg1',
-  rifle: 'm16 aug famas g11 enfield law crossbow wunderwaffe wintershowl', pump: 'trench hs10 ks23', sniper: 'kar98k' })) for (const id of l.split(' ')) FPW[id] = { pack: p, syn: 1 };
+const FSYN = { off: /[?&]syn=0\b/.test(location.search), bracos: { smg: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, mp40: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, spas: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] } } /* D23: MP40 (do Zumbi) como as SMGs do código; SPAS idem */, olho: .16, adsZ: { smg: .06, sniper: .14 }, mira: { hs10: [.12, 1], trench: [.1, 1], sawedoff: [.1, 1] /* Sawed-Off do CS: sem coronha, a mão do punho ficava na frente do olho */, ks23: [.05, 1] /* D15: com .2 o olho ia para cima da coronha (madeira lisa enorme no centro) */, law: [.1, 0], wunderwaffe: [.32, 0], spectre: [.2, 0], pm63: [.2, 0] /* PM63: a mão do punho, embaixo do olho, enchia 13% da tela na mira */ } }; /* mira: por arma [distância extra (m), braços somem na mira]: bombas (a mão da bomba e a coronha cobriam a tela), LAW (tubo na frente do olho), Wunderwaffe (bulbo);  adsZ: na mira a arma do código fica mais longe do olho (m; medido: braço esquerdo cobria 28% da tela nas SMGs, 21% depois; Kar98k 24% -> 14%; na bomba piora: fica 0) */
+if (!FSYN.off) for (const [p, l] of Object.entries({ pistol: 'fiveseven b23r c96 raygun2 tec9', smg: 'ppsh thompson spectre kiparis uzi pm63 mac10', ak: 'stg44 mg42 stoner psg1 g3sg1 scar20',
+  rifle: 'm16 aug famas g11 enfield law crossbow wunderwaffe wintershowl', pump: 'trench hs10 ks23 sawedoff', sniper: 'kar98k' })) for (const id of l.split(' ')) FPW[id] = { pack: p, syn: 1 };
 function fpSyn(id, ud, gun) { // modelo "baixado" sintético: origem no gatilho, cano para -Z, metros (escala 1)
   const D = { syn: 1, T: [null, 0, 0], fwd: '-z', up: '+y', L: 1, noMag2: 1, gun, ud, parts: {} };
   if (ud.mag && ud.rig === 'mag' && !ud.magUp) { ud.mag.name = 'zsyn_mag'; D.parts.mag = /^zsyn_mag$/; }
@@ -21986,7 +22040,7 @@ function vmSetWeapon(id) {
   if (fw) { // arma com braços prontos: o modelo procedural não aparece
     if (attHas(mid, 'akimbo') && akOK(mid)) ud.akimbo = true; // uni: Pistolas Duplas também no modelo baixado (antes do return; o fpBuild esconde o braço esquerdo)
     const h = fpBuild(mid, ud, gun);
-    if (h) { if (!fw.syn) gun.visible = false; else if (ZC.on) vxzArma(vmGun, gun); vmGun.add(h); vmRoot.add(vmGun); vmRoot.updateMatrixWorld(true); if (vck) vmcGuardar(vck, vmGun); return; } // matriz do pai já no 1º quadro (o IK e as camadas leem o mundo: sem isso a mão esquerda aparecia atrás da câmera por um quadro)
+    if (h) { if (!fw.syn) gun.visible = false; else if (ZC.on || W[mid]?.cs) vxzArma(vmGun, gun); /* CS: as armas sem modelo baixado (feitas no código) também em voxel, como as baixadas */ vmGun.add(h); vmRoot.add(vmGun); vmRoot.updateMatrixWorld(true); if (vck) vmcGuardar(vck, vmGun); return; } /* matriz do pai já no 1º quadro (o IK e as camadas leem o mundo: sem isso a mão esquerda aparecia atrás da câmera por um quadro) */
   }
   if (fw) vck = null; /* modelo baixado ainda carregando: a arma feita no código que fica no lugar não vai para o cache */
   if (MAO_ITENS.has(m) && !MAO.off) { // E3: granadas, Semtex, macaco e Claymore nos braços das armas (pacote da pistola, em voxel)
