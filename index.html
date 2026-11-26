@@ -20998,7 +20998,7 @@ function fpSkin(root, mats, L, keep = [], all = false, filt = null) { // all: pi
   root.updateMatrixWorld(true);
   const Ri = root.matrixWorld.clone().invert(), cache = {};
   root.traverse(o => {
-    if (!o.isMesh || o.userData.voxOrig || (filt && !filt(o)) || keep.includes(o.userData.voxDe ?? o.material.name) || (!all && o.material.emissive?.getHex())) return; // vx: o latão continua latão
+    if (!o.isMesh || o.userData.voxOrig || o.name === 'voxBraco' || (filt && !filt(o)) || keep.includes(o.userData.voxDe ?? o.material.name) || (!all && o.material.emissive?.getHex())) return; // vx: o latão continua latão; os braços em voxel (voxBraco, material voxPele) nunca levam a skin (fpArm não os reconhece)
     const c = o.material.color, wood = o.userData.vox ? !!o.userData.voxMad : c.r > c.b * 1.6 && c.r > .08; // madeira / marrom (vx: decidido pelo material de origem)
     const sc = +(2.5 / L * fpMeshScale(o, Ri)).toPrecision(3), k = (wood ? 'b' : 'a') + sc; // a malha pode ter escala própria
     const sm = wood ? mats.b || mats.a : mats.a;
@@ -21728,8 +21728,8 @@ function fpIK(F) {
   K.zm = F.z2 ? fz2Mao(F) : null; // fz2: mão esquerda desviada (saque e roteiro da recarga), no mundo dos braços
   if (K.zm && K.hl) { I.t.setFromMatrixPosition(K.hl.matrixWorld).add(K.zm); K.hl.position.copy(K.hl.parent.worldToLocal(I.t.clone())); K.hl.updateMatrixWorld(true); I.dl.add(K.zm); }
   for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.anM) a.tw.applyMatrix4(a.anM); /* an: a mão foi levada pelas camadas */ if (a.sd < 0) a.tw.add(I.dl); }
-  { const kp = F.P.adsMao ? smooth(G.ads || 0) * F.P.adsMao : 0; if (kp) for (const a of K.arms) { a.tw.y -= kp; if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld); I.t.y -= kp; a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } } // en1: pistola na mira: as mãos descem no punho (alça e massa à vista por cima delas, sem olhar de cima do ferrolho)
-  { const E = F.P.adsMaoE, kp = E ? smooth(G.ads || 0) * (1 - (K.arms.find(a => a.sd < 0)?.fora ?? 1)) : 0; // item 4: mirando, a mão esquerda corre para a frente no guarda-mão e desce (o antebraço sai do meio da tela)
+  { const kp = F.P.adsMao ? smooth(Math.min(1, (G.ads || 0) * ADS.adi)) * F.P.adsMao : 0; if (kp) for (const a of K.arms) { a.tw.y -= kp; if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld); I.t.y -= kp; a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } } // en1: pistola na mira: as mãos descem no punho (alça e massa à vista por cima delas, sem olhar de cima do ferrolho)
+  { const E = F.P.adsMaoE, kp = E ? smooth(Math.min(1, (G.ads || 0) * ADS.adi)) * (1 - (K.arms.find(a => a.sd < 0)?.fora ?? 1)) : 0; // item 4: mirando, a mão esquerda corre para a frente no guarda-mão e desce (o antebraço sai do meio da tela)
     if (kp) for (const a of K.arms) if (a.sd < 0) { I.c.set(0, -E[1] * kp, -E[0] * kp); a.tw.add(I.c); if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } }
   // mão que vem para perto do olho (pegar carregador no colete): desce e vai para a frente, senão o braço passa colado na câmera
   // (a câmera fica na origem, olhando para -Z)
@@ -21740,7 +21740,7 @@ function fpIK(F) {
     I.c.set(0, -.16 * s, -.1 * s); a.tw.add(I.c);
     I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true);
   }
-  const ka = smooth(G.ads || 0), Ao = F.P.ombro || ADS.ombro; // mirando: ombros mais para fora e para baixo (os antebraços não sobem na frente da arma)
+  const ka = smooth(Math.min(1, (G.ads || 0) * ADS.adi)), Ao = F.P.ombro || ADS.ombro; // mirando: ombros mais para fora e para baixo (os antebraços não sobem na frente da arma); adi: os ombros vão na frente da arma (entrando e saindo da mira), senão no meio do caminho a arma já subiu e os antebraços ainda não desceram (o braço cobria até +1,7% da tela a mais que no quadril e na mira)
   if (K.sh[0] || K.sh[1] || K.sh[2] || ka) for (const a of K.arms) { // ombros para fora/baixo/trás (no espaço da câmera)
     I.c.setFromMatrixPosition(a.cl.matrixWorld).add(I.a.set((K.sh[0] + Ao[0] * ka) * a.sd, K.sh[1] + Ao[1] * ka, K.sh[2] + Ao[2] * ka));
     a.cl.position.copy(a.cl.parent.worldToLocal(I.c)); a.cl.updateMatrixWorld(true);
@@ -22764,7 +22764,7 @@ function pistolaApoio(ud, o, r0) { // mão esquerda (braços do Blender) acompan
 // Peças mais baixas que alt e a coronha (atrás da mão do gatilho + coronha) ficam embaixo do rosto, como o rosto apoiado na coronha.
 // Com mira alta (acessório), o que fica até corpo abaixo da linha ainda empurra o olho para trás (encosto). Unidades da arma (antes da escala).
 const ADS = { rel: .144, folga: .05, larg: .3, alt: .02, lat: .035, coronha: .06, corpo: .07, encosto: .02, esc: 1.18,
-  ombro: [.06, -.12, .04], csPistola: .48, csLonga: .21, recuo: { ak47: .035, rpk: .035, galil: .035, ak74u: .035, thompson: .06, ppsh: .035, spectre: .025, kiparis: .025, m14: .035 } }; // 6-w05: a M14 é feita na caixa da AK (a tampa enchia o pé da tela, a 0,066 m do olho) // 6-w03: Thompson, PPSh, Spectre e Kiparis: a caixa da culatra enchia o pé da tela na mira (olho a 0,078/0,099/0,108/0,108 m) // 6-w02: AK-74u tem a mesma caixa e tampa da AK // 6-w04: a Galil tem a mesma caixa da AK (a tampa enchia o pé da tela na mira, a 0,066 m do olho) // ombro: desvio extra dos ombros dos braços prontos (modos estilo CS) ao mirar; cs*: distância olho→mira deles (m); recuo (a15): olho mais para trás (unidades da arma) nas armas de tampa larga, que enchia a parte de baixo da tela
+  ombro: [.06, -.12, .04], adi: 2, csPistola: .48, csLonga: .21, recuo: { ak47: .035, rpk: .035, galil: .035, ak74u: .035, thompson: .06, ppsh: .035, spectre: .025, kiparis: .025, m14: .035 } }; // 6-w05: a M14 é feita na caixa da AK (a tampa enchia o pé da tela, a 0,066 m do olho) // 6-w03: Thompson, PPSh, Spectre e Kiparis: a caixa da culatra enchia o pé da tela na mira (olho a 0,078/0,099/0,108/0,108 m) // 6-w02: AK-74u tem a mesma caixa e tampa da AK // 6-w04: a Galil tem a mesma caixa da AK (a tampa enchia o pé da tela na mira, a 0,066 m do olho) // ombro: desvio extra dos ombros dos braços prontos (modos estilo CS) ao mirar; cs*: distância olho→mira deles (m); recuo (a15): olho mais para trás (unidades da arma) nas armas de tampa larga, que enchia a parte de baixo da tela
 // ===== 6-w06: fuzis AUG, Famas, G11, Enfield e STG-44 =====
 // pe: altura (m) do pé do suporte da luneta integrada (topo da caixa); o suporte vai até o fundo do tubo.
 // g11Vai: onde a mão esquerda busca o carregador novo na G11 (desvio do ponto de pegar, espaço da arma: x, y, z), em vez de subir 0,38 m
