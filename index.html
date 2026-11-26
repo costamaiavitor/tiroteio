@@ -21549,6 +21549,7 @@ const AN = {
     ossos: { cart: '12ge_low', bomba: 'Slide' },
     // ciclo do clipe de cartucho (s): ins = o 1º cartucho termina de entrar no tubo; per = período; fim: mão até a bomba, bomba, volta
     ciclo: { ins: 1.32, per: 1.345, n: 4, maoBomba: 6.0, bomba: [6.0, 6.27], fim: 6.82 },
+    perto: .13, puxa: .4, // es1: a mão esquerda fica a até perto·hr (m) do guarda-mão; o que passa disso entra só puxa
     extraVazia: 0, // a bomba cabe no fim que já existe (0,45 s): o tempo de recarga não depende da arma na mão
     imp: { cart: [.35, .05, .12, 0, .015, .01], bomba: [.5, 0, 0, 0, .02, .05] }, cam: { cart: [-.08, .03], bomba: [-.2, .08] },
     saque: [[0, .02, -.24, .05, -.5, .1, .4], [.45, .01, -.06, .015, -.15, .03, .13], [.8, 0, .004, 0, .03, 0, -.015], [1, 0, 0, 0, 0, 0, 0]],
@@ -21678,6 +21679,13 @@ function anPose(ud, dt) {
   let ML = mexe ? Mg : null;
   if (an.esq) { const L = an.esq; ML = an.ML.copy(Mg).premultiply(_an.M2.makeTranslation(_an.v.set(L[0], L[1], L[2]).applyQuaternion(qc))); } // a mão esquerda chega depois
   if (an.rev) { const L = anRev(F, an, rv, Mg); if (L) { ML = an.ML.copy(Mg).premultiply(_an.M2.makeTranslation(L)); } }
+  if (an.pump && an.mL && !G.reloadEnd && !an.saq) { an.mL0 = (an.mL0 || new V3()).setFromMatrixPosition(an.mL.matrixWorld).applyMatrix4(_an.M3.multiplyMatrices(F.body.matrixWorld, F.C).invert()); } // es1: lugar da mão esquerda na arma (parada)
+  if (an.pump && F.cur === 'reload' && an.mL0 && an.mL) { // es1: o clipe leva a mão esquerda ao cinto a cada cartucho (na vazia, XM1014: aberta no ar longe da arma; Nova: fora do quadro): fica perto da janela
+    const hw = _an.v.setFromMatrixPosition(an.mL.matrixWorld); if (ML) hw.applyMatrix4(ML);
+    const gw = _an.v2.copy(an.mL0).applyMatrix4(_an.M3.multiplyMatrices(F.body.matrixWorld, F.C)); if (mexe) gw.applyMatrix4(Mg);
+    const dd = hw.sub(gw), L = dd.length(), R = AN.pump.perto * F.P.hr; // hw: agora o vetor guarda-mão → mão
+    if (L > R) { const k = 1 - (R + (L - R) * AN.pump.puxa) / L; ML = an.ML.copy(ML || _an.M2.identity()).premultiply(_an.M3.makeTranslation(-dd.x * k, -dd.y * k, -dd.z * k)); }
+  }
   if (mexe) { anAplica(an, F.body, Mg); anAplica(an, an.mR, Mg); if (an.mag && !fora) anAplica(an, an.mag, Mg); anAplica(an, an.cart, Mg); }
   if (ML) { anAplica(an, an.mL, ML); if (an.mag && fora) anAplica(an, an.mag, ML); }
   if (F.ik) for (const arm of F.ik.arms) arm.anM = arm.sd > 0 ? (mexe ? Mg : null) : ML; // o alvo do pulso vai junto (fpIK)
