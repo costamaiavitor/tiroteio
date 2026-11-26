@@ -21557,6 +21557,7 @@ const ANPEC = {
   glock: { ferrolho: { c: [0, 3.55, 0], h: [3, 1.85, 11] }, pente: { c: [.15, -4.4, -5.75], h: [1.05, 4.6, 1.45], a: 18 } },
   p250: { ferrolho: { c: [0, 3.95, 0], h: [3, 2.05, 12] }, pente: { c: [0, -4, -5.4], h: [1.05, 4.2, 1.5], a: 14 } },
   cz75: { ferrolho: { c: [0, 3.75, 0], h: [3, 1.75, 12] }, pente: { c: [0, -4.6, -6.3], h: [1.1, 4.6, 1.5], a: 16 } },
+  python: { tambor: { c: [-1.2, 4.5, 1.5], h: [2.2, 2.2, 3], eixo: [.6, 2.1] } }, // D7: tambor (gira em volta do eixo da báscula, embaixo e à esquerda; ver anRevolver)
 };
 const _an = { M: new THREE.Matrix4(), M2: new THREE.Matrix4(), M3: new THREE.Matrix4(), q: new THREE.Quaternion(), q2: new THREE.Quaternion(), q3: new THREE.Quaternion(), e: new THREE.Euler(), v: new V3(), v2: new V3(), p: new V3() };
 const AN_PECAS = new Map(); // recortes prontos por arquivo de voxels + parte (os voxels são os mesmos a cada saque)
@@ -21575,32 +21576,33 @@ function anPecas(F, an, R, model, u) { // ferrolho e carregador por caixa, recor
   const cano = { c: [mz.x, mz.y - .2, mz.z / 2 + 1], h: [.6, .65, Math.abs(mz.z / 2) + 1] }; // (até mz.y + .45: a massa de mira anda com o ferrolho) // em volta do eixo do cano, da frente do gatilho à boca
   const caixa = (B, p) => { const a = (B.a || 0) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), y = p.y - B.c[1], z = p.z - B.c[2];
     return Math.abs(p.x - B.c[0]) <= B.h[0] && Math.abs(y * c - z * s) <= B.h[1] && Math.abs(y * s + z * c) <= B.h[2]; };
-  const lado = p => caixa(R.pente, p) ? 'pente' : caixa(R.ferrolho, p) && !caixa(cano, p) ? 'ferrolho' : 'resto';
+  const lado = p => R.pente && caixa(R.pente, p) ? 'pente' : R.ferrolho && caixa(R.ferrolho, p) && !caixa(cano, p) ? 'ferrolho' : R.tambor && caixa(R.tambor, p) ? 'tambor' : 'resto';
   const partes = new Map(); model.traverse(o => { const p = o.userData.vxp; if (p) { if (!partes.has(p)) partes.set(p, []); partes.get(p).push(o); } });
-  const lista = VX.ult?.partes || [], nos = { ferrolho: [], pente: [] };
+  const lista = VX.ult?.partes || [], nos = { ferrolho: [], pente: [], tambor: [] };
   for (const [p, ms] of partes) {
     const pai = ms[0].parent, ck = nome + '|' + lista.indexOf(p) + '|' + JSON.stringify(R); let S = AN_PECAS.get(ck);
     if (!S) {
-      const V = new Map(p.V); vxMiolo(V); const M = _an.M2.multiplyMatrices(Gi, pai.matrixWorld), q = _an.p, sets = { resto: new Map(), ferrolho: new Map(), pente: new Map() };
+      const V = new Map(p.V); vxMiolo(V); const M = _an.M2.multiplyMatrices(Gi, pai.matrixWorld), q = _an.p, sets = { resto: new Map(), ferrolho: new Map(), pente: new Map(), tambor: new Map() };
       for (const [key, v] of V) { q.set((v.i + .5) * p.h, (v.j + .5) * p.h, (v.k + .5) * p.h).applyMatrix4(M).multiplyScalar(k); sets[lado(q)].set(key, v); }
       if (sets.pente.size) { // ponta das balas: a camada de cima do carregador (no eixo do punho), longe das paredes, vira latão
         const B = R.pente, a = (B.a || 0) * Math.PI / 180; let top = -1e9; const al = [];
         for (const [key, v] of sets.pente) { q.set((v.i + .5) * p.h, (v.j + .5) * p.h, (v.k + .5) * p.h).applyMatrix4(M).multiplyScalar(k); const ax = (q.y - B.c[1]) * Math.cos(a) - (q.z - B.c[2]) * Math.sin(a); al.push([v, ax, Math.abs(q.x - B.c[0]), key]); top = Math.max(top, ax); }
         for (const [v, ax, lx, key] of al) if (ax > top - .35 && lx < B.h[0] - .25) sets.pente.set(key, { ...v, c: [.72, .55, .28], m: 1 }); // objeto novo: o p.V do cache fica intacto
       }
-      S = {}; for (const s in sets) S[s] = sets[s].size ? vxMalha(sets[s], 1) : [null, null]; S.vazio = !sets.ferrolho.size && !sets.pente.size; AN_PECAS.set(ck, S);
+      S = {}; for (const s in sets) S[s] = sets[s].size ? vxMalha(sets[s], 1) : [null, null]; S.vazio = !sets.ferrolho.size && !sets.pente.size && !sets.tambor.size; AN_PECAS.set(ck, S);
     }
     if (S.vazio) continue;
     const mats = [0, 1].map(i => (ms.find(o => o.geometry === p.geos[i]) || ms[0]).material); // antes de trocar as geometrias
     for (const o of ms) { const i = p.geos.indexOf(o.geometry), g = S.resto[i]; if (g) o.geometry = g; else o.visible = false; }
-    for (const s of ['ferrolho', 'pente']) S[s].forEach((geo, i) => { if (geo) nos[s].push([pai, geo, mats[i], p.h]); });
+    for (const s of ['ferrolho', 'pente', 'tambor']) S[s].forEach((geo, i) => { if (geo) nos[s].push([pai, geo, mats[i], p.h]); });
   }
   F.root.updateMatrixWorld(true);
-  for (const [s, bn] of [['ferrolho', an.sl], ['pente', an.mag]]) { // uma peça por tipo: um grupo (preso ao pai da 1ª parte) e um follow só
-    const L = nos[s]; if (!L.length || !bn) continue; const pai0 = L[0][0], g = new THREE.Group(); g.name = 'an_' + s; pai0.add(g); g.updateMatrixWorld(true);
+  for (const [s, bn] of [['ferrolho', an.sl], ['pente', an.mag], ['tambor', null]]) { // uma peça por tipo: um grupo (preso ao pai da 1ª parte) e um follow só (tambor: sem osso, gira no anRevolver)
+    const L = nos[s]; if (!L.length || !bn && s !== 'tambor') continue; const pai0 = L[0][0], g = new THREE.Group(); g.name = 'an_' + s; pai0.add(g); g.updateMatrixWorld(true);
     const inv = pai0.matrixWorld.clone().invert();
     for (const [pai, geo, mat, h] of L) { const vm = new THREE.Mesh(geo, mat); vm.userData.vox = 1; vm.frustumCulled = false; vm.name = 'vox';
       inv.clone().multiply(pai.matrixWorld).multiply(_an.M3.makeScale(h, h, h)).decompose(vm.position, vm.quaternion, vm.scale); g.add(vm); }
+    if (s === 'tambor') { an.tb = rvTambor(F, g, pai0, R.tambor, k); continue; }
     const f = { a: bn, b: g, d: bn.matrixWorld.clone().invert().multiply(g.matrixWorld) };
     if (s === 'pente') { f.rest = F.body.matrixWorld.clone().invert().multiply(bn.matrixWorld); f.hr = F.P.hr; }
     F.follow.push(f); }
@@ -21630,9 +21632,7 @@ function anPose(ud, dt) {
   }
   // eventos da recarga (s do clipe)
   const rc = F.cur === 'reload' || F.cur === 'reloadE';
-  if (an.m === 'python' && G.reloadEnd && G.rEv && !G.reload) { const t = (now - G.reloadStart) / (G.reloadEnd - G.reloadStart); // R8: tambor (a recarga própria fica para depois): cartuchos entrando, sem o roteiro de carregador
-    for (const [k, at] of [['r1', .3], ['r2', .45], ['r3', .6]]) if (t >= at && !G.rEv['an_' + k]) { G.rEv['an_' + k] = 1; play('shellin'); if (k === 'r3') { anMunicao(a); anImpulso(an, A.imp.entra, A.cam.entra); } } }
-  else if (rc && F.act && G.reloadEnd && G.rEv && !G.reload && A.ev) {
+  if (rc && F.act && G.reloadEnd && G.rEv && !G.reload && A.ev) {
     const t = F.act.time, E = A.ev[F.cur];
     for (const k in E) if (t >= E[k] && !G.rEv['an_' + k]) { G.rEv['an_' + k] = 1; anEvento(an, k, a); }
   }
@@ -21644,18 +21644,73 @@ function anPose(ud, dt) {
     const uu = 1 - saqueK(ts, sd); if (uu <= 1) kfSuave(A.saque, uu, 6, o, true); else { kfSuave(A.saque, 2 - uu, 6, o, true); for (let j = 0; j < 6; j++) o[j] = -o[j]; } an.saq = 1;
     if (A.esq) { kfSuave(A.esq, clamp(ts / sd, 0, 1), 3, _anE2); an.esq = _anE2; } else an.esq = null;
   } else { an.saq = 0; an.esq = null; }
-  if (A.vis && (rc || an.m === 'python') && G.reloadEnd && !G.reload) { const V = A.vis, t = clamp((now - G.reloadStart) / (G.reloadEnd - G.reloadStart), 0, 1), k = seg(t, 0, V.ent) * (1 - seg(t, V.sai, 1)); for (let j = 0; j < 6; j++) o[j] += V.d[j] * k; }
+  if (an.m === 'python') anRevolver(F, an, a, o); // D7: revólver (Python, R8): tambor, ejetor, carregador rápido
+  if (A.vis && rc && an.m !== 'python' && G.reloadEnd && !G.reload) { const V = A.vis, t = clamp((now - G.reloadStart) / (G.reloadEnd - G.reloadStart), 0, 1), k = seg(t, 0, V.ent) * (1 - seg(t, V.sai, 1)); for (let j = 0; j < 6; j++) o[j] += V.d[j] * k; }
   molaPasso(an.mol, 6, AN.mola.w, AN.mola.z, dt, an.fm);
   for (let c = 0; c < 6; c++) o[c < 3 ? c + 3 : c - 3] += an.mol[c * 2]; // mol: [rx, ry, rz, x, y, z] → o: [x, y, z, rx, ry, rz]
   const qc = F.holder.parent.getWorldQuaternion(_an.q3), pw = _an.p.setFromMatrixPosition(_an.M.multiplyMatrices(F.body.matrixWorld, F.C));
   let mexe = false; for (let j = 0; j < 6; j++) if (Math.abs(o[j]) > 1e-5) mexe = true;
   const Mg = anMat(an.Mg, pw, qc, o[3], o[4], o[5], o[0], o[1], o[2]), fora = anMagFora(F, an); // carregador fora da arma: vai com a mão esquerda
   let ML = mexe ? Mg : null;
+  if (an.rv) anRevolverMao(F, an, Mg, qc); // D7: mão esquerda no tambor / no carregador rápido
   if (an.esq) { const L = an.esq; ML = an.ML.copy(Mg).premultiply(_an.M2.makeTranslation(_an.v.set(L[0], L[1], L[2]).applyQuaternion(qc))); } // a mão esquerda chega depois
   if (mexe) { anAplica(an, F.body, Mg); anAplica(an, an.mR, Mg); if (an.mag && !fora) anAplica(an, an.mag, Mg); anAplica(an, an.cart, Mg); }
   if (ML) { anAplica(an, an.mL, ML); if (an.mag && fora) anAplica(an, an.mag, ML); }
   if (F.ik) for (const arm of F.ik.arms) arm.anM = arm.sd > 0 ? (mexe ? Mg : null) : ML; // o alvo do pulso vai junto (fpIK)
   // tremida da câmera (encaixes): camTremePasso, em fpUpdate (a mesma mola para todos os pacotes)
+}
+// ===== D7: recarga de revólver (Python no Zumbi; o R8 do CS usa o mesmo modelo): o tambor (recortado dos voxels, ANPEC.python.tambor)
+// abre para a esquerda na báscula, a arma aponta para cima e o ejetor solta as cápsulas, a mão esquerda desce e volta com o carregador
+// rápido, encaixa por trás, fecha o tambor com um tranco e volta ao punho. Reutilizável: outro revólver só precisa da caixa do tambor
+// em ANPEC[m].tambor (c, h em cm; eixo: x, y da báscula) e de an.m no teste de anPose.
+// t: fração da recarga. arma: [t, x, y, z, rx, ry, rz] (m e rad, câmera); mao: [t, peso, x, y, z] (peso 0 = mão no punho; ponto em cm
+// no referencial da arma: gatilho na origem, cano +z, topo +y); ab: abertura do tambor (0..1 de RV.giro rad)
+const RV = {
+  giro: 1.35, sinal: -1, sentido: 1, ej: .3, encaixa: .68, fecha: .77, palma: [-.03, -.05, .04],
+  arma: [[0, 0, 0, 0, 0, 0, 0], [.12, -.03, .03, 0, .1, .15, .55], [.22, -.03, .05, .02, .2, .15, .6], [.28, -.03, .06, .03, .95, .1, .45], [.36, -.03, .05, .02, .9, .1, .45],
+    [.46, -.03, .02, 0, -.15, .15, .55], [.66, -.03, .03, 0, -.12, .15, .55], [.72, -.03, .03, 0, -.08, .15, .55], [.8, -.02, .03, 0, .05, .05, .15], [.9, 0, .004, 0, -.02, 0, 0], [1, 0, 0, 0, 0, 0, 0]],
+  mao: [[0, 0, 3, 3, 1], [.12, 1, 2.6, 2.5, 1.5], [.22, 1, 5.2, 1.5, 1.5], [.3, .85, 6, -7, 2], [.44, .9, 6, -14, -2], [.5, .9, 4, -16, -4], [.58, 1, 0, 3, -9],
+    [.66, 1, -1.2, 3, -5], [.7, 1, -1.2, 3, -2.2], [.74, 1, 2, 2, 1.5], [.78, 1, -1, 2, 1.5], [.88, .6, 0, 0, 0], [1, 0, 0, 0, 0]], // pontos relativos ao centro do tambor (aberto)
+  ab: [[0, 0], [.12, 0], [.2, 1], [.74, 1], [.79, 0], [1, 0]],
+  esp: [[.5, -6], [.62, -6], [.68, -1.2], [.71, -1.2]], // carregador rápido: z da traseira (cm, atrás da traseira do tambor)
+};
+const _rv = { o: new Float32Array(6), m: new Float32Array(4), a: new Float32Array(1), v: new V3(), w: new V3(), c: new V3(), q: new THREE.Quaternion(), G: new THREE.Matrix4(), L: new Float32Array(3) };
+function rvTambor(F, g, pai0, T, k) { // pivô e eixo da báscula no referencial do pai do grupo
+  const G = new THREE.Matrix4().multiplyMatrices(F.body.matrixWorld, F.C), Li = pai0.matrixWorld.clone().invert().multiply(G);
+  return { g, T, k, P: new V3(T.eixo[0], T.eixo[1], T.c[2]).divideScalar(k).applyMatrix4(Li), ax: new V3(0, 0, 1).transformDirection(Li) };
+}
+function rvGira(tb, ang) { const g = tb.g; g.quaternion.setFromAxisAngle(tb.ax, ang); g.position.copy(tb.P).sub(_rv.v.copy(tb.P).applyQuaternion(g.quaternion)); }
+function rvEspera(F, an) { // carregador rápido (6 balas em volta do botão), no referencial da arma em cm (preso ao corpo da arma)
+  if (an.spdl) return an.spdl; const tb = an.tb, A = armMats(), T = tb.T, g = new THREE.Group(), r = Math.min(T.h[0], T.h[1]);
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(r * .9, r * .9, 1, 14).rotateX(Math.PI / 2).translate(0, 0, -.5), A.watch));
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(r * .3, r * .3, 1.2, 10).rotateX(Math.PI / 2).translate(0, 0, -1.4), A.watch));
+  const b = new THREE.CylinderGeometry(.42, .42, 1.6, 8).rotateX(Math.PI / 2).translate(0, 0, .8);
+  for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3, m = new THREE.Mesh(b, A.brass); m.position.set(Math.cos(a) * r * .56, Math.sin(a) * r * .56, 0); g.add(m); }
+  g.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
+  g.matrixAutoUpdate = false; g.visible = false; F.body.add(g); return an.spdl = g;
+}
+function anRevolver(F, an, a, o) {
+  const tb = an.tb, on = G.reloadEnd && G.rEv && !G.reload && G.reloadStart != null, t = on ? clamp((now - G.reloadStart) / (G.reloadEnd - G.reloadStart), 0, 1) : 0;
+  const ang = on ? RV.sinal * RV.giro * kfSuave(RV.ab, t, 1, _rv.a)[0] : 0; if (tb) { rvGira(tb, ang); tb.ang = ang; }
+  if (!on) { an.rv = null; if (an.spdl) an.spdl.visible = false; return; }
+  const A = an.A, ev = (k, at) => t >= at && !G.rEv['rv_' + k] && (G.rEv['rv_' + k] = 1);
+  if (ev('abre', .16)) { play('slide'); anImpulso(an, A.imp.sai, null); }
+  if (ev('ej', RV.ej)) { play('magout'); const w = W[G.cur]; if (vmGun && w && CFG.gfx !== 'baixo') for (let i = 0; i < Math.min(6, wMag(G.cur) - (a?.mag ?? 0) || 6); i++) { const f = w19Capsula(w); rvPonto(F, tb, 0, 0, -tb.T.h[2], f.m.position); f.m.position.x += rand(-.01, .01); f.m.position.y += rand(-.01, .01); f.v.set(rand(-.15, .15), rand(-1.4, -.7), rand(-.1, .2)); vmScene.add(f.m); vmFx.push(f); } setTimeout(() => play('shell'), 380); }
+  if (ev('encaixa', RV.encaixa)) { play('shellin'); anMunicao(a); anImpulso(an, A.imp.entra, A.cam.entra); }
+  if (ev('fecha', RV.fecha)) { play('bolt'); anImpulso(an, A.imp.solta, A.cam.solta); }
+  kfSuave(RV.arma, t, 6, _rv.o); for (let j = 0; j < 6; j++) o[j] += _rv.o[j];
+  kfSuave(RV.mao, t, 4, _rv.m); an.rv = { w: clamp(_rv.m[0], 0, 1), x: _rv.m[1], y: _rv.m[2], z: _rv.m[3] };
+  if (tb) { const sp = rvEspera(F, an), E = RV.esp, vis = t >= E[0][0] && t < E[E.length - 1][0]; sp.visible = vis;
+    if (vis) { const T = tb.T, z = T.c[2] - T.h[2] + kfSuave(E, t, 1, _rv.a)[0], c = rvCentro(tb); sp.matrix.copy(F.C).multiply(_rv.G.makeScale(1 / tb.k, 1 / tb.k, 1 / tb.k)).multiply(_rv.G.makeTranslation(c[0], c[1], z)); sp.matrixWorldNeedsUpdate = true; } }
+}
+function rvCentro(tb) { const T = tb.T, e = T.eixo, a = (tb.ang || 0) * RV.sentido, c = Math.cos(a), s = Math.sin(a), x = T.c[0] - e[0], y = T.c[1] - e[1]; return [e[0] + x * c - y * s, e[1] + x * s + y * c]; } // centro do tambor (cm) com a báscula aberta
+function rvPonto(F, tb, x, y, z, out) { const T = tb?.T || { c: [0, 0, 0] }, k = tb?.k || 1, c = tb ? rvCentro(tb) : T.c; return out.set(c[0] + x, c[1] + y, T.c[2] + z).divideScalar(k).applyMatrix4(_rv.G.multiplyMatrices(F.body.matrixWorld, F.C)); }
+function anRevolverMao(F, an, Mg, qc) { // an.esq (deslocamento da mão esquerda, câmera) para o ponto da arma em RV.mao
+  const R = an.rv, arm = F.ik?.arms.find(x => x.sd < 0); if (!R || !arm?.wr || !R.w || vmGun?.userData.akimbo) { an.esq = null; return; } // Duplas: a mão esquerda é a da passada espelhada
+  const p = rvPonto(F, an.tb, R.x, R.y, R.z, _rv.c).applyMatrix4(Mg), w = _rv.w.setFromMatrixPosition(arm.wr.matrixWorld).applyMatrix4(Mg);
+  p.sub(w).applyQuaternion(_rv.q.copy(qc).invert()); const L = _rv.L;
+  for (let j = 0; j < 3; j++) L[j] = (p.getComponent(j) + RV.palma[j]) * R.w;
+  an.esq = L;
 }
 function anMagFora(F, an) { if (F.cur !== 'reload' && F.cur !== 'reloadE') return false; if (an.mag) for (const f of F.follow) if (f.a === an.mag && f.rest && f.w > .5) return true; return false; }
 function anEvento(an, k, a) {
@@ -21693,7 +21748,7 @@ function anEscopeta(F, an, w, a) {
   }
   F.act.timeScale = 0; F.act.time = clamp(t, 0, F.act.getClip().duration - 1e-3);
 }
-if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AN, ANPEC, AN_PECAS }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AN, ANPEC, AN_PECAS, RV }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
 // ===== fim an =====
 // IK dos braços: recua os ombros, leva a mão esquerda ao guarda-mão do modelo e gira braço e antebraço (dois ossos, cotovelo no mesmo
 // plano de antes) até cada pulso chegar ao alvo
