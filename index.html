@@ -34349,7 +34349,7 @@ const FIREBASE_CONFIG = {
 };
 const XP_CASE = 300; // XP para ganhar uma caixa
 // nível do jogador: XP total (txp) de jogo; do nível L para o L+1 custa 400 + 40·L (nível 10 com 5,4 mil XP; teto 999)
-function nivelInfo(t) { t = Math.max(0, +t || 0); let L = 1, c = 440; while (L < 999 && t >= c) { t -= c; L++; c = 400 + 40 * L; } return { L, x: t, c }; }
+function nivelInfo(t) { t = Math.max(0, +t || 0); let L = 1, c = 440; while (L < 999 && t >= c) { t -= c; L++; c = 400 + 40 * L; } return { L, x: L >= 999 ? c : t, c }; }
 function msqNivel(d) { return nivelInfo(d?.txp).L; }
 const nivelLimpo = v => { v = Math.floor(+v); return v >= 1 && v <= 999 ? v : 0; }; /* nível que vem pela rede */
 const xpStats = s => s ? (s.k | 0) * 10 + (s.hs | 0) * 5 + (s.m | 0) * 40 + (s.w | 0) * 110 + (s.zk | 0) * 3 : 0; /* piso do XP total pelas estatísticas (que sobem para a nuvem) */
@@ -34393,7 +34393,7 @@ function profSave(now_) {
   if (!PROF.cloud) return;
   clearTimeout(PROF.saveT);
   const gravar = async (imediato) => {
-    try { const { av, txp, ...dados } = PROF.data; if (AV_NUVEM) dados.av = av; if (TXP_NUVEM) dados.txp = txp; await FB.F.setDoc(FB.F.doc(FB.db, 'players', PROF.uid), { ...dados, name: PROF.name, upd: FB.F.serverTimestamp() }, { merge: true }); PROF.retentou = false; }
+    try { const { av, txp, ...dados } = PROF.data; if (AV_NUVEM) dados.av = av; if (TXP_NUVEM) dados.txp = Math.min(txp || 0, (PROF.txpNuvem || 0) + 5000); /* firestore.rules (saltoOk) recusa salto > 5000: sobe em degraus */ await FB.F.setDoc(FB.F.doc(FB.db, 'players', PROF.uid), { ...dados, name: PROF.name, upd: FB.F.serverTimestamp() }, { merge: true }); if (TXP_NUVEM) PROF.txpNuvem = dados.txp; PROF.retentou = false; }
     catch (e) {
       // as regras do Firestore (firestore.rules) aceitam uma gravação por segundo: duas imediatas no mesmo segundo (abrir caixa e esconder a aba) são refeitas em silêncio
       if (imediato && e.code === 'permission-denied' && !PROF.retentou) { PROF.retentou = true; clearTimeout(PROF.saveT); PROF.saveT = setTimeout(() => gravar(false), 3100); return; }
@@ -34422,11 +34422,11 @@ async function profOnUser(u) {
   try {
     const snap = await FB.F.getDoc(ref);
     PROF.user = (snap.exists() && normUser(snap.data().username)) || PROF.claimed?.[u.uid] || null;
-    if (snap.exists()) { PROF.data = cleanProf(snap.data()); const loc = load(profKey(), null); PROF.data.txp = Math.max(PROF.data.txp, Math.min(1e9, +loc?.txp || 0)); } /* o nível guardado neste navegador não regride */
+    if (snap.exists()) { PROF.txpNuvem = Math.max(0, +snap.data().txp || 0); PROF.data = cleanProf(snap.data()); const loc = load(profKey(), null); PROF.data.txp = Math.max(PROF.data.txp, Math.min(1e9, +loc?.txp || 0)); } /* o nível guardado neste navegador não regride */
     else { // conta nova: leva junto o que foi ganho como convidado neste navegador
       const guest = load('prof.guest', null);
       PROF.data = guest ? cleanProf(guest) : newProfile();
-      const { txp, ...ini } = PROF.data; await FB.F.setDoc(ref, { ...ini, ...(TXP_NUVEM ? { txp } : {}), name: PROF.name, created: FB.F.serverTimestamp() }, { merge: true });
+      const { txp, ...ini } = PROF.data; await FB.F.setDoc(ref, { ...ini, ...(TXP_NUVEM ? { txp: (PROF.txpNuvem = Math.min(txp || 0, 5000)) } : {}), name: PROF.name, created: FB.F.serverTimestamp() }, { merge: true });
       if (guest) save('prof.guest', newProfile(0));
     }
     PROF.cloud = true; PROF.status = ''; save(profKey(), PROF.data); nameSync(); frStart();
@@ -34464,7 +34464,7 @@ const normUser = v => { v = String(v || '').trim().toLowerCase(); return /^[a-z0
 function mpUI() { // cartão do jogador: inicial, nome, usuário/caixas e barra de XP até a próxima caixa
   const d = PROF.data; if (!$('#mAv')) return;
   if (!$('#mAv').firstChild) $('#mAv').innerHTML = '<svg viewBox="0 0 12 17"><path d="M1 1h10v4L6 8 1 5zM1 7l5 3 5-3v4l-5 3-5-3z" fill="currentColor"/></svg>';
-  const nv = nivelInfo(d?.txp); $('#mRank').textContent = 'Nível ' + nv.L; $('#mRank').title = Math.floor(nv.x) + ' / ' + nv.c + ' XP para o nível ' + (nv.L + 1);
+  const nv = nivelInfo(d?.txp); $('#mRank').textContent = 'Nível ' + nv.L; $('#mRank').title = nv.L >= 999 ? 'Nível máximo' : Math.floor(nv.x) + ' / ' + nv.c + ' XP para o nível ' + (nv.L + 1);
   setHTMLm('mpSub', (d ? `<b>${patente(d.elo)}</b> · ` : '') + (PROF.user ? '@' + esc(PROF.user) : PROF.uid ? 'Conta sem usuário' : 'Convidado'));
   if (d) { $('#mpXp').style.width = (d.xp / XP_CASE * 100).toFixed(1) + '%'; $('#mAv').style.setProperty('--xp', (nv.x / nv.c * 100).toFixed(1) + '%'); $('#mCxN').textContent = cxN(d, 0) + cxN(d, 1) + cxN(d, 2) + cxN(d, 3); }
   try { mnNovidades(); } catch (e) { } // (antes do FR existir)
