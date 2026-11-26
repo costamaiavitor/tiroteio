@@ -20620,7 +20620,7 @@ function fpSuavizaClipe(c) {
     return new tr.constructor(tr.name, nt, nv);
   });
 }
-function fpBuild(id, ud, gun) {
+function fpBuild(id, ud, gun, dono = vmGun) { // dono: quem recebe os voxels das peças do fpAtt (a arma da mão, ou o ARVX na prévia do Arsenal)
   const tb0 = performance.now(), W2 = fpw(id), P = FPK[W2.pack], D = W2.syn ? fpSyn(id, ud, gun) : W2.m && FPM[W2.m], pk = 'p:' + W2.pack, mk = W2.m && 'm:' + W2.m;
   const ak = P.armsFrom && 'p:' + P.armsFrom;
   if (!fpReady(pk) || (mk && !fpReady(mk)) || (ak && !fpReady(ak))) {
@@ -20775,7 +20775,7 @@ function fpBuild(id, ud, gun) {
     ud.fab = FAB_HOLO.includes(attBase(id)) ? 'holo' : 'luneta'; ud.fabLens = [];
     if (ud.fab === 'luneta') model.traverse(o => { if (o.isMesh && D.lens.includes(o.material.name) && !ud.fabLens.includes(o.material)) { o.material.transparent = true; ud.fabLens.push(o.material); } });
   }
-  if (!D?.syn) fpAtt(id, ud, ud.fps2, { D, tips, model, F2, P, root, holder, arms }); // uni2: acessórios do Armeiro no modelo baixado (peças em voxel, presas aos ossos)
+  if (!D?.syn) fpAtt(id, ud, ud.fps2, { D, tips, model, F2, P, root, holder, arms, dono }); // uni2: acessórios do Armeiro no modelo baixado (peças em voxel, presas aos ossos)
   // a15: o saque do pacote cabe no tempo do jogo (G.switchDur); modelo que chega depois entra no ponto do saque em que a troca está (ou parado)
   const z2 = !D?.syn && FZ2F.includes(W2.pack); // fz2: saque procedural (sobe girando com mola, a mão esquerda chega depois) sobre a pose parada
   const sw = G.switchEnd - now, dr = clips.draw && sw > .02 && !z2; mixer.stopAllAction(); fpPlay(ud, dr ? 'draw' : 'idle', dr ? G.switchDur : undefined); mixer.update(dr ? Math.max(0, G.switchDur - sw) : 0); if (dr) ud.fps2.until = G.switchEnd;
@@ -20945,7 +20945,7 @@ function fpAtt(id, ud, F, X) {
   for (const o of prx) { o.removeFromParent(); o.geometry.dispose(); } // sondas fora
   for (const g of [gM, gS]) if (g) for (const o of [...g.children]) if (o.geometry?.userData.prx) { o.removeFromParent(); o.geometry.dispose(); } // e as cópias delas
   gA.updateMatrixWorld(true);
-  vxzArma(vmGun, gA); // vxz: peças em voxel (com tudo ainda no gA: a grade é a do gA)
+  vxzArma(X.dono, gA); // vxz: peças em voxel (com tudo ainda no gA: a grade é a do gA)
   // peças do carregador e do ferrolho vão para o osso deles (seguem recarga e tiro)
   for (const [g, L] of [[gM, Vs.mag], [gS, Vs.sl]]) { const no = L[0]?.no; if (!g || !no) continue; for (const o of [...g.children]) no.attach(o); g.removeFromParent(); }
   // boca, mira (ADS) e retícula
@@ -22319,7 +22319,7 @@ function vxzArma(dono, gun) {
   const alvos = vxzAlvos(gun), falta = alvos.filter(a => (a.g = vxzCache(a.key)) === undefined), job = { dono, gun, alvos, t0, msMain: 0 };
   if (!falta.length) { job.msMain = performance.now() - t0; vxzTroca(job); return; } // tudo no cache: na hora
   const ps = falta.map(a => vxzPede(a).then(g => (a.g = g))); job.msMain = performance.now() - t0;
-  Promise.all(ps).then(() => { if (job.dono === vmGun || VMC.dono.has(job.dono)) vxzTroca(job); }); // arma descartada no meio: os voxels ficam só no cache
+  Promise.all(ps).then(() => { if (job.dono === vmGun || job.dono === ARVX || VMC.dono.has(job.dono)) vxzTroca(job); }); /* ARVX: prévia do Arsenal (fica no cache dela) */ // arma descartada no meio: os voxels ficam só no cache
 }
 function vxzAquece(g) { // aquecimento (warmUp): uma caixinha com cada material de voxel (senão a 1ª arma em voxel compila na hora e engasga)
   const geo = new THREE.BoxGeometry(.01, .01, .01), vistos = new Set(), I = new THREE.Matrix4(), add = [];
@@ -35176,7 +35176,7 @@ function arVox(w, f, list = []) {
   const fw = fpw(w); if (!fw || fw.syn || !FPK[fw.pack]) return null;
   const k = w + '|' + (f || '') + '|' + list.join(); let g = ARVX.cache.get(k); if (g) { ARVX.cache.delete(k); ARVX.cache.set(k, g); return g; }
   const ud = {}, ap = ATT_PV, sp = SKIN_PV; let h; ATT_PV = { list, f }; SKIN_PV = { id: w, f: f || null };
-  try { h = fpBuild(w, ud, new THREE.Group()); } catch (e) { console.warn('arVox', e); return null; } finally { ATT_PV = ap; SKIN_PV = sp; }
+  try { h = fpBuild(w, ud, new THREE.Group(), ARVX); } catch (e) { console.warn('arVox', e); return null; } finally { ATT_PV = ap; SKIN_PV = sp; }
   if (!h) return 'espera';
   const F = ud.fps2; F.mixer.stopAllAction();
   F.root.traverse(o => { if (o.isMesh && (o.name === 'voxBraco' || fpArm(o) || o.material?.name === '12ge')) o.visible = false; });
