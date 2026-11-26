@@ -20523,7 +20523,8 @@ const VXB = { mat: null, ult: new Map(), passo: .0016 }; // braços: cubo menor 
 function vxbMat() { if (!VXB.mat) { VXB.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .74, metalness: 0, name: 'voxPele' }); VXB.mat.userData.env = .7; vxEnv(); } return VXB.mat; }
 // item 0: o reflexo dos voxels da mão segue a luz do mapa (VM_ENV), como os materiais da arma feita no código: à noite (Zumbi, Sanatório,
 // exposição 1,4) o reflexo cheio da sala branca deixava a arma quase branca
-function vxEnv() { for (const m of [...(VX.mats || []), VXB.mat]) if (m) m.envMapIntensity = VM_ENV * m.userData.env; }
+// D20: à noite (luar, lâmpadas) o reflexo do ambiente (sala clara) deixava o aço do voxel quase branco: na arma ele cai a 45%
+function vxEnv() { for (const m of [...(VX.mats || []), VXB.mat]) if (m) m.envMapIntensity = VM_ENV * m.userData.env * (m !== VXB.mat && VM_ENV < 1 ? .45 : 1); }
 const vxbK = (i, j, k) => ((i + 1024) * 2048 + (j + 1024)) * 2048 + (k + 1024);
 function vxbVoxels(o, h) { // casca na pose de amarração (posições da geometria), com cor e até 4 pesos de osso por voxel
   const geo = o.geometry, pos = geo.attributes.position, uv = geo.attributes.uv, idx = geo.index, si = geo.attributes.skinIndex, sw = geo.attributes.skinWeight;
