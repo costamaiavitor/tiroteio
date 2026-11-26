@@ -1109,7 +1109,7 @@ Object.assign(W, {
   five7:    CSW('p250', { name: 'Five-SeveN', slot: 'secondary', price: 500, dmg: 32, rate: .12, mag: 20, res: 100, reload: 2.2, spread: .007, move: .03, air: .1, pen: .91, rm: .81, speed: .96, snd: 'pistol' }),
   cz75a:    CSW('cz75', { name: 'CZ75-Auto', slot: 'secondary', price: 500, dmg: 31, rate: .1, auto: 1, mag: 12, res: 12, reload: 2.7, spread: .01, move: .035, air: .1, pen: .78, rm: .85, speed: .96, reward: 100, snd: 'pistol' }),
   r8:       CSW('python', { name: 'R8 Revolver', slot: 'secondary', price: 600, dmg: 86, rate: .5, mag: 8, res: 8, reload: 2.3, spread: .006, move: .08, air: .2, pen: .93, rm: .94, speed: .96, snd: 'deagle' }),
-  mac10:    CSW('mp5k', { name: 'MAC-10', price: 1050, dmg: 29, rate: .075, auto: 1, mag: 30, res: 100, reload: 2.6, spread: .013, move: .02, air: .12, pen: .58, rm: .8, speed: .96, reward: 600, snd: 'smg' }),
+  mac10:    CSW('mac10', { model: 'uzi', name: 'MAC-10', price: 1050, dmg: 29, rate: .075, auto: 1, mag: 30, res: 100, reload: 2.6, spread: .013, move: .02, air: .12, pen: .58, rm: .8, speed: .96, reward: 600, snd: 'smg' }),
   mp9:      CSW('mp5k', { name: 'MP9', price: 1250, dmg: 26, rate: .07, auto: 1, mag: 30, res: 120, reload: 2.1, spread: .012, move: .02, air: .12, pen: .6, rm: .87, speed: .96, reward: 600, snd: 'smg' }),
   ump45:    CSW('mp5', { name: 'UMP-45', price: 1200, dmg: 35, rate: .09, auto: 1, mag: 25, res: 100, reload: 3.5, spread: .011, move: .025, air: .12, pen: .65, rm: .75, speed: .92, reward: 600, snd: 'smg' }),
   xm1014:   CSW('spas', { name: 'XM1014', price: 2000, dmg: 20, pellets: 6, rate: .35, auto: 1, mag: 7, res: 32, reload: 3, shellTime: .45, spread: .045, move: .02, air: .05, pen: .8, rm: .7, speed: .86, reward: 900, snd: 'shotgun' }),
@@ -18863,7 +18863,21 @@ function gunModel(id, fp = false, skin = null) {
       break;
     }
     case 'uzi': { // Uzi (caixa com o carregador no punho) e PM63 (pistola-metralhadora com empunhadura dobrável)
-      if (bid === 'pm63') {
+      if (bid === 'mac10') { /* MAC-10 (CS): caixa de chapa quadrada e curta, cano rosqueado, botão de manejo em cima, coronha de arame recolhida, alça de mão na frente */
+        add(g, EX([[-.115, .0], [-.115, .058], [-.108, .062], [.122, .062], [.128, .056], [.128, .0]], .05, null, .003), M.metal);
+        add(g, new THREE.BoxGeometry(.006, .002, .2), M.dark, 0, .0625, -.0); /* fenda do botão de manejo */
+        for (const s2 of [-1, 1]) add(g, new THREE.BoxGeometry(.002, .03, .16), M.dark, s2 * .0255, .03, .0); /* emenda das chapas */
+        add(g, EX([[-.03, -.002], [.128, -.002], [.128, -.016], [.06, -.016], [.045, -.022], [-.03, -.022]], .048, null, .003), M.polymer); /* caixa de baixo */
+        add(g, CY(.0105, .016, 12), M.metal, 0, .03, -.136); add(g, CY(.0075, .045, 12), M.metal, 0, .03, -.165); for (let k = 0; k < 6; k++) add(g, new THREE.TorusGeometry(.0076, .0011, 4, 12), M.dark, 0, .03, -.15 - k * .006);
+        bore(0, .03, -.188, .0045); mz = -.19; my = .03;
+        add(g, new THREE.TorusGeometry(.022, .004, 6, 14, Math.PI), M.dark, 0, -.004, -.1, 0, Math.PI / 2, Math.PI); /* alça de nylon da mão de apoio */
+        grip(g, -.03, .0, .1, M.polymer, .036); guard(g, .035, .0, .06);
+        for (const s2 of [-1, 1]) add(g, CY(.0028, .2, 8), M.steel, s2 * .029, .035, .01); add(g, RB(.06, .045, .008, .003), M.steel, 0, .02, .118); add(g, RB(.008, .03, .02, .002), M.steel, 0, .045, .112); /* coronha de arame recolhida dos lados da caixa */
+        const bolt = grp(g, 0, .068, -.03); add(bolt, RB(.012, .012, .014, .003), M.dark); for (const s2 of [-1, 1]) add(bolt, RB(.004, .008, .014, .001), M.dark, s2 * .0045, .008, 0); ud.bolt = bolt; /* botão de manejo com o entalhe por onde se mira */
+        const mag = grp(g, 0, -.04, .0); add(mag, RB(.026, .2, .03, .003), M.metal, 0, -.055, .012, -.14); add(mag, RB(.03, .012, .034, .003), M.dark, 0, -.15, .025, -.14); ud.mag = mag; ud.magGrab = new V3(0, -.2, .03); ud.rh = new V3(0, -.045, .008);
+        ud.lh = new V3(-.005, -.03, -.1);
+        irons(.085, .1, -.115, { notch: 0, base: .022, fbase: .022 });
+      } else if (bid === 'pm63') {
         pistolBody({ L: .19, sy: .032, sh: .019, sw: .03, sz: .07, fl: .15, gs: 1.05, bs: 1.1, slideM: M.metal, frameM: M.metal, gripM: M.bakelite, stipple: 0 });
         add(ud.mag, RB(.022, .1, .03, .003), M.metal, 0, -.05, -.004); ud.magGrab = new V3(0, -.22, .046);
         add(g, EX([[.13, .0], [.155, .0], ['q', .152, -.04, .148, -.07], [.128, -.07], ['q', .13, -.03, .13, .0]], .026, null, .004), M.bakelite, 0, .012, 0); // empunhadura dianteira
@@ -19791,7 +19805,7 @@ FPW.l96 = { pack: 'sniper', m: 'awp' }; // uni: a L96A1 do Zumbi é da mesma fam
 // mexer na tela); carregador de caixa embaixo (rig 'mag') e ferrolho da pistola seguem a peça do pacote. Acessórios do Armeiro, PaP
 // (papUV), Pistolas Duplas e o voxel fino (vxz) continuam os da arma do código. ?syn=0 volta às mãos antigas.
 const FSYN = { off: /[?&]syn=0\b/.test(location.search), bracos: { smg: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, mp40: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, spas: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] } } /* D23: MP40 (do Zumbi) como as SMGs do código; SPAS idem */, olho: .16, adsZ: { smg: .06, sniper: .14 }, mira: { hs10: [.12, 1], trench: [.1, 1], ks23: [.05, 1] /* D15: com .2 o olho ia para cima da coronha (madeira lisa enorme no centro) */, law: [.1, 0], wunderwaffe: [.32, 0], spectre: [.2, 0], pm63: [.2, 0] /* PM63: a mão do punho, embaixo do olho, enchia 13% da tela na mira */ } }; /* mira: por arma [distância extra (m), braços somem na mira]: bombas (a mão da bomba e a coronha cobriam a tela), LAW (tubo na frente do olho), Wunderwaffe (bulbo);  adsZ: na mira a arma do código fica mais longe do olho (m; medido: braço esquerdo cobria 28% da tela nas SMGs, 21% depois; Kar98k 24% -> 14%; na bomba piora: fica 0) */
-if (!FSYN.off) for (const [p, l] of Object.entries({ pistol: 'fiveseven b23r c96 raygun2 tec9', smg: 'ppsh thompson spectre kiparis uzi pm63', ak: 'stg44 mg42 stoner psg1',
+if (!FSYN.off) for (const [p, l] of Object.entries({ pistol: 'fiveseven b23r c96 raygun2 tec9', smg: 'ppsh thompson spectre kiparis uzi pm63 mac10', ak: 'stg44 mg42 stoner psg1',
   rifle: 'm16 aug famas g11 enfield law crossbow wunderwaffe wintershowl', pump: 'trench hs10 ks23', sniper: 'kar98k' })) for (const id of l.split(' ')) FPW[id] = { pack: p, syn: 1 };
 function fpSyn(id, ud, gun) { // modelo "baixado" sintético: origem no gatilho, cano para -Z, metros (escala 1)
   const D = { syn: 1, T: [null, 0, 0], fwd: '-z', up: '+y', L: 1, noMag2: 1, gun, ud, parts: {} };
