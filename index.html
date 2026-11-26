@@ -21204,7 +21204,7 @@ function fzSons(ud) {
 // y cima, z para trás); fer: [s, cm] ferrolho/alavanca puxado para trás (sem o osso do pacote); larga: velocidade inicial da cópia (m/s, câmera)
 // r7: fuzil do pacote: a mão esquerda sai do guarda-mão para o carregador passando colada na câmera (o antebraço atravessava a parte de
 // baixo da tela, 19-21%, e no quadro seguinte sumia de vez): desce e vai para a frente nesse trecho (mc: [s, x, y, z], m na câmera)
-const FZ2MC = [[.08, 0, 0, 0], [.22, .02, -.08, -.05], [.38, .02, -.13, -.05], [.5, 0, -.1, -.02], [.62, 0, 0, 0]];
+const FZ2MC = [[0, 0, 0, 0], [.1, .04, -.09, .06], [.22, .03, -.08, .03], [.38, .02, -.13, -.05], [.5, 0, -.1, -.02], [.62, 0, 0, 0]];
 const FZ2 = {
   ak: { // AK do pacote (Pmag + Pmag2): o novo bate no velho, que cai; na vazia a mão passa por baixo e puxa a alavanca do lado direito
     P: { seg: [[0, .43, .6], [.43, .8, 3, 0, 9], [.8, 1.14, .8], [1.14, 1.38, .35], [1.38, 1.66, .45], [1.66, 1.9, 1.2, 0, 3], [1.9, 2.648, .7]],
