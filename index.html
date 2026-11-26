@@ -19748,7 +19748,7 @@ const FPM = {
   ak74u: { T: [-115, 23, null], fwd: '+x', up: '+y', L: .73 },
   galil: { T: [-130, 39, null], fwd: '+x', up: '+y', L: .98, brass: ['Material.007', 'Material.008', 'Material.009'], lhf: .32 }, // a3: mão esquerda no guarda-mão, não no tubo de gás
   rpk: { T: [-116, 20, null], fwd: '+x', up: '+y', L: 1.04, lhf: .3, tint: { 'Material.008': 0x3a2014, 'Material.003': 0x3a2014, 'Material.002': 0x45281a, 'Material.007': 0x2e1a10 } }, // a3: madeira chapada rosada vira madeira escura; mão no guarda-mão
-  hk21: { T: [-1.0, -.30, null], fwd: '+x', up: '+y', L: 1.02, lens: ['Material.015'], lhf: .78, cover: 'topcover', coverA: 1.1 }, // mão esquerda à frente da caixa de munição; a7: tampa abre na recarga
+  hk21: { T: [-1.0, -.30, null], fwd: '+x', up: '+y', L: 1.02, lens: ['Material.015'], lhf: .78, cover: 'topcover', coverA: 1.1, velhoSome: 1 }, // D10: a caixa velha, fora da arma e longe da mão (a nova vem na mão), some em vez de flutuar ao lado da arma; mão esquerda à frente da caixa de munição; a7: tampa abre na recarga
   dragunov: { T: [-93, -6.7, null], fwd: '+x', up: '+y', L: 1.225, magBase: 1, att: { inteira: 1 } }, // fz2: carregador curto: o fundo dele vai para o fundo do do pacote (a cópia na mão ficava solta)
   m4: { T: [-20, -3, null], fwd: '+x', up: '+y', L: .84 , lhf: .5, magBase: 1 },
   commando: { T: [-44, -1, null], fwd: '+x', up: '+y', L: .85 , lhf: .5, magBase: 1 },
@@ -20664,7 +20664,7 @@ function fpBuild(id, ud, gun) {
       if (!b) continue;
       const f = { a, b, d: a.matrixWorld.clone().invert().multiply(b.matrixWorld) };
       if (pb === P.mag) { // carregador: fora da arma, o centro do carregador do modelo vai para o centro do do pacote (senão fica no ar, longe da mão)
-        if (P.mag2 && D.noMag2) f.hlV = fpBone(root, 'Hand_L'); // pb1: sem a cópia na mão (Dragunov/G3SG1/SCAR-20), o velho voando solto some (ver fpFollow)
+        if (P.mag2 && D.noMag2) f.hlV = fpBone(root, 'Hand_L'); f.velho = D.velhoSome; // pb1: sem a cópia na mão (Dragunov/G3SG1/SCAR-20), o velho voando solto some (ver fpFollow)
         const cA = fpBoneCenter(root, a, m => !fpArm(m)), cB = fpBoneCenter(ms, b, m => m.visible);
         if (cA && cB) { f.t0 = new V3().setFromMatrixPosition(f.d); f.t1 = cA.clone().sub(cB.applyMatrix3(new THREE.Matrix3().setFromMatrix4(f.d))); }
         if (D.magBase && f.t1) fpMagBase(f, root, ms, a, b, A, D.magBase); // a4: na mão, o fundo do carregador (onde a mão segura) no lugar do fundo do do pacote
@@ -21108,7 +21108,7 @@ function fpFollow(F, f) {
   }
   _fm2.copy(f.d); if (f.t1) _fm2.setPosition(_fv.copy(f.t0).lerp(f.t1, w));
   if (f.ghost) f.g.updateMatrixWorld(true);
-  if (preso) _fm2.premultiply(_fm.copy(F.body.matrixWorld).multiply(f.rest)); else _fm2.premultiply(f.a.matrixWorld);
+  if (preso || f.velho && !f.ghost && w < .02) _fm2.premultiply(_fm.copy(F.body.matrixWorld).multiply(f.rest)); else _fm2.premultiply(f.a.matrixWorld);
   if (pl && f.rest) { _fv.setFromMatrixPosition(_fm2).addScaledVector(pl, f.ghost ? 1 : w); _fm2.setPosition(_fv); } // fora da arma, o carregador vai junto com a mão desviada
   const zm = F.ik?.zm; if (zm && f.rest) { _fv.setFromMatrixPosition(_fm2).addScaledVector(zm, f.ghost ? 1 : w); _fm2.setPosition(_fv); } // fz2: idem com o desvio do roteiro
   _fm.copy(f.b.parent.matrixWorld).invert().multiply(_fm2); _fm.decompose(f.b.position, f.b.quaternion, f.b.scale);
@@ -21116,6 +21116,7 @@ function fpFollow(F, f) {
     _fv2.setFromMatrixPosition(f.hlV.matrixWorld); if (pl) _fv2.sub(pl);
     if (_fv.setFromMatrixPosition(f.a.matrixWorld).distanceTo(_fv2) > FPIK.magMao) f.b.scale.multiplyScalar(1e-4);
   }
+  if (f.velho && rec && !f.ghost) { const gh = F.follow.find(x => x.ghost && x.main === f); if (w > .02 || gh?.g.visible) f.b.scale.multiplyScalar(1e-4); } // D10 (HK21): a caixa velha sai da arma e some; não fica no ar ao lado da arma enquanto a mão traz a nova
 }
 // pb1: carregadores da arma do próprio pacote (AK-47: Pmag na arma, Pmag2 o novo). Fora da recarga o da arma fica preso ao encaixe e o
 // novo some; na recarga cada um só aparece encaixado, na mão esquerda ou longe do olho (FPIK.magZ), e o da mão acompanha o desvio dela.
