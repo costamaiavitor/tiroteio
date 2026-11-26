@@ -17084,6 +17084,7 @@ function buildMap(id) {
     if (b.mat === 'inv' || b.mat === 'col') { COL.push({ minX: b.x - b.w / 2, maxX: b.x + b.w / 2, minY: b.y, maxY: b.y + b.h, minZ: b.z - b.d / 2, maxZ: b.z + b.d / 2, ...(b.mat === 'inv' ? { ns: 1 } : {}) }); continue; }
     const th = M.theme[b.mat] || ['concrete', 0xaaaaaa], tk = paredeKind(th, b.x, b.z), key = b.mat + '|' + (b.c ?? '') + '|' + tk;
     const mat = mats[key] || (mats[key] = worldMat(tk, b.c ?? th[1], b.mat !== 'floor'));
+    if (b.mat === 'floor' && !PROP[tk]) Object.assign(mat, { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 4 }); // D11: o chão geral fica atrás, na profundidade, dos pisos dos cômodos 5 mm acima (Sanatório): sem isto, com a câmera em certas posições/FOV (entrando na mira) ele ganhava o teste de profundidade e o piso do cômodo sumia (cinza liso)
     if (!b.nc) COL.push({ minX: b.x - b.w / 2, maxX: b.x + b.w / 2, minY: b.y, maxY: b.y + b.h, minZ: b.z - b.d / 2, maxZ: b.z + b.d / 2 }); // nc: só desenho (fachadas)
     if (merge && b.mat !== 'floor') {
       const g = paredeGeo(b, tk, TEXS[tk]); g.translate(b.x, b.y + b.h / 2, b.z);
