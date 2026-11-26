@@ -21142,6 +21142,7 @@ function fpUpdate(ud, dt) {
   if (F.until && now >= F.until) F.until = 0;
   if (!F.until && !F.reloading) fpPlay(ud, me.sprinting && F.clips.run && !F.P?.semCorrida ? 'run' : hs > 1.5 && me.onGround && F.clips.walk ? 'walk' : 'idle');
   if (F.ik?.sv) { F.ik.arms.forEach((a, i) => { const v = F.ik.sv[i]; a.cl.position.copy(v[0]); a.ua.quaternion.copy(v[1]); a.fa.quaternion.copy(v[2]); if (a.hand) a.hand.position.copy(v[3]); }); if (F.ik.hp) F.ik.hl.position.copy(F.ik.hp); } // desfaz o IK do quadro anterior (ossos sem chave na animação)
+  if (F.gl) anDesfaz(F, F.gl); // gin2
   if (F.an) anDesfaz(F); // an: ossos mexidos pelas camadas voltam ao que a animação deixou
   if (F.z2) fz2Tempo(F); // fz2: tempo do clipe da recarga pelo roteiro
   F.mixer.update(dt);
@@ -21149,6 +21150,7 @@ function fpUpdate(ud, dt) {
   if (F.hideL) F.hideL.scale.setScalar(1e-3); // faca: a mão esquerda do pacote fica parada no canto da tela, então some (como no CS)
   if (F.foraL) F.foraL.cl.position.copy(F.foraL.p); // E3 (granadas): braço esquerdo fora da tela
   if (F.an) anPose(ud, dt); // an: saque, travas, eventos e molas no esqueleto (antes do IK)
+  if (F.ik && !F.knife) fpGin(F); // gin2: inspeção das armas longas no esqueleto
   if (F.ik) fpIK(F); // braços antes das peças: o carregador na mão esquerda acompanha o desvio da mão (pushL)
   if (F.follow.length) { // peças móveis do modelo copiam o movimento das peças do pacote
     F.root.updateMatrixWorld(true);
@@ -21606,7 +21608,7 @@ function anPecas(F, an, R, model, u) { // ferrolho e carregador por caixa, recor
 }
 // osso: guarda o estado da animação antes de mexer (anDesfaz devolve no quadro seguinte, antes do mixer)
 function anGuarda(an, o) { let s = an.sv.get(o); if (!s) an.sv.set(o, s = { p: new V3(), q: new THREE.Quaternion(), s: new V3(), on: false }); if (!s.on) { s.p.copy(o.position); s.q.copy(o.quaternion); s.s.copy(o.scale); s.on = true; } }
-function anDesfaz(F) { for (const [o, s] of F.an.sv) if (s.on) { o.position.copy(s.p); o.quaternion.copy(s.q); o.scale.copy(s.s); s.on = false; } }
+function anDesfaz(F, an = F.an) { for (const [o, s] of an.sv) if (s.on) { o.position.copy(s.p); o.quaternion.copy(s.q); o.scale.copy(s.s); s.on = false; } }
 // M (mundo) = giro e (rad, eixos da câmera) em volta do ponto pw + deslocamento d (m, câmera)
 function anMat(out, pw, qc, e0, e1, e2, d0, d1, d2) {
   const q = _an.q.setFromEuler(_an.e.set(e0, e1, e2, 'YXZ')); q.premultiply(qc).multiply(_an.q2.copy(qc).invert());
@@ -22673,7 +22675,8 @@ function knifeAnim(o, ud) {
 // traz para o meio, mostra um lado, vira e mostra o outro, volta. Para na hora com tiro, recarga, mira, luneta, corrida, troca ou queda.
 // Quadros: [t (0–1), x, y, z, giro x, y, z] somados à pose do quadril, entre eles curva suave (sem passar do alvo).
 const _gin6 = new Float32Array(6);
-const GINSP = { sai: .2, dur: 2.6, fr: [[0, 0, 0, 0, 0, 0, 0], [.2, -.06, .03, .04, .1, .55, .35], [.45, -.065, .035, .045, .12, .6, .4], [.63, -.005, .04, 0, .2, .12, -.36], [.85, -.005, .045, 0, .22, .15, -.4], [1, 0, 0, 0, 0, 0, 0]] };
+const GINSP = { sai: .2, dur: 2.6, fr: [[0, 0, 0, 0, 0, 0, 0], [.2, -.06, .03, .04, .1, .55, .35], [.45, -.065, .035, .045, .12, .6, .4], [.63, -.005, .04, 0, .2, .12, -.36], [.85, -.005, .045, 0, .22, .15, -.4], [1, 0, 0, 0, 0, 0, 0]],
+  longa: [[0, 0, 0, 0, 0, 0, 0], [.2, -.04, .02, .02, .1, .45, .35], [.45, -.045, .025, .025, .12, .5, .4], [.63, .035, -.025, 0, .03, .1, -.3], [.85, .035, -.02, 0, .04, .12, -.34], [1, 0, 0, 0, 0, 0, 0]] };
 function armaInspect() {
   const w = W[G.cur]; if (!w) return;
   if (['knife', 'karambit'].includes(w.model)) return knifeInspect();
@@ -22685,11 +22688,30 @@ function armaInspectPose(o) {
   if (now - S.t0 >= GINSP.dur || S.id !== G.cur || now < G.switchEnd || !me.alive) { G.gin = null; return; }
   if (!S.out && (G.nextFire > S.t0 || now < G.reloadEnd || (G.ads || 0) > .02 || G.scope || me.sprinting || me.downed)) S.out = now; // interrompida (tiro, recarga, mira, corrida): sai misturando em GINSP.sai s, sem pular
   const f = S.out ? 1 - smooth((now - S.out) / GINSP.sai) : 1; if (f <= 0) { G.gin = null; return; }
+  if (ginEsq(vmGun?.userData.fps2)) return; // gin2: armas longas dos braços prontos: no esqueleto (fpGin), não no conjunto inteiro
   const t = (now - S.t0) / GINSP.dur, P6 = kfSuave(GINSP.fr, t, 6, _gin6), v = j => P6[j - 1] * f; // curva sem paradas em cada quadro
   o.x += v(1); o.y += v(2); o.z += v(3); o.rx += v(4); o.ry += v(5); o.rz += v(6);
   const P = vmGun?.userData.fps2?.P; if (P?.v || P?.view) { // rp1: braços prontos: gira em volta do gatilho, o + (P - R·P) (em volta do olho a arma saía da tela e o braço a enchia)
     _vmQ.setFromEuler(_vmE.set(v(4), v(5), v(6))); _vmV.fromArray(P.v?.p || FPV[P.view === 'pistol' ? 'pistol' : 'long'].p); _vmV2.copy(_vmV).applyQuaternion(_vmQ);
     o.x += _vmV.x - _vmV2.x; o.y += _vmV.y - _vmV2.y; o.z += _vmV.z - _vmV2.z; }
+}
+// gin2: inspeção das armas longas nos braços prontos: girar o conjunto inteiro (braços junto) mostrava a ponta aberta da manga esquerda no
+// meio da tela (o ombro girava para a frente da câmera; braço até 22%). Agora a arma e os controles das mãos giram em volta do gatilho no
+// esqueleto e os braços seguem pelo IK com os ombros parados (como as camadas do an). GINSP.longa: curva mais contida (o guarda-mão fica
+// longe do gatilho: o mesmo giro levaria a mão esquerda para o meio da tela)
+const ginEsq = F => !!(F?.ik && !F.knife && F.P?.view !== 'pistol' && F.body && F.C && F.holder);
+const _ginL = new Float32Array(6);
+function fpGin(F) {
+  if (!F.an) for (const a of F.ik.arms) a.anM = null; // (com an, o anPose refaz o anM a cada quadro)
+  const S = G.gin; if (!S || S.id !== G.cur || !ginEsq(F)) return;
+  const f = S.out ? 1 - smooth((now - S.out) / GINSP.sai) : 1; if (f <= 0) return;
+  const P6 = kfSuave(GINSP.longa, clamp((now - S.t0) / GINSP.dur, 0, 1), 6, _ginL); for (let j = 0; j < 6; j++) P6[j] *= f;
+  const L = F.gl || (F.gl = { sv: new Map(), mR: fpBone(F.root, 'IK_Hand_Cntrl_R'), mL: fpBone(F.root, 'IK_Hand_Cntrl_L'), M: new THREE.Matrix4() });
+  F.root.updateMatrixWorld(true);
+  const qc = F.holder.parent.getWorldQuaternion(_an.q3), pw = _an.p.setFromMatrixPosition(_an.M.multiplyMatrices(F.body.matrixWorld, F.C));
+  const M = anMat(L.M, pw, qc, P6[3], P6[4], P6[5], P6[0], P6[1], P6[2]);
+  anAplica(L, F.body, M); anAplica(L, L.mR, M); anAplica(L, L.mL, M);
+  for (const a of F.ik.arms) a.anM = a.anM ? (a.ginM || (a.ginM = new THREE.Matrix4())).multiplyMatrices(M, a.anM) : M;
 }
 function knifeInspect() {
   if (vmGun?.userData.armsKnife) { if (ARMS.cur === 'idle') armsPlay('inspect'); return; }
