@@ -35435,7 +35435,7 @@ function tick(dt) {
   atmosTick(dt);
   // câmera
   const w = W[G.cur];
-  const adsT = G.adsHold && me.alive && !G.reloadEnd && !me.sprinting && now >= G.switchEnd && w && !w.scope && (w.slot === 'primary' || w.slot === 'secondary') ? 1 : 0;
+  const adsT = G.adsHold && me.alive && !G.reloadEnd && !me.sprinting && now >= G.switchEnd && w && !w.scope && (w.slot === 'primary' || w.slot === 'secondary') && !akOn() ? 1 : 0; // D3: Pistolas Duplas não miram (botão direito segurado desde a arma anterior levava as duas pistolas ao centro: braços em V e mãos juntas)
   w18Mola(G, 'ads', 'adsV', adsT, W18.k * 11 * attStat(G.cur, 'adsSpd'), dt, 0, 1); if (G.ads < .002 && !adsT) { G.ads = 0; G.adsV = 0; } // mola criticamente amortecida (era lerp: a mira começava já na velocidade máxima, um tranco na arma e na inspeção cortada)
   $('#xhair').style.opacity = G.ads > .5 ? 0 : 1;
   scopeTick(dt, w);
