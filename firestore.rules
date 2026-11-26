@@ -67,7 +67,8 @@ service cloud.firestore {
       // wxp: XP de cada arma (nível do Arsenal); att: acessórios escolhidos por arma; elo: patente (Rodadas)
       function mapaArmasOk(m) { return m is map && m.keys().size() <= 150 && m.keys().join(',').matches('^$|^[a-z0-9_]{1,24}(,[a-z0-9_]{1,24})*$'); }
       function formaOk() {
-        return d().keys().hasOnly(['xp', 'cases', 'items', 'equipped', 'opened', 'name', 'upd', 'created', 'st', 'cx', 'wxp', 'att', 'elo', 'av'])
+        return d().keys().hasOnly(['xp', 'cases', 'items', 'equipped', 'opened', 'name', 'upd', 'created', 'st', 'cx', 'wxp', 'att', 'elo', 'av', 'txp'])
+          && (!('txp' in d()) || (d().txp is number && d().txp >= 0 && d().txp <= 1000000000)) // XP total (nível do jogador); o index.html só manda com TXP_NUVEM = true
           && (!('av' in d()) || (d().av is string && d().av.size() <= 240 && d().av.matches('^[a-z0-9.+]*$'))) // avatar (aba Personagem): código compacto; o index.html só manda com AV_NUVEM = true
           && (!('wxp' in d()) || mapaArmasOk(d().wxp))
           && (!('att' in d()) || mapaArmasOk(d().att))
@@ -95,7 +96,8 @@ service cloud.firestore {
         return valor(d()) <= valor(antes()) + 10
           && d().opened <= antes().opened + 5
           && valor(d()) >= valor(antes()) - 27 * (d().opened - antes().opened)
-          && d().items.size() <= antes().items.size() + 1 + (d().opened - antes().opened);
+          && d().items.size() <= antes().items.size() + 1 + (d().opened - antes().opened)
+          && (!('txp' in d()) || !('txp' in antes()) || d().txp <= antes().txp + 5000); // nível: no máximo +5000 XP por gravação (a primeira traz o acumulado)
       }
 
       // ---- D4: tetos absolutos na criação ----

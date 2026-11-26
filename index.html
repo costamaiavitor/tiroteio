@@ -728,8 +728,6 @@ summary{cursor:pointer;color:#fff;font-weight:700}
 .msqT .lv{font-family:Teko,Rajdhani,sans-serif;font-size:21px;color:#9fc3e6;line-height:1}
 .msqT .rk{width:12px;height:17px;color:#d8dde2}
 .msqT.eu .nm{color:var(--mg)}
-.msqT .mic{width:16px;height:16px;color:#cfd3d7;opacity:.85}
-.msqT .mic.mut{opacity:.35}
 #menu .msqI{position:absolute;left:0;top:0;pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;background:none;border:0;color:rgba(255,255,255,.6);font-family:Teko,Rajdhani,sans-serif;letter-spacing:1.5px;text-transform:uppercase;padding:0;cursor:pointer;opacity:.7;transition:opacity .2s,color .2s;will-change:transform}
 #menu .msqI:hover{opacity:1;color:var(--mg);background:none}
 .msqI svg{opacity:.3}
@@ -23168,6 +23166,7 @@ function equip(id, force) {
   if (id !== G.cur && hasW(G.cur)) G.last = G.cur; // Q: a granada que acabou de sair não vira a "última arma"
   G.ads = 0; G.adsV = 0;
   G.swing = 0; G.pin = null; // 6-w18: o balanço do arremesso/colocação (G.swing, só visual) ficava para a arma nova, que girava até 63° logo depois do saque
+  if (W[id]?.slot === 'primary' && G.ultW !== id) { G.ultW = id; save('ultArma', id); } /* a do boneco no menu */
   G.cur = id; G.reloadEnd = 0; G.reload = null; G.scope = 0; G.rezoom = 0; G.burstN = 0; G.switchDur = W[id]?.model === 'awp' ? .6 : id === 'knife' ? .55 : .35; G.kan = null; G.gin = null; G.switchEnd = now + G.switchDur; G.shots = 0;
   vmSetWeapon(id); play('draw');
 }
@@ -24020,7 +24019,9 @@ function avtMeuPadrao() {
 }
 function avtLimpa(s) { return typeof s === 'string' && s.length <= 240 && /^[a-z0-9.+]+$/.test(s) ? s : null; } // o que chega pela rede (o resto é ignorado ao decodificar)
 // o que vai para os outros no sk: skins equipadas + o avatar
-function skEnvio() { const sk = cleanSk(PROF.data?.equipped), av = avtLimpa(PROF.data?.av); if (av) sk._av = av; return sk; }
+function skEnvio() { const sk = cleanSk(PROF.data?.equipped), av = avtLimpa(PROF.data?.av), w = minhaArma(); if (av) sk._av = av; sk._lv = msqNivel(PROF.data); if (w) sk._w = w; return sk; } // _lv e _w: nível e arma do boneco no menu do grupo
+const armaPrim = w => typeof w === 'string' && Object.hasOwn(W, w) && W[w].slot === 'primary' ? w : null; /* arma do boneco no menu (a minha e a que vem pela rede) */
+function minhaArma() { let w = null; try { w = armaPrim(load('ultArma', null)); } catch (e) { } return w || armaPrim(AR.w) || 'ak47'; } /* a primária que usei por último na partida */
 // ===== fim dos avatares (a aba Personagem fica perto da tela de skins: pgUI) =====
 
 // ---------- jogadores remotos ----------
@@ -34218,6 +34219,11 @@ const FIREBASE_CONFIG = {
   appId: '1:226278812286:web:c967aee2e976fc5e61862f',
 };
 const XP_CASE = 300; // XP para ganhar uma caixa
+// nível do jogador: XP total (txp) de jogo; do nível L para o L+1 custa 400 + 40·L (nível 10 com 5,4 mil XP; teto 999)
+function nivelInfo(t) { t = Math.max(0, +t || 0); let L = 1, c = 440; while (L < 999 && t >= c) { t -= c; L++; c = 400 + 40 * L; } return { L, x: t, c }; }
+function msqNivel(d) { return nivelInfo(d?.txp).L; }
+const nivelLimpo = v => { v = Math.floor(+v); return v >= 1 && v <= 999 ? v : 0; }; /* nível que vem pela rede */
+const xpStats = s => s ? (s.k | 0) * 10 + (s.hs | 0) * 5 + (s.m | 0) * 40 + (s.w | 0) * 110 + (s.zk | 0) * 3 : 0; /* piso do XP total pelas estatísticas (que sobem para a nuvem) */
 const OWNERS = ['costamaiavitor@gmail.com']; // contas que recebem todas as skins ao entrar
 function grantAllSkins() {
   const d = PROF.data; if (!d) return 0;
@@ -34232,23 +34238,25 @@ function grantAllSkins() {
 }
 const PROF = { user: null, uid: null, email: '', name: '', cloud: false, fb: false, data: null, saveT: 0, status: '' };
 const FB = {};
-const newProfile = (cases = 2) => ({ xp: 0, cases, items: [], equipped: {}, opened: 0, st: {}, wxp: {}, att: {}, cx: { r: 0, e: 0, l: 0 } }); // cases: Caixas Comuns; cx: Raras, Épicas e Lendárias
+const newProfile = (cases = 2) => ({ xp: 0, txp: 0, cases, items: [], equipped: {}, opened: 0, st: {}, wxp: {}, att: {}, cx: { r: 0, e: 0, l: 0 } }); // cases: Caixas Comuns; cx: Raras, Épicas e Lendárias
 const STK = ['k', 'd', 'hs', 'w', 'm', 'zk', 'zr']; // abates, mortes, headshots, vitórias, partidas, zumbis, recorde de rodada
-function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) { if (w === '_faca') { if (f === 'karambit') o._faca = f; } else if (w === '_av') { const a = avtLimpa(f); if (a) o._av = a; } else if (typeof f === 'string' && Object.hasOwn(W, w) && Object.hasOwn(SKIN_BY, f)) o[w] = f; } return o; } // hasOwn: 'constructor'/'toString' passavam e quebravam o state de todos
+function cleanSk(sk) { const o = {}; if (sk && typeof sk === 'object') for (const [w, f] of Object.entries(sk).slice(0, 80)) { if (w === '_faca') { if (f === 'karambit') o._faca = f; } else if (w === '_av') { const a = avtLimpa(f); if (a) o._av = a; } else if (w === '_lv') { const v = nivelLimpo(f); if (v) o._lv = v; } else if (w === '_w') { const a = armaPrim(f); if (a) o._w = a; } else if (typeof f === 'string' && Object.hasOwn(W, w) && Object.hasOwn(SKIN_BY, f)) o[w] = f; } return o; } // hasOwn: 'constructor'/'toString' passavam e quebravam o state de todos
 function cleanProf(d) {
   const p = newProfile(0); if (!d || typeof d !== 'object') return p;
   p.xp = Math.max(0, +d.xp || 0); p.cases = Math.max(0, Math.floor(+d.cases || 0)); p.opened = Math.max(0, Math.floor(+d.opened || 0));
   p.items = Array.isArray(d.items) ? [...new Set(d.items.filter(it => typeof it === 'string' && Object.hasOwn(W, it.split(':')[0]) && Object.hasOwn(SKIN_BY, it.split(':')[1] ?? '')))] : [];
   if (d.cx && typeof d.cx === 'object') for (const k of ['r', 'e', 'l']) p.cx[k] = Math.max(0, Math.min(1e5, Math.floor(+d.cx[k] || 0))); // caixas de raridade (perfil antigo: zero)
   p.st = {}; if (d.st && typeof d.st === 'object') for (const k of STK) p.st[k] = Math.max(0, Math.floor(+d.st[k] || 0));
+  p.txp = Math.min(1e9, Math.max(+d.txp || 0, xpStats(p.st))); /* XP total do nível; perfil antigo: estimado pelas estatísticas */
   if (d.wxp && typeof d.wxp === 'object') for (const [k, v] of Object.entries(d.wxp)) if (Object.hasOwn(W, k) && +v > 0) p.wxp[k] = Math.min(1e7, Math.floor(+v)); // nível das armas (Armeiro)
   if (d.att && typeof d.att === 'object') for (const [k, v] of Object.entries(d.att)) if (Object.hasOwn(W, k) && Array.isArray(v)) { const a = [], sl = new Set(); for (const x of v.slice(0, 20)) if (typeof x === 'string' && Object.hasOwn(ATT, x) && !sl.has(ATT[x].slot) && a.length < ATT_MAX) { sl.add(ATT[x].slot); a.push(x); } if (a.length) p.att[k] = a; }
   p.equipped = cleanSk(d.equipped); for (const [w, f] of Object.entries(p.equipped)) if (w !== '_faca' && !p.items.includes(w + ':' + f)) delete p.equipped[w];
-  delete p.equipped._av; p.av = avtLimpa(d.av) || avtLimpa(load('avatar', null)) || ''; // avatar (aba Personagem); a cópia em 'avatar' cobre a conta na nuvem
+  delete p.equipped._av; delete p.equipped._lv; delete p.equipped._w; p.av = avtLimpa(d.av) || avtLimpa(load('avatar', null)) || ''; // avatar (aba Personagem); a cópia em 'avatar' cobre a conta na nuvem
   return p;
 }
 const profKey = () => 'prof.' + (PROF.uid || 'guest');
 function profLoadLocal() { const d = load(profKey(), null); PROF.data = d ? cleanProf(d) : newProfile(); }
+const TXP_NUVEM = false; // o XP total (nível) só vai para a nuvem depois de publicar o firestore.rules com o campo txp; até lá fica no localStorage e as estatísticas (que já sobem) dão o piso
 const AV_NUVEM = false; // o avatar só vai para a nuvem depois de publicar o firestore.rules com o campo av (senão a gravação inteira é recusada)
 function profSave(now_) {
   if (!PROF.data) return;
@@ -34256,7 +34264,7 @@ function profSave(now_) {
   if (!PROF.cloud) return;
   clearTimeout(PROF.saveT);
   const gravar = async (imediato) => {
-    try { const { av, ...dados } = PROF.data; if (AV_NUVEM) dados.av = av; await FB.F.setDoc(FB.F.doc(FB.db, 'players', PROF.uid), { ...dados, name: PROF.name, upd: FB.F.serverTimestamp() }, { merge: true }); PROF.retentou = false; }
+    try { const { av, txp, ...dados } = PROF.data; if (AV_NUVEM) dados.av = av; if (TXP_NUVEM) dados.txp = txp; await FB.F.setDoc(FB.F.doc(FB.db, 'players', PROF.uid), { ...dados, name: PROF.name, upd: FB.F.serverTimestamp() }, { merge: true }); PROF.retentou = false; }
     catch (e) {
       // as regras do Firestore (firestore.rules) aceitam uma gravação por segundo: duas imediatas no mesmo segundo (abrir caixa e esconder a aba) são refeitas em silêncio
       if (imediato && e.code === 'permission-denied' && !PROF.retentou) { PROF.retentou = true; clearTimeout(PROF.saveT); PROF.saveT = setTimeout(() => gravar(false), 3100); return; }
@@ -34285,11 +34293,11 @@ async function profOnUser(u) {
   try {
     const snap = await FB.F.getDoc(ref);
     PROF.user = (snap.exists() && normUser(snap.data().username)) || PROF.claimed?.[u.uid] || null;
-    if (snap.exists()) PROF.data = cleanProf(snap.data());
+    if (snap.exists()) { PROF.data = cleanProf(snap.data()); const loc = load(profKey(), null); PROF.data.txp = Math.max(PROF.data.txp, Math.min(1e9, +loc?.txp || 0)); } /* o nível guardado neste navegador não regride */
     else { // conta nova: leva junto o que foi ganho como convidado neste navegador
       const guest = load('prof.guest', null);
       PROF.data = guest ? cleanProf(guest) : newProfile();
-      await FB.F.setDoc(ref, { ...PROF.data, name: PROF.name, created: FB.F.serverTimestamp() }, { merge: true });
+      const { txp, ...ini } = PROF.data; await FB.F.setDoc(ref, { ...ini, ...(TXP_NUVEM ? { txp } : {}), name: PROF.name, created: FB.F.serverTimestamp() }, { merge: true });
       if (guest) save('prof.guest', newProfile(0));
     }
     PROF.cloud = true; PROF.status = ''; save(profKey(), PROF.data); nameSync(); frStart();
@@ -34327,9 +34335,9 @@ const normUser = v => { v = String(v || '').trim().toLowerCase(); return /^[a-z0
 function mpUI() { // cartão do jogador: inicial, nome, usuário/caixas e barra de XP até a próxima caixa
   const d = PROF.data; if (!$('#mAv')) return;
   if (!$('#mAv').firstChild) $('#mAv').innerHTML = '<svg viewBox="0 0 12 17"><path d="M1 1h10v4L6 8 1 5zM1 7l5 3 5-3v4l-5 3-5-3z" fill="currentColor"/></svg>';
-  $('#mRank').textContent = 'Nível ' + msqNivel(d);
+  const nv = nivelInfo(d?.txp); $('#mRank').textContent = 'Nível ' + nv.L; $('#mRank').title = Math.floor(nv.x) + ' / ' + nv.c + ' XP para o nível ' + (nv.L + 1);
   setHTMLm('mpSub', (d ? `<b>${patente(d.elo)}</b> · ` : '') + (PROF.user ? '@' + esc(PROF.user) : PROF.uid ? 'Conta sem usuário' : 'Convidado'));
-  if (d) { $('#mpXp').style.width = (d.xp / XP_CASE * 100).toFixed(1) + '%'; $('#mAv').style.setProperty('--xp', (d.xp / XP_CASE * 100).toFixed(1) + '%'); $('#mCxN').textContent = cxN(d, 0) + cxN(d, 1) + cxN(d, 2) + cxN(d, 3); }
+  if (d) { $('#mpXp').style.width = (d.xp / XP_CASE * 100).toFixed(1) + '%'; $('#mAv').style.setProperty('--xp', (nv.x / nv.c * 100).toFixed(1) + '%'); $('#mCxN').textContent = cxN(d, 0) + cxN(d, 1) + cxN(d, 2) + cxN(d, 3); }
   try { mnNovidades(); } catch (e) { } // (antes do FR existir)
 }
 function nameSync() { // logado com usuário: o nome no jogo é o usuário (fixo)
@@ -34445,7 +34453,7 @@ function openLobby(priv) {
 function lobbySync() {
   if (!S.lobby) return;
   if (isR()) for (const p of S.players.values()) if (p.team !== 't' && p.team !== 'ct') setTeam(p, teamPick());
-  broadcast({ t: 'lobby', st: S.st, code: NET.code, priv: LB.priv ? 1 : 0, pl: [...S.players.values()].map(p => ({ id: p.id, n: p.name, tm: p.team || '', c: p.color, av: avtLimpa(p.skins?._av) || '' })) });
+  broadcast({ t: 'lobby', st: S.st, code: NET.code, priv: LB.priv ? 1 : 0, pl: [...S.players.values()].map(p => ({ id: p.id, n: p.name, tm: p.team || '', c: p.color, av: avtLimpa(p.skins?._av) || '', lv: nivelLimpo(p.skins?._lv), w: armaPrim(p.skins?._w) || '' })) });
 }
 function srvAfterMatch() { if (S.fromLobby) backToLobby(); else srvStartMatch(); }
 function backToLobby() { // fim da partida: todo mundo volta ao lobby (o host troca modo, mapa e times e começa de novo)
@@ -34631,8 +34639,9 @@ function lobbyUI() {
   } else setHTMLm('lbInfo', `<div class="lbl" style="margin-top:0">Partida</div><div style="font-size:19px">Modo: <b>${MODE_N[st.mode] || '-'}</b> · Mapa: <b>${esc(MAPS[st.map]?.name || '-')}</b>${rounds ? ` · ${st.rounds} rodadas para vencer` : ''}</div><div class="hint">Esperando o host começar a partida...</div>`);
 }
 // ---------- recompensas: XP → caixas ----------
-function grantXP(n) {
+function grantXP(n, nivel = true) { // nivel: XP de jogo (abates, rodadas, partidas) também sobe o nível; skin repetida não
   const d = PROF.data; if (!d || !(n > 0)) return;
+  if (nivel) { const a = msqNivel(d); d.txp = Math.min(1e9, (d.txp || 0) + n); const b = msqNivel(d); if (b > a && inGame) { toast('Subiu para o nível ' + b + '!', 3); play('kaching'); } }
   d.xp += n; let got = 0;
   while (d.xp >= XP_CASE) { d.xp -= XP_CASE; d.cases++; got++; }
   if (got && inGame) { toast(got > 1 ? `Você ganhou ${got} Caixas Comuns! Abra no menu → Caixas` : 'Você ganhou uma Caixa Comum! Abra no menu → Caixas', 4); play('kaching'); }
@@ -34806,7 +34815,7 @@ function pgPrevia() { // médio já (rápido) e o fino logo depois; pedidos anti
 // ===== menu principal: palco 3D do grupo (fim de tarde, terra, pedras, mato, árvores e neblina) atrás da aba Jogar =====
 // Desenhado pelo renderer do jogo (sem outro contexto WebGL) só com o menu aberto na aba Jogar; em partida não roda.
 // O grupo = quem está na sala do lobby (host e quem entrou); fora de sala, só você. Cada um com o seu avatar (médio já, fino depois)
-// e uma arma em voxel da terceira pessoa, em prontidão com respiração. Os rótulos (nível, patente, nome, voz, coroa) são HTML.
+// e a arma primária que usou por último (terceira pessoa), em prontidão com respiração. Os rótulos (nível, patente, nome, coroa) são HTML.
 const MSQ = { sc: null, cam: null, dl: null, t: 0, acc: 0, slots: [], tk: 1, ids: null, sim: 0, L: 0, gfx: '', poeira: null, lbl: [], key: [] };
 const MSQ_POS = [[0, 0, -.55], [-1.4, .6, -.4], [1.35, .55, -.7], [2.6, 1.2, -.8]]; // x, z, giro (o líder no meio, à frente)
 const MSQ_ARMAS = ['m4', 'ak47', 'p90', 'awp', 'mp5', 'nova'], MSQ_SIM = ['Lince', 'Sargento_Vasco', 'Tomate'];
@@ -34814,7 +34823,6 @@ const MSQ_K = { aim: 0, run: 0 };
 const MSQ_SVG = {
   cr: '<svg class="cr" viewBox="0 0 26 17"><path d="M1 15h24l2-12-7 5-7-7-7 7-7-5z" fill="currentColor"/></svg>',
   rk: '<svg class="rk" viewBox="0 0 12 17"><path d="M1 1h10v4L6 8 1 5zM1 7l5 3 5-3v4l-5 3-5-3z" fill="currentColor"/></svg>',
-  mic: '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9zM15.5 8.5a5 5 0 010 7M18 6a8.5 8.5 0 010 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   pes: h => `<svg viewBox="0 0 40 100" style="height:${h}px"><path d="M20 2a8 8 0 110 16 8 8 0 010-16zM9 22h22l4 30-5 2-2-14v58h-7V67h-2v31h-7V40l-2 14-5-2z" fill="currentColor"/></svg>`,
 };
 function msqRnd(s) { return () => (s = (s * 16807) % 2147483647) / 2147483647; }
@@ -34895,13 +34903,12 @@ function msqSolta(sc) { // troca de gráfico: o palco velho sai da placa. Tudo n
   for (const t of tex) t?.isTexture && t.dispose();
   MSQ.poeira = null; MSQ.dl = null;
 }
-function msqNivel(d) { return d ? 1 + Math.floor(((d.opened | 0) + (d.cases | 0) + 3 * ((d.cx?.r | 0) + 3 * (d.cx?.e | 0) + 9 * (d.cx?.l | 0))) + (d.xp || 0) / XP_CASE) : 1; }
 function msqMembros() {
-  const d = PROF.data, eu = { n: CFG.name || 'Jogador', av: avtLimpa(d?.av), eu: 1, lv: msqNivel(d), w: W[AR.w]?.slot === 'primary' ? AR.w : 'ak47' };
+  const d = PROF.data, eu = { n: CFG.name || 'Jogador', av: avtLimpa(d?.av), eu: 1, lv: msqNivel(d), w: minhaArma() };
   let L = [{ ...eu, id: 'eu', lider: 1 }];
   if (LB.on && !inGame) {
-    if (NET.isHost) L = [...S.players.values()].filter(p => !p.isBot).map(p => p.id === 'h' ? { ...eu, id: 'h', lider: 1 } : { id: p.id, n: p.name, av: avtLimpa(p.skins?._av) });
-    else if (LB.data?.pl?.length) L = LB.data.pl.map(p => ({ ...(p.id === C.myId ? eu : { n: p.n, av: avtLimpa(p.av) }), id: p.id, lider: p.id === 'h' ? 1 : 0 }));
+    if (NET.isHost) L = [...S.players.values()].filter(p => !p.isBot).map(p => p.id === 'h' ? { ...eu, id: 'h', lider: 1 } : { id: p.id, n: p.name, av: avtLimpa(p.skins?._av), lv: nivelLimpo(p.skins?._lv), w: armaPrim(p.skins?._w) });
+    else if (LB.data?.pl?.length) L = LB.data.pl.map(p => ({ ...(p.id === C.myId ? eu : { n: p.n, av: avtLimpa(p.av), lv: nivelLimpo(p.lv), w: armaPrim(p.w) }), id: p.id, lider: p.id === 'h' ? 1 : 0 }));
   }
   for (let i = 0; i < MSQ.sim && L.length < 4; i++) L.push({ id: 'sim' + i, n: MSQ_SIM[i], lv: 14 + i * 23, sim: 1 });
   L.sort((a, b) => (b.lider | 0) - (a.lider | 0)); return L.slice(0, 4);
@@ -34941,7 +34948,7 @@ function msqGrupo() { // 4x por segundo: quem está no grupo, avatar, arma, rót
     const m = L[i], k = m ? `${m.id}|${m.n}|${m.lv}|${m.lider}|${i}` : 'vazio' + i;
     if (MSQ.key[i] === k && MSQ.lbl[i]) continue; MSQ.key[i] = k; MSQ.lbl[i]?.remove();
     const el = document.createElement(m ? 'div' : 'button');
-    if (m) { el.className = 'msqT' + (m.eu ? ' eu' : ''); el.innerHTML = (m.lider ? MSQ_SVG.cr : '') + `<div class="ln">${m.lv ? `<span class="lv">${m.lv}</span>` : ''}${MSQ_SVG.rk}<span class="nm">${esc(m.n)}</span><span class="mic${m.eu ? '' : ' mut'}">${MSQ_SVG.mic}</span></div>`; }
+    if (m) { el.className = 'msqT' + (m.eu ? ' eu' : ''); el.innerHTML = (m.lider ? MSQ_SVG.cr : '') + `<div class="ln">${m.lv ? `<span class="lv">${m.lv}</span>` : ''}${MSQ_SVG.rk}<span class="nm">${esc(m.n)}</span></div>`; } /* sem ícone de voz: o jogo não tem chat de voz */
     else { el.className = 'msqI'; el.type = 'button'; el.title = 'Convidar para o grupo'; el.onclick = msqConvidar; }
     box.appendChild(el); MSQ.lbl[i] = el;
   }
@@ -35356,7 +35363,7 @@ function openCaseUI(t = 0) {
     setHTMLm('skRollRes', `<div class="sknm big" style="--rc:${RARITY[rar].css}"><b>${esc(wn)} | ${esc(s.name)}</b><span>${RARITY[rar].name}</span></div>${dup ? `<div class="hint">Repetida: virou +${DUP_XP[rar]} XP</div>` : '<div class="hint">Equipe no Arsenal → Personalizar.</div>'}`);
     play(rar >= 3 ? 'pap' : 'kaching');
     SKUI.rolling = false; SKUI.hide = null; AR.w = it.split(':')[0]; AR.tab = 'cus'; AR.sel = it.split(':')[1]; AR.slot = null; // o Arsenal abre nela
-    if (dup) grantXP(DUP_XP[rar]); else skinsUI();
+    if (dup) grantXP(DUP_XP[rar], false); else skinsUI();
   }, 5400);
 }
 function skinsInit() {
