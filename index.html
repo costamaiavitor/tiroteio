@@ -20734,7 +20734,7 @@ function fpBuild(id, ud, gun) {
   // das mangas ficar fora da tela; as mãos ficam onde a animação põe (a esquerda vai para o guarda-mão do modelo)
   const arm = sd => ({ cl: fpBone(root, 'Arm_' + sd), ua: fpBone(root, 'UpArm_' + sd), fa: fpBone(root, 'Forearm_' + sd), wr: fpBone(root, 'BoneTwist_01' + sd + '_end'), hand: fpBone(root, 'Hand_' + sd), sd: sd === 'L' ? -1 : 1 });
   const arms = [arm('L'), arm('R')];
-  for (const a of arms) if (a.hand) a.r0 = new V3().setFromMatrixPosition(a.hand.matrixWorld).applyMatrix4(Ai); // pb1: lugar da mão na arma (pose parada), no referencial da arma
+  for (const a of arms) if (a.hand) a.r0 = new V3().setFromMatrixPosition(a.hand.matrixWorld).applyMatrix4(Ai); for (const a of arms) if (a.wr) a.w0 = new V3().setFromMatrixPosition(a.wr.matrixWorld).applyMatrix4(Ai); // (D25: pulso parado, no referencial da arma) // pb1: lugar da mão na arma (pose parada), no referencial da arma
   if (arms.every(a => a.cl && a.ua && a.fa && a.wr) && (lh || P.sh)) ik = { arms, ...lh, sh: P.sh || [0, 0, 0], Cb: new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A), body, magD };
   root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; if (o.material) { o.material = o.material.clone(); o.material.envMapIntensity = .8; } } });
   if (D?.tint) model.traverse(o => { if (o.isMesh && D.tint[o.material.name] != null) o.material.color.set(D.tint[o.material.name]); }); // cores chapadas estranhas do modelo
@@ -21570,7 +21570,8 @@ const AN = {
     ossos: { cart: '12ge_low', bomba: 'Slide' },
     // ciclo do clipe de cartucho (s): ins = o 1º cartucho termina de entrar no tubo; per = período; fim: mão até a bomba, bomba, volta
     ciclo: { ins: 1.32, per: 1.345, n: 4, maoBomba: 6.0, bomba: [6.0, 6.27], fim: 6.82 },
-    perto: .13, puxa: .4, // es1: a mão esquerda fica a até perto·hr (m) do guarda-mão; o que passa disso entra só puxa
+    perto: .13, puxa: .4, arma: { olympia: [.06, .12] }, // D25: Olympia (cano basculante): a mão fica junto da culatra aberta (em r3 flutuava a ~20 cm)
+    // es1: a mão esquerda fica a até perto·hr (m) do guarda-mão; o que passa disso entra só puxa
     extraVazia: 0, // a bomba cabe no fim que já existe (0,45 s): o tempo de recarga não depende da arma na mão
     imp: { cart: [.35, .05, .12, 0, .015, .01], bomba: [.5, 0, 0, 0, .02, .05] }, cam: { cart: [-.08, .03], bomba: [-.2, .08] },
     saque: [[0, .02, -.24, .05, -.5, .1, .4], [.45, .01, -.06, .015, -.15, .03, .13], [.8, 0, .004, 0, .03, 0, -.015], [1, 0, 0, 0, 0, 0, 0]],
@@ -21704,8 +21705,8 @@ function anPose(ud, dt) {
   if (an.pump && F.cur === 'reload' && an.mL0 && an.mL) { // es1: o clipe leva a mão esquerda ao cinto a cada cartucho (na vazia, XM1014: aberta no ar longe da arma; Nova: fora do quadro): fica perto da janela
     const hw = _an.v.setFromMatrixPosition(an.mL.matrixWorld); if (ML) hw.applyMatrix4(ML);
     const gw = _an.v2.copy(an.mL0).applyMatrix4(_an.M3.multiplyMatrices(F.body.matrixWorld, F.C)); if (mexe) gw.applyMatrix4(Mg);
-    const dd = hw.sub(gw), L = dd.length(), R = AN.pump.perto * F.P.hr; // hw: agora o vetor guarda-mão → mão
-    if (L > R) { const k = 1 - (R + (L - R) * AN.pump.puxa) / L; ML = an.ML.copy(ML || _an.M2.identity()).premultiply(_an.M3.makeTranslation(-dd.x * k, -dd.y * k, -dd.z * k)); }
+    const dd = hw.sub(gw), L = dd.length(), PA = AN.pump.arma[an.m], R = (PA ? PA[0] : AN.pump.perto) * F.P.hr; // hw: agora o vetor guarda-mão → mão
+    if (L > R) { const k = 1 - (R + (L - R) * (PA ? PA[1] : AN.pump.puxa)) / L; ML = an.ML.copy(ML || _an.M2.identity()).premultiply(_an.M3.makeTranslation(-dd.x * k, -dd.y * k, -dd.z * k)); }
   }
   if (mexe) { anAplica(an, F.body, Mg); anAplica(an, an.mR, Mg); if (an.mag && !fora) anAplica(an, an.mag, Mg); anAplica(an, an.cart, Mg); }
   if (ML) { anAplica(an, an.mL, ML); if (an.mag && fora) anAplica(an, an.mag, ML); }
@@ -21822,6 +21823,10 @@ function fpIK(F) {
     if (kp) for (const a of K.arms) if (a.sd < 0) { I.c.set(0, -E[1] * kp, -E[0] * kp); a.tw.add(I.c); if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } }
   // mão que vem para perto do olho (pegar carregador no colete): desce e vai para a frente, senão o braço passa colado na câmera
   // (a câmera fica na origem, olhando para -Z)
+  if (F.P.view === 'pistol' && (F.cur === 'reload' || F.cur === 'reloadE') && !vmGun?.userData.akimbo) for (const a of K.arms) if (a.sd < 0 && a.w0) { // D25: pistola: voltando ao punho, a mão esquerda passava por cima da arma (cobria a pistola): não sobe acima do lugar dela
+    I.h.copy(a.tw).applyMatrix4(I.Gi); const lim = a.w0.y + .004 * F.P.hr; if (I.h.y <= lim) continue;
+    I.c.copy(I.h); I.h.y = lim; I.h.applyMatrix4(I.G); I.c.applyMatrix4(I.G); I.c.subVectors(I.h, I.c); a.tw.add(I.c);
+    if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } }
   K.pushL = null;
   for (const a of K.arms) {
     const s = (F.cur === 'reload' || F.cur === 'reloadE') && !(a.sd > 0 && (F.P.view === 'pistol' || F.z2)) ? smooth((a.tw.z + .25) / .15) * a.fora : 0; if (!s || !a.hand) continue; // só na recarga (as pistolas ficam perto do olho de propósito; fz2: a mão direita não sai do punho)
