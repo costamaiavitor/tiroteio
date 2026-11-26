@@ -21678,7 +21678,7 @@ function anPose(ud, dt) {
     const uu = 1 - saqueK(ts, sd); if (uu <= 1) kfSuave(A.saque, uu, 6, o, true); else { kfSuave(A.saque, 2 - uu, 6, o, true); for (let j = 0; j < 6; j++) o[j] = -o[j]; } an.saq = 1;
     if (A.esq) { kfSuave(A.esq, clamp(ts / sd, 0, 1), 3, _anE2); an.esq = _anE2; } else an.esq = null;
   } else { an.saq = 0; an.esq = null; }
-  if (rv >= 0) { kfSuave(ANREV.arma, rv, 6, _anR6); for (let j = 0; j < 6; j++) o[j] += _anR6[j]; }
+  if (rv >= 0) { kfSuave(ANREV.arma, rv, 6, _anR6); const ak = vmGun?.userData.akimbo; for (let j = 0; j < 6; j++) if (!ak || j !== 0 && j !== 4) o[j] += _anR6[j]; } // D7: Duplas: sem ir para o meio nem girar para dentro (a passada espelhada juntava as duas pistolas no centro, braços em V)
   else if (A.vis && rc && G.reloadEnd && !G.reload) { const V = A.vis, t = clamp((now - G.reloadStart) / (G.reloadEnd - G.reloadStart), 0, 1), k = seg(t, 0, V.ent) * (1 - seg(t, V.sai, 1)); for (let j = 0; j < 6; j++) o[j] += V.d[j] * k; }
   molaPasso(an.mol, 6, AN.mola.w, AN.mola.z, dt, an.fm);
   for (let c = 0; c < 6; c++) o[c < 3 ? c + 3 : c - 3] += an.mol[c * 2]; // mol: [rx, ry, rz, x, y, z] → o: [x, y, z, rx, ry, rz]
@@ -21687,7 +21687,7 @@ function anPose(ud, dt) {
   const Mg = anMat(an.Mg, pw, qc, o[3], o[4], o[5], o[0], o[1], o[2]), fora = anMagFora(F, an); // carregador fora da arma: vai com a mão esquerda
   let ML = mexe ? Mg : null;
   if (an.esq) { const L = an.esq; ML = an.ML.copy(Mg).premultiply(_an.M2.makeTranslation(_an.v.set(L[0], L[1], L[2]).applyQuaternion(qc))); } // a mão esquerda chega depois
-  if (an.rev) { const L = anRev(F, an, rv, Mg); if (L) { ML = an.ML.copy(Mg).premultiply(_an.M2.makeTranslation(L)); } }
+  if (an.rev) { const L = anRev(F, an, rv, Mg); if (L && !vmGun?.userData.akimbo) { ML = an.ML.copy(Mg).premultiply(_an.M2.makeTranslation(L)); } }
   if (an.pump && an.mL && !G.reloadEnd && !an.saq) { an.mL0 = (an.mL0 || new V3()).setFromMatrixPosition(an.mL.matrixWorld).applyMatrix4(_an.M3.multiplyMatrices(F.body.matrixWorld, F.C).invert()); } // es1: lugar da mão esquerda na arma (parada)
   if (an.pump && F.cur === 'reload' && an.mL0 && an.mL) { // es1: o clipe leva a mão esquerda ao cinto a cada cartucho (na vazia, XM1014: aberta no ar longe da arma; Nova: fora do quadro): fica perto da janela
     const hw = _an.v.setFromMatrixPosition(an.mL.matrixWorld); if (ML) hw.applyMatrix4(ML);
