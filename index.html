@@ -1103,9 +1103,9 @@ W.dmach = { name: 'Máquina da Morte', slot: 'special', pu: 1, dmg: 150, rate: .
 // Armas do CS2 (Rodadas e Mata-mata): números do CS2 (dano, perfuração de colete, cadência, pente, preço, recompensa, velocidade).
 // Cada uma usa o modelo realista baixado de uma arma parecida (base); no modo Zumbis elas não aparecem.
 // rp1: MAC-10 na MP5K (compacta, sem coronha; era a MP40, comprida e de coronha) e UMP-45 na MP5 (caixa de polímero; era a AK-74u)
-const CSW = (base, o) => ({ slot: 'primary', air: .2, move: .05, recoil: .02, rm: .9, speed: .9, reward: 300, head: 4, ...o, base, model: W[base].model, cs: 1 });
+const CSW = (base, o) => ({ slot: 'primary', air: .2, move: .05, recoil: .02, rm: .9, speed: .9, reward: 300, head: 4, ...o, base, model: o.model || W[base].model, cs: 1 }); /* base = o próprio id (com o.model): modelo feito no código só para ela (variante em gunModel pelo id) */
 Object.assign(W, {
-  tec9:     CSW('m1911', { name: 'Tec-9', slot: 'secondary', price: 500, dmg: 33, rate: .12, mag: 18, res: 90, reload: 2.5, spread: .008, move: .035, air: .1, pen: .9, rm: .83, speed: .96, snd: 'pistol' }),
+  tec9:     CSW('tec9', { model: 'pistol', name: 'Tec-9', slot: 'secondary', price: 500, dmg: 33, rate: .12, mag: 18, res: 90, reload: 2.5, spread: .008, move: .035, air: .1, pen: .9, rm: .83, speed: .96, snd: 'pistol' }),
   five7:    CSW('p250', { name: 'Five-SeveN', slot: 'secondary', price: 500, dmg: 32, rate: .12, mag: 20, res: 100, reload: 2.2, spread: .007, move: .03, air: .1, pen: .91, rm: .81, speed: .96, snd: 'pistol' }),
   cz75a:    CSW('cz75', { name: 'CZ75-Auto', slot: 'secondary', price: 500, dmg: 31, rate: .1, auto: 1, mag: 12, res: 12, reload: 2.7, spread: .01, move: .035, air: .1, pen: .78, rm: .85, speed: .96, reward: 100, snd: 'pistol' }),
   r8:       CSW('python', { name: 'R8 Revolver', slot: 'secondary', price: 600, dmg: 86, rate: .5, mag: 8, res: 8, reload: 2.3, spread: .006, move: .08, air: .2, pen: .93, rm: .94, speed: .96, snd: 'deagle' }),
@@ -18442,9 +18442,24 @@ function gunModel(id, fp = false, skin = null) {
     for (const s2 of [-1, 1]) add(slide, new THREE.SphereGeometry(.0011, 8, 6), M.trit, s2 * .0058, sh + .0055, h - .0055); // pontos da alça
     ud.sight = new V3(0, sy + sh + .0072, -o.sz - h + .01); ud.sightR = -o.sz + h - .01;
   };
+  const tec9Body = () => { /* Tec-9 (CS): caixa quadrada de polímero sem ferrolho que corre, capa do cano furada, carregador comprido na frente do guarda-mato */
+    pistolBody({ L: .2, sy: .033, sh: .02, sw: .031, sz: .07, fl: .15, gs: 1, bs: 1, slideM: M.polymer, frameM: M.polymer, gripM: M.polymer, stipple: 1 });
+    const rc = ud.slide; ud.slide = null; rc.children.slice(1, 8).forEach(o => (o.visible = false)); /* a caixa não corre (sem serrilha de ferrolho); quem corre é o botão de manejo */
+    for (let k = 0; k < 3; k++) add(rc, new THREE.BoxGeometry(.034, .003, .018), M.dark, 0, -.004, .03 - k * .045);
+    const zc = -.07 - .1; add(g, CY(.0135, .075, 16), M.metal, 0, .037, zc - .0375); /* capa do cano */
+    for (let k = 0; k < 4; k++) for (const s2 of [-1, 1]) add(g, RB(.003, .007, .011, .001), M.dark, s2 * .0128, .037, zc - .012 - k * .017);
+    for (let k = 0; k < 4; k++) add(g, RB(.007, .003, .011, .001), M.dark, 0, .0502, zc - .012 - k * .017);
+    add(g, CY(.0062, .02, 10), M.metal, 0, .037, zc - .085); bore(0, .037, zc - .0955, .0042); mz = zc - .096; my = .037;
+    const kb = grp(g, -.019, .036, -.04); add(kb, CY(.0035, .012, 8), M.metal, -.004, 0, 0, 0, Math.PI / 2); add(kb, new THREE.SphereGeometry(.005, 10, 8), M.metal, -.011, 0, 0); ud.slide = kb; /* botão de manejo do lado esquerdo */
+    g.remove(ud.mag); const fy = .013, zm = -.082;
+    add(g, RB(.035, .034, .044, .004), M.polymer, 0, fy - .016, zm); /* poço do carregador */
+    const mag = grp(g, 0, fy - .03, zm); add(mag, RB(.025, .17, .033, .003), M.metal, 0, -.085, -.004, -.05); add(mag, RB(.029, .012, .037, .003), M.dark, 0, -.168, -.008, -.05);
+    ud.mag = mag; ud.magGrab = new V3(0, fy - .2, zm - .01);
+  };
   switch (model) {
     case 'pistol': {
-      const steel = /^(m1911|cz75)/.test(id), usp = id.startsWith('usp'), fs = bid === 'fiveseven', b23 = bid === 'b23r', c96 = bid === 'c96';
+      const steel = /^(m1911|cz75)/.test(id), usp = id.startsWith('usp'), fs = bid === 'fiveseven', b23 = bid === 'b23r', c96 = bid === 'c96', tec = bid === 'tec9';
+      if (tec) { tec9Body(); break; }
       pistolBody({ L: usp ? .2 : b23 ? .22 : c96 ? .17 : .19, sy: .032, sh: c96 ? .015 : .017, sw: c96 ? .026 : .029, sz: .075, fl: .14, gs: c96 ? 1.08 : 1, bs: 1,
         slideM: steel ? M.steel : M.metal, frameM: steel ? M.steel : c96 ? M.metal : fs ? M.tan : M.polymer, /* D24: C96 em aço oxidado escuro (era prateada) */ gripM: steel ? M.woodDark : c96 ? M.wood : fs ? M.tan : M.polymer, stipple: !steel && !c96 });
       if (usp) { add(g, CY(.0145, .13, 18), M.dark, 0, .036, -.24); bore(0, .036, -.305, .005); mz = -.31; }
@@ -19776,7 +19791,7 @@ FPW.l96 = { pack: 'sniper', m: 'awp' }; // uni: a L96A1 do Zumbi é da mesma fam
 // mexer na tela); carregador de caixa embaixo (rig 'mag') e ferrolho da pistola seguem a peça do pacote. Acessórios do Armeiro, PaP
 // (papUV), Pistolas Duplas e o voxel fino (vxz) continuam os da arma do código. ?syn=0 volta às mãos antigas.
 const FSYN = { off: /[?&]syn=0\b/.test(location.search), bracos: { smg: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, mp40: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] }, spas: { ombro: [.03, -.7, .08], adsMaoE: [.12, .07] } } /* D23: MP40 (do Zumbi) como as SMGs do código; SPAS idem */, olho: .16, adsZ: { smg: .06, sniper: .14 }, mira: { hs10: [.12, 1], trench: [.1, 1], ks23: [.05, 1] /* D15: com .2 o olho ia para cima da coronha (madeira lisa enorme no centro) */, law: [.1, 0], wunderwaffe: [.32, 0], spectre: [.2, 0], pm63: [.2, 0] /* PM63: a mão do punho, embaixo do olho, enchia 13% da tela na mira */ } }; /* mira: por arma [distância extra (m), braços somem na mira]: bombas (a mão da bomba e a coronha cobriam a tela), LAW (tubo na frente do olho), Wunderwaffe (bulbo);  adsZ: na mira a arma do código fica mais longe do olho (m; medido: braço esquerdo cobria 28% da tela nas SMGs, 21% depois; Kar98k 24% -> 14%; na bomba piora: fica 0) */
-if (!FSYN.off) for (const [p, l] of Object.entries({ pistol: 'fiveseven b23r c96 raygun2', smg: 'ppsh thompson spectre kiparis uzi pm63', ak: 'stg44 mg42 stoner psg1',
+if (!FSYN.off) for (const [p, l] of Object.entries({ pistol: 'fiveseven b23r c96 raygun2 tec9', smg: 'ppsh thompson spectre kiparis uzi pm63', ak: 'stg44 mg42 stoner psg1',
   rifle: 'm16 aug famas g11 enfield law crossbow wunderwaffe wintershowl', pump: 'trench hs10 ks23', sniper: 'kar98k' })) for (const id of l.split(' ')) FPW[id] = { pack: p, syn: 1 };
 function fpSyn(id, ud, gun) { // modelo "baixado" sintético: origem no gatilho, cano para -Z, metros (escala 1)
   const D = { syn: 1, T: [null, 0, 0], fwd: '-z', up: '+y', L: 1, noMag2: 1, gun, ud, parts: {} };
