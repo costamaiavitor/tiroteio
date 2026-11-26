@@ -18990,7 +18990,8 @@ function gunModel(id, fp = false, skin = null) {
     case 'molotov': { // garrafa com o pano enfiado no gargalo, já acesa
       const vd = mk3(fp, 0x4f6a2c, .2, .15); add(g, new THREE.CylinderGeometry(.03, .03, .09, 14), vd); add(g, new THREE.CylinderGeometry(.011, .03, .03, 14), vd, 0, .06, 0);
       add(g, new THREE.CylinderGeometry(.011, .011, .04, 10), vd, 0, .094, 0); add(g, new THREE.CylinderGeometry(.013, .009, .035, 8), mk3(fp, 0xcfc4a4, 0, .95), 0, .126, 0);
-      add(g, new THREE.ConeGeometry(.014, .04, 8), new THREE.MeshBasicMaterial({ color: 0xffa040 }), 0, .16, 0);
+      ud.chama = add(g, new THREE.ConeGeometry(.014, .04, 8), new THREE.MeshBasicMaterial({ color: 0xffa040 }), 0, .16, 0);
+      if (fp) { ud.isqAlvo = new THREE.Object3D(); ud.isqAlvo.position.set(0, .13, 0); g.add(ud.isqAlvo); } // isq: na mão, o pano só acende quando o isqueiro da mão esquerda chega (maoPino)
       ud.rig = 'none'; mz = 0; my = 0; nadeHold(g, ud, 'over', NADE8.molotov); break;
     }
     case 'inc': { // incendiária: lata cinza-escura com faixa vermelha
@@ -23735,17 +23736,25 @@ const NADE_PINO = .22;
 const NADEP = { ombro: .45, ent: .12, puxa: [.12, .24], sai: [.26, .5], some: .4, vet: [-.07, -.03, .03], mao: [-.012, -.02, .01] };
 const _np = { v: new V3(), w: new V3(), M: new THREE.Matrix4() };
 function maoPino(F, ud) {
-  const L = F.foraL, P = G.pin, Q = NADEP, t = P && P.w === G.cur ? now - P.t0 : -1, arm = F.ik?.arms[0], pino = ud.pino;
+  const L = F.foraL, P = G.pin, Q = NADEP, t = P && P.w === G.cur ? now - P.t0 : -1, arm = F.ik?.arms[0], isq = !ud.pino && ud.isqAlvo, pino = ud.pino || isq;
   const w = t < 0 ? 0 : smooth(t / Q.ent) * (1 - smooth((t - Q.sai[0]) / (Q.sai[1] - Q.sai[0])));
   L.cl.position.copy(L.p).lerp(L.p0, w * Q.ombro); if (arm) arm.anM = null;
+  if (isq) { // molotov: a mão esquerda entra com um isqueiro aceso, encosta no pano e ele pega fogo (antes já vinha acesa, sem isqueiro)
+    if (!ud.isq && arm?.hand) { const g = new THREE.Group(), mt = new THREE.MeshStandardMaterial({ color: 0x8a8e94, metalness: .8, roughness: .35 });
+      const c = new THREE.Mesh(new THREE.BoxGeometry(.022, .036, .012), mt), ch = new THREE.Mesh(new THREE.ConeGeometry(.005, .018, 6), new THREE.MeshBasicMaterial({ color: 0xffb050 }));
+      ch.position.y = .028; g.add(c, ch); for (const o of [c, ch]) o.frustumCulled = false; g.position.copy(isq.position).add(_np.w.set(-.03, -.008, .006)); g.rotation.z = -.35; isq.parent.add(g); ud.isq = g; } // ao lado do pano, a chama encostando nele
+    if (ud.isq) ud.isq.visible = w > .15;
+    if (ud.chama) ud.chama.visible = t >= Q.puxa[0];
+  }
   if (!pino) return;
   const p0 = pino.userData.p0 || (pino.userData.p0 = pino.position.clone());
   if (t < 0) { pino.position.copy(p0); return; }
   pino.parent.updateWorldMatrix(true, false); F.root.updateMatrixWorld(true);
-  const k = smooth((t - Q.puxa[0]) / (Q.puxa[1] - Q.puxa[0])), alvo = _np.v.copy(p0).applyMatrix4(pino.parent.matrixWorld).add(_np.w.set(Q.vet[0] * k, Q.vet[1] * k, Q.vet[2] * k));
-  pino.position.copy(pino.parent.worldToLocal(_np.w.copy(alvo))); // a argola vai com a mão
+  const k = isq ? 0 : smooth((t - Q.puxa[0]) / (Q.puxa[1] - Q.puxa[0])), alvo = _np.v.copy(p0).applyMatrix4(pino.parent.matrixWorld).add(_np.w.set(Q.vet[0] * k, Q.vet[1] * k, Q.vet[2] * k));
+  if (!isq) pino.position.copy(pino.parent.worldToLocal(_np.w.copy(alvo))); // a argola vai com a mão (o pano da molotov fica)
   if (!arm || w <= 0) return;
-  const d = alvo.add(_np.w.set(...Q.mao)).sub(_np.w.setFromMatrixPosition(arm.wr.matrixWorld)).multiplyScalar(w);
+  if (isq && ud.isq) { ud.isq.updateMatrixWorld(true); alvo.setFromMatrixPosition(ud.isq.matrixWorld).add(_np.w.set(-.018, -.03, .012)); } // molotov: o pulso fica embaixo e à esquerda do isqueiro (a mão não tapa o gargalo)
+  const d = (isq ? alvo : alvo.add(_np.w.set(...Q.mao))).sub(_np.w.setFromMatrixPosition(arm.wr.matrixWorld)).multiplyScalar(w);
   arm.anM = _np.M.makeTranslation(d.x, d.y, d.z); // (fpIK leva o pulso até lá)
 }
 function nadePino(forte, btn) {
