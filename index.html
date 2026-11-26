@@ -20641,7 +20641,7 @@ function fpBuild(id, ud, gun) {
   const Tw = new V3().setFromMatrixPosition(Aw), e = Aw.elements;
   const A = fpFrame(Tw, new V3(e[8], e[9], e[10]), new V3(e[4], e[5], e[6]));
   const Ai = A.clone().invert(), pc = pp.map(p => p.applyMatrix4(Ai)), ptips = fpTips(pc); // arma do pacote no referencial da arma
-  let C, tips, model = null, follow = [], ik = null, lh = null, F2 = null, magP = null, z2r = null;
+  let C, tips, model = null, follow = [], ik = null, lh = null, F2 = null, magP = null, z2r = null, magD = null;
   if (D) { // modelo baixado no lugar da arma do pacote
     const ms = D.syn ? D.gun : SkeletonUtils.clone(FPC[mk].scene); // E3 syn: a própria arma feita no código
     ms.traverse(o => { if (o.isMesh && D.hide?.includes(o.name)) o.visible = false; });
@@ -20705,6 +20705,10 @@ function fpBuild(id, ud, gun) {
         if (D.magBase && F2.t1) fpMagBase(F2, root, ms, a2, fm.b, A, D.magBase); // fz2: carregador curto (G3SG1/SCAR-20): o fundo dele na mão
       }
     }
+    // D21: bullpup do código (AUG, Famas, G11, Enfield): o carregador fica atrás do punho, longe do lugar do do pacote; na recarga a mão
+    // esquerda (e o carregador com ela) vai junto desse desvio, senão ela buscava o carregador no ponto do fuzil comum, longe dele
+    if (D.syn && fm && D.ud?.magRest?.z > 0) { const cA = fpBoneCenter(root, fm.a, m => !fpArm(m)), cB = new THREE.Box3().setFromObject(fm.b).getCenter(new V3());
+      if (cA) { magD = cB.applyMatrix4(Ai).sub(cA.applyMatrix4(fm.a.matrixWorld).applyMatrix4(Ai)); if (magD.length() < .05 * P.hr) magD = null; } }
     // mão esquerda: no pacote ela segura o guarda-mão da arma dele; no modelo vai para o guarda-mão do modelo (mesma folga embaixo dele)
     const hl = fpBone(root, 'Hand_L');
     if (P.view !== 'pistol' && hl) {
@@ -20730,7 +20734,7 @@ function fpBuild(id, ud, gun) {
   const arm = sd => ({ cl: fpBone(root, 'Arm_' + sd), ua: fpBone(root, 'UpArm_' + sd), fa: fpBone(root, 'Forearm_' + sd), wr: fpBone(root, 'BoneTwist_01' + sd + '_end'), hand: fpBone(root, 'Hand_' + sd), sd: sd === 'L' ? -1 : 1 });
   const arms = [arm('L'), arm('R')];
   for (const a of arms) if (a.hand) a.r0 = new V3().setFromMatrixPosition(a.hand.matrixWorld).applyMatrix4(Ai); // pb1: lugar da mão na arma (pose parada), no referencial da arma
-  if (arms.every(a => a.cl && a.ua && a.fa && a.wr) && (lh || P.sh)) ik = { arms, ...lh, sh: P.sh || [0, 0, 0], Cb: new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A), body };
+  if (arms.every(a => a.cl && a.ua && a.fa && a.wr) && (lh || P.sh)) ik = { arms, ...lh, sh: P.sh || [0, 0, 0], Cb: new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(A), body, magD };
   root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; if (o.material) { o.material = o.material.clone(); o.material.envMapIntensity = .8; } } });
   if (D?.tint) model.traverse(o => { if (o.isMesh && D.tint[o.material.name] != null) o.material.color.set(D.tint[o.material.name]); }); // cores chapadas estranhas do modelo
   if (D?.brass) model.traverse(o => { if (o.isMesh && D.brass.includes(o.material.name)) Object.assign(o.material, { metalness: .9, roughness: .35 }).color.set(0xb08d3c); }); // balas brancas sem textura viram latão
@@ -21797,6 +21801,8 @@ function fpIK(F) {
       K.hl.position.copy(K.hl.parent.worldToLocal(I.t.clone())); K.hl.updateMatrixWorld(true);
     }
   }
+  K.mdw = null; if (K.magD && (F.cur === 'reload' || F.cur === 'reloadE')) { const fo = K.arms.find(a => a.sd < 0)?.fora || 0; // D21: bullpup: a mão solta vai junto do desvio até o carregador atrás do punho
+    if (fo > 0) { K.mdw = (K.mdw0 ||= new V3()).copy(K.magD).applyMatrix4(I.G).sub(I.t.set(0, 0, 0).applyMatrix4(I.G)).multiplyScalar(fo); I.dl.add(K.mdw); } }
   K.zm = F.z2 ? fz2Mao(F) : null; // fz2: mão esquerda desviada (saque e roteiro da recarga), no mundo dos braços
   if (K.zm && K.hl) { I.t.setFromMatrixPosition(K.hl.matrixWorld).add(K.zm); K.hl.position.copy(K.hl.parent.worldToLocal(I.t.clone())); K.hl.updateMatrixWorld(true); I.dl.add(K.zm); }
   for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.anM) a.tw.applyMatrix4(a.anM); /* an: a mão foi levada pelas camadas */ if (a.sd < 0) a.tw.add(I.dl); }
@@ -21808,10 +21814,11 @@ function fpIK(F) {
   K.pushL = null;
   for (const a of K.arms) {
     const s = (F.cur === 'reload' || F.cur === 'reloadE') && !(a.sd > 0 && (F.P.view === 'pistol' || F.z2)) ? smooth((a.tw.z + .25) / .15) * a.fora : 0; if (!s || !a.hand) continue; // só na recarga (as pistolas ficam perto do olho de propósito; fz2: a mão direita não sai do punho)
-    if (a.sd < 0) K.pushL = new V3(0, -.16 * s, -.1 * s);
+    if (a.sd < 0) K.pushL = new V3(0, -.16 * s, -.1 * s), K.mdw && K.pushL.add(K.mdw);
     I.c.set(0, -.16 * s, -.1 * s); a.tw.add(I.c);
     I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true);
   }
+  if (K.mdw && !K.pushL) K.pushL = K.mdw.clone(); // D21: o carregador fora da arma vai com a mão desviada
   const ka = smooth(Math.min(1, (G.ads || 0) * ADS.adi)), Ao = F.ombro || F.P.ombro || ADS.ombro; // mirando: ombros mais para fora e para baixo (os antebraços não sobem na frente da arma); adi: os ombros vão na frente da arma (entrando e saindo da mira), senão no meio do caminho a arma já subiu e os antebraços ainda não desceram (o braço cobria até +1,7% da tela a mais que no quadril e na mira)
   if (K.sh[0] || K.sh[1] || K.sh[2] || ka) for (const a of K.arms) { // ombros para fora/baixo/trás (no espaço da câmera)
     I.c.setFromMatrixPosition(a.cl.matrixWorld).add(I.a.set((K.sh[0] + Ao[0] * ka) * a.sd, K.sh[1] + Ao[1] * ka, K.sh[2] + Ao[2] * ka));
