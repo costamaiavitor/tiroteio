@@ -22707,7 +22707,7 @@ const PIST = { saque: { rx: -.7, ry: 0, rz: -.3, x: .02, y: -.1, z: .03 }, corri
 const pistolaVM = ud => ['pistol', 'deagle', 'revolver'].includes(W[G.cur]?.model) && !ud.armsKnife;
 const _pE = new THREE.Euler(), _pQ = new THREE.Quaternion(), _pV = new V3(), _pV2 = new V3();
 function pistolaPose(o, ud) {
-  const k = now < G.switchEnd && !ud.fps2?.an ? smooth((G.switchEnd - now) / (G.switchDur || .35)) : 0, c = me.sprintK > .01 ? me.sprintK : 0; // (an: o saque dos braços prontos é no esqueleto)
+  const k = now < G.switchEnd && !ud.fps2?.an && !ud.fps2?.syn ? smooth((G.switchEnd - now) / (G.switchDur || .35)) : 0, c = me.sprintK > .01 ? me.sprintK : 0; // (an: o saque dos braços prontos é no esqueleto)
   if (!k && !c) return;
   const S = PIST.saque, R = ud.fps2 ? PIST.corridaCS : PIST.corrida, rx = S.rx * k + R.rx * c, ry = S.ry * k + R.ry * c, rz = S.rz * k + R.rz * c;
   o.rx += rx; o.ry += ry; o.rz += rz + Math.sin(bobT) * .05 * c;
@@ -22948,7 +22948,7 @@ function updateViewmodel(dt) {
   G.kick = Math.max(0, G.kick - dt * 10); G.kickL = Math.max(0, (G.kickL || 0) - dt * 10);
   o.z += G.kick * .06; o.rx += G.kick * .1;
   const pist = pistolaVM(ud); if (pist) pistolaPose(o, ud);
-  if (now < G.switchEnd && !pist && ud.fps2?.P && !ud.fps2.knife && !ud.fps2.clips.draw && !ud.fps2.an) { // pacote sem clipe de saque (sniper, bomba): sobe de baixo girando em volta do gatilho (em volta do olho a luneta/coronha enchia a tela)
+  if (now < G.switchEnd && (!pist || ud.fps2?.syn) && ud.fps2?.P && !ud.fps2.knife && !ud.fps2.clips.draw && !ud.fps2.an) { // pacote sem clipe de saque (sniper, bomba; D5: pistolas do código, que no giro da pistola em volta do gatilho levavam o antebraço para a frente do olho: 42% da tela no 1º quadro): sobe de baixo girando em volta do gatilho (em volta do olho a luneta/coronha enchia a tela)
     const k = smooth((G.switchEnd - now) / (G.switchDur || .35)), S = FZSAQ; o.x += S.x * k; o.y += S.y * k;
     _pQ.setFromEuler(_pE.set(S.rx * k, 0, S.rz * k)); _pV.fromArray(ud.fps2.P.v?.p || FPV.long.p); _pV2.copy(_pV).applyQuaternion(_pQ); o.x += _pV.x - _pV2.x; o.y += _pV.y - _pV2.y; o.z += _pV.z - _pV2.z; o.rx += S.rx * k; o.rz += S.rz * k;
   } else if (now < G.switchEnd && !pist && !ud.armsKnife && !ud.fps2?.clips.draw && !ud.fps2?.an) { const k = smooth((G.switchEnd - now) / (G.switchDur || .35)); o.y -= k * .22; o.rx -= k * .9; o.rz += k * .35; if (ud.scopeEye || ud.boltAction) { o.rx += k * .5; o.y -= k * .08; } } // precisão (a6): arma comprida sobe de baixo sem apontar a luneta para o olho // sacando a arma (os braços do Blender têm animação própria)
