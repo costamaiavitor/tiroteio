@@ -34885,6 +34885,16 @@ function msqMonta() {
   }
   MSQ.cam = new THREE.PerspectiveCamera(30, 1, .1, 120); MSQ.gfx = CFG.gfx;
 }
+function msqSolta(sc) { // troca de gráfico: o palco velho sai da placa. Tudo nele foi criado no msqMonta (os jogadores e as armas, com moldes compartilhados, já saíram no msqLimpa)
+  if (!sc) return; const tex = new Set([sc.background, sc.environment]);
+  sc.traverse(o => {
+    o.geometry?.dispose();
+    for (const m of [o.material].flat()) if (m) { for (const k in m) if (m[k]?.isTexture) tex.add(m[k]); m.dispose(); }
+    if (o.isLight || o.isInstancedMesh) o.dispose(); /* luz: mapa de sombra; instâncias: matrizes/cores */
+  });
+  for (const t of tex) t?.isTexture && t.dispose();
+  MSQ.poeira = null; MSQ.dl = null;
+}
 function msqNivel(d) { return d ? 1 + Math.floor(((d.opened | 0) + (d.cases | 0) + 3 * ((d.cx?.r | 0) + 3 * (d.cx?.e | 0) + 9 * (d.cx?.l | 0))) + (d.xp || 0) / XP_CASE) : 1; }
 function msqMembros() {
   const d = PROF.data, eu = { n: CFG.name || 'Jogador', av: avtLimpa(d?.av), eu: 1, lv: msqNivel(d), w: W[AR.w]?.slot === 'primary' ? AR.w : 'ak47' };
@@ -34910,7 +34920,7 @@ function msqGrupo() { // 4x por segundo: quem está no grupo, avatar, arma, rót
   const L = msqMembros(), ids = L.map(m => m.id + ':' + m.n);
   if (MSQ.ids) { for (const m of L) if (!MSQ.ids.includes(m.id + ':' + m.n) && !m.eu) msqAviso(`[${m.n}] entrou no grupo.`); for (const k of MSQ.ids) if (!ids.includes(k) && !k.startsWith('eu:') && !k.startsWith('h:')) { const n = k.slice(k.indexOf(':') + 1); if (!L.some(m => m.n === n)) msqAviso(`[${n}] saiu do grupo.`); } }
   MSQ.ids = ids;
-  if (MSQ.gfx !== CFG.gfx) { for (let i = 0; i < 4; i++) msqLimpa(i); MSQ.sc = null; msqMonta(); }
+  if (MSQ.gfx !== CFG.gfx) { for (let i = 0; i < 4; i++) msqLimpa(i); msqSolta(MSQ.sc); MSQ.sc = null; msqMonta(); }
   const fino = CFG.gfx !== 'baixo' && AVT.w !== false;
   for (let i = 0; i < 4; i++) {
     const m = L[i]; let s = MSQ.slots[i];
