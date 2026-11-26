@@ -21713,14 +21713,15 @@ function anPose(ud, dt) {
   if (an.esq) { const L = an.esq; ML = an.ML.copy(Mg).premultiply(_an.M2.makeTranslation(_an.v.set(L[0], L[1], L[2]).applyQuaternion(qc))); } // a mão esquerda chega depois
   if (an.rev) { const L = anRev(F, an, rv, Mg); if (L && !vmGun?.userData.akimbo) { ML = an.ML.copy(Mg).premultiply(_an.M2.makeTranslation(L)); } }
   if (an.pump && an.mL && !G.reloadEnd && !an.saq) { an.mL0 = (an.mL0 || new V3()).setFromMatrixPosition(an.mL.matrixWorld).applyMatrix4(_an.M3.multiplyMatrices(F.body.matrixWorld, F.C).invert()); } // es1: lugar da mão esquerda na arma (parada)
+  let cartML = false; // es2: o cartucho vai na mão esquerda desviada (antes ficava no lugar do clipe, longe da mão)
   if (an.pump && F.cur === 'reload' && an.mL0 && an.mL) { // es1: o clipe leva a mão esquerda ao cinto a cada cartucho (na vazia, XM1014: aberta no ar longe da arma; Nova: fora do quadro): fica perto da janela
     const hw = _an.v.setFromMatrixPosition(an.mL.matrixWorld); if (ML) hw.applyMatrix4(ML);
     const gw = _an.v2.copy(an.mL0).applyMatrix4(_an.M3.multiplyMatrices(F.body.matrixWorld, F.C)); if (mexe) gw.applyMatrix4(Mg);
     const dd = hw.sub(gw), L = dd.length(), PA = AN.pump.arma[an.m], R = (PA ? PA[0] : AN.pump.perto) * F.P.hr; // hw: agora o vetor guarda-mão → mão
-    if (L > R) { const k = 1 - (R + (L - R) * (PA ? PA[1] : AN.pump.puxa)) / L; ML = an.ML.copy(ML || _an.M2.identity()).premultiply(_an.M3.makeTranslation(-dd.x * k, -dd.y * k, -dd.z * k)); }
+    if (L > R) { const k = 1 - (R + (L - R) * (PA ? PA[1] : AN.pump.puxa)) / L; ML = an.ML.copy(ML || _an.M2.identity()).premultiply(_an.M3.makeTranslation(-dd.x * k, -dd.y * k, -dd.z * k)); cartML = true; }
   }
-  if (mexe) { anAplica(an, F.body, Mg); anAplica(an, an.mR, Mg); if (an.mag && !fora) anAplica(an, an.mag, Mg); anAplica(an, an.cart, Mg); }
-  if (ML) { anAplica(an, an.mL, ML); if (an.mag && fora) anAplica(an, an.mag, ML); }
+  if (mexe) { anAplica(an, F.body, Mg); anAplica(an, an.mR, Mg); if (an.mag && !fora) anAplica(an, an.mag, Mg); if (!cartML) anAplica(an, an.cart, Mg); }
+  if (ML) { anAplica(an, an.mL, ML); if (an.mag && fora) anAplica(an, an.mag, ML); if (cartML) anAplica(an, an.cart, ML); }
   if (F.ik) for (const arm of F.ik.arms) arm.anM = arm.sd > 0 ? (mexe ? Mg : null) : ML; // o alvo do pulso vai junto (fpIK)
   // tremida da câmera (encaixes): camTremePasso, em fpUpdate (a mesma mola para todos os pacotes)
 }
