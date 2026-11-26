@@ -21969,7 +21969,7 @@ function knCurl(R) { for (let i = 0; i < 3; i++) R.idx[i].quaternion.copy(R.mid[
 // antebraço seguem por IK (o ombro avança se o braço não alcança)
 const _kn = { m: new THREE.Matrix4(), p: new V3(), q: new THREE.Quaternion(), s: new V3(), t: new V3(), c: new V3() };
 function vmSetWeapon(id) {
-  if (vmGun) { vmRoot.remove(vmGun); if (!VMC.dono.has(vmGun)) vmGun.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); }); } // 6-w17: a guardada no cache fica inteira
+  if (vmGun) { vmRoot.remove(vmGun); if (!VMC.dono.has(vmGun)) vmGun.traverse(o => { if (!o.geometry?.userData.keep) o.geometry?.dispose(); o.skeleton?.dispose(); }); } // 6-w17: a guardada no cache fica inteira; esqueleto: a textura dos ossos de cada cópia do pacote (SkeletonUtils.clone) ficava na placa a cada troca
   if (ARMS.knife) { ARMS.knife.removeFromParent(); ARMS.knife = null; } // a faca antiga sai do soquete dos braços
   if (ARMS.gunC) ARMS.gunC.removeFromParent();
   const vck = vmcChave(id); if (vck && vmcUsar(vck)) return; // 6-w17: arma já montada (troca sem refazer modelo, mãos e enquadramento)
