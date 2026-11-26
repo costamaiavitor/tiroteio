@@ -22129,7 +22129,7 @@ function vxzHash(geo) { // assinatura da geometria (posições, índices e UV)
 function vxzMat(src, R) {
   if (src.userData.papCamo) { // camuflagem do PaP: posição de repouso (espaço da arma) por matriz, uma cópia por peça (guardada: a arma remontada reusa)
     const k = src.uuid + R.elements.map(x => x.toFixed(4)).join(); let m = VXZ.pap.get(k); if (m) { VXZ.pap.delete(k); VXZ.pap.set(k, m); return m; }
-    m = papCamo(src.clone()); const ob = m.onBeforeCompile, u = { value: R.clone() }; m.vertexColors = true; m.name = 'vox'; // D9: o clone perde o onBeforeCompile da camuflagem (material clonado antes, só com o userData.papCamo): sem ele o voxel sem UV pegava uma cor só (PPSh PaP salmão chapado) m.userData = { ...src.userData, vxz: 1 }; m.defaultAttributeValues = {}; VXZ.pap.set(k, m); (GM.vxz ||= {})[m.uuid] = m;
+    m = papCamo(src.clone()); const ob = m.onBeforeCompile, u = { value: R.clone() }; m.vertexColors = true; m.name = 'vox'; m.userData = { ...src.userData, vxz: 1 }; m.defaultAttributeValues = {}; VXZ.pap.set(k, m); (GM.vxz ||= {})[m.uuid] = m; // D9: o clone perde o onBeforeCompile da camuflagem (material clonado antes, só com o userData.papCamo): sem ele o voxel sem UV pegava uma cor só (PPSh PaP salmão chapado)
     for (const [k2, m2] of VXZ.pap) { if (VXZ.pap.size <= VXZ.papMax) break; VXZ.pap.delete(k2); delete GM.vxz[m2.uuid]; m2.dispose(); } // a mais antiga sai (arma guardada que ainda usa recompila)
     m.onBeforeCompile = sh => { ob(sh); sh.uniforms.papM = u;
       sh.vertexShader = sh.vertexShader.replace('attribute vec4 papP;', 'uniform mat4 papM;').replace('vPapP = papP.w > .5 ? position : papP.xyz;', 'vPapP = (papM * vec4(position, 1.)).xyz;'); };
