@@ -5,12 +5,12 @@
 import * as THREE from '../../vendor/three@0.160.0/build/three.module.js';
 import { V, v, hx, mix, mul, sat, mk, child, wp, segFrame, ik, Bld, pl, bake, meshCubos, meshNets, rng } from './nucleo.js';
 import { CAMOS, camoCfg } from './tex.js';
-import { rosto, pele, cabelo, barba, chapeu, chapeuCobre, acessorio, CABELOS, CORES_CABELO, BARBAS, CHAPEUS, ROSTOS } from './cabeca.js';
+import { rosto, pele, cabelo, barba, chapeu, chapeuCobre, acessorio, CABELOS, CORES_CABELO, BARBAS, CHAPEUS, ROSTOS, FORMATOS, FORMA } from './cabeca.js';
 import { tronco, calca, calcado, colete, luvas, mochila, arma, TRONCOS, TRONCO_COR, CALCAS, CALCA_COR, CALCADOS, CALCADO_COR, COLETES, COLETE_COR, LUVAS, LUVA_COR, MOCHILAS, MOCHILA_COR } from './roupas.js';
 
 export const PELES = { porcelana: '#f6dcc6', clara: '#f0cfae', bege: '#e4b996', media: '#d2a07a', oliva: '#b98f66', morena: '#a8714a', canela: '#8d5a3a', parda: '#76472c', escura: '#5a3522', retinta: '#3e2418' };
 export const OLHOS = { castanho: '#4a2f1c', mel: '#8a5a24', verde: '#4a6a3a', azul: '#3d6a9a', cinza: '#6a7680', preto: '#1c1410' };
-export const OPCOES = { pele: PELES, corCabelo: CORES_CABELO, olho: OLHOS, cabelo: CABELOS, barba: BARBAS, chapeu: CHAPEUS, rosto: ROSTOS, tronco: TRONCOS, calca: CALCAS, calcado: CALCADOS, colete: COLETES, luvas: LUVAS, mochila: MOCHILAS, camo: Object.fromEntries(Object.entries(CAMOS).map(([k, d]) => [k, d.nome])), arma: { m4: 'M4', ak: 'AK' } };
+export const OPCOES = { formato: FORMATOS, pele: PELES, corCabelo: CORES_CABELO, olho: OLHOS, cabelo: CABELOS, barba: BARBAS, chapeu: CHAPEUS, rosto: ROSTOS, tronco: TRONCOS, calca: CALCAS, calcado: CALCADOS, colete: COLETES, luvas: LUVAS, mochila: MOCHILAS, camo: Object.fromEntries(Object.entries(CAMOS).map(([k, d]) => [k, d.nome])), arma: { m4: 'M4', ak: 'AK' } };
 const P0 = { ombro: 1, grossura: 1, mao: 1, cabeca: 1, perna: 1, tronco: 1, cintura: 1, quadril: 1, braco: 1, olho: 1 };
 export const CORPOS = {
   fino: { nome: 'Voxel fino', malha: 'cubos', res: .0068, resCab: .0034, resMao: .0045, det: 2, jit: .035, jitCab: .02 },
@@ -118,7 +118,7 @@ function mao(B, F, s, col, o, c) {
 const def = (o, d) => o ?? d;
 export function normalizar(cfg0 = {}) {
   const p = cfg0.preset ? PRESETS[cfg0.preset] || {} : {};
-  const cfg = { corpo: 'fino', pele: 'media', cabelo: 'curto', corCabelo: 'castanho_escuro', barba: 'nenhuma', chapeu: 'nenhum', rosto: [], tronco: 'camiseta', calca: 'cargo', calcado: 'coturno', colete: 'nenhum', luvas: 'nenhuma', mochila: 'nenhuma', camo: 'multicam', olho: 'castanho', arma: 'm4', ...p, ...cfg0, cores: { ...(p.cores || {}), ...(cfg0.cores || {}) } };
+  const cfg = { corpo: 'fino', pele: 'media', cabelo: 'curto', corCabelo: 'castanho_escuro', barba: 'nenhuma', chapeu: 'nenhum', rosto: [], tronco: 'camiseta', calca: 'cargo', calcado: 'coturno', colete: 'nenhum', luvas: 'nenhuma', mochila: 'nenhuma', camo: 'multicam', olho: 'castanho', arma: 'm4', formato: 'padrao', ...p, ...cfg0, cores: { ...(p.cores || {}), ...(cfg0.cores || {}) } };
   if (!Array.isArray(cfg.rosto)) cfg.rosto = cfg.rosto ? [cfg.rosto] : [];
   return cfg;
 }
@@ -129,6 +129,7 @@ export function construir(cfg0, rig = null) {
   const cc = cfg.cores, rc = (part, tab, i = 0) => { let x = i ? cc[part + '2'] : cc[part]; if (x === undefined) x = (tab[cfg[part]] || [])[i]; return x === 'camo' ? cfg.camo : x; };
   const c = { pele: PELES[cfg.pele] || cfg.pele, cabelo: CORES_CABELO[cfg.corCabelo] || cfg.corCabelo, olho: OLHOS[cfg.olho] || cfg.olho, chapeu: (cc.chapeu === 'camo' ? cfg.camo : cc.chapeu) || ({ capacete_fast: cfg.camo, capacete_nvg: cfg.camo, capacete_pasgt: 'woodland', bone: '#3a3f45', bone_tras: '#a33a2c', gorro: '#3a3f45', boina: '#6e1f24', chapeu_selva: cfg.camo, capuz: '#4a4f57', faixa: '#7a1a1a', bandana: '#8a1c1c', cowboy: '#6b4a2b', quepe: '#1f2638' }[cfg.chapeu] || '#3a3f45'), logo: cc.logo };
   const B = new Bld(), k = rig ? esqueletoRig(pr, rig) : esqueleto(pr); k.pele = c.pele;
+  c.forma = FORMA[cfg.formato] || FORMA.padrao;
   corpo(B, k, pr, c); rosto(B, k.Fh, pr, c);
   cabelo(B, k.Fh, cfg.cabelo, c, chapeuCobre(cfg.chapeu)); barba(B, k.Fh, cfg.barba, c);
   tronco(B, k, pr, cfg.tronco, rc('tronco', TRONCO_COR), rc('tronco', TRONCO_COR, 1), K.det);
@@ -176,7 +177,7 @@ export function montarAvatar(cfg0) {
 // peça do jogo (frente = -z). As mãos saem já fechadas na empunhadura: a pose delas vem do esqueleto da arma (esqueleto()).
 export const RIG = { quadril: .86, ombro: 1.38, reach: [.3, .34] };
 export const NIVEIS = { // resolução (m) do corpo, da cabeça e das mãos; det = detalhes pequenos das roupas
-  f: { res: .0068, cab: .0034, mao: .0045, jit: .035, jitCab: .02, det: 2 },
+  f: { res: .0068, cab: .0034, mao: .0045, jit: .035, jitCab: .02, det: 2, rosto: .0022 }, // rosto: frente da cabeça em voxel menor
   m: { res: .02, cab: .014, mao: .016, jit: .03, jitCab: .02, det: 1 },
   l: { res: .032, cab: .024, mao: .026, jit: .02, jitCab: .02, det: 0 },
 };
@@ -248,6 +249,11 @@ function espaco(b) {
   const m = [-x.x, x.y, -x.z, -y.x / L, y.y / L, -y.z / L, -z.x, z.y, -z.z];
   return { m, t: [-(x.x * mid.x + x.y * mid.y + x.z * mid.z), -(y.x * mid.x + y.y * mid.y + y.z * mid.z) / L, -(z.x * mid.x + z.y * mid.y + z.z * mid.z)], ny: L * L };
 }
+// esvazia as células de um lado do plano z = zc (frente = true: fica só z >= zc)
+function corta(G, zc, frente) {
+  const { D, nx, ny, nz, o, res } = G;
+  for (let kk = 0; kk < nz; kk++) { const z = o[2] + (kk + .5) * res; if ((z >= zc) === frente) continue; for (let i = kk * nx * ny, e = i + nx * ny; i < e; i++) D[i] = 1; }
+}
 // gera as peças: { partes: { inner, head, legL, legR, shL, shR, upL, upR, foL, foR, hL, hR: { pos, nor, col, ind } }, rig, tri, ms }
 export function gerarPartes(cfg0, nivel = 'm') {
   const t0 = (typeof performance !== 'undefined' ? performance : Date).now(), N = NIVEIS[nivel] || NIVEIS.m;
@@ -261,7 +267,14 @@ export function gerarPartes(cfg0, nivel = 'm') {
   const partes = {}, tr = []; let tri = 0;
   for (const n in grupos) {
     const b = O[n], P = b.mao ? grupos[n] : grupos[n].concat(soltas); if (!P.some(p => p.kind === 'add')) continue;
-    const res = b.mao ? N.mao : n === 'head' ? N.cab : N.res, G = bake(P, res), m = meshCubos(G, { jit: n === 'head' ? N.jitCab : N.jit, cru: true }), E = espaco(b);
+    const res = b.mao ? N.mao : n === 'head' ? N.cab : N.res, E = espaco(b);
+    let m;
+    if (n === 'head' && N.rosto) { // frente da cabeça (do plano zc para a frente) num voxel menor; atrás, o da cabeça. Cada malha fecha no plano
+      const zc = wp(k.Fh, [0, 0, .036]).z, G1 = bake(P, res), G2 = bake(P, N.rosto, 3, [zc - 3 * N.rosto, 9]);
+      corta(G1, zc, false); corta(G2, zc, true);
+      const a = meshCubos(G1, { jit: N.jitCab, cru: true, aoK: .75 }), c2 = meshCubos(G2, { jit: N.jitCab * .7, cru: true, aoK: .6 }), nv = a.pos.length / 3;
+      m = { pos: a.pos.concat(c2.pos), nor: a.nor.concat(c2.nor), col: a.col.concat(c2.col), ind: a.ind.concat(c2.ind.map(i => i + nv)) };
+    } else m = meshCubos(bake(P, res), { jit: n === 'head' ? N.jitCab : N.jit, cru: true });
     const nv = m.pos.length / 3, pos = new Float32Array(m.pos), nor = new Int8Array(m.nor.length), col = new Uint16Array(m.col.length), MP = m.pos, MN = m.nor, MC = m.col;
     for (let j = 0; j < nv * 3; j += 3) {
       let X = MN[j], Y = MN[j + 1], Z = MN[j + 2];
@@ -283,7 +296,7 @@ export function gerarPartes(cfg0, nivel = 'm') {
 // 'pe3.ol0.ca4...' : cada campo = 2 letras + índice (base 36) na ordem das chaves de OPCOES (só acrescentar opções no FIM das
 // listas, nunca reordenar: o índice é o que viaja). ro = acessórios de rosto (índices com '+'); k0..k8 = cor por peça:
 // 'x' + hex de 6, 'c' + índice da camuflagem, ou só 'c' (= a camuflagem geral). Valor fora da lista é ignorado (fica o padrão).
-export const CAMPOS = [['pe', 'pele'], ['ol', 'olho'], ['ca', 'cabelo'], ['cc', 'corCabelo'], ['ba', 'barba'], ['ch', 'chapeu'], ['tr', 'tronco'], ['cl', 'calca'], ['cd', 'calcado'], ['co', 'colete'], ['lu', 'luvas'], ['mo', 'mochila'], ['cm', 'camo']];
+export const CAMPOS = [['pe', 'pele'], ['ol', 'olho'], ['ca', 'cabelo'], ['cc', 'corCabelo'], ['ba', 'barba'], ['ch', 'chapeu'], ['tr', 'tronco'], ['cl', 'calca'], ['cd', 'calcado'], ['co', 'colete'], ['lu', 'luvas'], ['mo', 'mochila'], ['cm', 'camo'], ['fo', 'formato']]; // novos campos só no fim
 export const PECAS_COR = ['tronco', 'tronco2', 'calca', 'calcado', 'calcado2', 'colete', 'luvas', 'mochila', 'chapeu'];
 export const COD_MAX = 240, COD_RE = /^[a-z0-9.+]{0,240}$/;
 const chaves = c => Object.keys(OPCOES[c]);
@@ -317,6 +330,7 @@ export function aleatorio(seed) {
   cfg.chapeu = r() < .3 ? 'nenhum' : um(ks('chapeu')); cfg.colete = r() < .3 ? 'nenhum' : um(ks('colete'));
   cfg.luvas = r() < .5 ? 'nenhuma' : um(ks('luvas')); cfg.mochila = r() < .55 ? 'nenhuma' : um(ks('mochila'));
   cfg.rosto = r() < .6 ? [] : [um(ks('rosto').filter(x => x !== 'nenhum'))];
+  cfg.formato = r() < .35 ? 'padrao' : um(ks('formato'));
   if (cfg.tronco === 'ghillie' || cfg.calca === 'ghillie') cfg.tronco = cfg.calca = 'ghillie';
   return normalizar(cfg);
 }

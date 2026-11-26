@@ -9,42 +9,107 @@ const sp = (th, ph, k = 1, kk = 0) => [C[0] + Math.sin(ph) * Math.sin(th) * (R[0
 export const pele = c => { const P = hx(c), Rr = mix(P, [.75, .3, .28], .25); return (x, y, z) => mix(P, Rr, Math.max(0, vnoise(x * 18, y * 18, z * 18) - .55) * .9); };
 
 // ---------- rosto ----------
+// Anatomia esculpida em camadas (crânio, testa, arco das sobrancelhas, órbitas cavadas, maçãs, bochechas, mandíbula, queixo, nariz com
+// ponte/asas/columela, lábios com arco do cupido e filtro, orelha com hélice) e cor da pele por região (rubor nas maçãs, nariz e orelhas,
+// olheira, sombra da barba). Formatos (FORMATOS) mudam larguras e volumes sem mexer nos pontos onde óculos, barbas e chapéus encaixam.
+export const FORMATOS = { padrao: 'Padrão', fino: 'Fino', largo: 'Largo', quadrado: 'Quadrado', redondo: 'Redondo', maduro: 'Maduro' };
+export const FORMA = { // fw: largura do meio do rosto; jw: mandíbula; bo: bochecha; qx/qy: largura/altura do queixo; cr: crânio; qq: ângulo da mandíbula; mad: idade
+  padrao: { fw: 1, jw: 1, bo: 1, qx: 1, qy: 0, cr: 1, qq: 0, mad: 0 },
+  fino: { fw: .93, jw: .87, bo: .7, qx: .86, qy: -.006, cr: .95, qq: 0, mad: 0 },
+  largo: { fw: 1.09, jw: 1.1, bo: 1.15, qx: 1.08, qy: 0, cr: 1.06, qq: .3, mad: 0 },
+  quadrado: { fw: 1.03, jw: 1.15, bo: .85, qx: 1.32, qy: -.003, cr: 1.02, qq: 1, mad: 0 },
+  redondo: { fw: 1.06, jw: 1, bo: 1.5, qx: .95, qy: .004, cr: 1.04, qq: 0, mad: 0 },
+  maduro: { fw: 1, jw: 1.03, bo: .9, qx: 1, qy: 0, cr: 1, qq: .25, mad: 1 },
+};
+const gau = (dx, dy, dz, s) => Math.exp(-(dx * dx + dy * dy + dz * dz) / (2 * s * s));
+// pele do rosto: cor por região no espaço da cabeça (p.loc); só nas primitivas da cabeça (o corpo usa pele())
+function peleRosto(c, fm) {
+  const P = hx(c.pele), lum = P[0] * .3 + P[1] * .59 + P[2] * .11, RU = [Math.min(1, P[0] * 1.1), P[1] * .84, P[2] * .84], OL = mix(P, [.33, .22, .3], .55), BA = mix(mul(P, .8), [.25, .3, .36], .25);
+  const kr = .4 - (1 - lum) * .18, kb = fm.qq * .05 + fm.mad * .05 + .03;
+  return (x, y, z, p) => {
+    const l = p.loc(x, y, z), ax = Math.abs(l[0]);
+    let c0 = P;
+    const ru = kr * (gau(ax - .046, l[1] - .077, l[2] - .075, .017) + .8 * gau(l[0], l[1] - .072, l[2] - .108, .01) + .7 * (ax > .074 && l[2] < .012 ? 1 : 0) * gau(0, l[1] - .09, 0, .025));
+    c0 = mix(c0, RU, Math.min(.6, ru));
+    c0 = mix(c0, OL, .2 * gau(ax - .031, l[1] - .085, l[2] - .086, .006)); // olheira leve
+    if (l[1] < .066 && l[2] > .02) c0 = mix(c0, BA, kb * Math.min(1, (.066 - l[1]) / .02) * (1 - gau(l[0], l[1] - .047, l[2] - .095, .012))); // sombra da barba (fora dos lábios)
+    if (fm.mad) c0 = mix(c0, mul(c0, .9), Math.max(0, vnoise(x * 70, y * 70, z * 70) - .62) * 2); // manchas da idade
+    return mul(c0, 1 + (vnoise(x * 260, y * 260, z * 260) - .5) * .05); // poros
+  };
+}
 export function rosto(B, F, pr, c) {
-  const SK = pele(c.pele), o = { reg: 'head', body: true, tag: 'rosto' }, ol = pr.olho, P = hx(c.pele);
-  B.ell(F, C, R, null, SK, o);
-  B.ell(F, [0, .14, .02], [.071, .062, .07], null, SK, o);
-  B.box(F, [0, .072, .033], [.061, .045, .05], .03, null, SK, o);
-  B.box(F, [0, .038, .038], [.054 * (pr.mandibula || 1), .028, .046], .027, null, SK, o);
-  B.ell(F, [0, .022, .077], [.023, .019, .021], null, SK, o);
-  B.ell(F, [0, .0215, .094], [.004, .006, .004], null, mul(P, .9), { kind: 'paint', on: ['rosto'] });
+  const fm = c.forma || FORMA.padrao, SK = peleRosto(c, fm), o = { reg: 'head', body: true, tag: 'rosto' }, ol = pr.olho, P = hx(c.pele), PT = { kind: 'paint', on: ['rosto'] };
+  const SKd = k => (x, y, z, p) => mul(SK(x, y, z, p), k);
+  // volumes
+  B.ell(F, C, [R[0] * fm.cr, R[1], R[2]], null, SK, o);
+  B.ell(F, [0, .14, .02], [.071 * fm.cr, .062, .07], null, SK, o);
+  B.box(F, [0, .072, .033], [.061 * fm.fw, .045, .05], .03, null, SK, o);
+  B.box(F, [0, .038, .038], [.054 * fm.jw, .028, .046], .027 * (1 - .55 * fm.qq), null, SK, o);
+  if (fm.qq > 0) for (const s of [1, -1]) B.ell(F, [s * .05 * fm.jw, .034, .006], [.013, .016 + .004 * fm.qq, .022], null, SK, o); // ângulo da mandíbula
+  B.ell(F, [0, .022 + fm.qy, .077], [.023 * fm.qx, .019, .021], null, SK, o); // queixo
+  if (fm.qq > .5) B.box(F, [0, .02 + fm.qy, .082], [.019 * fm.qx, .011, .012], .007, null, SK, o);
+  B.ell(F, [0, .0215 + fm.qy, .094], [.004, .006, .004], null, mul(P, .9), PT);
   for (const s of [1, -1]) {
-    B.ell(F, [s * .045, .085, .066], [.023, .017, .021], null, SK, o); // maçã
-    B.ell(F, [s * .084, .095, -.006], [.0115, .027, .017], [0, 0, s * .15], SK, o); // orelha
-    B.ell(F, [s * .086, .072, -.003], [.0075, .0085, .0075], null, SK, o); // lóbulo
-    B.ell(F, [s * .093, .097, -.004], [.006, .016, .009], null, mul(P, .62), { kind: 'paint', on: ['rosto'] });
-    B.ell(F, [s * .091, .088, .006], [.004, .006, .004], null, SK, o); // trago
+    B.ell(F, [s * .05 * fm.fw, .089, .058], [.021, .012, .021], [0, s * .3, 0], SK, o); // osso da maçã (zigomático)
+    B.ell(F, [s * .04 * fm.fw, .07 - fm.mad * .004, .061], [.021 * Math.sqrt(fm.bo), .02, .019 * Math.sqrt(fm.bo)], null, SK, o); // bochecha
+    B.ell(F, [s * .029, .1135, .083], [.023, .0085, .012], [0, 0, -s * .12], SK, o); // arco da sobrancelha
+    // orelha: concha, hélice (anel por cima e atrás), lóbulo, trago
+    B.ell(F, [s * .084, .095, -.006], [.0105, .026, .016], [0, 0, s * .15], SK, o);
+    B.tor(F, [s * .087, .099, -.008], .0165, .0036, [0, 0, Math.PI / 2], SK, { ...o, clip: [pl(F, [s * .087, .086, -.008], [0, -1, .35])] });
+    B.ell(F, [s * .086, .072, -.003], [.0075, .0085, .0075], null, SK, o);
+    B.ell(F, [s * .093, .094, -.004], [.005, .011, .007], null, mul(P, .7), PT);
+    B.ell(F, [s * .091, .088, .006], [.004, .006, .004], null, SK, o);
   }
-  B.box(F, [0, .114, .082], [.054, .0095, .013], .008, null, SK, o); // arcada
-  B.cone(F, [0, .108, .088], [0, .076, .103], .0085, .0115, SK, o); // dorso do nariz
-  B.ell(F, [0, .071, .103], [.0112, .0095, .0105], null, SK, o); // ponta
-  for (const s of [1, -1]) { B.ell(F, [s * .0115, .0685, .096], [.0078, .0072, .0082], null, SK, o); B.ell(F, [s * .0068, .0628, .0995], [.0042, .0026, .0055], null, mul(P, .38), { kind: 'paint', on: ['rosto'] }); }
-  const L = mul(mix(P, [.6, .28, .26], .38), .93);
-  B.ell(F, [0, .0528, .0925], [.0195, .0055, .0082], null, L, { ...o, bias: .001 }); B.ell(F, [0, .0432, .0905], [.0165, .0068, .0088], null, mul(L, 1.04), { ...o, bias: .001 });
-  B.box(F, [0, .0483, .1], [.0178, .0013, .012], 0, null, mul(L, .45), { kind: 'paint', on: ['rosto', 'barba'] });
-  for (const s of [1, -1]) B.ell(F, [s * .019, .0485, .093], [.0025, .0025, .006], null, mul(L, .6), { kind: 'paint', on: ['rosto'] });
-  const sob = mul(hx(c.cabelo), .85), irisC = hx(c.olho);
-  const iris = (x0) => (x, y, z, p) => { const l = p.loc(x, y, z), r = Math.hypot(l[0] - x0, l[1] - .0965) / (.0076 * Math.min(ol, 1.6)); return r < .42 ? [.03, .02, .02] : mul(irisC, r > .85 ? .55 : 1.05 - r * .3); };
+  B.ell(F, [0, .111, .089], [.011, .008, .008], null, SK, o); // glabela
+  // órbitas: cava antes dos olhos (os olhos e as pálpebras entram depois e ficam no fundo)
+  for (const s of [1, -1]) B.ell(F, [s * .031, .0985, .094], [.0165, .012, .012], null, SK, { kind: 'cut' });
+  // nariz: ponte, dorso, ponta, asas, columela, narinas
+  B.cone(F, [0, .109, .087], [0, .077, .103], .0075, .0108, SK, o);
+  B.ell(F, [0, .071, .1035], [.0108, .0095, .0105], null, SK, o);
+  for (const s of [1, -1]) { B.ell(F, [s * .0118, .0688, .0955], [.0076, .0074, .0084], null, SK, o); B.ell(F, [s * .0175, .0705, .095], [.0035, .006, .005], null, mul(P, .78), PT); // sulco da asa
+    B.ell(F, [s * .0066, .0626, .0995], [.0042, .0026, .0055], null, mul(P, .32), PT); }
+  B.ell(F, [0, .0645, .1015], [.0034, .004, .006], null, SK, o); // columela
+  // boca: filtro, lábio de cima com o arco do cupido, lábio de baixo cheio, cantos e sulco abaixo
+  const L = mul(mix(P, [.62, .28, .27], .4), .93), Ld = mul(L, .82), Lc = (x, y, z, p) => { const l = p.loc(x, y, z); return mul(L, 1.02 + .1 * gau(l[0], l[1] - .043, l[2] - .1, .006) - .08 * Math.abs(l[0]) / .018); };
+  for (const s of [1, -1]) B.cone(F, [s * .0042, .0636, .0995], [s * .0058, .0565, .0975], .0017, .0017, SK, o);
+  B.ell(F, [0, .0602, .099], [.0028, .0034, .004], null, mul(P, .86), PT);
+  const ol2 = { ...o, tag: 'labio', bias: .001 };
+  B.ell(F, [0, .0526, .0928], [.0188, .005, .0078], null, Lc, ol2);
+  for (const s of [1, -1]) B.ell(F, [s * .0056, .0546, .0948], [.0068, .0036, .0058], null, Lc, ol2);
+  B.ell(F, [0, .0428, .0908], [.0162, .0072, .0092], null, Lc, ol2);
+  B.box(F, [0, .0484, .1], [.0176, .0012, .012], 0, null, mul(L, .42), { kind: 'paint', on: ['rosto', 'barba', 'labio'] });
+  for (const s of [1, -1]) B.ell(F, [s * .0192, .0485, .093], [.0026, .0026, .006], null, mul(L, .55), { kind: 'paint', on: ['rosto', 'labio'] });
+  B.ell(F, [0, .0345, .093], [.013, .0028, .007], null, mul(P, .86), PT); // sulco mentolabial
+  // sulco nasolabial (mais fundo com a idade)
+  const nl = .82 - fm.mad * .1;
+  for (const s of [1, -1]) B.cone(F, [s * .0175, .0675, .0985], [s * .0265, .047, .0925], .0026 + fm.mad * .0008, .0022, mul(P, nl), PT);
+  // olhos: globo, íris com anel escuro, fibras e brilho, pálpebras com prega, cílios, canto rosado e sobrancelhas com fios
+  const sob = hx(c.cabelo), irisC = hx(c.olho), ro = .0076 * Math.min(ol, 1.6);
+  const iris = x0 => (x, y, z, p) => {
+    const l = p.loc(x, y, z), dx = l[0] - x0, dy = l[1] - .0965, r = Math.hypot(dx, dy) / ro, a = Math.atan2(dy, dx);
+    if (r < .36) return [.018, .014, .014];
+    if (r > .88) return mul(irisC, .38);
+    const fib = .82 + .36 * vnoise(Math.cos(a) * 9 + x0 * 99, Math.sin(a) * 9, r * 3), col = r < .55 ? mix(mul(irisC, 1.35), [.75, .6, .35], .18) : irisC;
+    return mul(col, fib * (1.1 - r * .35) * (dy > ro * .35 ? .78 : 1)); // a pálpebra sombreia a parte de cima
+  };
   for (const s of [1, -1]) {
     const x0 = s * .031;
-    B.ell(F, [x0, .097, .077], [.0122, .0102, .0115], null, '#e4ddd2', { tag: 'olho', bias: .002 });
-    B.ell(F, [x0, .0965, .089], [.0076 * Math.min(ol, 1.6), .0079 * Math.min(ol, 1.6), .006], null, iris(x0), { kind: 'paint', on: ['olho'] });
-    B.ell(F, [x0 + .0025, .099, .089], [.0016, .0016, .006], null, '#ffffff', { kind: 'paint', on: ['olho'] });
-    B.ell(F, [x0, .1078, .0808], [.0152, .0054, .0112], [0, 0, -s * .1], SK, { ...o, bias: .003 }); // pálpebra superior
-    B.ell(F, [x0, .0885, .0805], [.0138, .0038, .0092], null, SK, { ...o, bias: .003 }); // inferior
-    B.box(F, [x0, .1031, .0895], [.0135, .0015, .012], 0, [0, 0, -s * .08], mul(hx(c.cabelo), .35), { kind: 'paint', on: ['rosto', 'olho'] }); // cílios
-    B.box(F, [s * .0215, .1185, .092], [.0095, .0026, .012], 0, [0, 0, -s * .08], sob, { kind: 'paint', on: ['rosto'] }); // sobrancelha
-    B.box(F, [s * .0405, .1188, .09], [.0105, .002, .012], 0, [0, 0, s * .22], sob, { kind: 'paint', on: ['rosto'] });
+    B.ell(F, [x0, .097, .077], [.0124, .0104, .0117], null, (x, y, z, p) => { const l = p.loc(x, y, z); return mix(hx('#ece6dc'), hx('#c99a90'), Math.max(0, Math.abs(l[0] - x0) / .012 - .55) * .6); }, { tag: 'olho', bias: .002 });
+    B.ell(F, [x0, .0965, .089], [ro, ro * 1.04, .006], null, iris(x0), { kind: 'paint', on: ['olho'] });
+    B.ell(F, [x0 + .0026, .0992, .089], [.0017, .0017, .006], null, '#ffffff', { kind: 'paint', on: ['olho'] });
+    B.ell(F, [x0 - .002, .0945, .089], [.0008, .0008, .006], null, '#e8eef5', { kind: 'paint', on: ['olho'] });
+    B.ell(F, [x0 - s * .0105, .0965, .0855], [.0028, .0028, .005], null, '#c98d84', { kind: 'paint', on: ['olho'] }); // carúncula
+    B.ell(F, [x0, .1078, .0815], [.0156, .0056, .0115], [0, 0, -s * .1], SK, { ...o, bias: .003 }); // pálpebra superior
+    B.ell(F, [x0, .0882, .0808], [.0138, .0036, .0094], null, SK, { ...o, bias: .003 }); // inferior
+    B.box(F, [x0, .1135, .0875], [.0128, .0011, .012], 0, [0, 0, -s * .1], mul(P, .72), PT); // prega da pálpebra
+    B.box(F, [x0, .1028, .0905], [.0138, .0016, .012], 0, [0, 0, -s * .08], mul(sob, .3), { kind: 'paint', on: ['rosto', 'olho'] }); // cílios
+    if (fm.mad) { B.ell(F, [x0, .0848, .0825], [.0115, .0035, .0068], null, SK, o); for (let i = 0; i < 3; i++) B.box(F, [s * (.046 + .002 * i), .1 + (i - 1) * .005, .078], [.0065, .0007, .01], 0, [0, 0, s * (i - 1) * .35], mul(P, .74), PT); }
+    const fios = (x, y, z) => mul(sob, .75 + .5 * vnoise(x * 400, y * 90, z * 400)); // sobrancelha: grossa no meio, afina para fora
+    B.box(F, [s * .0175, .1182, .0925], [.0075, .0032, .012], 0, [0, 0, -s * .14], fios, PT);
+    B.box(F, [s * .031, .1205, .092], [.0085, .0028, .012], 0, [0, 0, s * .06], fios, PT);
+    B.box(F, [s * .0435, .1178, .088], [.0075, .0019, .012], 0, [0, 0, s * .38], fios, PT);
   }
+  if (fm.mad) for (let i = 0; i < 3; i++) B.box(F, [0, .136 + i * .009, .1], [.032 - i * .004, .0007, .03], 0, null, mul(P, .8), PT); // rugas da testa
 }
 
 // ---------- cabelos ----------
@@ -60,7 +125,7 @@ export function cabelo(B, F, tipo, c, chap) {
   const Hc = (x, y, z) => mul(H, .72 + .45 * fbm(x * 160, y * 160, z * 160, 2));
   const fade = (k = .5) => { const S = hx(c.pele); return (x, y, z) => mul(mix(S, H, k), .95 + .1 * vnoise(x * 300, y * 300, z * 300)); };
   const cap = (th, linha = 'normal', nuca = .072, extra = [], col = Hf) => B.ell(F, C, R, null, col, { ...o, inf: th, clip: [pl(F, LINHA[linha], [0, -.75, .66]), pl(F, [0, nuca, 0], [0, -1, 0]), ...extra] });
-  const cost = (len = .016, col = fade(.75)) => { for (const s of [1, -1]) B.box(F, [s * .078, .09 - (len - .016) / 2, .027], [.005, len, .0065], .004, null, col, o); };
+  const cost = (len = .016, col = fade(.75)) => { const yb = .09 - (len - .016) / 2 - len; for (const s of [1, -1]) { B.cone(F, [s * .08, .13, .02], [s * .079, yb, .027], .011, .006, col, { kind: 'paint', on: ['rosto'] }); B.cone(F, [s * .077, .125, .019], [s * .076, yb + .006, .025], .005, .0035, col, o); } }; // costeleta do cabelo: pinta a pele junto à orelha, afinando para baixo
   const vol = (p, rr, rot, col = Hf, ex = {}) => B.ell(F, p, rr, rot, col, { ...o, ...ex });
   const cachos = (n, rmin, rmax, faixa, col = Hc) => { for (let i = 0; i < n; i++) { const th = r() * Math.PI * 2, ph = faixa[0] + r() * (faixa[1] - faixa[0]); if (Math.abs(Math.sin(th / 2)) < .38 && ph > .55) continue; const rr = rmin + r() * (rmax - rmin); vol(sp(th, ph, 1, .004), [rr, rr, rr], null, col); } };
   const S1 = [1, -1];
@@ -123,12 +188,12 @@ export function barba(B, F, tipo, c) {
   if (tipo === 'nenhuma') return;
   const H = hx(c.cabelo), Hf = (x, y, z) => mul(H, .78 + .32 * vnoise(x * 240, y * 160, z * 240)), o = { tag: 'barba' };
   const base = [pl(F, [0, .074, 0], [0, 1, 0]), pl(F, [0, 0, -.02], [0, 0, -1])], bochecha = pl(F, [0, .06, .085], [0, .6, .8]);
-  const mand = (inf, ex = []) => B.box(F, [0, .038, .038], [.054, .028, .046], .027, null, Hf, { ...o, inf, clip: [...base, ...ex] });
-  const baixo = (inf, ex = []) => B.ell(F, [0, .072, .033], [.064, .045, .05], null, Hf, { ...o, inf, clip: [...base, bochecha, ...ex] });
+  const jw = c.forma?.jw || 1, mand = (inf, ex = []) => B.box(F, [0, .038, .038], [.054 * jw, .028, .046], .027, null, Hf, { ...o, inf, clip: [...base, ...ex] });
+  const baixo = (inf, ex = []) => B.ell(F, [0, .072, .033], [.064 * (c.forma?.fw || 1), .045, .05], null, Hf, { ...o, inf, clip: [...base, bochecha, ...ex] });
   const queixo = inf => B.ell(F, [0, .022, .078], [.027, .025, .024], null, Hf, { ...o, inf });
   const bigode = (w = .024, h = .0055, inf = 0) => B.box(F, [0, .061, .098], [w, h, .01], .005, null, Hf, { ...o, inf });
   switch (tipo) {
-    case 'por_fazer': B.ell(F, [0, .045, .035], [.068, .052, .078], null, mix(hx(c.pele), H, .3), { kind: 'paint', on: ['rosto'], clip: base }); B.box(F, [0, .061, .098], [.024, .006, .012], 0, null, mix(hx(c.pele), H, .3), { kind: 'paint', on: ['rosto'] }); break;
+    case 'por_fazer': { const pf = (x, y, z) => mix(hx(c.pele), H, vnoise(x * 520, y * 520, z * 520) > .5 ? .42 : .14); B.ell(F, [0, .045, .035], [.068 * jw, .052, .078], null, pf, { kind: 'paint', on: ['rosto'], clip: base }); B.box(F, [0, .061, .098], [.024, .006, .012], 0, null, pf, { kind: 'paint', on: ['rosto'] }); break; } // barba por fazer: pontinhos (não pinta os lábios)
     case 'bigode': bigode(); break;
     case 'bigodao': B.ell(F, [0, .0605, .097], [.03, .0095, .013], null, Hf, o); for (const s of [1, -1]) B.cone(F, [s * .026, .058, .095], [s * .038, .046, .088], .0075, .0035, Hf, o); break;
     case 'cavanhaque': bigode(); queixo(.004); for (const s of [1, -1]) B.cone(F, [s * .022, .058, .094], [s * .02, .035, .088], .0055, .0055, Hf, o); break;
