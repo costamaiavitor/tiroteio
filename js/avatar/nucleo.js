@@ -110,10 +110,11 @@ function prep(pr) {
 }
 
 // ---------- campo ----------
-export function bake(P, res, pad = 3) {
+export function bake(P, res, pad = 3, lim = null) { // lim = [zmin, zmax]: só esta faixa de z (rosto em voxel menor)
   P.forEach(prep);
   const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
   for (const p of P) if (p.kind === 'add') for (let a = 0; a < 3; a++) { mn[a] = Math.min(mn[a], p.bb[a]); mx[a] = Math.max(mx[a], p.bb[a + 3]); }
+  if (lim) { mn[2] = Math.max(mn[2], lim[0]); mx[2] = Math.min(mx[2], lim[1]); }
   const o = mn.map(m => m - pad * res), n = [0, 1, 2].map(a => Math.ceil((mx[a] - mn[a]) / res) + 2 * pad);
   const [nx, ny, nz] = n, N = nx * ny * nz;
   const D = new Float32Array(N).fill(1), S = new Float32Array(N).fill(1), O = new Int32Array(N).fill(-1), PT = new Int32Array(N).fill(-1);
@@ -156,7 +157,7 @@ function aoCav(G, sol, i, j, k, R, st) {
 
 // ---------- malha de cubos (voxel com AO por vértice) ----------
 const DIRS = [[0, 1, 2, 1], [0, 2, 1, -1], [1, 2, 0, 1], [1, 0, 2, -1], [2, 0, 1, 1], [2, 1, 0, -1]]; // eixo, t1, t2, sinal (t1×t2 = n)
-export function meshCubos(G, { jit = .05, cru = false } = {}) {
+export function meshCubos(G, { jit = .05, cru = false, aoK = 1 } = {}) { // aoK < 1: sombra de cavidade mais suave (rosto: menos anéis nos degraus)
   const { D, nx, ny, nz, o, res } = G, N = nx * ny * nz, sol = new Uint8Array(N);
   for (let i = 0; i < N; i++) sol[i] = D[i] <= 0;
   const S = (i, j, k) => (i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz) ? 0 : sol[i + nx * (j + ny * k)];
@@ -180,7 +181,7 @@ export function meshCubos(G, { jit = .05, cru = false } = {}) {
         const p = [i, j, k]; if (sg > 0) p[ax] += 1; p[t1] += u; p[t2] += w;
         pos.push(o[0] + p[0] * res, o[1] + p[1] * res, o[2] + p[2] * res);
         const nn = [0, 0, 0]; nn[ax] = sg; nor.push(...nn);
-        const f = AOV[ao[q]] * cav; col.push(cc[0] * f, cc[1] * f, cc[2] * f);
+        const f = 1 - (1 - AOV[ao[q]] * cav) * aoK; col.push(cc[0] * f, cc[1] * f, cc[2] * f);
       }
       if (ao[0] + ao[2] >= ao[1] + ao[3]) ind.push(nv, nv + 1, nv + 2, nv, nv + 2, nv + 3); else ind.push(nv + 1, nv + 2, nv + 3, nv + 1, nv + 3, nv);
       nv += 4;
