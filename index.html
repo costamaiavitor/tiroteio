@@ -21296,7 +21296,7 @@ function fpMagProprio(F) {
 }
 function fpUpdate(ud, dt) {
   const F = ud.fps2, hs = Math.hypot(me.vel.x, me.vel.z);
-  if (G.reloadEnd && !F.reloading) { F.reloading = true; fpPlay(ud, F.an?.m === 'python' || ud.akimbo && F.P.view === 'pistol' ? 'idle' /* pq3: Duplas: o clipe de recarga leva a pistola para o meio (e o espelho a da esquerda): as duas se batiam no centro; recarga própria em an (AKREC) */ : (G.reloadEmpty || F.z2 && FZ2.arma[G.cur]?.sempreE) && F.clips.reloadE ? 'reloadE' : 'reload', G.reloadEnd - now); if (F.z2) fz2Inicio(F); } // an: R8 sem o clipe de carregador; fz2: roteiro da recarga
+  if (G.reloadEnd && !F.reloading) { F.reloading = true; fpPlay(ud, F.an?.m === 'python' || ud.akimbo && F.P.view === 'pistol' || F.syn && ud.rig0 === 'break' && G.reload ? 'idle' /* pq3: Duplas: o clipe de recarga leva a pistola para o meio (e o espelho a da esquerda): as duas se batiam no centro; recarga própria em an (AKREC) */ : (G.reloadEmpty || F.z2 && FZ2.arma[G.cur]?.sempreE) && F.clips.reloadE ? 'reloadE' : 'reload', G.reloadEnd - now); if (F.z2) fz2Inicio(F); } // an: R8 sem o clipe de carregador; fz2: roteiro da recarga
   if (!G.reloadEnd) { if (F.z2?.r) { F.until = 0; F.z2.r = null; if (F.z2.pm) { F.z2.pm.a.scale.setScalar(1); F.z2.pm.b?.scale.setScalar(1e-4); } } F.reloading = false; } // fz2: recarga cancelada (plantar, morrer): volta já à pose parada
   if (F.until && now >= F.until) F.until = 0;
   if (!F.until && !F.reloading) fpPlay(ud, me.sprinting && F.clips.run && !F.P?.semCorrida ? 'run' : hs > 1.5 && me.onGround && F.clips.walk ? 'walk' : 'idle');
@@ -21939,7 +21939,7 @@ function anEscopeta(F, an, w, a) {
   }
   F.act.timeScale = 0; F.act.time = clamp(t, 0, F.act.getClip().duration - 1e-3);
 }
-if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AN, ANPEC, AN_PECAS, KNF, ANREV }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AN, ANPEC, AN_PECAS, KNF, ANREV, BRKR }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
 // ===== fim an =====
 // IK dos braços: recua os ombros, leva a mão esquerda ao guarda-mão do modelo e gira braço e antebraço (dois ossos, cotovelo no mesmo
 // plano de antes) até cada pulso chegar ao alvo
@@ -21977,6 +21977,10 @@ function fpIK(F) {
   { const ud = vmGun?.userData; if (F.syn && ud?.rig0 === 'clip' && ud.clipG && G.reloadEnd && !G.reload) { // D22: Kar98k: a mão esquerda leva o pente-clipe por cima (a peça do código) e o empurra
     const t = clamp((now - G.reloadStart) / (G.reloadEnd - G.reloadStart), 0, 1), w = smooth(seg(t, .1, .24) * (1 - seg(t, .62, .76))), aL = K.arms.find(a => a.sd < 0);
     if (w > 0 && aL) { ud.clipG.updateMatrixWorld(true); const C = FPIK.clipMao, u = F.P.hr; I.c.setFromMatrixPosition(ud.clipG.matrixWorld).add(I.a.set(C[0] * u, C[1] * u, C[2] * u));
+      I.c.sub(I.w.setFromMatrixPosition(aL.wr.matrixWorld)).sub(I.dl).multiplyScalar(w); I.dl.add(I.c); } } }
+  { const ud = vmGun?.userData, S = G.reload; if (F.syn && ud?.rig0 === 'break' && ud.brk && S) { /* pq3: Sawed-Off: a mão esquerda larga a telha, vai à culatra aberta e busca cada cartucho embaixo */
+    const aL = K.arms.find(a => a.sd < 0), w = brkFase(S), k = S.stage === 'load' ? clamp((now - S.t0) / S.iv, 0, 1) : 0, d = k < .45 ? smooth(k / .45) : 1 - smooth(clamp((k - .45) / .4, 0, 1)), B = BRKR;
+    if (w > 0 && aL) { ud.brk.updateMatrixWorld(true); I.c.set(B.mao[0], B.mao[1] - B.desce * d, B.mao[2] + B.tras * d); ud.brk.localToWorld(I.c);
       I.c.sub(I.w.setFromMatrixPosition(aL.wr.matrixWorld)).sub(I.dl).multiplyScalar(w); I.dl.add(I.c); } } }
   K.zm = F.z2 ? fz2Mao(F) : null; // fz2: mão esquerda desviada (saque e roteiro da recarga), no mundo dos braços
   if (K.zm && K.hl) { I.t.setFromMatrixPosition(K.hl.matrixWorld).add(K.zm); K.hl.position.copy(K.hl.parent.worldToLocal(I.t.clone())); K.hl.updateMatrixWorld(true); I.dl.add(K.zm); }
@@ -22638,15 +22642,34 @@ function akRock(ud, t, E) {
   if (E && ud.bolt) { const B = ud.boltRest, wb = seg(t, .66, .71) * (1 - seg(t, .8, .88)); if (wb > 0) ud.lhG.position.lerp(_rg.set(B.x + R.cx, B.y + R.cy, ud.bolt.position.z + .012), wb); }
   if (E && ud.bolt) ud.lhG.position.y -= AKR.baixa * seg(t, .79, .83) * (1 - seg(t, .85, .9)); // 6-w04: da alavanca ao guarda-mão a mão passa por baixo da caixa (antes cruzava 3–4 mm por dentro dela)
 }
+// pq3: Sawed-Off (cano duplo do CS nos braços do pacote da escopeta): recarga de cano basculante em vez da bomba. abre: giro do cano (rad);
+// pose: [x, y, z, rx, ry, rz] da arma em volta do gatilho com o cano aberto; mao: pulso esquerdo junto da culatra (m, no referencial do
+// cano), desce/tras: até onde ele vai buscar cada cartucho (m)
+const BRKR = { abre: .62, pose: [-.09, .05, -.06, -.5, .35, -.15], mao: [-.03, -.08, -.08], desce: .08, tras: 0 };
+function brkFase(S) { const el = now - S.t0; return S.stage === 'start' ? smooth(clamp(el / (.35 * S.sp), 0, 1)) : S.stage === 'end' ? 1 - smooth(clamp(el / (.45 * S.sp), 0, 1)) : 1; }
+function brkPose(o, ud) {
+  if (!ud.fps2?.syn || ud.rig0 !== 'break') return; const F = ud.fps2;
+  if (!F.sem12) { F.sem12 = 1; F.root.traverse(m => { if (m.isMesh && m.material?.name === '12ge') m.visible = false; }); } /* o cartucho do pacote (da bomba) não serve no cano duplo: ficava solto ao lado da mão */
+  const S = G.reload; if (!S) return;
+  const k = brkFase(S), B = BRKR.pose, P = ud.fps2.P; if (k <= 0) return;
+  o.x += B[0] * k; o.y += B[1] * k; o.z += B[2] * k; o.rx += B[3] * k; o.ry += B[4] * k; o.rz += B[5] * k;
+  _vmQ.setFromEuler(_vmE.set(B[3] * k, B[4] * k, B[5] * k)); _vmV.fromArray(P.v?.p || FPV.long.p); _vmV2.copy(_vmV).applyQuaternion(_vmQ); /* em volta do gatilho */
+  o.x += _vmV.x - _vmV2.x; o.y += _vmV.y - _vmV2.y; o.z += _vmV.z - _vmV2.z;
+}
 function shellAnim(ud, o) { // escopeta / lança-granadas: bala por bala
   const S_ = G.reload, el = now - S_.t0, P = ud.port || ud.lhRest, L = ud.lhRest;
   let tilt = 1; if (S_.stage === 'start') tilt = seg(el / (.35 * S_.sp), 0, 1); else if (S_.stage === 'end') tilt = 1 - seg(el / (.45 * S_.sp), .3, 1);
   o.rz -= .55 * tilt; o.rx += .14 * tilt; o.x -= .06 * tilt; o.y += .05 * tilt; // gira a janela de carga (embaixo da caixa) para o lado do olho e levanta a boca: a mão aparece pondo cada cartucho
   if (ud.lhG) { // cartucho vem de baixo, perto o bastante para a mão continuar na tela. 6-w07: quadros-chave guardados por arma (sgShellKF), sem alocar
     const F = ud.sgKF ||= sgShellKF(ud, P, L);
-    if (S_.stage === 'load') { const k = clamp(el / S_.iv, 0, 1); kfTo(k, F.load, ud.lhG.position); if (ud.handShell) ud.handShell.visible = k < SGA.solta; }
+    if (S_.stage === 'load') { const k = clamp(el / S_.iv, 0, 1); kfTo(k, F.load, ud.lhG.position); if (ud.handShell) ud.handShell.visible = k < SGA.solta && !ud.fps2; } /* pq3: nos braços do pacote a mão da arma do código não aparece: o cartucho dela ficava solto no ar */
     else if (S_.stage === 'start') kfTo(tilt, F.start, ud.lhG.position);
     else kfTo(seg(el / (.45 * S_.sp), 0, .5), F.end, ud.lhG.position);
+  }
+  if ((ud.rig === 'break' || ud.rig0 === 'break') && ud.brk) { /* pq3: cano duplo com recarga bala por bala (Sawed-Off): o cano abre no começo, fica aberto enquanto entram os cartuchos e fecha no fim */
+    const op = S_.stage === 'start' ? seg(el / (.35 * S_.sp), .1, .7) : S_.stage === 'end' ? 1 - seg(el / (.45 * S_.sp), .3, .75) : 1; ud.brk.rotation.x = -BRKR.abre * op;
+    if (!G.rEv.brkA && op > .5) { G.rEv.brkA = 1; play('magout'); for (let i = 0; i < clamp(G.reloadVazias ?? 2, 0, 2); i++) ejectShell(W[G.cur], true); }
+    if (S_.stage === 'end' && !G.rEv.brkF && op < .3) { G.rEv.brkF = 1; play('slide'); }
   }
   if (S_.stage === 'end' && G.reloadEmpty && ud.pump) {
     const k = el / (.45 * S_.sp), pp = seg(k, .45, .65) * (1 - seg(k, .7, .9));
@@ -23264,6 +23287,7 @@ function updateViewmodel(dt) {
   { const k = G.pin ? smooth(clamp((now - G.pin.t0) / NADE_PINO, 0, 1)) : 0; if (k) { o.y += .05 * k; o.z += .06 * k; o.x -= .02 * k; o.rx += .4 * k; o.rz -= .15 * k; } if (ud.pino) ud.pino.visible = ud.fps2?.foraL ? !G.pin || now - G.pin.t0 < NADEP.some : k < .6; } // pino puxado (gr1: nos braços prontos a argola sai com a mão esquerda): prepara o arremesso
   if (vmGun && ['knife', 'karambit'].includes(W[G.cur]?.model) && !ud.armsKnife && !ud.fps2) knifeAnim(o, ud);
   armaInspectPose(o); // inspeção da arma de fogo (F)
+  brkPose(o, ud); /* pq3: Sawed-Off: a arma deita e mostra a culatra aberta na recarga */
   if (ud.fps2?.z2) fz2Pose(o, ud, dt); // fz2: saque com mola, giro da recarga e trancos (fuzis, SMGs e metralhadoras)
   if (me.downed) { o.y -= .04; o.rz += .35; }
   // correndo: arma abaixada e de lado, balançando mais; deslize, pulo, pouso e agachar (a13, ver vmMove)
