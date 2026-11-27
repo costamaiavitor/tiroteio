@@ -21270,7 +21270,7 @@ function fpMagProprio(F) {
 }
 function fpUpdate(ud, dt) {
   const F = ud.fps2, hs = Math.hypot(me.vel.x, me.vel.z);
-  if (G.reloadEnd && !F.reloading) { F.reloading = true; fpPlay(ud, F.an?.m === 'python' ? 'idle' : (G.reloadEmpty || F.z2 && FZ2.arma[G.cur]?.sempreE) && F.clips.reloadE ? 'reloadE' : 'reload', G.reloadEnd - now); if (F.z2) fz2Inicio(F); } // an: R8 sem o clipe de carregador; fz2: roteiro da recarga
+  if (G.reloadEnd && !F.reloading) { F.reloading = true; fpPlay(ud, F.an?.m === 'python' || ud.akimbo && F.P.view === 'pistol' ? 'idle' /* pq3: Duplas: o clipe de recarga leva a pistola para o meio (e o espelho a da esquerda): as duas se batiam no centro; recarga própria em an (AKREC) */ : (G.reloadEmpty || F.z2 && FZ2.arma[G.cur]?.sempreE) && F.clips.reloadE ? 'reloadE' : 'reload', G.reloadEnd - now); if (F.z2) fz2Inicio(F); } // an: R8 sem o clipe de carregador; fz2: roteiro da recarga
   if (!G.reloadEnd) { if (F.z2?.r) { F.until = 0; F.z2.r = null; if (F.z2.pm) { F.z2.pm.a.scale.setScalar(1); F.z2.pm.b?.scale.setScalar(1e-4); } } F.reloading = false; } // fz2: recarga cancelada (plantar, morrer): volta já à pose parada
   if (F.until && now >= F.until) F.until = 0;
   if (!F.until && !F.reloading) fpPlay(ud, me.sprinting && F.clips.run && !F.P?.semCorrida ? 'run' : hs > 1.5 && me.onGround && F.clips.walk ? 'walk' : 'idle');
@@ -21717,9 +21717,11 @@ const ANPEC = {
 // encaixa os cartuchos, fecha o tambor com um tranco e volta ao punho. Tempos em fração da recarga; arma: [u, x, y, z, rx, ry, rz]
 // (câmera, m e rad, em volta do gatilho); tambor: [u, aberto 0..1]; esq: [u, peso, desce (m, câmera), atrás (m, eixo do cano)] da mão
 // esquerda em relação à traseira do tambor; piv: eixo da haste (cm, referencial da arma); ang: giro do tambor aberto (rad)
+const AKREC = [.015, -.05, .02, .55, 0, -.35, 0, .012, 0, -.08, 0, .04]; /* pq3: recarga das Pistolas Duplas no pacote da pistola: [x, y, z, rx, ry, rz] da pose baixada (em volta do gatilho) e do tranco do encaixe */
 const ANREV = {
-  arma: [[0, 0, 0, 0, 0, 0, 0], [.12, -.07, .045, -.01, .2, -.75, .1], [.24, -.075, .05, -.01, .25, -.8, .12], [.3, -.07, .065, -.01, .85, -.65, .1], [.38, -.075, .05, -.01, .3, -.78, .12],
-    [.72, -.075, .05, -.01, .25, -.8, .12], [.8, -.05, .035, -.01, .15, -.5, .05], [.92, 0, .004, 0, .01, -.01, 0], [1, 0, 0, 0, 0, 0, 0]],
+  /* pq3: com a pegada nova (a arma já gira ~30° para dentro no quadril, FPK.pistol.v.e) a guinada de -0,8 e o tranco de 0,85 para cima punham o cano apontando para a câmera no meio da recarga: agora quase sem guinada e com pouca arfagem (cano para a esquerda, tambor aberto à vista) */
+  arma: [[0, 0, 0, 0, 0, 0, 0], [.12, -.07, .045, -.01, .06, 0, .1], [.24, -.075, .05, -.01, .075, -.05, .12], [.3, -.07, .065, -.01, .25, 0, .1], [.38, -.075, .05, -.01, .09, -.03, .12],
+    [.72, -.075, .05, -.01, .075, -.05, .12], [.8, -.05, .035, -.01, .045, 0, .05], [.92, 0, .004, 0, .003, 0, 0], [1, 0, 0, 0, 0, 0, 0]],
   tambor: [[0, 0], [.14, 0], [.22, 1], [.74, 1], [.79, 0], [1, 0]],
   esq: [[0, 0, .1, -.026], [.1, 1, .1, -.026], [.24, 1, .1, -.026], [.3, 1, .13, -.02], [.4, 1, .3, .05], [.47, 1, .3, .06], [.58, 1, .06, .05], [.62, 1, .045, .035], [.68, 1, .045, .012], [.72, 1, .1, -.026], [.8, 1, .1, -.026], [.92, 0, .1, -.026], [1, 0, .1, -.026]],
   sl: [.49, .69], // carregador rápido visível (s: fração)
@@ -21825,6 +21827,7 @@ function anPose(ud, dt) {
     if (A.esq) { kfSuave(A.esq, clamp(ts / sd, 0, 1), 3, _anE2); an.esq = _anE2; } else an.esq = null;
   } else { an.saq = 0; an.esq = null; }
   if (rv >= 0) { kfSuave(ANREV.arma, rv, 6, _anR6); const ak = vmGun?.userData.akimbo; for (let j = 0; j < 6; j++) if (!ak || j !== 0 && j !== 4) o[j] += _anR6[j]; } // D7: Duplas: sem ir para o meio nem girar para dentro (a passada espelhada juntava as duas pistolas no centro, braços em V)
+  else if (vmGun?.userData.akimbo && F.P.view === 'pistol' && G.reloadEnd && !G.reload) { const t = clamp((now - G.reloadStart) / (G.reloadEnd - G.reloadStart), 0, 1), k = smooth(seg(t, 0, .2)) * (1 - smooth(seg(t, .78, 1))), b = Math.sin(clamp((t - .4) / .25, 0, 1) * Math.PI); for (let j = 0; j < 6; j++) o[j] += AKREC[j] * k + AKREC[j + 6] * b; } /* pq3: Duplas: cada pistola desce e gira para fora (cano para cima, pente para a câmera) e leva um tranco no encaixe */
   else if (A.vis && rc && G.reloadEnd && !G.reload) { const V = A.vis, t = clamp((now - G.reloadStart) / (G.reloadEnd - G.reloadStart), 0, 1), k = seg(t, 0, V.ent) * (1 - seg(t, V.sai, 1)); for (let j = 0; j < 6; j++) o[j] += V.d[j] * k; }
   molaPasso(an.mol, 6, AN.mola.w, AN.mola.z, dt, an.fm);
   for (let c = 0; c < 6; c++) o[c < 3 ? c + 3 : c - 3] += an.mol[c * 2]; // mol: [rx, ry, rz, x, y, z] → o: [x, y, z, rx, ry, rz]
@@ -21910,7 +21913,7 @@ function anEscopeta(F, an, w, a) {
   }
   F.act.timeScale = 0; F.act.time = clamp(t, 0, F.act.getClip().duration - 1e-3);
 }
-if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AN, ANPEC, AN_PECAS, KNF }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
+if (DEBUG) { const ganchos = () => window.__T ? Object.assign(window.__T, { AN, ANPEC, AN_PECAS, KNF, ANREV }) : setTimeout(ganchos, 50); setTimeout(ganchos, 0); } // testes
 // ===== fim an =====
 // IK dos braços: recua os ombros, leva a mão esquerda ao guarda-mão do modelo e gira braço e antebraço (dois ossos, cotovelo no mesmo
 // plano de antes) até cada pulso chegar ao alvo
@@ -22939,7 +22942,7 @@ function armaInspectPose(o) {
   if (!S.out && (G.nextFire > S.t0 || now < G.reloadEnd || (G.ads || 0) > .02 || G.scope || me.sprinting || me.downed)) S.out = now; // interrompida (tiro, recarga, mira, corrida): sai misturando em GINSP.sai s, sem pular
   const f = S.out ? 1 - smooth((now - S.out) / GINSP.sai) : 1; if (f <= 0) { G.gin = null; return; }
   if (ginEsq(vmGun?.userData.fps2)) return; // gin2: armas longas dos braços prontos: no esqueleto (fpGin), não no conjunto inteiro
-  const t = (now - S.t0) / GINSP.dur, P6 = kfSuave(GINSP.fr, t, 6, _gin6), v = j => P6[j - 1] * f; // curva sem paradas em cada quadro
+  const t = (now - S.t0) / GINSP.dur, P6 = kfSuave(GINSP.fr, t, 6, _gin6), ak = vmGun?.userData.akimbo, v = j => ak && (j === 1 || j === 5) ? 0 : P6[j - 1] * f; // curva sem paradas em cada quadro; pq3: Duplas sem ir para o meio nem girar para dentro (as duas pistolas se cruzavam no centro)
   o.x += v(1); o.y += v(2); o.z += v(3); o.rx += v(4); o.ry += v(5); o.rz += v(6);
   const P = vmGun?.userData.fps2?.P; if (P?.v || P?.view) { // rp1: braços prontos: gira em volta do gatilho, o + (P - R·P) (em volta do olho a arma saía da tela e o braço a enchia)
     _vmQ.setFromEuler(_vmE.set(v(4), v(5), v(6))); _vmV.fromArray(P.v?.p || FPV[P.view === 'pistol' ? 'pistol' : 'long'].p); _vmV2.copy(_vmV).applyQuaternion(_vmQ);
