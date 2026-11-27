@@ -19772,7 +19772,7 @@ const FPV = { long: { p: [.202, -.118, -.233], e: [.025, 0, -.102] }, pistol: { 
 const FPK = {
   ak: { url: 'assets/fps/ak/scene.gltf', ombro: [.03, -.55, .08], adsMaoE: [.1, .05], mag2: 'Pmag2', armsFrom: 'rifle', v: { p: [.13, -.08, -.28], e: [.025, 0, -.102] }, sh: [.11, -.08, .1], hr: 1.99, body: 'PBody', ref: 'Rif', T: [null, .194, -.075], fwd: '-y', up: '+z', mag: 'Pmag', spare: ['Object_99'],
     clips: { idle: 'AK_Idle', draw: 'AK_Draw', fire: 'AK_Shot', reload: 'AK_Reload', reloadE: 'AK_Reload_full', walk: 'AK_Walk', run: 'AK_Run' }, semCorrida: 1 }, // a13 semCorrida: a animação de correr põe a arma em pé e solta a mão esquerda; corre com a de andar + VMOV.corridaCS
-  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.12, -.11, -.33], e: [.55, .1, .1] }, gEsc: 1.45, ombro: [0, -.4, .05], ads: .4, adsMao: .05, // pq2: no quadril, embaixo à direita, girada ~30° para dentro e ~5° para baixo (vista de trás e da esquerda: o ferrolho aparece inteiro, quase deitado na tela, como no CS2) e 1,45× maior em relação à mão (o punho fechado tinha 3× o tamanho da arma na tela); o feixe do laser vai para a retícula (fpLaser); ombros para fora e para baixo; uni: pistola maior e mais baixa no quadril; na mira os ombros descem e entram (os antebraços não cobrem a tela); en1: olho na linha da alça e da massa (sem olhar de cima do ferrolho) e as mãos descem no punho (adsMao, ver fpIK)
+  pistol: { url: 'assets/fps/pistol/scene.gltf', armsFrom: 'rifle', v: { p: [.13, -.12, -.35], e: [.3, .06, .05] }, gEsc: 1.45, ombro: [0, -.4, .05], ads: .4, adsMao: .05, // pq2: no quadril, embaixo à direita, girada ~17° para dentro e ~4° para baixo (av2: com ~30° parecia "de lado"; ainda se vê o ferrolho pela esquerda, como no CS2) e 1,45× maior em relação à mão (o punho fechado tinha 3× o tamanho da arma na tela); o feixe do laser vai para a retícula (fpLaser); ombros para fora e para baixo; uni: pistola maior e mais baixa no quadril; na mira os ombros descem e entram (os antebraços não cobrem a tela); en1: olho na linha da alça e da massa (sem olhar de cima do ferrolho) e as mãos descem no punho (adsMao, ver fpIK)
     sh: [.12, -.2, .1], hr: 1, view: 'pistol', body: 'PBody', ref: 'Rif', T: [.061, null, .054], fwd: '+x', up: '-z', mag: 'Pmag', slide: 'Rif',
     clips: { idle: 'FPS_Pistol_Idle', fire: 'FPS_Pistol_Fire', reload: 'FPS_Pistol_Reload_easy', reloadE: 'FPS_Pistol_Reload_full', walk: 'FPS_Pistol_Walk' } },
   smg: { url: 'assets/fps/smg/scene.gltf', armsFrom: 'rifle', v: { p: [.178, -.093, -.383], e: [.016, -.007, -.105] }, sh: [.09, -.1, .13], hr: 1.98, body: 'PBody', ref: 'Rif', T: [-.092, null, -.067], fwd: '+x', up: '+z', mag: 'Pmag', spare: ['Object_96'],
@@ -20604,12 +20604,13 @@ function vxbMat() { if (!VXB.mat) { VXB.mat = new THREE.MeshStandardMaterial({ v
 // ossos), y = ponta dos dedos (falanges média e distal: a luva de meio dedo deixa a pele), z = sombra (a cor cozida dividida pela média:
 // o relevo e a oclusão do arquivo continuam). O shader troca a cor pela da região (uniforms do material compartilhado): trocar o boneco
 // não remonta nada. Sem avatar (ou malha sem avR): a cor cozida de sempre. A skin da arma continua sem pintar os braços (fpSkin).
+const VXB_CLARO = .2; /* av2: canal máximo (linear) das cores do boneco nos braços */
 const VXB_PUNHO = { tatica: .14, meio_dedo: .12, couro: .12, latex: .06, inverno: .24 }, VXB_MANGA = { longa: 2.02, arregacada: 1.45, curta: .45, nenhuma: 0 }; /* punho da luva (fração do antebraço a partir do pulso) e até onde a manga cobre (escala do avR.x) */
 function vxbAvMat(m) {
   const U = m.userData.av = { avOn: { value: 0 }, avSL: { value: 9 }, avSM: { value: 2.02 }, avLuva: { value: new THREE.Color() }, avPonta: { value: new THREE.Color() }, avManga: { value: new THREE.Color() }, avPele: { value: new THREE.Color() } };
   m.onBeforeCompile = sh => { Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 avR; uniform float avOn, avSL, avSM; uniform vec3 avLuva, avPonta, avManga, avPele;')
-      .replace('#include <color_vertex>', '#include <color_vertex>\n#ifdef USE_COLOR\nif (avOn > .5 && avR.z > 0.) { float s = avR.x * 2.; vec3 c = s >= avSL ? avLuva : s < avSM ? avManga : avPele; vColor.rgb = mix(c, avPonta, avR.y) * avR.z * 2.; }\n#endif'); };
+      .replace('#include <color_vertex>', '#include <color_vertex>\n#ifdef USE_COLOR\nif (avOn > .5 && avR.z > 0.) { float s = avR.x * 2.; vec3 c = s >= avSL ? avLuva : s < avSM ? avManga : avPele; vec3 b = mix(c, avPonta, avR.y); float z = avR.z * 2.; vColor.rgb = z <= 1. ? b * z : min(b * z, b + (1. - b) * (z - 1.) * .3); }\n#endif'); };
   m.customProgramCacheKey = () => 'voxPeleAv';
   vxbAvatar();
 }
@@ -20621,6 +20622,7 @@ function vxbAvatar() { /* cores do boneco salvo nos uniforms (barato: só refaz 
   let b; try { b = AVT.mod.bracos(AVT.mod.decodificar(cod)); } catch (e) { console.warn('vxb: avatar', e); VXB.avCod = cod; U.avOn.value = 0; return; }
   VXB.avCod = cod; const sem = b.luva === 'nenhuma' || !b.corLuva;
   U.avPele.value.set(b.pele); U.avLuva.value.set(sem ? b.pele : b.corLuva); U.avPonta.value.set(sem || b.luva === 'meio_dedo' ? b.pele : b.corLuva); U.avManga.value.set(b.corManga || b.pele);
+  for (const k of ['avLuva', 'avPonta', 'avManga']) { if (U[k].value.equals(U.avPele.value)) continue; const c = U[k].value, m = Math.max(c.r, c.g, c.b); if (m > VXB_CLARO) c.multiplyScalar(VXB_CLARO / m); } /* av2: tecido branco ou muito claro fica abaixo do branco puro (com a luz do mapa e o relevo multiplicado ele estourava em branco chapado, sem sombra) */
   U.avSL.value = sem ? 9 : 2 - (VXB_PUNHO[b.luva] || .12); U.avSM.value = b.corManga ? VXB_MANGA[b.manga] ?? 2.02 : 0; U.avOn.value = 1;
 }
 function vxbRegiao(geo, o, h) { /* avR de cada face (4 vértices seguidos = uma face de um voxel): região pelo centro do voxel, pesos pela média dos cantos */
@@ -20902,7 +20904,7 @@ function fpBuild(id, ud, gun, dono = vmGun) { // dono: quem recebe os voxels das
   const Gv = holder.matrix.clone().multiply(body.matrixWorld).multiply(C);
   const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)).multiply(tq.clone().invert()), sp = tips.sight.clone().applyMatrix4(Gv).applyQuaternion(aq);
   holder.add(root);
-  Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, pk: W2.pack, mz, follow, ik, body, C, aq, maoD: D?.maoD || 0, sl: tips.sight.clone().applyMatrix4(C), adsY: (P.adsY || 0) + (D?.adsY || 0), ap: new V3(0, (P.adsY || 0) + (D?.adsY || 0), -(P.ads ?? (P.view === 'pistol' ? ADS.csPistola : ADS.csLonga))).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', rig0: ud.rig, muzzle: new V3() }); // (D22: rig0: o da arma do código, para as camadas de peças que o pacote não tem)
+  Object.assign(ud, { fps2: { holder, root, mixer, clips, act: null, cur: '', P, pk: W2.pack, mz, follow, ik, body, C, aq, maoD: D?.maoD || 0, sl: tips.sight.clone().applyMatrix4(C), adsY: (P.adsY || 0) + (D?.adsY || 0), ap: new V3(0, (P.adsY || 0) + (D?.adsY || 0), -(P.ads ?? (P.view === 'pistol' ? ADS.csPistola : ADS.csLonga)) * (P.gEsc || 1) /* av2: arma maior (gEsc) mira mais longe: na tela fica do tamanho de antes */).sub(sp) }, vm: [-.165, .145, .43], rig: 'fps2', rig0: ud.rig, muzzle: new V3() }); // (D22: rig0: o da arma do código, para as camadas de peças que o pacote não tem)
   if (FPID[id]?.ads) ud.fps2.ap.z += FPID[id].ads; /* mq1: mira mais perto do olho */
   ud.fps2.ej = ej; ud.fps2.vxFalta = VX.falta; ud.fps2.vxUso = VX.uso; ud.fps2.magP = magP; /* vxUso: volta a valer quando a arma sai do cache VMC */
   if (ud.akimbo && arms[0].ua) ud.fps2.hideL = arms[0].ua; // uni: Pistolas Duplas: o braço esquerdo do pacote some (a passada espelhada da direita segura a outra pistola)
@@ -21987,7 +21989,7 @@ function fpIK(F) {
   for (const a of K.arms) { a.tw = (a.tw || new V3()).setFromMatrixPosition(a.wr.matrixWorld); if (a.anM) a.tw.applyMatrix4(a.anM); /* an: a mão foi levada pelas camadas */ if (a.sd < 0) a.tw.add(I.dl);
     if (a.anM && a.anMao && a.hand && a.r0 && a.w0) { I.c.copy(a.r0).applyMatrix4(I.G).sub(I.h.copy(a.w0).applyMatrix4(I.G)).add(a.tw); I.t.setFromMatrixPosition(a.hand.matrixWorld).lerp(I.c, a.anMao); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } /* mo1: a mão (osso do controle do IK, fora da corrente do antebraço) vai junto com o pulso, no lugar dela em relação a ele (r0 - w0) */
   { const kp = F.P.adsMao ? smooth(Math.min(1, (G.ads || 0) * ADS.adi)) * F.P.adsMao : 0; if (kp) for (const a of K.arms) { a.tw.y -= kp; if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld); I.t.y -= kp; a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } } // en1: pistola na mira: as mãos descem no punho (alça e massa à vista por cima delas, sem olhar de cima do ferrolho)
-  if (F.maoD) { I.c.setFromMatrixColumn(I.G, 1).normalize().multiplyScalar(-F.maoD); /* r8b: mão direita mais baixa no punho (o tambor do revólver fica à vista) */
+  if (F.maoD) { I.c.setFromMatrixColumn(I.G, 1).normalize().multiplyScalar(-F.maoD * (1 - smooth(Math.min(1, (G.ads || 0) * ADS.adi)))); /* av2: na mira a mão volta ao lugar (o cabo aparecia entre a mão e o tambor) */ /* r8b: mão direita mais baixa no punho (o tambor do revólver fica à vista) */
     for (const a of K.arms) if (a.sd > 0) { a.tw.add(I.c); if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } }
   { const E = F.adsMaoE || F.P.adsMaoE, kp = E ? smooth(Math.min(1, (G.ads || 0) * ADS.adi)) * (1 - (K.arms.find(a => a.sd < 0)?.fora ?? 1)) : 0; // item 4: mirando, a mão esquerda corre para a frente no guarda-mão e desce (o antebraço sai do meio da tela)
     if (kp) for (const a of K.arms) if (a.sd < 0) { I.c.set(0, -E[1] * kp, -E[0] * kp); a.tw.add(I.c); if (a.hand) { I.t.setFromMatrixPosition(a.hand.matrixWorld).add(I.c); a.hand.position.copy(a.hand.parent.worldToLocal(I.t.clone())); a.hand.updateMatrixWorld(true); } } }
@@ -35379,6 +35381,7 @@ function arVox(w, f, list = []) {
   try { h = fpBuild(w, ud, new THREE.Group(), ARVX); } catch (e) { console.warn('arVox', e); return null; } finally { ATT_PV = ap; SKIN_PV = sp; }
   if (!h) return 'espera';
   const F = ud.fps2; F.mixer.stopAllAction();
+  { const m2 = F.P.mag2 && fpBone(F.root, F.P.mag2); if (m2 && fpBone(F.root, F.P.mag) !== m2) { m2.scale.setScalar(1e-4); F.root.updateMatrixWorld(true); } } /* ar2: o carregador novo da recarga (AK: Pmag2) ficava solto ao lado da arma na prévia (no jogo o fpMagProprio o esconde a cada quadro) */
   F.root.traverse(o => { if (o.isMesh && (o.name === 'voxBraco' || fpArm(o) || o.material?.name === '12ge')) o.visible = false; });
   g = new THREE.Group(); g.quaternion.copy(F.aq); g.add(h); g.updateMatrixWorld(true);
   const gi = g.matrixWorld.clone().invert(), L = v => v.applyMatrix4(gi), hr = fpBone(F.root, 'Hand_R'), hl = fpBone(F.root, 'Hand_L');
